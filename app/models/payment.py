@@ -1,0 +1,26 @@
+from sqlmodel import SQLModel, Field, Relationship
+from typing import Optional
+from datetime import datetime
+
+class PaymentTransaction(SQLModel, table=True):
+    __tablename__ = "payment_transactions"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id")
+    amount: float
+    currency: str = Field(default="INR")
+    status: str = Field(default="pending") # pending, success, failed, refunded
+    payment_method: str = "razorpay" 
+    
+    # Razorpay specific
+    razorpay_order_id: Optional[str] = Field(index=True)
+    razorpay_payment_id: Optional[str] = Field(index=True)
+    razorpay_signature: Optional[str] = None
+    
+    error_code: Optional[str] = None
+    error_description: Optional[str] = None
+    
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Relationships
+    user: "User" = Relationship()

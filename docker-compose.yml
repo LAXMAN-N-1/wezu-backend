@@ -1,0 +1,123 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database (Customer Data)
+  db:
+    image: postgres:15-alpine
+    container_name: wezu_postgres
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=wezu_user
+      - POSTGRES_PASSWORD=wezu_pass
+      - POSTGRES_DB=wezu_db
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U wezu_user" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis (Sessions, Caching, Real-time Data)
+  redis:
+    image: redis:7-alpine
+    container_name: wezu_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MQTT Broker (IoT Battery Tracking)
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: wezu_mqtt
+    restart: unless-stopped
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    ports:
+      - "1883:1883" # MQTT
+      - "9001:9001" # WebSocket
+    healthcheck:
+      test: [ "CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 | grep -v Error || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # FastAPI Backend (Customer API)
+  web:
+    build: .
+    container_name: wezu_backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+    volumes:
+      - .:/app
+      - uploads:/var/www/uploads
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://wezu_user:wezu_pass@db:5432/wezu_db
+      - REDIS_URL=redis://redis:6379/0
+      - MQTT_BROKER_URL=mqtt://mqtt:1883
+      - ENVIRONMENT=development
+      - DEBUG=true
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mqtt:
+        condition: service_healthy
+    env_file:
+      - .env
+
+  # PgAdmin (Optional - Database Management)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: wezu_pgadmin
+    restart: unless-stopped
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@wezu.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+    profiles:
+      - tools
+
+  # Redis Commander (Optional - Redis Management)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: wezu_redis_commander
+    restart: unless-stopped
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    profiles:
+      - tools
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  uploads:
+    driver: local
+
+networks:
+  default:
+    name: wezu_network

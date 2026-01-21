@@ -1,0 +1,28 @@
+# Environment
+.env
+.env.local
+
+# Firebase
+firebase-credentials.json
+firebase-*.json
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Uploads
+uploads/
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.sqlite
+
+# IDE
+.vscode/
+.idea/
