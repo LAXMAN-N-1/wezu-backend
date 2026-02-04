@@ -1,6 +1,9 @@
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
 from sqlmodel import SQLModel, Field, Relationship
+
+if TYPE_CHECKING:
+    from app.models.dealer import DealerProfile
 
 # Import Zone and Vendor for Relationship
 from .location import Zone
@@ -22,6 +25,7 @@ class Station(SQLModel, table=True):
     
     # Ownership
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id")
+    dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id")
     
     # Hardware Specs
     station_type: str = Field(default="automated") # automated, manual, hybrid
@@ -46,6 +50,7 @@ class Station(SQLModel, table=True):
     slots: List["StationSlot"] = Relationship(back_populates="station")
     images: List["StationImage"] = Relationship(back_populates="station")
     vendor: Optional["Vendor"] = Relationship()
+    dealer: Optional["DealerProfile"] = Relationship(back_populates="stations")
     zone: Optional["Zone"] = Relationship(back_populates="stations")
     reviews: List["Review"] = Relationship(back_populates="station")
 
