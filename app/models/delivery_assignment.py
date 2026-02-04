@@ -29,4 +29,4 @@ class DeliveryAssignment(SQLModel, table=True):
     
     # Relationships
     driver: Optional[DriverProfile] = Relationship()
-    # order: Optional["EcommerceOrder"] = Relationship() # Circular import risk, use string ref if needed
+    order: Optional["EcommerceOrder"] = Relationship(back_populates="delivery")

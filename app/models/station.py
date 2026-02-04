@@ -5,6 +5,7 @@ from sqlmodel import SQLModel, Field, Relationship
 # Import Zone and Vendor for Relationship
 from .location import Zone
 from .vendor import Vendor
+from .dealer import DealerProfile
 from .battery import Battery
 
 class Station(SQLModel, table=True):
@@ -20,6 +21,7 @@ class Station(SQLModel, table=True):
     
     # Ownership
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id")
+    dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id")
     
     # Hardware Specs
     station_type: str = Field(default="automated") # automated, manual, hybrid
@@ -44,8 +46,9 @@ class Station(SQLModel, table=True):
     slots: List["StationSlot"] = Relationship(back_populates="station")
     images: List["StationImage"] = Relationship(back_populates="station")
     vendor: Optional["Vendor"] = Relationship()
+    dealer: Optional["DealerProfile"] = Relationship(back_populates="stations")
     zone: Optional["Zone"] = Relationship(back_populates="stations")
-    # reviews: List["Review"] = Relationship(back_populates="station")
+    reviews: List["Review"] = Relationship(back_populates="station")
 
 class StationImage(SQLModel, table=True):
     __tablename__ = "station_images"

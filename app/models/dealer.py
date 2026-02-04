@@ -23,6 +23,9 @@ class DealerProfile(SQLModel, table=True):
     state: str
     pincode: str
     
+    # Financial Details
+    bank_details: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSONB))
+    
     is_active: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
@@ -30,7 +33,19 @@ class DealerProfile(SQLModel, table=True):
     user: "User" = Relationship(back_populates="dealer_profile")
     stations: List["Station"] = Relationship(back_populates="dealer")
     application: Optional["DealerApplication"] = Relationship(back_populates="dealer")
-    commissions: List["Commission"] = Relationship(back_populates="dealer")
+    # commissions: List["Commission"] = Relationship(back_populates="dealer")
+    documents: List["DealerDocument"] = Relationship(back_populates="dealer")
+
+class DealerDocument(SQLModel, table=True):
+    __tablename__ = "dealer_documents"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    dealer_id: int = Field(foreign_key="dealer_profiles.id")
+    document_type: str = Field(index=True) # gst, pan, registration, cancelled_cheque
+    file_url: str
+    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+    is_verified: bool = Field(default=False)
+    
+    dealer: DealerProfile = Relationship(back_populates="documents")
 
 class DealerApplication(SQLModel, table=True):
     __tablename__ = "dealer_applications"

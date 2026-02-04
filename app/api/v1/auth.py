@@ -12,7 +12,7 @@ from app.api import deps
 from pydantic import BaseModel, EmailStr
 import logging
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from app.services.token_service import TokenService
 
@@ -68,7 +68,7 @@ async def request_registration_otp(
     return {"message": "OTP sent successfully"}
 
 from sqlalchemy.orm import selectinload
-from app.models.role import Role
+from app.models.rbac import Role
 
 @router.post("/register/verify-otp", response_model=Token)
 async def verify_registration_otp(
@@ -449,3 +449,286 @@ async def verify_2fa(
     
     logger.info(f"2FA verified for user {current_user.id}")
     return {"message": "2FA verification successful", "verified": True}
+
+
+# ===== CUSTOMER REGISTRATION =====
+
+from app.schemas.auth import CustomerRegisterRequest, CustomerRegisterResponse, VehicleCreate
+from app.models.vehicle import Vehicle
+from app.services.referral_service import ReferralService
+
+
+class CustomerVerificationToken(BaseModel):
+    user_id: int
+    phone_number: str
+    purpose: str = "customer_registration"
+
+
+@router.post("/register/customer", response_model=CustomerRegisterResponse)
+async def register_customer(
+    register_data: CustomerRegisterRequest,
+    db: Session = Depends(get_session)
+):
+    """
+    Register a new customer (EV owner).
+    
+    Process:
+    1. Validate phone number is not already registered
+    2. Validate referral code if provided
+    3. Create user with role "customer" and status "pending_verification"
+    4. Create vehicle record
+    5. Send OTP to phone
+    6. Return user_id, confirmation, and verification token
+    """
+    # 1. Check if phone number already exists
+    existing_user = db.exec(
+        select(User).where(User.phone_number == register_data.phone_number)
+    ).first()
+    
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Phone number already registered"
+        )
+    
+    # 2. Check if email already exists (if provided)
+    if register_data.email:
+        existing_email = db.exec(
+            select(User).where(User.email == register_data.email)
+        ).first()
+        if existing_email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+    
+    # 3. Validate referral code if provided
+    referral = None
+    if register_data.referral_code:
+        from app.models.referral import Referral
+        referral = db.exec(
+            select(Referral).where(
+                Referral.referral_code == register_data.referral_code,
+                Referral.status == "pending"
+            )
+        ).first()
+        if not referral:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Invalid referral code"
+            )
+    
+    # 4. Check if vehicle registration number already exists
+    existing_vehicle = db.exec(
+        select(Vehicle).where(
+            Vehicle.registration_number == register_data.vehicle.registration_number
+        )
+    ).first()
+    if existing_vehicle:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Vehicle registration number already exists"
+        )
+    
+    # 5. Create user with pending_verification status
+    from app.core.security import get_password_hash
+    
+    new_user = User(
+        phone_number=register_data.phone_number,
+        full_name=register_data.full_name,
+        email=register_data.email,
+        hashed_password=get_password_hash(register_data.password),
+        is_active=False,  # Will be activated after OTP verification
+        kyc_status="pending_verification"
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    # 6. Assign customer role
+    from app.models.rbac import Role
+    customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
+    if customer_role:
+        new_user.roles.append(customer_role)
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+    
+    # 7. Create vehicle record
+    new_vehicle = Vehicle(
+        user_id=new_user.id,
+        make=register_data.vehicle.make,
+        model=register_data.vehicle.model,
+        registration_number=register_data.vehicle.registration_number,
+        compatible_battery_type=register_data.vehicle.vehicle_type,
+        is_active=True,
+        is_verified=False
+    )
+    db.add(new_vehicle)
+    db.commit()
+    
+    # 8. Claim referral if provided
+    if referral:
+        try:
+            ReferralService.claim_referral(
+                db, register_data.referral_code, new_user.id
+            )
+        except Exception as e:
+            logger.warning(f"Failed to claim referral: {e}")
+    
+    # 9. Generate and send OTP
+    code = OTPService.generate_otp(register_data.phone_number)
+    OTPService.create_otp_record(
+        db, register_data.phone_number, code, "customer_registration"
+    )
+    await OTPService.send_sms_otp(register_data.phone_number, code)
+    
+    # 10. Generate verification token
+    verification_token = create_access_token(
+        subject=f"{new_user.id}:customer_registration",
+        expires_delta=timedelta(minutes=15)
+    )
+    
+    logger.info(f"Customer registered: {new_user.id}, OTP sent to {register_data.phone_number}")
+    
+    return CustomerRegisterResponse(
+        user_id=new_user.id,
+        message="OTP sent successfully",
+        verification_token=verification_token
+    )
+
+
+# ===== DEALER REGISTRATION =====
+
+from app.schemas.auth import DealerRegisterRequest, DealerRegisterResponse
+from app.models.dealer import DealerProfile, DealerDocument, DealerApplication
+from app.models.station import Station
+
+@router.post("/register/dealer", response_model=DealerRegisterResponse)
+async def register_dealer(
+    register_data: DealerRegisterRequest,
+    db: Session = Depends(get_session)
+):
+    """
+    Register a new dealer/vendor.
+    
+    Process:
+    1. Validate email/phone uniqueness
+    2. Create User with role "vendor_owner" and status "active=False"
+    3. Create DealerProfile with business & bank details
+    4. Create DealerDocument records
+    5. Create DealerApplication (SUBMITTED)
+    6. Create Proposed Stations
+    7. Trigger Admin Notification (Log)
+    8. Return application ID and status
+    """
+    
+    # 1. Check existing user
+    existing_user = db.exec(
+        select(User).where(
+            (User.email == register_data.owner_email) | 
+            (User.phone_number == register_data.owner_phone)
+        )
+    ).first()
+    
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User with this email or phone already exists"
+        )
+        
+    # 2. Check existing business (optional, e.g. GST)
+    # existing_dealer = db.exec(select(DealerProfile).where(DealerProfile.gst_number == register_data.gst_number)).first()
+    # if existing_dealer: ... 
+    
+    # 3. Create User
+    from app.core.security import get_password_hash
+    
+    new_user = User(
+        full_name=register_data.owner_name,
+        email=register_data.owner_email,
+        phone_number=register_data.owner_phone,
+        hashed_password=get_password_hash(register_data.password),
+        is_active=False, # Wait for admin approval
+        kyc_status="pending_approval"
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    # Assign vendor_owner role
+    vendor_role = db.exec(select(Role).where(Role.name == "vendor_owner")).first()
+    if vendor_role:
+        new_user.roles.append(vendor_role)
+    else:
+        # Fallback or error log
+        logger.warning("Role 'vendor_owner' not found during dealer registration")
+        
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    # 4. Create Dealer Profile
+    dealer_profile = DealerProfile(
+        user_id=new_user.id,
+        business_name=register_data.business_name,
+        gst_number=register_data.gst_number,
+        contact_person=register_data.owner_name,
+        contact_email=register_data.owner_email,
+        contact_phone=register_data.owner_phone,
+        address_line1=register_data.business_address,
+        city=register_data.city,
+        state=register_data.state,
+        pincode=register_data.pincode,
+        bank_details=register_data.bank_details.model_dump(),
+        is_active=False
+    )
+    db.add(dealer_profile)
+    db.commit()
+    db.refresh(dealer_profile)
+    
+    # 5. Add Documents
+    for doc_url in register_data.registration_documents:
+        # Simple logic to guess type or default to 'registration'
+        doc = DealerDocument(
+            dealer_id=dealer_profile.id,
+            document_type="registration", # Could be enhanced to accept type from frontend
+            file_url=doc_url,
+            is_verified=False
+        )
+        db.add(doc)
+    
+    # 6. Create Application
+    application = DealerApplication(
+        dealer_id=dealer_profile.id,
+        current_stage="SUBMITTED",
+        status_history=[{
+            "stage": "SUBMITTED", 
+            "timestamp": str(datetime.utcnow()), 
+            "notes": "Initial submission"
+        }]
+    )
+    db.add(application)
+    db.commit()
+    db.refresh(application)
+    
+    # 7. Log Proposed Stations (Placeholder)
+    logger.info(f"Proposed stations for {dealer_profile.business_name}: {register_data.proposed_stations}")
+    
+    # 8. Notify Admin (Mock)
+    logger.info(f"New Dealer Application Submitted: {application.id} by {new_user.email}")
+    
+    # Generate verification token
+    verification_token = create_access_token(
+        subject=f"{new_user.id}:dealer_registration",
+        expires_delta=timedelta(hours=24)
+    )
+
+    return DealerRegisterResponse(
+        application_id=application.id,
+        user_id=new_user.id,
+        status="pending_approval",
+        message="Application submitted successfully. Compliance team will contact you.",
+        verification_token=verification_token
+    )
+

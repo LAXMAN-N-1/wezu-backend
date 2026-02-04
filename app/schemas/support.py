@@ -37,3 +37,17 @@ class SupportTicketResponse(BaseModel):
 
 class SupportTicketDetailResponse(SupportTicketResponse):
     messages: List[TicketMessageResponse]
+
+class NotificationResponse(BaseModel):
+    id: int
+    title: str
+    message: str
+    type: str
+    is_read: bool
+    created_at: datetime
+    payload: Optional[str] = None
+    
+    class Config:
+        orm_mode = True
+
+

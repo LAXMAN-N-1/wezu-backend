@@ -1,7 +1,7 @@
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
-from app.api.deps import get_current_active_user
+from app.api.deps import get_current_user
 from app.db.session import get_session
 from app.models.user import User
 from app.models.support import SupportTicket, TicketMessage
@@ -17,7 +17,7 @@ def create_ticket(
     *,
     session: Session = Depends(get_session),
     ticket_in: TicketCreate,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
 ) -> Any:
     """
     Create a new support ticket.
@@ -47,7 +47,7 @@ def create_ticket(
 @router.get("/", response_model=List[SupportTicketResponse])
 def read_my_tickets(
     session: Session = Depends(get_session),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
 ) -> Any:
     """
     List current user's tickets.
@@ -59,7 +59,7 @@ def read_ticket_detail(
     *,
     session: Session = Depends(get_session),
     ticket_id: int,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
 ) -> Any:
     """
     Get detailed thread.
@@ -81,7 +81,7 @@ def reply_ticket(
     session: Session = Depends(get_session),
     ticket_id: int,
     reply_in: TicketMessageCreate,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
 ) -> Any:
     """
     Add a response to the ticket.

@@ -44,7 +44,7 @@ class Battery(SQLModel, table=True):
     
     lifecycle_events: List["BatteryLifecycleEvent"] = Relationship(back_populates="battery")
     rentals: List["Rental"] = Relationship(back_populates="battery")
-    # iot_device: Optional["IoTDevice"] = Relationship(back_populates="battery")
+    iot_device: Optional["IoTDevice"] = Relationship(back_populates="battery")
 
 class BatteryLifecycleEvent(SQLModel, table=True):
     __tablename__ = "battery_lifecycle_events"
