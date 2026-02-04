@@ -45,3 +45,4 @@ scikit-learn
 numpy
 gunicorn
 uvicorn[standard]
+psutil
