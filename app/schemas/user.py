@@ -63,6 +63,13 @@ class UserResponse(UserBase):
     class Config:
         from_attributes = True
 
+class UserNavigationResponse(BaseModel):
+    user_id: int
+    roles: List[str]
+    permissions: List[str]
+    menu_config: dict # JSON object following requested structure
+
+
 class DeviceCreate(BaseModel):
     fcm_token: str
     device_type: str

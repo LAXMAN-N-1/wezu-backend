@@ -11,6 +11,8 @@ class Station(SQLModel, table=True):
     __tablename__ = "stations"
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
+    tenant_id: Optional[str] = Field(default="default", index=True)
+
     
     # Location
     address: str

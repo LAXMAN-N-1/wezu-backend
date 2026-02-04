@@ -17,6 +17,28 @@ async def read_user_me(
 ):
     return current_user
 
+from app.schemas.user import UserNavigationResponse
+from app.services.rbac_service import RBACService
+from sqlmodel import Session
+
+@router.get("/me/navigation", response_model=UserNavigationResponse)
+async def get_user_navigation(
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    """
+    Returns the dynamic menu and permissions for the current user.
+    """
+    permissions = RBACService.get_user_permissions(db, current_user.id)
+    menu = RBACService.generate_menu_config(permissions)
+    
+    return UserNavigationResponse(
+        user_id=current_user.id,
+        roles=[r.name for r in current_user.roles],
+        permissions=list(permissions),
+        menu_config=menu
+    )
+
 @router.put("/me", response_model=UserResponse)
 async def update_user_me(
     user_in: UserUpdate,

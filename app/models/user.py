@@ -12,6 +12,8 @@ class User(SQLModel, table=True):
     hashed_password: Optional[str] = None
     is_active: bool = Field(default=True)
     is_superuser: bool = Field(default=False)
+    tenant_id: Optional[str] = Field(default="default", index=True)
+
     
     # OAuth specific
     google_id: Optional[str] = Field(default=None, index=True)
