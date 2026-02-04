@@ -47,7 +47,7 @@ class Station(SQLModel, table=True):
     images: List["StationImage"] = Relationship(back_populates="station")
     vendor: Optional["Vendor"] = Relationship()
     zone: Optional["Zone"] = Relationship(back_populates="stations")
-    # reviews: List["Review"] = Relationship(back_populates="station")
+    reviews: List["Review"] = Relationship(back_populates="station")
 
 class StationImage(SQLModel, table=True):
     __tablename__ = "station_images"
