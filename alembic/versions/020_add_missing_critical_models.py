@@ -11,6 +11,7 @@ from alembic import op
 import sqlalchemy as sa
 import sqlmodel
 from sqlalchemy.dialects import postgresql
+from sqlalchemy import Text
 
 # revision identifiers, used by Alembic.
 revision: str = '7147282b1fa1'
@@ -1202,7 +1203,7 @@ def upgrade() -> None:
     sa.Column('return_request_id', sa.Integer(), nullable=False),
     sa.Column('inspector_id', sa.Integer(), nullable=False),
     sa.Column('inspection_status', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-    sa.Column('items_inspected', postgresql.JSONB(astext_type=Text()), nullable=True),
+    sa.Column('items_inspected', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('physical_condition', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
     sa.Column('functional_test_passed', sa.Boolean(), nullable=False),
     sa.Column('approved_refund_amount', sa.Float(), nullable=False),

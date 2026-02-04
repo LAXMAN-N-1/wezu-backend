@@ -4,7 +4,7 @@ CatalogProduct catalog management with search and filtering
 """
 from sqlmodel import Session, select, or_, and_
 from typing import List, Optional, Dict
-from app.models.catalog import CatalogCatalogProduct, CatalogProductImage, CatalogProductVariant
+from app.models.catalog import CatalogProduct, CatalogProductImage, CatalogProductVariant
 from datetime import datetime
 import logging
 

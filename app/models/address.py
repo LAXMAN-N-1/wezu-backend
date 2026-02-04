@@ -1,5 +1,8 @@
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional
+from typing import Optional, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .user import User
 from datetime import datetime
 
 class Address(SQLModel, table=True):
