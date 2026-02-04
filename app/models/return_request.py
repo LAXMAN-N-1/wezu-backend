@@ -2,6 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
 from datetime import datetime
 import sqlalchemy as sa
+from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
 
 class ReturnRequest(SQLModel, table=True):
@@ -18,7 +19,7 @@ class ReturnRequest(SQLModel, table=True):
     # REQUESTED, APPROVED, REJECTED, PICKUP_SCHEDULED, PICKED_UP, 
     # INSPECTING, REFUND_INITIATED, COMPLETED, CANCELLED
     
-    requested_items: dict = Field(sa_column=sa.Column(JSONB))  # Array of {battery_id, quantity, reason}
+    requested_items: dict = Field(sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))  # Array of {battery_id, quantity, reason}
     
     pickup_address: Optional[str] = None
     pickup_scheduled_at: Optional[datetime] = None
@@ -53,7 +54,7 @@ class ReturnInspection(SQLModel, table=True):
     inspection_status: str  # PASSED, FAILED, PARTIAL
     
     # Detailed inspection results
-    items_inspected: dict = Field(sa_column=sa.Column(JSONB))  
+    items_inspected: dict = Field(sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))  
     # Array of {battery_id, condition, defects, images, approved_for_refund}
     
     physical_condition: str  # EXCELLENT, GOOD, FAIR, POOR, DAMAGED
@@ -64,7 +65,7 @@ class ReturnInspection(SQLModel, table=True):
     deduction_reason: Optional[str] = None
     
     inspection_notes: Optional[str] = None
-    inspection_images: Optional[list[str]] = Field(default=None, sa_column=sa.Column(JSONB))
+    inspection_images: Optional[list[str]] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
     inspected_at: datetime = Field(default_factory=datetime.utcnow)
     

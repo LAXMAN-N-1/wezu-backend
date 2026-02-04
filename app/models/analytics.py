@@ -2,6 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
 from datetime import datetime, date
 import sqlalchemy as sa
+from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
 
 class DemandForecast(SQLModel, table=True):
@@ -34,7 +35,7 @@ class DemandForecast(SQLModel, table=True):
     
     # Model metadata
     model_version: str = Field(default="v1.0")
-    model_features: Optional[dict] = Field(default=None, sa_column=sa.Column(JSONB))
+    model_features: Optional[dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -64,10 +65,10 @@ class ChurnPrediction(SQLModel, table=True):
     payment_failures_count: int = Field(default=0)
     
     # Feature importance
-    top_churn_factors: Optional[dict] = Field(default=None, sa_column=sa.Column(JSONB))
+    top_churn_factors: Optional[dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
     # Retention recommendations
-    recommended_actions: Optional[dict] = Field(default=None, sa_column=sa.Column(JSONB))
+    recommended_actions: Optional[dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     # e.g., {"offer_discount": true, "send_win_back_email": true, "assign_account_manager": false}
     
     # Action tracking
