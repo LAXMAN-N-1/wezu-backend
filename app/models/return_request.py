@@ -42,6 +42,7 @@ class ReturnRequest(SQLModel, table=True):
     user: "User" = Relationship(sa_relationship_kwargs={"foreign_keys": "[ReturnRequest.user_id]"})
     approver: Optional["User"] = Relationship(sa_relationship_kwargs={"foreign_keys": "[ReturnRequest.approved_by]"})
     inspection: Optional["ReturnInspection"] = Relationship(back_populates="return_request")
+    delivery: Optional["DeliveryAssignment"] = Relationship(back_populates="return_request")
 
 class ReturnInspection(SQLModel, table=True):
     __tablename__ = "return_inspections"
