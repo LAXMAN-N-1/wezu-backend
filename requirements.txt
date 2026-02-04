@@ -37,3 +37,8 @@ slowapi
 pytest
 httpx
 paho-mqtt
+pandas
+scikit-learn
+numpy
+gunicorn
+uvicorn[standard]
