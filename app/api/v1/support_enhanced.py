@@ -7,7 +7,8 @@ from sqlmodel import Session
 from typing import List
 from app.api import deps
 from app.models.user import User
-from app.models.support import SupportTicket, FAQItem
+from app.models.support import SupportTicket
+from app.models.faq import FAQ as FAQItem
 from app.db.session import get_session
 from pydantic import BaseModel
 import os
