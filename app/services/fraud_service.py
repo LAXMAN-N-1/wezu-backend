@@ -1,62 +1,60 @@
-from sqlmodel import Session, select
-from app.core.database import engine
-from app.models.fraud import RiskScore, FraudCheckLog, Blacklist
-from app.models.user import User
-from datetime import datetime
-import random
+from datetime import datetime, timedelta
+from sqlmodel import Session, select, func
+from app.models.otp import OTP
+from app.models.fraud import Blacklist
+from typing import Optional
+import logging
+
+logger = logging.getLogger("wezu_fraud")
 
 class FraudService:
-    
     @staticmethod
-    def calculate_risk_score(user_id: int) -> float:
-        with Session(engine) as session:
-            score = 0
-            breakdown = {}
-            
-            user = session.get(User, user_id)
-            if not user:
-                 return 0
-                 
-            # 1. Profile Completeness
-            if not user.email or not user.phone_number:
-                score += 20
-                breakdown["profile_incomplete"] = 20
-            
-            # 2. Blacklist Check
-            blacklist_hit = session.exec(select(Blacklist).where(Blacklist.value.in_([user.email, user.phone_number]))).first()
-            if blacklist_hit:
-                score += 100
-                breakdown["blacklist"] = 100
-                
-            # 3. Mock External Fraud API
-            # if user.phone_number.startswith("999"): score += 50
-            
-            # Update DB
-            risk_entry = session.exec(select(RiskScore).where(RiskScore.user_id == user_id)).first()
-            if not risk_entry:
-                risk_entry = RiskScore(user_id=user_id)
-            
-            risk_entry.total_score = min(score, 100)
-            risk_entry.breakdown = breakdown
-            risk_entry.last_updated = datetime.utcnow()
-            
-            session.add(risk_entry)
-            session.commit()
-            return risk_entry.total_score
-
-    @staticmethod
-    def get_risk_score(user_id: int):
-        with Session(engine) as session:
-            return session.exec(select(RiskScore).where(RiskScore.user_id == user_id)).first()
-
-    @staticmethod
-    def log_check(user_id: int, check_type: str, status: str, details: str = ""):
-        with Session(engine) as session:
-            log = FraudCheckLog(
-                user_id=user_id,
-                check_type=check_type,
-                status=status,
-                details=details
+    def check_velocity(db: Session, target: str, action_type: str, limit: int = 3, window_minutes: int = 10) -> bool:
+        """
+        Check if an action has been performed too many times within a window.
+        Returns True if action is allowed, False if velocity limit exceeded.
+        """
+        if action_type == "otp":
+            window_start = datetime.utcnow() - timedelta(minutes=window_minutes)
+            statement = select(func.count(OTP.id)).where(
+                OTP.target == target,
+                OTP.created_at >= window_start
             )
-            session.add(log)
-            session.commit()
+            count = db.exec(statement).one()
+            if count >= limit:
+                logger.warning(f"Velocity limit exceeded for OTP to {target}: {count} in {window_minutes}m")
+                return False
+        
+        # Add more action types as needed (rental_attempt, login_failure, etc.)
+        return True
+
+    @staticmethod
+    def is_blacklisted(db: Session, user_id: Optional[int] = None, phone: Optional[str] = None) -> bool:
+        """
+        Check if a user or phone number is in the system blacklist.
+        """
+        if user_id:
+            block = db.exec(select(Blacklist).where(Blacklist.user_id == user_id, Blacklist.is_active == True)).first()
+            if block: return True
+            
+        if phone:
+            block = db.exec(select(Blacklist).where(Blacklist.identifier == phone, Blacklist.is_active == True)).first()
+            if block: return True
+            
+        return False
+
+    @staticmethod
+    def add_to_blacklist(db: Session, identifier: str, reason: str, user_id: Optional[int] = None):
+        """
+        Manually add an identifier or user to the blacklist.
+        """
+        entry = Blacklist(
+            identifier=identifier,
+            user_id=user_id,
+            reason=reason,
+            is_active=True
+        )
+        db.add(entry)
+        db.commit()
+        db.refresh(entry)
+        return entry

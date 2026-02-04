@@ -1,4 +1,5 @@
 from sqlmodel import SQLModel, Field, Relationship
+from app.models.rbac import UserRole
 from typing import Optional, List
 from datetime import datetime
 
@@ -46,8 +47,12 @@ class User(SQLModel, table=True):
     addresses: List["Address"] = Relationship(back_populates="user")
     kyc_documents: List["KYCDocument"] = Relationship(back_populates="user")
     devices: List["Device"] = Relationship(back_populates="user")
+    vehicles: List["Vehicle"] = Relationship(back_populates="user")
     dealer_profile: Optional["DealerProfile"] = Relationship(back_populates="user")
     driver_profile: Optional["DriverProfile"] = Relationship(back_populates="user")
+    
+    # RBAC
+    roles: List["Role"] = Relationship(back_populates="users", link_model=UserRole)
 
 # OTP class removed (moved to app/models/otp.py)
 

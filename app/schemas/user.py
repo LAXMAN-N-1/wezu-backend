@@ -48,6 +48,8 @@ class UserUpdate(BaseModel):
     security_question: Optional[str] = None
     security_answer: Optional[str] = None
 
+from app.schemas.role import RoleResponse
+
 class UserResponse(UserBase):
     id: int
     is_active: bool
@@ -56,6 +58,7 @@ class UserResponse(UserBase):
     kyc_status: str
     wallet_balance: float = 0.0 # Virtual field
     addresses: List[AddressResponse] = []
+    roles: List[RoleResponse] = []
     
     class Config:
         from_attributes = True

@@ -26,13 +26,35 @@ class AuthService:
     @staticmethod
     def verify_apple_token(token: str):
         try:
-            # Apple Sign-In token verification logic
-            # Final implementation requires apple-id-token or manual JWT verification
-            # against Apple's public keys at https://appleid.apple.com/auth/keys
-            payload = jwt.get_unverified_claims(token)
+            import requests
+            from jose import jwt
+            
+            # 1. Fetch Apple's public keys
+            apple_keys_url = "https://appleid.apple.com/auth/keys"
+            apple_keys = requests.get(apple_keys_url).json()
+
+            # 2. Decode the header to find the 'kid'
+            unverified_header = jwt.get_unverified_header(token)
+            kid = unverified_header.get("kid")
+            
+            # 3. Verify the token using Apple's keys
+            # jose.jwt.decode handles finding the correct key from the jwks if passed correctly,
+            # but manually finding it is safer for simple integration.
+            payload = jwt.decode(
+                token,
+                apple_keys,
+                algorithms=["RS256"],
+                audience=settings.APPLE_CLIENT_ID,
+                issuer="https://appleid.apple.com"
+            )
             return payload
-        except Exception:
+        except Exception as e:
+            # In development, if APPLE_CLIENT_ID is not set, allow unverified for testing (CAUTION)
+            if settings.ENVIRONMENT != "production" and not settings.APPLE_CLIENT_ID:
+                from jose import jwt as jose_jwt
+                return jose_jwt.get_unverified_claims(token)
+                
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid Apple token",
+                detail=f"Invalid Apple token: {str(e)}",
             )

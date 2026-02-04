@@ -1,43 +1,38 @@
-from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional
 from datetime import datetime
+from typing import Optional
+from sqlmodel import SQLModel, Field
 
-class Commission(SQLModel, table=True):
-    __tablename__ = "commissions"
+class CommissionConfig(SQLModel, table=True):
+    __tablename__ = "commission_configs"
     id: Optional[int] = Field(default=None, primary_key=True)
-    dealer_id: int = Field(foreign_key="dealer_profiles.id")
+    
+    # Target entity
+    dealer_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id")
+    
+    # Type of transaction
+    transaction_type: str = Field(index=True) # rental, swap, purchase
+    
+    # Commission Rate
+    percentage: float = Field(default=0.0)
+    flat_fee: float = Field(default=0.0)
+    
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class CommissionLog(SQLModel, table=True):
+    __tablename__ = "commission_logs"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    
+    # Reference to causing event
     transaction_id: int = Field(foreign_key="transactions.id")
-    settlement_id: Optional[int] = Field(default=None, foreign_key="settlements.id")
+    
+    # Beneficiary
+    dealer_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id")
+    
+    # Earnings
     amount: float
-    percentage: float
-    status: str = Field(default="pending") # pending, paid
+    status: str = Field(default="pending") # pending, paid, reversed
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    paid_at: Optional[datetime] = None
-    
-    # Relationships
-    # Relationships
-    transaction: "Transaction" = Relationship()
-    dealer: Optional["DealerProfile"] = Relationship(back_populates="commissions")
-    settlement: Optional["Settlement"] = Relationship(back_populates="commissions")
-
-class Settlement(SQLModel, table=True):
-    __tablename__ = "settlements"
-    id: Optional[int] = Field(default=None, primary_key=True)
-    dealer_id: int = Field(foreign_key="dealer_profiles.id")
-    
-    start_date: datetime
-    end_date: datetime
-    
-    total_commission: float
-    total_deductions: float = Field(default=0.0)
-    net_amount: float
-    
-    status: str = Field(default="pending") # pending, processed, paid, disputing
-    
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
-    paid_at: Optional[datetime] = None
-    
-    pdf_statement_url: Optional[str] = None
-    
-    commissions: list[Commission] = Relationship(back_populates="settlement")

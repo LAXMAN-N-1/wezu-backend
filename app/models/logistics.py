@@ -1,54 +1,48 @@
-from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, List, Dict
+from typing import Optional, List
 from datetime import datetime
-import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlmodel import SQLModel, Field, Relationship
 
-class DriverProfile(SQLModel, table=True):
-    __tablename__ = "driver_profiles"
+class Warehouse(SQLModel, table=True):
+    __tablename__ = "warehouses"
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id", unique=True)
+    name: str = Field(index=True)
+    address: Optional[str] = None
+    city: str
+    state: str
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     
-    license_number: str
-    vehicle_type: str = Field(default="bike") # bike, van, truck
-    vehicle_plate: str
+    manager_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    is_active: bool = Field(default=True)
     
-    is_online: bool = Field(default=False)
-    current_latitude: Optional[float] = None
-    current_longitude: Optional[float] = None
-    last_location_update: Optional[datetime] = None
+    # Relationships
+    manager: Optional["User"] = Relationship()
+    # inventory: List["Battery"] = Relationship() # Implied by battery.location_id
+
+class BatteryTransfer(SQLModel, table=True):
+    __tablename__ = "battery_transfers"
+    id: Optional[int] = Field(default=None, primary_key=True)
     
-    rating: float = Field(default=5.0)
-    total_deliveries: int = Field(default=0)
+    battery_id: int = Field(foreign_key="batteries.id")
+    
+    # Source
+    from_location_type: str # warehouse, station
+    from_location_id: int
+    
+    # Destination
+    to_location_type: str
+    to_location_id: int
+    
+    # Status
+    status: str = Field(default="pending") # pending, in_transit, completed, cancelled
+    
+    # Logistics
+    driver_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    vehicle_id: Optional[str] = None # License plate or ID
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: Optional[datetime] = None
     
-    user: "User" = Relationship(back_populates="driver_profile")
-    assignments: List["DeliveryAssignment"] = Relationship(back_populates="driver")
-
-class DeliveryAssignment(SQLModel, table=True):
-    __tablename__ = "delivery_assignments"
-    id: Optional[int] = Field(default=None, primary_key=True)
-    order_id: Optional[int] = Field(default=None, foreign_key="ecommerce_orders.id") # Link to EcommerceOrder
-    return_request_id: Optional[int] = Field(default=None) # Link to Return (if implemented)
-    
-    driver_id: Optional[int] = Field(default=None, foreign_key="driver_profiles.id")
-    
-    # Status: PENDING, ASSIGNED, PICKED_UP, IN_TRANSIT, DELIVERED, FAILED
-    status: str = Field(default="PENDING")
-    
-    pickup_address: str # Can be station address or warehouse
-    delivery_address: str # User address
-    
-    assigned_at: Optional[datetime] = None
-    picked_up_at: Optional[datetime] = None
-    delivered_at: Optional[datetime] = None
-    
-    proof_of_delivery_img: Optional[str] = None
-    customer_signature: Optional[str] = None
-    otp_verified: bool = Field(default=False)
-    
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    
-    driver: Optional[DriverProfile] = Relationship(back_populates="assignments")
-    order: Optional["EcommerceOrder"] = Relationship(back_populates="delivery")
+    # Relationships
+    battery: "Battery" = Relationship()
+    driver: Optional["User"] = Relationship()

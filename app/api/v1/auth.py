@@ -13,7 +13,8 @@ from pydantic import BaseModel, EmailStr
 import logging
 from typing import Optional
 from datetime import datetime
-from jose import jwt
+from jose import jwt, JWTError
+from app.services.token_service import TokenService
 
 router = APIRouter()
 logger = logging.getLogger("wezu_auth")
@@ -66,6 +67,9 @@ async def request_registration_otp(
 
     return {"message": "OTP sent successfully"}
 
+from sqlalchemy.orm import selectinload
+from app.models.role import Role
+
 @router.post("/register/verify-otp", response_model=Token)
 async def verify_registration_otp(
     verify_data: OTPVerifyRequest,
@@ -81,9 +85,9 @@ async def verify_registration_otp(
 
     # Check if user already exists
     if "@" in verify_data.target:
-        statement = select(User).where(User.email == verify_data.target)
+        statement = select(User).where(User.email == verify_data.target).options(selectinload(User.roles))
     else:
-        statement = select(User).where(User.phone_number == verify_data.target)
+        statement = select(User).where(User.phone_number == verify_data.target).options(selectinload(User.roles))
     
     user = db.exec(statement).first()
 
@@ -102,6 +106,14 @@ async def verify_registration_otp(
         db.add(user)
         db.commit()
         db.refresh(user)
+        
+        # Assign Default Role: Customer
+        customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
+        if customer_role:
+            user.roles.append(customer_role)
+            db.add(user)
+            db.commit()
+            db.refresh(user)
         
         # Check Fraud Risk
         FraudService.calculate_risk_score(user.id)
@@ -132,7 +144,7 @@ async def authenticate_google(
         )
 
     # 2. Check if user exists
-    user = db.exec(select(User).where(User.email == email)).first()
+    user = db.exec(select(User).where(User.email == email).options(selectinload(User.roles))).first()
 
     if not user:
         # Create new user
@@ -145,6 +157,15 @@ async def authenticate_google(
         db.add(user)
         db.commit()
         db.refresh(user)
+        
+        # Assign Default Role: Customer
+        customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
+        if customer_role:
+            user.roles.append(customer_role)
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            
         # Check Fraud Risk
         FraudService.calculate_risk_score(user.id)
     else:
@@ -186,7 +207,7 @@ async def authenticate_apple(
     # 2. Check if user exists by apple_id or email
     user = db.exec(select(User).where(
         (User.apple_id == apple_id) | (User.email == email)
-    )).first()
+    ).options(selectinload(User.roles))).first()
 
     if not user:
         user = User(
@@ -197,6 +218,15 @@ async def authenticate_apple(
         db.add(user)
         db.commit()
         db.refresh(user)
+        
+        # Assign Default Role: Customer
+        customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
+        if customer_role:
+            user.roles.append(customer_role)
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            
         # Check Fraud Risk
         FraudService.calculate_risk_score(user.id)
     else:
@@ -242,8 +272,15 @@ async def refresh_token(
         
         access_token = create_access_token(subject=user.id)
         refresh_token = create_refresh_token(subject=user.id)
+        
+        # Blacklist the old refresh token so it can't be reused
+        TokenService.blacklist_token(db, refresh_data.refresh_token)
+        
         return Token(access_token=access_token, refresh_token=refresh_token)
-    except Exception:
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Could not validate credentials")
+    except Exception as e:
+        logger.error(f"Refresh error: {str(e)}")
         raise HTTPException(status_code=401, detail="Could not validate credentials")
 
 
@@ -252,14 +289,12 @@ async def refresh_token(
 @router.post("/logout")
 async def logout(
     current_user: User = Depends(deps.get_current_user),
+    token: str = Depends(deps.oauth2_scheme),
     db: Session = Depends(get_session)
 ):
     """Logout user - invalidate tokens"""
-    # In a production system, you would:
-    # 1. Add token to blacklist
-    # 2. Clear refresh token from database
-    # 3. Clear user session
-    logger.info(f"User {current_user.id} logged out")
+    TokenService.blacklist_token(db, token)
+    logger.info(f"User {current_user.id} logged out and token blacklisted")
     return {"message": "Logged out successfully"}
 
 

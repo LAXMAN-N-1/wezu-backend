@@ -1,5 +1,6 @@
 from sqlmodel import Session, select
-from app.models.station import Station, StationImage
+from app.models.station import Station, StationImage, StationSlot
+from app.models.battery import Battery
 from app.schemas.station import StationCreate
 from typing import List, Optional
 from math import radians, cos, sin, asin, sqrt
@@ -47,3 +48,50 @@ class StationService:
         db.commit()
         db.refresh(station)
         return station
+
+    @staticmethod
+    def get_available_slots(db: Session, station_id: int) -> List[StationSlot]:
+        return db.exec(
+            select(StationSlot).where(
+                StationSlot.station_id == station_id, 
+                StationSlot.status == "empty"
+            )
+        ).all()
+
+    @staticmethod
+    def assign_battery_to_slot(db: Session, slot_id: int, battery_id: int):
+        slot = db.get(StationSlot, slot_id)
+        if not slot:
+            return None
+        
+        slot.battery_id = battery_id
+        slot.status = "charging"
+        slot.is_locked = True
+        
+        # Update Battery location
+        battery = db.get(Battery, battery_id)
+        if battery:
+            battery.location_type = "station"
+            battery.location_id = slot.station_id
+            db.add(battery)
+            
+        db.add(slot)
+        db.commit()
+        db.refresh(slot)
+        return slot
+
+    @staticmethod
+    def release_battery_from_slot(db: Session, slot_id: int):
+        slot = db.get(StationSlot, slot_id)
+        if not slot:
+            return None
+        
+        slot.battery_id = None
+        slot.status = "empty"
+        slot.is_locked = False
+        
+        db.add(slot)
+        db.commit()
+        db.refresh(slot)
+        return slot
+

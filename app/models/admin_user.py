@@ -1,12 +1,25 @@
-from sqlmodel import SQLModel, Field
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
+from sqlmodel import SQLModel, Field, Relationship
+
+# Import link model for relationship
+from .rbac import AdminUserRole
 
 class AdminUser(SQLModel, table=True):
+    __tablename__ = "admin_users"
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True)
     hashed_password: str
     full_name: Optional[str] = None
-    role: str = "admin" # admin, super_admin, support
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationships
+    roles: List["Role"] = Relationship(
+        back_populates="admin_users",
+        link_model=AdminUserRole,
+        sa_relationship_kwargs={
+            "primaryjoin": "AdminUser.id==AdminUserRole.admin_id",
+            "secondaryjoin": "Role.id==AdminUserRole.role_id"
+        }
+    )

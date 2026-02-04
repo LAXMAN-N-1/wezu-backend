@@ -8,6 +8,7 @@ from app.core import security
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.user import User, TokenPayload
+from app.models.oauth import BlacklistedToken
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
@@ -26,10 +27,19 @@ def get_current_user(
             detail="Could not validate credentials",
         )
     
+    # Check if token is blacklisted
+    blacklisted = db.query(BlacklistedToken).filter(BlacklistedToken.token == token).first()
+    if blacklisted:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
+        )
+    
     # Check if we are using SQLModel (which uses .get) or pure SQLAlchemy
     # User model inherits from SQLModel, so we can use db.get(User, id) or query.
     # To be safe and consistent with typical patterns:
-    user = db.query(User).filter(User.id == int(token_data.sub)).first()
+    from sqlalchemy.orm import selectinload
+    user = db.query(User).filter(User.id == int(token_data.sub)).options(selectinload(User.roles)).first()
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")

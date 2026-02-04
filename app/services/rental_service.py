@@ -7,6 +7,7 @@ from app.schemas.rental import RentalCreate
 from typing import List, Optional
 from datetime import datetime, timedelta
 from fastapi import HTTPException
+from app.services.security_service import SecurityService
 
 class RentalService:
     @staticmethod
@@ -45,6 +46,16 @@ class RentalService:
         
         db.commit()
         db.refresh(rental)
+
+        # Log Security Event
+        SecurityService.log_event(
+            db,
+            event_type="rental_started",
+            severity="low",
+            details=f"Rental {rental.id} started for battery {rental_in.battery_id}",
+            user_id=user_id
+        )
+
         return rental
 
     @staticmethod

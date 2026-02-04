@@ -41,3 +41,58 @@ class KYCService:
         db.commit()
         db.refresh(user)
         return user
+    @staticmethod
+    def approve_document(db: Session, doc_id: int) -> Optional[KYCDocument]:
+        doc = db.get(KYCDocument, doc_id)
+        if not doc:
+            return None
+        
+        doc.status = "verified"
+        db.add(doc)
+        db.commit()
+        db.refresh(doc)
+        
+        # Check if all required documents are now verified to finalize user KYC
+        KYCService.finalize_kyc(db, doc.user_id)
+        return doc
+
+    @staticmethod
+    def reject_document(db: Session, doc_id: int, reason: str) -> Optional[KYCDocument]:
+        doc = db.get(KYCDocument, doc_id)
+        if not doc:
+            return None
+        
+        doc.status = "rejected"
+        doc.verification_response = reason
+        db.add(doc)
+        
+        # Update user status back to pending or rejected
+        user = db.get(User, doc.user_id)
+        if user:
+            user.kyc_status = "rejected"
+            db.add(user)
+            
+        db.commit()
+        db.refresh(doc)
+        return doc
+
+    @staticmethod
+    def finalize_kyc(db: Session, user_id: int) -> User:
+        """
+        Check all documents. If Aadhaar and PAN (minimum) are verified, mark user as verified.
+        """
+        user = db.get(User, user_id)
+        if not user:
+            return None
+            
+        docs = db.exec(select(KYCDocument).where(KYCDocument.user_id == user_id, KYCDocument.status == "verified")).all()
+        doc_types = {d.document_type for d in docs}
+        
+        # Business Rule: Need at least 'aadhaar' and 'pan' verified
+        if "aadhaar" in doc_types and "pan" in doc_types:
+            user.kyc_status = "verified"
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            
+        return user

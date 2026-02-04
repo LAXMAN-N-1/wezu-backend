@@ -59,13 +59,59 @@ app.include_router(system.router, prefix=f"{settings.API_V1_STR}", tags=["System
 app.include_router(payments_enhanced.router, prefix=f"{settings.API_V1_STR}/payments", tags=["Payments Enhanced"])
 app.include_router(wallet_enhanced.router, prefix=f"{settings.API_V1_STR}/wallet", tags=["Wallet Enhanced"])
 app.include_router(notifications_enhanced.router, prefix=f"{settings.API_V1_STR}/notifications", tags=["Notifications Enhanced"])
+
+# Locations Hierarchy
+from app.api.v1 import locations
+app.include_router(locations.router, prefix=f"{settings.API_V1_STR}/locations", tags=["Locations Hierarchy"])
+
+# Vendor Management
+from app.api.v1 import vendors
+app.include_router(vendors.router, prefix=f"{settings.API_V1_STR}/vendors", tags=["Vendor Management"])
+
+# Battery Inventory
+from app.api.v1 import batteries
+app.include_router(batteries.router, prefix=f"{settings.API_V1_STR}/batteries", tags=["Battery Management"])
+
+# Customer Vehicles
+from app.api.v1 import vehicles
+app.include_router(vehicles.router, prefix=f"{settings.API_V1_STR}/vehicles", tags=["Customer Vehicles"])
+
+# Swap Operations
+from app.api.v1 import swaps
+app.include_router(swaps.router, prefix=f"{settings.API_V1_STR}/swaps", tags=["Swap Operations"])
+
+# Financial Settlements
+from app.api.v1 import settlements
+app.include_router(settlements.router, prefix=f"{settings.API_V1_STR}/settlements", tags=["Financial Settlements"])
+
+# Telematics Ingestion
+from app.api.v1 import telematics
+app.include_router(telematics.router, prefix=f"{settings.API_V1_STR}/telematics", tags=["Telematics & IoT"])
+
+# Support Tickets
+from app.api.v1 import support
+app.include_router(support.router, prefix=f"{settings.API_V1_STR}/support", tags=["Support & Ticketing"])
+
+# Admin / RBAC
+from app.api.v1 import admin_rbac, security
+app.include_router(admin_rbac.router, prefix=f"{settings.API_V1_STR}/admin/rbac", tags=["Admin RBAC"])
+app.include_router(security.router, prefix=f"{settings.API_V1_STR}/admin/security", tags=["Admin Security"])
 app.include_router(support_enhanced.router, prefix=f"{settings.API_V1_STR}/support", tags=["Support Enhanced"])
 app.include_router(rentals_enhanced.router, prefix=f"{settings.API_V1_STR}/rentals", tags=["Rentals Enhanced"])
 app.include_router(purchases_enhanced.router, prefix=f"{settings.API_V1_STR}/purchases", tags=["Purchases Enhanced"])
 app.include_router(analytics_enhanced.router, prefix=f"{settings.API_V1_STR}/analytics", tags=["Analytics Enhanced"])
 
 # Webhooks
+# Webhooks
 app.include_router(razorpay_webhook.router, prefix="/api/webhooks", tags=["Webhooks"])
+
+# Battery Catalog (Specs)
+from app.api.v1 import battery_catalog
+app.include_router(battery_catalog.router, prefix=f"{settings.API_V1_STR}/batteries", tags=["Battery Catalog"])
+
+# Logistics (Warehouses & Transfers)
+from app.api.v1 import logistics
+app.include_router(logistics.router, prefix=f"{settings.API_V1_STR}/logistics", tags=["Logistics & Supply Chain"])
 
 
 @app.get("/")
@@ -85,7 +131,9 @@ from app.workers import start_scheduler, stop_scheduler
 
 @app.on_event("startup")
 async def startup_event():
-    """Start background scheduler on app startup"""
+    """Start background scheduler on app startup and init DB"""
+    from app.db.session import init_db
+    init_db()
     start_scheduler()
 
 @app.on_event("shutdown")

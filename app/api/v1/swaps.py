@@ -1,208 +1,118 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Any, List
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlmodel import Session, select
-from typing import List, Optional
+from app.api.deps import get_current_active_user
 from app.db.session import get_session
-from app.models.swap import SwapRequest, SwapHistory
-from app.models.station import Station
-from app.services.swap_service import SwapService
-from app.api.deps import get_current_user
 from app.models.user import User
-from app.schemas.common import DataResponse
-from pydantic import BaseModel
+from app.models.swap import SwapSession
+from app.models.station import Station
+from app.models.financial import Transaction, Wallet
+from app.models.battery import Battery, BatteryLifecycleEvent
+from app.schemas.swap import SwapInitRequest, SwapResponse, SwapCompleteRequest
 
 router = APIRouter()
 
-class SwapCreate(BaseModel):
-    rental_id: int
-    station_id: int
-
-class SwapExecute(BaseModel):
-    station_id: int
-    old_battery_sn: str
-    new_battery_sn: str
-
-@router.post("/stations", response_model=DataResponse[List[Station]])
-def find_swap_stations(
-    lat: float, 
-    lng: float, 
-    session: Session = Depends(get_session)
-):
-    stations = SwapService.get_stations_with_batteries(lat, lng)
-    return DataResponse(data=stations)
-
-@router.post("/request", response_model=DataResponse[SwapRequest])
-def request_swap(
-    req: SwapCreate,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session)
-):
-    try:
-        swap = SwapService.request_swap(req.rental_id, req.station_id)
-        return DataResponse(data=swap)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@router.post("/execute", response_model=DataResponse[SwapHistory])
-def execute_swap(
-    req: SwapExecute,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session)
-):
+@router.post("/initiate", response_model=SwapResponse)
+def initiate_swap(
+    *,
+    session: Session = Depends(get_session),
+    swap_in: SwapInitRequest,
+    current_user: User = Depends(get_current_active_user),
+) -> Any:
     """
-    Called by the device or user (via scan) to confirm physical swap.
+    User initiates a swap at a station.
     """
-    try:
-        history = SwapService.execute_swap(current_user.id, req.station_id, req.old_battery_sn, req.new_battery_sn)
-        return DataResponse(data=history)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-# Swap Enhancements
-from app.models.swap_suggestion import SwapSuggestion, SwapPreference
-
-@router.get("/{rental_id}/suggestions", response_model=List[SwapSuggestion])
-def get_swap_suggestions(
-    rental_id: int,
-    lat: float,
-    lng: float,
-    battery_soc: float,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session)
-):
-    """Get ML-based swap station suggestions"""
-    from app.models.rental import Rental
-    from sqlmodel import select
-    
-    rental = session.get(Rental, rental_id)
-    if not rental or rental.user_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Rental not found")
-    
-    # Get user preferences
-    preference = session.exec(
-        select(SwapPreference).where(SwapPreference.user_id == current_user.id)
-    ).first()
-    
-    # Get nearby stations
-    stations = SwapService.get_stations_with_batteries(lat, lng)
-    
-    # Create suggestions with scoring
-    suggestions = []
-    for idx, station in enumerate(stations[:5]):  # Top 5 stations
-        # Calculate distance (simplified)
-        import math
-        distance = math.sqrt((station.latitude - lat)**2 + (station.longitude - lng)**2) * 111  # Rough km
+    # 1. Validate Station
+    station = session.get(Station, swap_in.station_id)
+    if not station:
+        raise HTTPException(status_code=404, detail="Station not found")
         
-        # Calculate scores
-        availability_score = min(station.available_batteries / 10.0 * 100, 100) if hasattr(station, 'available_batteries') else 50
-        preference_score = 80 if preference and preference.prefer_nearby > 5 else 50
+    # 2. Check Wallet Balance (Minimum amount required e.g. 100)
+    wallet = session.exec(select(Wallet).where(Wallet.user_id == current_user.id)).first()
+    if not wallet or wallet.balance < 50: # Example threshold
+        raise HTTPException(status_code=400, detail="Insufficient wallet balance. Please recharge.")
         
-        # Total score (weighted)
-        total_score = (
-            (10 - distance) * 10 +  # Distance weight
-            availability_score * 0.3 +
-            preference_score * 0.2
-        )
-        
-        suggestion = SwapSuggestion(
-            user_id=current_user.id,
-            rental_id=rental_id,
-            current_battery_soc=battery_soc,
-            current_location_lat=lat,
-            current_location_lng=lng,
-            suggested_station_id=station.id,
-            priority_rank=idx + 1,
-            distance_km=distance,
-            estimated_travel_time_minutes=int(distance * 3),  # Rough estimate
-            station_availability_score=availability_score,
-            station_rating=station.rating if hasattr(station, 'rating') else 4.5,
-            preference_match_score=preference_score,
-            total_score=total_score
-        )
-        session.add(suggestion)
-        suggestions.append(suggestion)
-    
+    # 3. Create Session
+    swap_session = SwapSession(
+        user_id=current_user.id,
+        station_id=station.id,
+        status="initiated"
+    )
+    session.add(swap_session)
     session.commit()
-    return suggestions
+    session.refresh(swap_session)
+    
+    return {
+        "id": swap_session.id, 
+        "status": swap_session.status, 
+        "station_id": station.id,
+        "station_name": station.name,
+        "amount": 0.0,
+        "created_at": swap_session.created_at
+    }
 
-@router.get("/{rental_id}/history", response_model=List[SwapHistory])
-def get_swap_history(
-    rental_id: int,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session)
-):
-    """Get swap history for a rental"""
-    from app.models.rental import Rental
-    from sqlmodel import select
+@router.post("/{swap_id}/complete", response_model=SwapResponse)
+def complete_swap(
+    *,
+    session: Session = Depends(get_session),
+    swap_id: int,
+    complete_in: SwapCompleteRequest,
+    # In production, this endpoint might be protected for IoT Station Callbacks only
+    current_user: User = Depends(get_current_active_user), 
+) -> Any:
+    """
+    Finalize swap: hardware confirmed dispense. Deduct money.
+    """
+    swap_session = session.get(SwapSession, swap_id)
+    if not swap_session:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    if swap_session.status == "completed":
+        raise HTTPException(status_code=400, detail="Swap already completed")
+        
+    # Calculate Cost (Mock logic)
+    cost = 50.0 # Fixed price for MVP
     
-    rental = session.get(Rental, rental_id)
-    if not rental or rental.user_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Rental not found")
+    # 1. Update Session
+    swap_session.new_battery_id = complete_in.new_battery_id
+    swap_session.old_battery_soc = complete_in.old_battery_soc
+    swap_session.new_battery_soc = complete_in.new_battery_soc
+    swap_session.amount = cost
+    swap_session.status = "completed"
+    swap_session.payment_status = "paid"
+    swap_session.completed_at = datetime.utcnow()
     
-    history = session.exec(
-        select(SwapHistory)
-        .where(SwapHistory.rental_id == rental_id)
-        .order_by(SwapHistory.timestamp.desc())
-    ).all()
-    
-    return history
-
-@router.post("/preferences", response_model=SwapPreference)
-def set_swap_preferences(
-    preferences: dict,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session)
-):
-    """Set user swap preferences"""
-    from sqlmodel import select
-    
-    existing = session.exec(
-        select(SwapPreference).where(SwapPreference.user_id == current_user.id)
-    ).first()
-    
-    if existing:
-        # Update existing
-        for key, value in preferences.items():
-            if hasattr(existing, key):
-                setattr(existing, key, value)
-        existing.updated_at = datetime.utcnow()
-        session.add(existing)
-    else:
-        # Create new
-        pref = SwapPreference(user_id=current_user.id, **preferences)
-        session.add(pref)
-    
-    session.commit()
-    session.refresh(existing if existing else pref)
-    return existing if existing else pref
-
-@router.get("/preferences", response_model=SwapPreference)
-def get_swap_preferences(
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session)
-):
-    """Get user swap preferences"""
-    from sqlmodel import select
-    
-    pref = session.exec(
-        select(SwapPreference).where(SwapPreference.user_id == current_user.id)
-    ).first()
-    
-    if not pref:
-        # Return defaults
-        pref = SwapPreference(
-            user_id=current_user.id,
-            prefer_nearby=8,
-            prefer_fast_charging=5,
-            prefer_high_rated=6,
-            prefer_low_wait=7,
-            max_acceptable_distance_km=10.0,
-            notify_when_battery_below=20,
-            notify_suggestion_radius_km=5.0
+    # 2. Deduct Wallet
+    wallet = session.exec(select(Wallet).where(Wallet.user_id == swap_session.user_id)).first()
+    if wallet:
+        wallet.balance -= cost
+        session.add(wallet)
+        
+        # Log Transaction
+        txn = Transaction(
+            wallet_id=wallet.id,
+            amount=-cost,
+            balance_after=wallet.balance,
+            type="debit",
+            category="swap_fee",
+            reference_type="swap_session",
+            reference_id=str(swap_session.id),
+            description=f"Swap at {swap_session.station_id}"
         )
-        session.add(pref)
-        session.commit()
-        session.refresh(pref)
+        session.add(txn)
     
-    return pref
+    # 3. Update Batteries (Mock)
+    # old_bat = ... set location to station
+    # new_bat = ... set location to user
+    
+    session.add(swap_session)
+    session.commit()
+    session.refresh(swap_session)
+    
+    return {
+        "id": swap_session.id, 
+        "status": swap_session.status, 
+        "station_id": swap_session.station_id,
+        "amount": swap_session.amount,
+        "created_at": swap_session.created_at
+    }

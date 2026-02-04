@@ -1,127 +1,101 @@
+from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
-from typing import List, Optional
+from app.api import deps
 from app.db.session import get_session
-from app.models.logistics import DeliveryAssignment, DriverProfile
+from app.models.logistics import Warehouse, BatteryTransfer
+from app.models.battery import Battery
 from app.models.user import User
-from app.services.logistics_service import LogisticsService
-from app.services.driver_service import DriverService
-from app.api.deps import get_current_user
-from app.schemas.common import DataResponse
-from pydantic import BaseModel
+from app.schemas.logistics import (
+    WarehouseCreate, WarehouseResponse,
+    BatteryTransferCreate, BatteryTransferResponse
+)
 
 router = APIRouter()
 
-# Schemas
-class DriverOnboard(BaseModel):
-    license_number: str
-    vehicle_type: str
-    vehicle_plate: str
+# --- Warehouses ---
+@router.post("/warehouses", response_model=WarehouseResponse)
+def create_warehouse(
+    *,
+    session: Session = Depends(get_session),
+    wh_in: WarehouseCreate,
+    current_user: User = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Create a new warehouse location.
+    """
+    wh = Warehouse.from_orm(wh_in)
+    session.add(wh)
+    session.commit()
+    session.refresh(wh)
+    return wh
 
-class LocationUpdate(BaseModel):
-    lat: float
-    lng: float
+@router.get("/warehouses", response_model=List[WarehouseResponse])
+def read_warehouses(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    List all warehouses.
+    """
+    return session.exec(select(Warehouse)).all()
 
-class StatusUpdate(BaseModel):
-    is_online: bool
-
-class AssignRequest(BaseModel):
-    delivery_id: int
-    driver_id: int
-
-class DeliveryStatusUpdate(BaseModel):
-    status: str # PICKED_UP, DELIVERED, FAILED
-    pod_img: Optional[str] = None
-    signature: Optional[str] = None
-
-# Driver Endpoints
-@router.post("/drivers/onboard", response_model=DataResponse[DriverProfile])
-def onboard_driver(
-    data: DriverOnboard,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session)
-):
-    existing = DriverService.get_profile(current_user.id)
-    if existing:
-        raise HTTPException(status_code=400, detail="Driver profile already exists")
+# --- Transfers ---
+@router.post("/transfers", response_model=BatteryTransferResponse)
+def initiate_transfer(
+    *,
+    session: Session = Depends(get_session),
+    transfer_in: BatteryTransferCreate,
+    current_user: User = Depends(deps.get_current_user), # Logistics Manager
+) -> Any:
+    """
+    Initiate a battery transfer.
+    """
+    # 1. Validate Battery
+    battery = session.get(Battery, transfer_in.battery_id)
+    if not battery:
+        raise HTTPException(status_code=404, detail="Battery not found")
+        
+    # 2. Update Battery Location to 'transit'
+    battery.location_type = "transit"
+    # location_id logic depends on how we track transit (e.g., vehicle_id or None)
+    session.add(battery)
     
-    profile = DriverService.create_profile(current_user.id, data.dict())
-    return DataResponse(data=profile)
-
-@router.post("/drivers/status", response_model=DataResponse[dict])
-def update_driver_status(
-    status: StatusUpdate,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session)
-):
-    profile = DriverService.get_profile(current_user.id)
-    if not profile:
-        raise HTTPException(status_code=404, detail="Not a driver")
+    # 3. Create Transfer Record
+    transfer = BatteryTransfer.from_orm(transfer_in)
+    transfer.status = "in_transit"
+    session.add(transfer)
     
-    DriverService.toggle_status(profile.id, status.is_online)
-    return DataResponse(data={"status": "online" if status.is_online else "offline"})
+    session.commit()
+    session.refresh(transfer)
+    return transfer
 
-@router.post("/drivers/location", response_model=DataResponse[dict])
-def update_location(
-    loc: LocationUpdate,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session)
-):
-    profile = DriverService.get_profile(current_user.id)
-    if not profile:
-        raise HTTPException(status_code=404, detail="Not a driver")
+@router.put("/transfers/{transfer_id}/complete", response_model=BatteryTransferResponse)
+def complete_transfer(
+    *,
+    session: Session = Depends(get_session),
+    transfer_id: int,
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Mark transfer as completed and update battery location.
+    """
+    transfer = session.get(BatteryTransfer, transfer_id)
+    if not transfer:
+        raise HTTPException(status_code=404, detail="Transfer not found")
+        
+    battery = session.get(Battery, transfer.battery_id)
     
-    DriverService.update_location(profile.id, loc.lat, loc.lng)
-    return DataResponse(data={"message": "Location updated"})
-
-@router.get("/drivers/deliveries", response_model=DataResponse[List[DeliveryAssignment]])
-def get_driver_deliveries(
-    status: Optional[str] = None,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session)
-):
-    profile = DriverService.get_profile(current_user.id)
-    if not profile:
-        raise HTTPException(status_code=404, detail="Not a driver")
+    # Update Status
+    transfer.status = "completed"
+    transfer.completed_at = datetime.utcnow()
     
-    query = select(DeliveryAssignment).where(DeliveryAssignment.driver_id == profile.id)
-    if status:
-        query = query.where(DeliveryAssignment.status == status)
+    # Update Battery Location
+    battery.location_type = transfer.to_location_type
+    battery.location_id = transfer.to_location_id
     
-    deliveries = session.exec(query).all()
-    return DataResponse(data=deliveries)
-
-# Delivery Ops (Admin/System)
-@router.post("/deliveries/assign", response_model=DataResponse[DeliveryAssignment])
-def assign_delivery(
-    req: AssignRequest,
-    current_user: User = Depends(get_current_user), # Admin check needed
-    session: Session = Depends(get_session)
-):
-    try:
-        delivery = LogisticsService.assign_driver(req.delivery_id, req.driver_id)
-        return DataResponse(data=delivery)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@router.post("/deliveries/{id}/status", response_model=DataResponse[DeliveryAssignment])
-def update_delivery_status_endpoint(
-    id: int,
-    update: DeliveryStatusUpdate,
-    current_user: User = Depends(get_current_user), # Driver check needed
-    session: Session = Depends(get_session)
-):
-    # Verify driver owns this delivery
-    profile = DriverService.get_profile(current_user.id)
-    delivery = session.get(DeliveryAssignment, id)
-    if not delivery:
-         raise HTTPException(status_code=404, detail="Delivery not found")
-         
-    if profile and delivery.driver_id != profile.id:
-        raise HTTPException(status_code=403, detail="Not assigned to this delivery")
-
-    try:
-        updated = LogisticsService.update_delivery_status(id, update.status, update.pod_img, update.signature)
-        return DataResponse(data=updated)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    session.add(transfer)
+    session.add(battery)
+    session.commit()
+    session.refresh(transfer)
+    return transfer

@@ -1,9 +1,12 @@
 from sqlmodel import Session, select
 from app.core.database import engine
-from app.models.logistics import DeliveryAssignment, DriverProfile
+from app.models.logistics import DeliveryAssignment, DriverProfile, BatteryTransfer, Warehouse
 from app.models.ecommerce import Order
+from app.models.station import Station, StationSlot
+from app.models.battery import Battery
 from app.services.notification_service import NotificationService
 from datetime import datetime
+from sqlmodel import func, select
 
 class LogisticsService:
     
@@ -87,3 +90,50 @@ class LogisticsService:
             session.commit()
             session.refresh(delivery)
             return delivery
+
+    @staticmethod
+    def check_and_trigger_restock(db: Session, station_id: int, threshold: int = 2):
+        """
+        Check if a station needs restocking and create a transfer request if so.
+        """
+        # Count 'ready' batteries at this station
+        statement = select(func.count(StationSlot.id)).where(
+            StationSlot.station_id == station_id,
+            StationSlot.status == "ready"
+        )
+        ready_count = db.exec(statement).one()
+        
+        if ready_count < threshold:
+            # Need restock. Find nearest warehouse with stock.
+            # (Simplified distance logic for now)
+            warehouse = db.exec(select(Warehouse).where(Warehouse.is_active == True)).first()
+            if not warehouse:
+                return None
+            
+            # Find a 'ready' battery in the warehouse
+            battery = db.exec(select(Battery).where(
+                Battery.location_type == "warehouse",
+                Battery.location_id == warehouse.id,
+                Battery.status == "ready"
+            )).first()
+            
+            if battery:
+                transfer = BatteryTransfer(
+                    battery_id=battery.id,
+                    from_location_type="warehouse",
+                    from_location_id=warehouse.id,
+                    to_location_type="station",
+                    to_location_id=station_id,
+                    status="pending"
+                )
+                db.add(transfer)
+                
+                # Update battery status to 'in_transit' effectively
+                battery.status = "in_transit" 
+                db.add(battery)
+                
+                db.commit()
+                db.refresh(transfer)
+                return transfer
+        return None
+

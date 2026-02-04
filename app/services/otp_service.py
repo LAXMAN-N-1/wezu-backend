@@ -16,6 +16,13 @@ class OTPService:
 
     @staticmethod
     def create_otp_record(db: Session, target: str, code: str, purpose: str = "registration") -> OTP:
+        # Check for rate limiting: prevent more than 1 OTP per minute
+        statement = select(OTP).where(OTP.target == target, OTP.purpose == purpose, OTP.created_at > datetime.utcnow() - timedelta(minutes=1))
+        recent_otp = db.exec(statement).first()
+        if recent_otp:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=429, detail="Too many OTP requests. Please wait 60 seconds.")
+
         # Deactivate previous OTPs for the same target and purpose
         statement = select(OTP).where(OTP.target == target, OTP.purpose == purpose, OTP.is_active == True)
         old_otps = db.exec(statement).all()
