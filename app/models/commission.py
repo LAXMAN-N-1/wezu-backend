@@ -35,4 +35,7 @@ class CommissionLog(SQLModel, table=True):
     amount: float
     status: str = Field(default="pending") # pending, paid, reversed
     
+    # Settlement linkage
+    settlement_id: Optional[int] = Field(default=None, foreign_key="settlements.id")
+    
     created_at: datetime = Field(default_factory=datetime.utcnow)

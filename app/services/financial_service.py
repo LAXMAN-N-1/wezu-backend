@@ -2,7 +2,8 @@ from sqlmodel import Session, select
 from app.core.database import engine
 from app.models.invoice import Invoice
 from app.models.financial import Transaction
-from app.models.commission import Commission, Settlement
+from app.models.commission import CommissionLog as Commission
+from app.models.settlement import Settlement
 from datetime import datetime, timedelta
 import uuid
 
