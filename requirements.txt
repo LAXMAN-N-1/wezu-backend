@@ -46,3 +46,4 @@ numpy
 gunicorn
 uvicorn[standard]
 psutil
+apscheduler
