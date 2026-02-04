@@ -1,5 +1,5 @@
 from sqlmodel import Session, select
-from app.models.role import Role
+from app.models.rbac import Role
 
 def seed_roles(session: Session):
     """

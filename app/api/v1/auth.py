@@ -68,7 +68,7 @@ async def request_registration_otp(
     return {"message": "OTP sent successfully"}
 
 from sqlalchemy.orm import selectinload
-from app.models.role import Role
+from app.models.rbac import Role
 
 @router.post("/register/verify-otp", response_model=Token)
 async def verify_registration_otp(
