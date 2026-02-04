@@ -30,6 +30,7 @@ jobs:
         env:
           ENVIRONMENT: testing
           DATABASE_URL: sqlite:///./test.db
+          PYTHONPATH: .
 
   build-and-push:
     needs: lint-and-test
