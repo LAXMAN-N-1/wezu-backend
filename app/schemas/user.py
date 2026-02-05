@@ -72,3 +72,61 @@ class DeviceResponse(DeviceCreate):
     id: int
     is_active: bool
     last_active_at: datetime
+
+
+# Enhanced User Profile Response
+class StaffAssignmentInfo(BaseModel):
+    """Staff assignment details for profile"""
+    staff_type: Optional[str] = None
+    station_id: Optional[int] = None
+    dealer_id: Optional[int] = None
+    employment_id: Optional[str] = None
+    is_active: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class MenuConfig(BaseModel):
+    """Menu configuration for role"""
+    label: str
+    icon: Optional[str] = None
+    path: str
+    children: Optional[List["MenuConfig"]] = None
+
+
+class UserProfileResponse(BaseModel):
+    """Complete user profile with all details"""
+    # Basic Info
+    id: int
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone_number: Optional[str] = None
+    profile_picture: Optional[str] = None
+    
+    # Status
+    is_active: bool
+    is_superuser: bool
+    kyc_status: str
+    
+    # Roles & Permissions
+    current_role: Optional[str] = None
+    available_roles: List[str] = []
+    permissions: List[str] = []
+    menu: List[MenuConfig] = []
+    
+    # Financial
+    wallet_balance: float = 0.0
+    
+    # Staff Info (if applicable)
+    staff_assignment: Optional[StaffAssignmentInfo] = None
+    
+    # Profile Completion
+    profile_completion_percentage: int = 0
+    
+    # Timestamps
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
