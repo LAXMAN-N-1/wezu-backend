@@ -50,6 +50,9 @@ class RoleDetail(RoleRead):
     parent_role: Optional["RoleRead"] = None
     child_roles: List["RoleRead"] = []
 
+class RoleHierarchy(RoleRead):
+    children: List["RoleHierarchy"] = []
+
 
 class RoleUpdate(BaseModel):
     name: Optional[str] = None

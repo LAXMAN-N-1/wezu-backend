@@ -358,4 +358,44 @@ def duplicate_role(
     db.commit()
     db.refresh(new_role)
     
+    db.refresh(new_role)
+    
     return new_role
+
+
+@router.get("/hierarchy", response_model=List[rbac_schema.RoleHierarchy])
+def get_role_hierarchy(
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Get role hierarchy/tree.
+    """
+    # 1. Fetch all active roles
+    roles = db.exec(select(Role).where(Role.is_active == True)).all()
+    
+    # 2. Build Tree
+    role_map = {}
+    roots = []
+    
+    # Initialize all nodes
+    for role in roles:
+        # Convert to hierarchy schema (without children first)
+        r_schema = rbac_schema.RoleHierarchy.model_validate(role)
+        # Manually enrich permission count if RoleRead (base) requires it or relies on it
+        # Since RoleRead has permission_count=0 default, likely fine. 
+        # But if we want accurate perm counts in tree:
+        r_schema.permission_count = len(role.permissions) 
+        r_schema.children = []
+        role_map[role.id] = r_schema
+        
+    # Link nodes
+    for role in roles:
+        node = role_map[role.id]
+        if role.parent_role_id and role.parent_role_id in role_map:
+            parent = role_map[role.parent_role_id]
+            parent.children.append(node)
+        else:
+            roots.append(node)
+            
+    return roots
