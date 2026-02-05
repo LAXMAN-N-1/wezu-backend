@@ -304,4 +304,58 @@ def delete_role(
     db.add(role)
     db.commit()
     
+    # 3. Soft Delete
+    role.is_active = False
+    db.add(role)
+    db.commit()
+    
     return {"status": "success", "message": "Role deleted successfully"}
+
+
+@router.post("/roles/{role_id}/duplicate", response_model=rbac_schema.RoleRead)
+def duplicate_role(
+    *,
+    role_id: int,
+    duplicate_in: rbac_schema.RoleDuplicate,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Duplicate an existing role.
+    """
+    # 1. Fetch Source Role
+    source_role = db.get(Role, role_id)
+    if not source_role:
+        raise HTTPException(status_code=404, detail="Source role not found")
+        
+    # 2. Check Uniqueness of New Name
+    existing = db.exec(select(Role).where(Role.name == duplicate_in.new_name)).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Role name already exists")
+        
+    # 3. Create New Role
+    # Copy attributes
+    new_role = Role(
+        name=duplicate_in.new_name,
+        description=duplicate_in.description or source_role.description,
+        category=source_role.category,
+        level=source_role.level,
+        parent_role_id=source_role.parent_role_id,
+        is_system_role=False, # Cloned roles are always custom
+        is_active=True
+    )
+    db.add(new_role)
+    db.commit()
+    db.refresh(new_role)
+    
+    # 4. Copy Permissions
+    source_perms = db.exec(select(Permission).join(RolePermission).where(RolePermission.role_id == source_role.id)).all()
+    
+    for perm in source_perms:
+        link = RolePermission(role_id=new_role.id, permission_id=perm.id)
+        db.add(link)
+        
+    db.commit()
+    db.refresh(new_role)
+    
+    return new_role

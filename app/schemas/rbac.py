@@ -59,6 +59,10 @@ class RoleUpdate(BaseModel):
     parent_role_id: Optional[int] = None
     permissions: Optional[List[str]] = None # List of Permission Slugs
 
+class RoleDuplicate(BaseModel):
+    new_name: str
+    description: Optional[str] = None
+
 # User Assignment Schema
 class UserRoleAssign(BaseModel):
     role_ids: List[int]
