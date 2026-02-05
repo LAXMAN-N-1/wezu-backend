@@ -15,7 +15,7 @@ class OTPService:
         return code
 
     @staticmethod
-    def create_otp_record(db: Session, target: str, code: str, purpose: str = "registration") -> OTP:
+    def create_otp_record(db: Session, target: str, code: str, purpose: str = "registration", validity_minutes: int = 15) -> OTP:
         # Rate Limiting Logic
         # 1. Count OTPs in the last 30 minutes
         window_start = datetime.utcnow() - timedelta(minutes=30)
@@ -66,7 +66,7 @@ class OTPService:
             old_otp.is_active = False # Mark as inactive instead of is_used
             db.add(old_otp)
         
-        expires_at = datetime.utcnow() + timedelta(minutes=15)
+        expires_at = datetime.utcnow() + timedelta(minutes=validity_minutes)
         otp_record = OTP(
             target=target,
             code=code,

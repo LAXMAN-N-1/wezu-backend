@@ -146,7 +146,7 @@ async def verify_otp_alias(
     """
     return await verify_registration_otp(verify_data, db)
 
-from app.schemas.auth import SocialLoginRequest, LoginResponse, MenuConfig
+from app.schemas.auth import SocialLoginRequest, LoginResponse, MenuConfig, ForgotPasswordRequest
 
 @router.post("/social-login", response_model=LoginResponse)
 async def social_login(
@@ -479,6 +479,58 @@ async def logout_all(
     logger.info(f"User {current_user.id} performed global logout")
     return {"message": "Logged out from all devices successfully"}
 
+@router.post("/forgot-password")
+async def forgot_password(
+    request: ForgotPasswordRequest,
+    db: Session = Depends(get_session)
+):
+    """
+    Initiate password reset process.
+    Sends 6-digit OTP to registered email or phone.
+    OTP expires in 10 minutes.
+    """
+    user = None
+    target = None
+    channel = None
+    
+    # 1. Look up user
+    if request.email:
+        user = db.exec(select(User).where(User.email == request.email)).first()
+        target = request.email
+        channel = "email"
+    elif request.phone_number:
+        # Normalize phone if needed, but for now strict match
+        user = db.exec(select(User).where(User.phone_number == request.phone_number)).first()
+        target = request.phone_number
+        channel = "sms"
+        
+    if not user:
+        # Security: Do not reveal if user exists, just return success
+        # But for development/UX, we might want to hint? 
+        # Standard practice: "If an account exists, an OTP has been sent."
+        # We will return 200 OK regardless to prevent user enumeration.
+        return {"message": "If an account with these details exists, an OTP has been sent."}
+
+    if not user.is_active:
+         raise HTTPException(status_code=400, detail="User account is inactive.")
+
+    # 2. Generate OTP
+    code = OTPService.generate_otp(target)
+    
+    # 3. Create Record (10 mins validity)
+    try:
+        OTPService.create_otp_record(db, target, code, purpose="password_reset", validity_minutes=10)
+    except HTTPException as e:
+        raise e # Propagate rate limit errors
+
+    # 4. Send OTP
+    if channel == "email":
+        await OTPService.send_email_otp(target, code)
+    else:
+        await OTPService.send_sms_otp(target, code)
+
+    return {"message": f"OTP sent to your registered {channel}. Valid for 10 minutes."}
+
 
 @router.post("/resend-otp")
 async def resend_otp(
@@ -499,32 +551,7 @@ async def resend_otp(
     return {"message": "OTP resent successfully"}
 
 
-class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
 
-
-@router.post("/forgot-password")
-async def forgot_password(
-    request: ForgotPasswordRequest,
-    db: Session = Depends(get_session)
-):
-    """Request password reset - sends OTP to email"""
-    # Check if user exists
-    statement = select(User).where(User.email == request.email)
-    user = db.exec(statement).first()
-    
-    if not user:
-        # Don't reveal if email exists or not (security best practice)
-        return {"message": "If the email exists, a reset code has been sent"}
-    
-    # Generate and send OTP
-    code = OTPService.generate_otp(request.email)
-    OTPService.create_otp_record(db, request.email, code, "password_reset")
-    
-    logger.info(f"Password reset requested for {request.email}")
-    await OTPService.send_email_otp(request.email, code)
-    
-    return {"message": "If the email exists, a reset code has been sent"}
 
 
 class ResetPasswordRequest(BaseModel):

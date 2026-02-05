@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, validator
 from typing import Optional, List
 
 class LoginRequest(BaseModel):
@@ -46,7 +46,22 @@ class OTPVerify(BaseModel):
     purpose: str = "login"
 
 class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
+    phone_number: Optional[str] = None
+    email: Optional[EmailStr] = None
+
+    @validator("phone_number")
+    def validate_phone(cls, v):
+        if v:
+             # Basic check, allows international format handling later
+             if not v.isdigit() and not v.startswith("+"):
+                 raise ValueError("Phone number must contain only digits or start with +")
+        return v
+    
+    @validator("email")
+    def validate_either_email_or_phone(cls, v, values):
+        if not v and not values.get("phone_number"):
+            raise ValueError("Either email or phone number must be provided")
+        return v
 
 class ResetPasswordRequest(BaseModel):
     token: str
