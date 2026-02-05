@@ -119,11 +119,32 @@ async def verify_registration_otp(
         FraudService.calculate_risk_score(user.id)
     else:
         logger.info(f"Existing user linked via OTP: {verify_data.target}")
+        
+        # ACTIVATE ACCOUNT if pending
+        if not user.is_active or user.kyc_status == "pending_verification":
+            user.is_active = True
+            if user.kyc_status == "pending_verification":
+                user.kyc_status = "verified" # Auto-verify phone for customers
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            logger.info(f"User {user.id} activated after OTP verification")
 
     # Create Dual Tokens
     access_token = create_access_token(subject=user.id)
     refresh_token = create_refresh_token(subject=user.id)
     return Token(access_token=access_token, refresh_token=refresh_token, user=user)
+
+@router.post("/verify-otp", response_model=Token)
+async def verify_otp_alias(
+    verify_data: OTPVerifyRequest,
+    db: Session = Depends(get_session)
+):
+    """
+    Verify OTP and log in / activate account.
+    (Alias for /register/verify-otp to match new requirements)
+    """
+    return await verify_registration_otp(verify_data, db)
 
 @router.post("/google", response_model=Token)
 async def authenticate_google(
