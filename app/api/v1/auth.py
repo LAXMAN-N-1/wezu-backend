@@ -305,7 +305,7 @@ async def refresh_token(
         raise HTTPException(status_code=401, detail="Could not validate credentials")
 
 
-from app.schemas.auth import LoginRequest, LoginResponse, MenuConfig
+from app.schemas.auth import LoginRequest, LoginResponse, MenuConfig, RoleSelectRequest
 
 @router.post("/login", response_model=LoginResponse)
 async def login(
@@ -364,33 +364,9 @@ async def login(
     access_token = create_access_token(subject=user.id)
     refresh_token = create_refresh_token(subject=user.id)
     
-    # Mock Permissions & Menu based on role (Replace with DB lookup later)
-    permissions = []
-    menu = []
-    
-    if selected_role_name == "customer":
-        permissions = ["vehicle:read", "station:read"]
-        menu = [
-            MenuConfig(label="Dashboard", path="/dashboard", icon="home"),
-            MenuConfig(label="My Vehicle", path="/vehicle", icon="car"),
-            MenuConfig(label="Find Stations", path="/stations", icon="map"),
-        ]
-    elif selected_role_name == "vendor_owner" or selected_role_name == "dealer":
-        permissions = ["station:create", "staff:create", "finance:read"]
-        menu = [
-            MenuConfig(label="Dashboard", path="/dashboard", icon="home"),
-            MenuConfig(label="Stations", path="/stations", icon="fuel"),
-            MenuConfig(label="Staff", path="/staff", icon="users"),
-            MenuConfig(label="Finance", path="/finance", icon="dollar-sign"),
-        ]
-    elif selected_role_name == "admin" or selected_role_name == "super_admin":
-        permissions = ["all"]
-        menu = [
-            MenuConfig(label="Dashboard", path="/admin/dashboard", icon="activity"),
-            MenuConfig(label="Users", path="/admin/users", icon="users"),
-            MenuConfig(label="Dealers", path="/admin/dealers", icon="briefcase"),
-            MenuConfig(label="Settings", path="/admin/settings", icon="settings"),
-        ]
+    # Get Permissions & Menu from AuthService
+    permissions = AuthService.get_permissions_for_role(selected_role_name)
+    menu_data = AuthService.get_menu_for_role(selected_role_name)
     
     return LoginResponse(
         success=True,
@@ -400,7 +376,45 @@ async def login(
         role=selected_role_name,
         available_roles=user_roles,
         permissions=permissions,
-        menu=menu
+        menu=menu_data
+    )
+
+@router.post("/select-role", response_model=LoginResponse)
+async def select_role(
+    role_data: RoleSelectRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session)
+):
+    """
+    Select/Switch active role for the current user.
+    """
+    # 1. Validate User has the role
+    user_roles = [r.name for r in current_user.roles]
+    
+    if role_data.role not in user_roles:
+         raise HTTPException(
+             status_code=status.HTTP_403_FORBIDDEN,
+             detail=f"User does not have role: {role_data.role}"
+         )
+         
+    # 2. Generate new tokens
+    access_token = create_access_token(subject=current_user.id)
+    refresh_token = create_refresh_token(subject=current_user.id)
+    
+    # 3. Get Permissions & Menu
+    permissions = AuthService.get_permissions_for_role(role_data.role)
+    menu_data = AuthService.get_menu_for_role(role_data.role)
+    
+    return LoginResponse(
+        success=True,
+        message=f"Switched to role: {role_data.role}",
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=current_user.model_dump(exclude={"hashed_password"}),
+        role=role_data.role,
+        available_roles=user_roles,
+        permissions=permissions,
+        menu=menu_data
     )
 # ===== NEW MISSING ENDPOINTS =====
 

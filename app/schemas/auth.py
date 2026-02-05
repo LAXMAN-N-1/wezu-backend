@@ -8,6 +8,9 @@ class LoginRequest(BaseModel):
     device_fingerprint: Optional[str] = None
     remember_me: bool = False
 
+class RoleSelectRequest(BaseModel):
+    role: str
+
 class MenuConfig(BaseModel):
     label: str
     icon: Optional[str] = None

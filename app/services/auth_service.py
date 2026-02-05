@@ -58,3 +58,40 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=f"Invalid Apple token: {str(e)}",
             )
+
+    @staticmethod
+    def get_permissions_for_role(role_name: str) -> list[str]:
+        if role_name == "customer":
+            return ["vehicle:read", "station:read"]
+        elif role_name in ["vendor_owner", "dealer"]:
+            return ["station:create", "staff:create", "finance:read"]
+        elif role_name in ["admin", "super_admin"]:
+            return ["all"]
+        return []
+
+    @staticmethod
+    def get_menu_for_role(role_name: str) -> list[dict]:
+        # Avoiding circular import by returning dicts or importing locally if needed
+        # But returning dicts is safer for service layer decoupling if schema isn't strictly needed here 
+        # However, for type safety let's use the schema if possible, but for now dicts are fine as they serialize to JSON
+        if role_name == "customer":
+            return [
+                {"label": "Dashboard", "path": "/dashboard", "icon": "home"},
+                {"label": "My Vehicle", "path": "/vehicle", "icon": "car"},
+                {"label": "Find Stations", "path": "/stations", "icon": "map"},
+            ]
+        elif role_name in ["vendor_owner", "dealer"]:
+            return [
+                {"label": "Dashboard", "path": "/dashboard", "icon": "home"},
+                {"label": "Stations", "path": "/stations", "icon": "fuel"},
+                {"label": "Staff", "path": "/staff", "icon": "users"},
+                {"label": "Finance", "path": "/finance", "icon": "dollar-sign"},
+            ]
+        elif role_name in ["admin", "super_admin"]:
+            return [
+                {"label": "Dashboard", "path": "/admin/dashboard", "icon": "activity"},
+                {"label": "Users", "path": "/admin/users", "icon": "users"},
+                {"label": "Dealers", "path": "/admin/users", "icon": "briefcase"},
+                {"label": "Settings", "path": "/admin/settings", "icon": "settings"},
+            ]
+        return []
