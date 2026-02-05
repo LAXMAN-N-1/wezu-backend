@@ -43,6 +43,13 @@ class RoleRead(RoleBase):
     class Config:
         from_attributes = True
 
+class RoleDetail(RoleRead):
+    user_count: int = 0
+    permission_tree: dict = {}
+    parent_role: Optional["RoleRead"] = None
+    child_roles: List["RoleRead"] = []
+
+
 class RoleUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None

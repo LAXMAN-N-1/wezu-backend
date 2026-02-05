@@ -1,9 +1,9 @@
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 from app.api import deps
 from app.models.admin_user import AdminUser
-from app.models.rbac import Role, Permission, RolePermission, AdminUserRole
+from app.models.rbac import Role, Permission, RolePermission, AdminUserRole, UserRole
 from app.schemas import rbac as rbac_schema
 
 router = APIRouter()
@@ -142,4 +142,51 @@ def assign_roles_to_user(
         db.add(link)
         
     db.commit()
+    db.commit()
     return {"status": "success", "message": "Roles updated"}
+
+
+@router.get("/roles/{role_id}", response_model=rbac_schema.RoleDetail)
+def get_role_detail(
+    role_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Get detailed role information including hierarchy and stats.
+    """
+    role = db.get(Role, role_id)
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+        
+    # 1. User Count
+    # Combining counts from UserRole and AdminUserRole if applicable
+    # Querying relationship table for counting is more efficient than loading relationships
+    user_count = db.exec(select(func.count()).select_from(UserRole).where(UserRole.role_id == role_id)).one()
+    
+    # 2. Permission Tree
+    permissions = role.permissions
+    permission_tree = {}
+    for perm in permissions:
+        if perm.module not in permission_tree:
+            permission_tree[perm.module] = []
+        permission_tree[perm.module].append(perm.action)
+        
+    # 3. Hierarchy
+    parent_role = None
+    if role.parent_role_id:
+        parent_role_obj = db.get(Role, role.parent_role_id)
+        if parent_role_obj:
+            parent_role = rbac_schema.RoleRead.model_validate(parent_role_obj)
+            
+    child_roles_objs = db.exec(select(Role).where(Role.parent_role_id == role_id)).all()
+    child_roles = [rbac_schema.RoleRead.model_validate(c) for c in child_roles_objs]
+    
+    # Construct Response
+    result = rbac_schema.RoleDetail.model_validate(role)
+    result.user_count = user_count
+    result.permission_tree = permission_tree
+    result.parent_role = parent_role
+    result.child_roles = child_roles
+    
+    return result
