@@ -53,6 +53,9 @@ class RoleDetail(RoleRead):
 class RoleUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    category: Optional[str] = None
+    level: Optional[int] = None
+    parent_role_id: Optional[int] = None
     permissions: Optional[List[str]] = None # List of Permission Slugs
 
 # User Assignment Schema

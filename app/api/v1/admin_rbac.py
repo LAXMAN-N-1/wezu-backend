@@ -142,8 +142,84 @@ def assign_roles_to_user(
         db.add(link)
         
     db.commit()
-    db.commit()
     return {"status": "success", "message": "Roles updated"}
+
+
+@router.put("/roles/{role_id}", response_model=rbac_schema.RoleRead)
+def update_role(
+    *,
+    role_id: int,
+    role_in: rbac_schema.RoleUpdate,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Update role.
+    """
+    role = db.get(Role, role_id)
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+        
+    # 1. System Role Protection
+    if role.is_system_role:
+        if role_in.name is not None and role_in.name != role.name:
+            raise HTTPException(status_code=400, detail="Cannot rename system roles")
+        if role_in.category is not None and role_in.category != role.category:
+             raise HTTPException(status_code=400, detail="Cannot change category of system roles")
+             
+    # 2. Update Basic Fields
+    if role_in.name is not None:
+        # Check uniqueness
+        if role_in.name != role.name:
+             existing = db.exec(select(Role).where(Role.name == role_in.name)).first()
+             if existing:
+                 raise HTTPException(status_code=400, detail="Role name already exists")
+        role.name = role_in.name
+        
+    if role_in.description is not None:
+        role.description = role_in.description
+    if role_in.category is not None:
+        role.category = role_in.category
+    if role_in.level is not None:
+        role.level = role_in.level
+    if role_in.parent_role_id is not None:
+        # Prevent circular logic usually, but keep simple for now
+        role.parent_role_id = role_in.parent_role_id
+        
+    db.add(role)
+    db.commit()
+    
+    # 3. Update Permissions
+    if role_in.permissions is not None:
+        # Clear existing
+        existing_links = db.exec(select(RolePermission).where(RolePermission.role_id == role.id)).all()
+        for link in existing_links:
+            db.delete(link)
+            
+        # Add new
+        for slug in role_in.permissions:
+            permission = db.exec(select(Permission).where(Permission.slug == slug)).first()
+            if permission:
+                 db.add(RolePermission(role_id=role.id, permission_id=permission.id))
+        
+        # 4. Session Invalidation (Security)
+        # Invalidate sessions for users having this role
+        # Find users
+        user_ids = db.exec(select(UserRole.user_id).where(UserRole.role_id == role.id)).all()
+        if user_ids:
+             # This requires UserSession import, avoiding circular dep if possible or import inside
+             from app.models.session import UserSession
+             # Bulk update approach
+             statement = select(UserSession).where(UserSession.user_id.in_(user_ids)).where(UserSession.is_active == True)
+             sessions = db.exec(statement).all()
+             for session in sessions:
+                 session.is_active = False
+                 db.add(session)
+        
+        db.commit()
+        
+    db.refresh(role)
+    return role
 
 
 @router.get("/roles/{role_id}", response_model=rbac_schema.RoleDetail)
