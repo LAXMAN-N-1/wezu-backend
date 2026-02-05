@@ -554,10 +554,7 @@ async def resend_otp(
 
 
 
-class ResetPasswordRequest(BaseModel):
-    email: EmailStr
-    otp: str
-    new_password: str
+from app.schemas.auth import ResetPasswordRequest, ChangePasswordRequest
 
 
 @router.post("/reset-password")
@@ -565,16 +562,27 @@ async def reset_password(
     request: ResetPasswordRequest,
     db: Session = Depends(get_session)
 ):
-    """Reset password using OTP"""
-    # Verify OTP
-    if not OTPService.verify_otp(db, request.email, request.otp, "password_reset"):
+    """
+    Reset password using OTP.
+    - Verifies OTP.
+    - Updates password.
+    - Invalidates all existing sessions (Global Logout).
+    """
+    target = request.email or request.phone_number
+    
+    # 1. Verify OTP
+    if not OTPService.verify_otp(db, target, request.otp, "password_reset"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid or expired OTP"
         )
     
-    # Get user
-    statement = select(User).where(User.email == request.email)
+    # 2. Get user
+    if request.email:
+        statement = select(User).where(User.email == request.email)
+    else:
+        statement = select(User).where(User.phone_number == request.phone_number)
+        
     user = db.exec(statement).first()
     
     if not user:
@@ -583,19 +591,21 @@ async def reset_password(
             detail="User not found"
         )
     
-    # Update password
+    # 3. Update password
     from app.core.security import get_password_hash
     user.hashed_password = get_password_hash(request.new_password)
+    
+    # 4. Global Logout (Security Best Practice)
+    user.last_global_logout_at = datetime.utcnow()
+    
     db.add(user)
     db.commit()
     
-    logger.info(f"Password reset successful for {request.email}")
-    return {"message": "Password reset successful"}
+    logger.info(f"Password reset successful for {target}. Global logout triggered.")
+    return {"message": "Password reset successful. You have been logged out from all devices."}
 
 
-class ChangePasswordRequest(BaseModel):
-    current_password: str
-    new_password: str
+
 
 
 @router.post("/change-password")
@@ -616,7 +626,10 @@ async def change_password(
     
     # Update password
     current_user.hashed_password = get_password_hash(request.new_password)
-    db.add(current_user)
+    
+    # Merge into current session to avoid "already attached" error
+    updated_user = db.merge(current_user)
+    db.add(updated_user)
     db.commit()
     
     logger.info(f"Password changed for user {current_user.id}")

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, validator, root_validator
 from typing import Optional, List
 
 class LoginRequest(BaseModel):
@@ -64,8 +64,50 @@ class ForgotPasswordRequest(BaseModel):
         return v
 
 class ResetPasswordRequest(BaseModel):
-    token: str
+    token: Optional[str] = None # Deprecated/Optional for backward compatibility or link-based reset
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
+    otp: str
     new_password: str
+
+    @validator("phone_number")
+    def validate_phone(cls, v):
+        if v and not v.isdigit() and not v.startswith("+"):
+             raise ValueError("Phone number must contain only digits or start with +")
+        return v
+    
+    @validator("new_password")
+    def validate_password_strength(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        return v
+
+    @root_validator(pre=True)
+    def validate_target(cls, values):
+        email = values.get("email")
+        phone = values.get("phone_number")
+        if not email and not phone:
+            raise ValueError("Either email or phone number must be provided")
+        return values
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+    @validator("new_password")
+    def validate_password_strength(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        return v
+
+    @root_validator(skip_on_failure=True)
+    def validate_passwords_different(cls, values):
+        current = values.get("current_password")
+        new = values.get("new_password")
+        if current and new and current == new:
+            raise ValueError("New password must be different from the current password")
+        return values
 
 
 # Customer Registration Schemas
