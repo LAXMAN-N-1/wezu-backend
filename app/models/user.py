@@ -1,7 +1,18 @@
 from sqlmodel import SQLModel, Field, Relationship
 from app.models.rbac import UserRole
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
+
+if TYPE_CHECKING:
+    from app.models.financial import Wallet
+    from app.models.location import Address
+    from app.models.kyc import KYCDocument
+    from app.models.iot import Device
+    from app.models.vehicle import Vehicle
+    from app.models.dealer import DealerProfile
+    from app.models.driver_profile import DriverProfile
+    from app.models.staff import StaffProfile
+    from app.models.rbac import Role
 
 class User(SQLModel, table=True):
     __tablename__ = "users"
@@ -50,6 +61,10 @@ class User(SQLModel, table=True):
     vehicles: List["Vehicle"] = Relationship(back_populates="user")
     dealer_profile: Optional["DealerProfile"] = Relationship(back_populates="user")
     driver_profile: Optional["DriverProfile"] = Relationship(back_populates="user")
+    staff_profile: Optional["StaffProfile"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"foreign_keys": "[StaffProfile.user_id]"}
+    )
     
     # RBAC
     roles: List["Role"] = Relationship(back_populates="users", link_model=UserRole)

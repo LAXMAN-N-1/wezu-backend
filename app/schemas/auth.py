@@ -109,3 +109,21 @@ class DealerRegisterResponse(BaseModel):
     status: str
     message: str
     verification_token: str
+
+class StaffRegisterRequest(BaseModel):
+    full_name: str
+    phone_number: str
+    email: EmailStr
+    staff_type: str # station_manager, technician
+    employment_id: str
+    
+    # Optional Assignments
+    station_id: Optional[int] = None
+    reporting_manager_id: Optional[int] = None
+
+class StaffRegisterResponse(BaseModel):
+    user_id: int
+    username: str # email or phone
+    temporary_password: str
+    role: str
+    message: str

@@ -732,3 +732,142 @@ async def register_dealer(
         verification_token=verification_token
     )
 
+# ===== STAFF REGISTRATION =====
+
+from app.schemas.auth import StaffRegisterRequest, StaffRegisterResponse
+from app.models.staff import StaffProfile
+import secrets
+import string
+
+@router.post("/register/staff", response_model=StaffRegisterResponse)
+async def register_staff(
+    register_data: StaffRegisterRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session)
+):
+    """
+    Register a new staff member (Station Manager, Technician, etc.).
+    
+    Authorization:
+    - Admin/Super Admin: Can create staff for any dealer/station (or no dealer).
+    - Vendor Owner: Can ONLY create staff for their own dealer profile.
+    
+    Process:
+    1. Check permissions and validate dealer ownership.
+    2. Check if user exists.
+    3. Generate temporary password.
+    4. Create User (active=True).
+    5. Assign Role.
+    6. Create StaffProfile.
+    7. Send credentials (Mock).
+    """
+    
+    # 1. Authorization & Validation
+    user_roles = [r.name for r in current_user.roles]
+    is_admin = "admin" in user_roles or "super_admin" in user_roles
+    is_vendor = "vendor_owner" in user_roles
+    is_regional_manager = "regional_manager" in user_roles
+    
+    if not (is_admin or is_vendor or is_regional_manager):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to create staff accounts"
+        )
+        
+    dealer_id_to_assign = None
+    
+    if is_vendor:
+        # ensuring vendor has a dealer profile
+        statement = select(DealerProfile).where(DealerProfile.user_id == current_user.id)
+        dealer_profile = db.exec(statement).first()
+        
+        if not dealer_profile:
+             raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Vendor does not have a valid dealer profile"
+            )
+        dealer_id_to_assign = dealer_profile.id
+        
+        # If station_id is provided, verify it belongs to this dealer
+        if register_data.station_id:
+            station = db.get(Station, register_data.station_id)
+            if not station or station.dealer_id != dealer_profile.id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Station not found or does not belong to your dealership"
+                )
+    
+    # 2. Check if user exists
+    existing_user = db.exec(
+        select(User).where(
+            (User.email == register_data.email) | 
+            (User.phone_number == register_data.phone_number)
+        )
+    ).first()
+    
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User with this email or phone already exists"
+        )
+
+    # 3. Generate Temporary Password
+    alphabet = string.ascii_letters + string.digits
+    temp_password = ''.join(secrets.choice(alphabet) for i in range(10))
+    
+    # 4. Create User
+    from app.core.security import get_password_hash
+    
+    new_user = User(
+        full_name=register_data.full_name,
+        email=register_data.email,
+        phone_number=register_data.phone_number,
+        hashed_password=get_password_hash(temp_password),
+        is_active=True,
+        kyc_status="verified" # Staff created by admin/vendor are trusted initially
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    # 5. Assign Role
+    # Try to find specific role based on staff_type, fallback to 'staff'
+    role_name = register_data.staff_type if register_data.staff_type in ["station_manager", "technician"] else "staff"
+    
+    role = db.exec(select(Role).where(Role.name == role_name)).first()
+    if not role:
+        # Fallback to 'staff' generic role if specific one doesn't exist
+        role = db.exec(select(Role).where(Role.name == "staff")).first()
+        
+    if role:
+        new_user.roles.append(role)
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+    else:
+        logger.warning(f"Role '{role_name}' or 'staff' not found for new user {new_user.id}")
+
+    # 6. Create Staff Profile
+    staff_profile = StaffProfile(
+        user_id=new_user.id,
+        dealer_id=dealer_id_to_assign,
+        station_id=register_data.station_id,
+        staff_type=register_data.staff_type,
+        employment_id=register_data.employment_id,
+        reporting_manager_id=register_data.reporting_manager_id
+    )
+    db.add(staff_profile)
+    db.commit()
+    db.refresh(staff_profile)
+    
+    # 7. Notify (Mock)
+    logger.info(f"Staff account created: {new_user.email} with pwd {temp_password}")
+    # In production: await NotificationService.send_credentials(...)
+    
+    return StaffRegisterResponse(
+        user_id=new_user.id,
+        username=new_user.email,
+        temporary_password=temp_password,
+        role=role.name if role else "none",
+        message="Staff account created successfully. Credentials sent."
+    )

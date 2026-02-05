@@ -1,6 +1,11 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List, Dict
 from datetime import datetime
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from app.models.station import Station
+    from app.models.commission import Commission # If it existed
+    from app.models.staff import StaffProfile
 # from pydantic import EmailStr
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
@@ -35,6 +40,7 @@ class DealerProfile(SQLModel, table=True):
     application: Optional["DealerApplication"] = Relationship(back_populates="dealer")
     # commissions: List["Commission"] = Relationship(back_populates="dealer")
     documents: List["DealerDocument"] = Relationship(back_populates="dealer")
+    staff_members: List["StaffProfile"] = Relationship(back_populates="dealer")
 
 class DealerDocument(SQLModel, table=True):
     __tablename__ = "dealer_documents"
