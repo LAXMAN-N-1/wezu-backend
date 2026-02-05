@@ -37,6 +37,10 @@ class User(SQLModel, table=True):
     kyc_video_url: Optional[str] = None
     utility_bill_url: Optional[str] = None
     
+    # Contact & Preferences
+    emergency_contact: Optional[str] = None  # Emergency contact phone/name
+    notification_preferences: Optional[str] = None  # JSON string: {"push": true, "email": true, "sms": false}
+    
     # Consent
     consent_captured: bool = Field(default=False)
     consent_date: Optional[datetime] = None

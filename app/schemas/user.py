@@ -42,9 +42,16 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(BaseModel):
+    """
+    Allowed fields for self-profile update.
+    NOT allowed: phone_number (requires verification), role (admin only), verification status
+    """
     full_name: Optional[str] = None
     email: Optional[EmailStr] = None
     profile_picture: Optional[str] = None
+    address: Optional[str] = None
+    emergency_contact: Optional[str] = None
+    notification_preferences: Optional[str] = None  # JSON: {"push": true, "email": true, "sms": false}
     security_question: Optional[str] = None
     security_answer: Optional[str] = None
 

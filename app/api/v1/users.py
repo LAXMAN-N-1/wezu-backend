@@ -107,14 +107,81 @@ async def read_user_me(
         updated_at=user.updated_at
     )
 
-@router.put("/me", response_model=UserResponse)
+@router.put("/me", response_model=UserProfileResponse)
 async def update_user_me(
     user_in: UserUpdate,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db),
+    db: Session = Depends(get_session),
 ):
-    user = UserService.update_user(db, current_user, user_in)
-    return user
+    """
+    Update authenticated user's profile.
+    
+    Allowed fields:
+    - full_name, email, profile_picture, address
+    - emergency_contact, notification_preferences
+    - security_question, security_answer
+    
+    NOT allowed (ignored if sent):
+    - phone_number (requires verification)
+    - role (admin only)
+    - kyc_status, is_active (admin only)
+    """
+    from datetime import datetime
+    
+    # Get fresh user from current session
+    user = db.get(User, current_user.id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Update allowed fields only
+    update_data = user_in.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        if hasattr(user, field):
+            setattr(user, field, value)
+    
+    # Update timestamp
+    user.updated_at = datetime.utcnow()
+    
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    # Return full profile response
+    user_roles = [r.name for r in user.roles] if user.roles else []
+    current_role = user_roles[0] if user_roles else None
+    permissions = AuthService.get_permissions_for_role(current_role) if current_role else []
+    menu = AuthService.get_menu_for_role(current_role) if current_role else []
+    wallet_balance = user.wallet.balance if user.wallet else 0.0
+    
+    staff_assignment = None
+    if user.staff_profile:
+        staff_assignment = StaffAssignmentInfo(
+            staff_type=user.staff_profile.staff_type,
+            station_id=user.staff_profile.station_id,
+            dealer_id=user.staff_profile.dealer_id,
+            employment_id=user.staff_profile.employment_id,
+            is_active=user.staff_profile.is_active
+        )
+    
+    return UserProfileResponse(
+        id=user.id,
+        full_name=user.full_name,
+        email=user.email,
+        phone_number=user.phone_number,
+        profile_picture=user.profile_picture,
+        is_active=user.is_active,
+        is_superuser=user.is_superuser,
+        kyc_status=user.kyc_status,
+        current_role=current_role,
+        available_roles=user_roles,
+        permissions=permissions,
+        menu=menu,
+        wallet_balance=wallet_balance,
+        staff_assignment=staff_assignment,
+        profile_completion_percentage=calculate_profile_completion(user),
+        created_at=user.created_at,
+        updated_at=user.updated_at
+    )
 
 @router.post("/me/avatar", response_model=UserResponse)
 async def upload_avatar(
