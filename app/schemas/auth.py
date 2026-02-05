@@ -4,24 +4,28 @@ from typing import Optional, List
 class LoginRequest(BaseModel):
     username: str # email or phone
     password: str
+    role: Optional[str] = None
+    device_fingerprint: Optional[str] = None
+    remember_me: bool = False
 
-class RegisterRequest(BaseModel):
-    full_name: str
-    email: Optional[EmailStr] = None
-    phone_number: str
-    password: str
-    referrer_code: Optional[str] = None
+class MenuConfig(BaseModel):
+    label: str
+    icon: Optional[str] = None
+    path: str
+    children: Optional[List["MenuConfig"]] = None
 
-class Token(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-    expires_in: int
-
-class TokenResponse(BaseModel):
+class LoginResponse(BaseModel):
     success: bool = True
     message: str = "Login successful"
-    data: Token
+    access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
+    token_type: str = "bearer"
+    user: Optional[dict] = None # Full user object
+    role: Optional[str] = None # Current active role
+    permissions: List[str] = []
+    menu: List[MenuConfig] = []
+    available_roles: List[str] = []
+    requires_role_selection: bool = False
 
 class OTPRequest(BaseModel):
     phone_number: str

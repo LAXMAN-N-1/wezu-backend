@@ -305,6 +305,103 @@ async def refresh_token(
         raise HTTPException(status_code=401, detail="Could not validate credentials")
 
 
+from app.schemas.auth import LoginRequest, LoginResponse, MenuConfig
+
+@router.post("/login", response_model=LoginResponse)
+async def login(
+    login_data: LoginRequest,
+    db: Session = Depends(get_session)
+):
+    """
+    Login with password. Supports multi-role users.
+    """
+    from app.core.security import verify_password
+    
+    # 1. Find User (by email or phone)
+    if "@" in login_data.username:
+        statement = select(User).where(User.email == login_data.username).options(selectinload(User.roles))
+    else:
+        statement = select(User).where(User.phone_number == login_data.username).options(selectinload(User.roles))
+    
+    user = db.exec(statement).first()
+    
+    if not user:
+        # Avoid user enumeration
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+    if not verify_password(login_data.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+        
+    if not user.is_active:
+         raise HTTPException(status_code=403, detail="Account is inactive")
+
+    # 2. Determine Role
+    user_roles = [r.name for r in user.roles]
+    selected_role_name = None
+    
+    if not user_roles:
+         raise HTTPException(status_code=403, detail="No roles assigned to user")
+
+    if login_data.role:
+        if login_data.role not in user_roles:
+            raise HTTPException(status_code=403, detail=f"User does not have role: {login_data.role}")
+        selected_role_name = login_data.role
+    else:
+        # Auto-select if only 1 role
+        if len(user_roles) == 1:
+            selected_role_name = user_roles[0]
+        else:
+            # Require selection
+            return LoginResponse(
+                success=False,
+                message="Please select a role to continue",
+                requires_role_selection=True,
+                available_roles=user_roles,
+                user=user.model_dump(exclude={"hashed_password"})
+            )
+            
+    # 3. Generate Response for Selected Role
+    access_token = create_access_token(subject=user.id)
+    refresh_token = create_refresh_token(subject=user.id)
+    
+    # Mock Permissions & Menu based on role (Replace with DB lookup later)
+    permissions = []
+    menu = []
+    
+    if selected_role_name == "customer":
+        permissions = ["vehicle:read", "station:read"]
+        menu = [
+            MenuConfig(label="Dashboard", path="/dashboard", icon="home"),
+            MenuConfig(label="My Vehicle", path="/vehicle", icon="car"),
+            MenuConfig(label="Find Stations", path="/stations", icon="map"),
+        ]
+    elif selected_role_name == "vendor_owner" or selected_role_name == "dealer":
+        permissions = ["station:create", "staff:create", "finance:read"]
+        menu = [
+            MenuConfig(label="Dashboard", path="/dashboard", icon="home"),
+            MenuConfig(label="Stations", path="/stations", icon="fuel"),
+            MenuConfig(label="Staff", path="/staff", icon="users"),
+            MenuConfig(label="Finance", path="/finance", icon="dollar-sign"),
+        ]
+    elif selected_role_name == "admin" or selected_role_name == "super_admin":
+        permissions = ["all"]
+        menu = [
+            MenuConfig(label="Dashboard", path="/admin/dashboard", icon="activity"),
+            MenuConfig(label="Users", path="/admin/users", icon="users"),
+            MenuConfig(label="Dealers", path="/admin/dealers", icon="briefcase"),
+            MenuConfig(label="Settings", path="/admin/settings", icon="settings"),
+        ]
+    
+    return LoginResponse(
+        success=True,
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=user.model_dump(exclude={"hashed_password"}),
+        role=selected_role_name,
+        available_roles=user_roles,
+        permissions=permissions,
+        menu=menu
+    )
 # ===== NEW MISSING ENDPOINTS =====
 
 @router.post("/logout")
