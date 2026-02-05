@@ -33,6 +33,7 @@ class RoleCreate(RoleBase):
 class RoleRead(RoleBase):
     id: int
     is_system_role: bool
+    is_active: bool
     permissions: Optional[List[PermissionRead]] = None
     permission_count: int = 0
     category: str

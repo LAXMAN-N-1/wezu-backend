@@ -43,6 +43,7 @@ class Role(SQLModel, table=True):
     level: int = Field(default=0) # Hierarchy level (e.g. 100=Admin, 10=User)
     parent_role_id: Optional[int] = Field(default=None, foreign_key="roles.id")
     is_system_role: bool = Field(default=False)  # If True, cannot be deleted (e.g., Super Admin)
+    is_active: bool = Field(default=True)
     
     permissions: List[Permission] = Relationship(back_populates="roles", link_model=RolePermission)
     

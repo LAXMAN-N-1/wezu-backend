@@ -13,6 +13,7 @@ def read_roles(
     skip: int = 0,
     limit: int = 100,
     category: str | None = None,
+    active_only: bool = False,
     include_permissions: bool = True,
     db: Session = Depends(deps.get_db),
     current_user: AdminUser = Depends(deps.get_current_active_superuser),
@@ -24,6 +25,9 @@ def read_roles(
     
     if category:
         query = query.where(Role.category == category)
+        
+    if active_only:
+        query = query.where(Role.is_active == True)
         
     # TODO: Implement stricter RBAC for non-superusers if needed
     # For now, Super Admin sees all. 
@@ -266,3 +270,38 @@ def get_role_detail(
     result.child_roles = child_roles
     
     return result
+
+@router.delete("/roles/{role_id}", response_model=Any)
+def delete_role(
+    role_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Soft delete a role.
+    """
+    role = db.get(Role, role_id)
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+        
+    # 1. System Role Protection
+    if role.is_system_role:
+        raise HTTPException(status_code=400, detail="Cannot delete system roles")
+        
+    # 2. Check for active users
+    # Check UserRole table
+    user_count = db.exec(select(func.count()).select_from(UserRole).where(UserRole.role_id == role_id)).one()
+    if user_count > 0:
+        raise HTTPException(status_code=400, detail="Cannot delete role with assigned active users")
+        
+    # Check AdminUserRole table
+    admin_user_count = db.exec(select(func.count()).select_from(AdminUserRole).where(AdminUserRole.role_id == role_id)).one()
+    if admin_user_count > 0:
+        raise HTTPException(status_code=400, detail="Cannot delete role with assigned admin users")
+
+    # 3. Soft Delete
+    role.is_active = False
+    db.add(role)
+    db.commit()
+    
+    return {"status": "success", "message": "Role deleted successfully"}
