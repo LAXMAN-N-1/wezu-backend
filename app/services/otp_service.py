@@ -16,12 +16,48 @@ class OTPService:
 
     @staticmethod
     def create_otp_record(db: Session, target: str, code: str, purpose: str = "registration") -> OTP:
-        # Check for rate limiting: prevent more than 1 OTP per minute
-        statement = select(OTP).where(OTP.target == target, OTP.purpose == purpose, OTP.created_at > datetime.utcnow() - timedelta(minutes=1))
-        recent_otp = db.exec(statement).first()
-        if recent_otp:
-            from fastapi import HTTPException
-            raise HTTPException(status_code=429, detail="Too many OTP requests. Please wait 60 seconds.")
+        # Rate Limiting Logic
+        # 1. Count OTPs in the last 30 minutes
+        window_start = datetime.utcnow() - timedelta(minutes=30)
+        statement = select(OTP).where(
+            OTP.target == target, 
+            OTP.purpose == purpose, 
+            OTP.created_at > window_start
+        ).order_by(OTP.created_at.desc())
+        
+        recent_otps = db.exec(statement).all()
+        count = len(recent_otps)
+        
+        # 2. Hard Limit: Max 3 OTPs per 30 mins
+        if count >= 3:
+             from fastapi import HTTPException
+             raise HTTPException(
+                 status_code=429, 
+                 detail="Maximum OTP limit reached. Please try again after 30 minutes."
+            )
+            
+        # 3. Progressive Delays
+        if count > 0:
+            last_otp_time = recent_otps[0].created_at
+            time_since_last = datetime.utcnow() - last_otp_time
+            
+            # After 1st OTP (attempting 2nd): Wait 1 minute
+            if count == 1 and time_since_last < timedelta(minutes=1):
+                 from fastapi import HTTPException
+                 wait_seconds = 60 - int(time_since_last.total_seconds())
+                 raise HTTPException(
+                     status_code=429, 
+                     detail=f"Please wait {wait_seconds} seconds before requesting a new OTP."
+                )
+            
+            # After 2nd OTP (attempting 3rd): Wait 5 minutes
+            if count == 2 and time_since_last < timedelta(minutes=5):
+                 from fastapi import HTTPException
+                 wait_minutes = 5 - int(time_since_last.total_seconds() / 60)
+                 raise HTTPException(
+                     status_code=429, 
+                     detail=f"Please wait {wait_minutes} minutes before requesting a new OTP."
+                )
 
         # Deactivate previous OTPs for the same target and purpose
         statement = select(OTP).where(OTP.target == target, OTP.purpose == purpose, OTP.is_active == True)
