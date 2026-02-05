@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
+from pydantic import BaseModel
 from typing import List, Optional
 from app.api import deps
 from app.db.session import get_session
@@ -183,12 +184,84 @@ async def update_user_me(
         updated_at=user.updated_at
     )
 
-@router.post("/me/avatar", response_model=UserResponse)
+# Profile Picture Upload Response
+class ProfilePictureResponse(BaseModel):
+    url: str
+    message: str = "Profile picture uploaded successfully"
+
+
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
+MAX_PROFILE_PICTURE_SIZE = 5 * 1024 * 1024  # 5MB
+
+
+@router.post("/me/profile-picture", response_model=ProfilePictureResponse)
+async def upload_profile_picture(
+    file: UploadFile = File(...),
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Upload profile picture for authenticated user.
+    
+    - Accepts: JPEG, PNG, GIF, WebP
+    - Max size: 5MB
+    - Returns: URL of uploaded image
+    """
+    from app.services.storage_service import StorageService
+    from datetime import datetime
+    import uuid
+    
+    # Validate file type
+    if file.content_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file type. Allowed: {', '.join(ALLOWED_IMAGE_TYPES)}"
+        )
+    
+    # Validate file size
+    content = await file.read()
+    if len(content) > MAX_PROFILE_PICTURE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File too large. Maximum size: 5MB"
+        )
+    
+    # Reset file position for upload
+    await file.seek(0)
+    
+    # Generate unique filename
+    file_ext = os.path.splitext(file.filename)[1] if file.filename else ".jpg"
+    unique_filename = f"profile_{current_user.id}_{uuid.uuid4().hex[:8]}{file_ext}"
+    
+    # Create a new UploadFile with the unique filename
+    file.filename = unique_filename
+    
+    # Upload to storage (local or cloud based on config)
+    file_url = await StorageService.upload_file(file, "profile-pictures")
+    
+    # Update user record
+    user = db.get(User, current_user.id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user.profile_picture = file_url
+    user.updated_at = datetime.utcnow()
+    db.add(user)
+    db.commit()
+    
+    return ProfilePictureResponse(url=file_url)
+
+
+# Legacy avatar endpoint (keep for backward compatibility)
+@router.post("/me/avatar", response_model=UserResponse, deprecated=True)
 async def upload_avatar(
     file: UploadFile = File(...),
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ):
+    """
+    DEPRECATED: Use POST /users/me/profile-picture instead.
+    """
     MAX_SIZE = 2 * 1024 * 1024
     content = await file.read()
     if len(content) > MAX_SIZE:
