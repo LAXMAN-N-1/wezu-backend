@@ -10,7 +10,7 @@ class EmailService:
              return True
 
         message = Mail(
-            from_email=settings.EMAILS_FROM_EMAIL,
+            from_email=settings.SENDGRID_FROM_EMAIL or "noreply@wezu.com",
             to_emails=to_email,
             subject=subject,
             html_content=content

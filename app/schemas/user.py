@@ -55,6 +55,10 @@ class UserUpdate(BaseModel):
     security_question: Optional[str] = None
     security_answer: Optional[str] = None
 
+class UserStatusUpdate(BaseModel):
+    status: str # active, suspended, banned
+    reason: str
+
 from app.schemas.role import RoleResponse
 
 class UserResponse(UserBase):
@@ -137,3 +141,36 @@ class UserProfileResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+class ActivityLogEntry(BaseModel):
+    action: str
+    resource_type: str
+    resource_id: Optional[str] = None
+    details: Optional[str] = None
+    ip_address: Optional[str] = None
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+class ActivityLogResponse(BaseModel):
+    logs: List[ActivityLogEntry]
+    total_count: int
+    page: int
+    limit: int
+
+class UserSessionResponse(BaseModel):
+    id: int
+    # user_id: int # Implicit from context
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    location: Optional[str] = None
+    device_type: str
+    is_active: bool
+    last_active_at: datetime
+    created_at: datetime
+    is_current: bool = False # Helper field
+
+    class Config:
+        from_attributes = True
+

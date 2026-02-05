@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session, select
 from app.db.session import get_session
 from app.models.user import User, Token
+from app.models.session import UserSession
 from app.models.otp import OTP
 from app.services.auth_service import AuthService
 from app.services.otp_service import OTPService
@@ -73,6 +74,7 @@ from app.models.rbac import Role
 @router.post("/register/verify-otp", response_model=Token)
 async def verify_registration_otp(
     verify_data: OTPVerifyRequest,
+    request: Request,
     db: Session = Depends(get_session)
 ):
     # Verify OTP
@@ -130,21 +132,64 @@ async def verify_registration_otp(
             db.refresh(user)
             logger.info(f"User {user.id} activated after OTP verification")
 
+    # Update Last Login
+    user.last_login = datetime.utcnow()
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
     # Create Dual Tokens
     access_token = create_access_token(subject=user.id)
     refresh_token = create_refresh_token(subject=user.id)
+    
+    
+    # Create Session
+    try:
+        # Extract JWT ID (jti) from refresh token
+        try:
+            payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            token_jti = payload.get("jti")
+        except:
+            import uuid
+            token_jti = str(uuid.uuid4()) # Fallback if no jti in token logic yet
+            
+        user_agent = request.headers.get("user-agent", "unknown")
+        ip_address = request.client.host if request.client else "unknown"
+        # X-Forwarded-For if behind proxy
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            ip_address = forwarded.split(",")[0]
+            
+        device_type = "mobile" if "mobile" in user_agent.lower() else "web"
+        
+        session = UserSession(
+            user_id=user.id,
+            token_id=token_jti,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            device_type=device_type,
+            expires_at=datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        )
+        db.add(session)
+        db.commit()
+    except Exception as e:
+        logger.error(f"Failed to create session: {e}")
+        
     return Token(access_token=access_token, refresh_token=refresh_token, user=user)
+
+
 
 @router.post("/verify-otp", response_model=Token)
 async def verify_otp_alias(
     verify_data: OTPVerifyRequest,
+    request: Request,
     db: Session = Depends(get_session)
 ):
     """
     Verify OTP and log in / activate account.
     (Alias for /register/verify-otp to match new requirements)
     """
-    return await verify_registration_otp(verify_data, db)
+    return await verify_registration_otp(verify_data, request, db)
 
 from app.schemas.auth import SocialLoginRequest, LoginResponse, MenuConfig, ForgotPasswordRequest
 
@@ -269,6 +314,12 @@ async def social_login(
         db.commit()
         db.refresh(user)
 
+    # Update Last Login
+    user.last_login = datetime.utcnow()
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
     # 3. Generate Tokens & Response (Using same logic as Login)
     # Determine Role (Social login usually defaults to single role or auto-selects)
     # But we should respect the same logic
@@ -388,6 +439,12 @@ async def login(
                 user=user.model_dump(exclude={"hashed_password"})
             )
             
+    # Update Last Login
+    user.last_login = datetime.utcnow()
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
     # 3. Generate Response for Selected Role
     access_token = create_access_token(subject=user.id)
     refresh_token = create_refresh_token(subject=user.id)

@@ -12,7 +12,9 @@ if TYPE_CHECKING:
     from app.models.dealer import DealerProfile
     from app.models.driver_profile import DriverProfile
     from app.models.staff import StaffProfile
+    from app.models.staff import StaffProfile
     from app.models.rbac import Role
+    from app.models.session import UserSession
 
 class User(SQLModel, table=True):
     __tablename__ = "users"
@@ -22,6 +24,7 @@ class User(SQLModel, table=True):
     full_name: Optional[str] = None
     hashed_password: Optional[str] = None
     is_active: bool = Field(default=True)
+    status: str = Field(default="active") # active, suspended, banned
     is_superuser: bool = Field(default=False)
     
     # OAuth specific
@@ -52,11 +55,17 @@ class User(SQLModel, table=True):
     security_answer: Optional[str] = None
     reset_token: Optional[str] = Field(default=None, index=True)
     reset_token_expires: Optional[datetime] = None
+    reset_token_expires: Optional[datetime] = None
     last_global_logout_at: Optional[datetime] = None
+    last_login: Optional[datetime] = Field(default=None, index=True)
 
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Soft Delete
+    is_deleted: bool = Field(default=False)
+    deleted_at: Optional[datetime] = None
 
     # Relationship
     wallet: Optional["Wallet"] = Relationship(back_populates="user")
@@ -73,6 +82,9 @@ class User(SQLModel, table=True):
     
     # RBAC
     roles: List["Role"] = Relationship(back_populates="users", link_model=UserRole)
+    
+    # Sessions
+    sessions: List["UserSession"] = Relationship(back_populates="user")
 
 # OTP class removed (moved to app/models/otp.py)
 

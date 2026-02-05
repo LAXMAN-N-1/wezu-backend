@@ -1,5 +1,5 @@
-from pydantic import BaseModel, EmailStr, Field, validator, root_validator
-from typing import Optional, List
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator, ValidationInfo
+from typing import Optional, List, Any, Dict
 
 class LoginRequest(BaseModel):
     username: str # email or phone
@@ -35,6 +35,8 @@ class LoginResponse(BaseModel):
     menu: List[MenuConfig] = []
     available_roles: List[str] = []
     requires_role_selection: bool = False
+    
+    model_config = {"from_attributes": True}
 
 class OTPRequest(BaseModel):
     phone_number: str
@@ -49,19 +51,20 @@ class ForgotPasswordRequest(BaseModel):
     phone_number: Optional[str] = None
     email: Optional[EmailStr] = None
 
-    @validator("phone_number")
-    def validate_phone(cls, v):
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
         if v:
              # Basic check, allows international format handling later
              if not v.isdigit() and not v.startswith("+"):
                  raise ValueError("Phone number must contain only digits or start with +")
         return v
     
-    @validator("email")
-    def validate_either_email_or_phone(cls, v, values):
-        if not v and not values.get("phone_number"):
+    @model_validator(mode='after')
+    def validate_either_email_or_phone(self) -> 'ForgotPasswordRequest':
+        if not self.email and not self.phone_number:
             raise ValueError("Either email or phone number must be provided")
-        return v
+        return self
 
 class ResetPasswordRequest(BaseModel):
     token: Optional[str] = None # Deprecated/Optional for backward compatibility or link-based reset
@@ -70,24 +73,28 @@ class ResetPasswordRequest(BaseModel):
     otp: str
     new_password: str
 
-    @validator("phone_number")
-    def validate_phone(cls, v):
+    @field_validator("phone_number")
+    @classmethod
+    def validate_phone(cls, v: Optional[str]) -> Optional[str]:
         if v and not v.isdigit() and not v.startswith("+"):
              raise ValueError("Phone number must contain only digits or start with +")
         return v
     
-    @validator("new_password")
-    def validate_password_strength(cls, v):
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters long")
         return v
 
-    @root_validator(pre=True)
-    def validate_target(cls, values):
-        email = values.get("email")
-        phone = values.get("phone_number")
-        if not email and not phone:
-            raise ValueError("Either email or phone number must be provided")
+    @model_validator(mode='before')
+    @classmethod
+    def validate_target(cls, values: Any) -> Any:
+        if isinstance(values, dict):
+            email = values.get("email")
+            phone = values.get("phone_number")
+            if not email and not phone:
+                raise ValueError("Either email or phone number must be provided")
         return values
 
 
@@ -95,19 +102,18 @@ class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
 
-    @validator("new_password")
-    def validate_password_strength(cls, v):
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_strength(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters long")
         return v
 
-    @root_validator(skip_on_failure=True)
-    def validate_passwords_different(cls, values):
-        current = values.get("current_password")
-        new = values.get("new_password")
-        if current and new and current == new:
+    @model_validator(mode='after')
+    def validate_passwords_different(self) -> 'ChangePasswordRequest':
+        if self.current_password and self.new_password and self.current_password == self.new_password:
             raise ValueError("New password must be different from the current password")
-        return values
+        return self
 
 
 # Customer Registration Schemas
