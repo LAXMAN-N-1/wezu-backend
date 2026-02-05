@@ -58,7 +58,31 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=f"Invalid Apple token: {str(e)}",
             )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Invalid Apple token: {str(e)}",
+            )
 
+    @staticmethod
+    def verify_facebook_token(token: str):
+        try:
+            import requests
+            
+            # Verify token via Graph API
+            # Fields: id, name, email, picture
+            url = f"https://graph.facebook.com/me?access_token={token}&fields=id,name,email,picture"
+            response = requests.get(url)
+            
+            if response.status_code != 200:
+                 raise ValueError("Invalid Facebook token")
+                 
+            data = response.json()
+            return data
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Invalid Facebook token: {str(e)}",
+            )
     @staticmethod
     def get_permissions_for_role(role_name: str) -> list[str]:
         if role_name == "customer":

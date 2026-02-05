@@ -146,35 +146,100 @@ async def verify_otp_alias(
     """
     return await verify_registration_otp(verify_data, db)
 
-@router.post("/google", response_model=Token)
-async def authenticate_google(
-    auth_data: GoogleAuthRequest,
+from app.schemas.auth import SocialLoginRequest, LoginResponse, MenuConfig
+
+@router.post("/social-login", response_model=LoginResponse)
+async def social_login(
+    auth_data: SocialLoginRequest,
     db: Session = Depends(get_session)
 ):
-    # 1. Verify Google Token
-    idinfo = AuthService.verify_google_token(auth_data.token)
-    email = idinfo.get("email")
-    google_id = idinfo.get("sub")
-    name = idinfo.get("name")
-    picture = idinfo.get("picture")
-
-    if not email:
+    """
+    Unified Social Login (Google, Facebook, Apple).
+    Creates user if not exists, or logs in existing user.
+    """
+    email = None
+    social_id = None
+    name = None
+    picture = None
+    
+    # 1. Verify Token based on Provider
+    if auth_data.provider == "google":
+        idinfo = AuthService.verify_google_token(auth_data.token)
+        email = idinfo.get("email")
+        social_id = idinfo.get("sub")
+        name = idinfo.get("name")
+        picture = idinfo.get("picture")
+        
+    elif auth_data.provider == "facebook":
+        data = AuthService.verify_facebook_token(auth_data.token)
+        email = data.get("email")
+        social_id = data.get("id")
+        name = data.get("name")
+        # Facebook picture structure is nested
+        if "picture" in data and "data" in data["picture"]:
+             picture = data["picture"]["data"]["url"]
+             
+    elif auth_data.provider == "apple":
+        payload = AuthService.verify_apple_token(auth_data.token)
+        email = payload.get("email")
+        social_id = payload.get("sub")
+        # Apple only sends name on first login, so we might not have it here
+        # Client app usually sends it separately if needed, but we'll leave as None for now
+        
+    else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Google token does not contain email",
+            detail=f"Unsupported provider: {auth_data.provider}"
         )
 
-    # 2. Check if user exists
-    user = db.exec(select(User).where(User.email == email).options(selectinload(User.roles))).first()
+    if not social_id:
+         raise HTTPException(status_code=400, detail="Could not retrieve social ID")
+
+    # 2. Check/Create User
+    # we match by email OR the specific social ID
+    statement = select(User).where(
+        (User.email == email) | 
+        (getattr(User, f"{auth_data.provider}_id", None) == social_id)
+    ).options(selectinload(User.roles))
+    
+    # Note: getattr handles dynamic field access like User.google_id
+    # But for safety/clarity in sqlmodel/sqlalchemy, explicit checks are often better 
+    # to avoiding building invalid queries if the column doesn't exist.
+    # Let's use explicit conditions:
+    conditions = []
+    if email:
+        conditions.append(User.email == email)
+    
+    if auth_data.provider == "google":
+        conditions.append(User.google_id == social_id)
+    elif auth_data.provider == "apple":
+        conditions.append(User.apple_id == social_id)
+    # Note: Facebook ID column needs to be added to User model if we want to store it explicitly
+    # For now, we'll rely on email matching for Facebook if the column is missing
+    
+    # Re-constructing the query properly
+    from sqlalchemy import or_
+    user = db.exec(select(User).where(or_(*conditions)).options(selectinload(User.roles))).first()
 
     if not user:
+        if not email:
+             raise HTTPException(status_code=400, detail="Email required for new registration")
+             
         # Create new user
         user = User(
             email=email,
             full_name=name,
-            google_id=google_id,
             profile_picture=picture,
+            is_active=True,
+            kyc_status="verified", # Social login usually implies verified email
         )
+        
+        # Set specific ID
+        if auth_data.provider == "google":
+            user.google_id = social_id
+        elif auth_data.provider == "apple":
+            user.apple_id = social_id
+            
         db.add(user)
         db.commit()
         db.refresh(user)
@@ -189,87 +254,50 @@ async def authenticate_google(
             
         # Check Fraud Risk
         FraudService.calculate_risk_score(user.id)
-    else:
-        # Update existing user
-        user.google_id = google_id
-        user.profile_picture = picture
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-    
-    # Save Consent
-    if auth_data.consent:
-        user.consent_captured = True
-        user.consent_date = datetime.utcnow()
-        db.add(user)
-        db.commit()
-
-    # 3. Create Dual Tokens
-    access_token = create_access_token(subject=user.id)
-    refresh_token = create_refresh_token(subject=user.id)
-
-    return Token(access_token=access_token, refresh_token=refresh_token)
-
-@router.post("/apple", response_model=Token)
-async def authenticate_apple(
-    auth_data: AppleAuthRequest,
-    db: Session = Depends(get_session)
-):
-    # 1. Verify Apple Token
-    payload = AuthService.verify_apple_token(auth_data.token)
-    email = payload.get("email")
-    apple_id = payload.get("sub")
-    
-    if not email:
-         # Some Apple logins don't provide email on subsequent sign-ins
-         # But the sub (apple_id) is unique and consistent
-         pass
-
-    # 2. Check if user exists by apple_id or email
-    user = db.exec(select(User).where(
-        (User.apple_id == apple_id) | (User.email == email)
-    ).options(selectinload(User.roles))).first()
-
-    if not user:
-        user = User(
-            email=email,
-            full_name=auth_data.full_name,
-            apple_id=apple_id,
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
         
-        # Assign Default Role: Customer
-        customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
-        if customer_role:
-            user.roles.append(customer_role)
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-            
-        # Check Fraud Risk
-        FraudService.calculate_risk_score(user.id)
     else:
-        user.apple_id = apple_id
-        if auth_data.full_name:
-            user.full_name = auth_data.full_name
+        # Update existing user info
+        if auth_data.provider == "google":
+            user.google_id = social_id
+        elif auth_data.provider == "apple":
+            user.apple_id = social_id
+            
+        if picture and not user.profile_picture:
+            user.profile_picture = picture
+            
         db.add(user)
         db.commit()
         db.refresh(user)
 
-    # Save Consent
-    if auth_data.consent:
-        user.consent_captured = True
-        user.consent_date = datetime.utcnow()
-        db.add(user)
-        db.commit()
-
-    # 3. Create Dual Tokens
+    # 3. Generate Tokens & Response (Using same logic as Login)
+    # Determine Role (Social login usually defaults to single role or auto-selects)
+    # But we should respect the same logic
+    user_roles = [r.name for r in user.roles]
+    selected_role_name = None
+    
+    if user_roles:
+        selected_role_name = user_roles[0] # Default to first role for social login
+        
     access_token = create_access_token(subject=user.id)
     refresh_token = create_refresh_token(subject=user.id)
+    
+    permissions = AuthService.get_permissions_for_role(selected_role_name)
+    menu_data = AuthService.get_menu_for_role(selected_role_name)
+    
+    return LoginResponse(
+        success=True,
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=user.model_dump(exclude={"hashed_password"}),
+        role=selected_role_name,
+        available_roles=user_roles,
+        permissions=permissions,
+        menu=menu_data
+    )
 
-    return Token(access_token=access_token, refresh_token=refresh_token)
+# Keeping old endpoints for backward compatibility if needed, 
+# but redirecting logic would be better. For now, replacing them completely as per plan.
+
 
 class RefreshRequest(BaseModel):
     refresh_token: str

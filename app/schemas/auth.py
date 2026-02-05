@@ -11,6 +11,12 @@ class LoginRequest(BaseModel):
 class RoleSelectRequest(BaseModel):
     role: str
 
+class SocialLoginRequest(BaseModel):
+    provider: str # google, facebook, apple
+    token: str
+    device_fingerprint: Optional[str] = None
+    consent: bool = False
+
 class MenuConfig(BaseModel):
     label: str
     icon: Optional[str] = None
