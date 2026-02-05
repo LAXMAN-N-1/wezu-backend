@@ -20,8 +20,14 @@ def create_access_token(subject: Union[str, Any], expires_delta: timedelta = Non
     return encoded_jwt
 
 def create_refresh_token(subject: Union[str, Any]) -> str:
+    import uuid
     expire = datetime.utcnow() + timedelta(days=7) # Refresh token valid for 7 days
-    to_encode = {"exp": expire, "sub": str(subject), "type": "refresh"}
+    to_encode = {
+        "exp": expire, 
+        "sub": str(subject), 
+        "type": "refresh",
+        "jti": str(uuid.uuid4()) # Unique identifier to ensure token rotation works even if timestamps are identical
+    }
     encoded_jwt = jwt.encode(
         to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
     )
