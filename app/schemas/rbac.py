@@ -17,6 +17,23 @@ class PermissionRead(PermissionBase):
     class Config:
         from_attributes = True
 
+# Permission Grouping Schemas
+class PermissionItem(BaseModel):
+    id: str # Mapped from slug
+    label: str
+    description: Optional[str] = None
+    resource: str
+    action: str
+    scope: str = "all"
+
+class PermissionModule(BaseModel):
+    module: str
+    label: str
+    permissions: List[PermissionItem]
+
+class PermissionListResponse(BaseModel):
+    modules: List[PermissionModule]
+
 # Role Schemas
 class RoleBase(BaseModel):
     name: str

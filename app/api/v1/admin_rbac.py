@@ -104,18 +104,53 @@ def create_role(
     return role
 
 
-@router.get("/permissions", response_model=List[rbac_schema.PermissionRead])
+@router.get("/permissions", response_model=rbac_schema.PermissionListResponse)
 def read_permissions(
     skip: int = 0,
-    limit: int = 100,
+    limit: int = 1000, # Increased limit for grouping view
     db: Session = Depends(deps.get_db),
     current_user: AdminUser = Depends(deps.get_current_active_superuser),
 ) -> Any:
     """
-    Retrieve permissions.
+    Retrieve permissions grouped by module.
     """
-    permissions = db.exec(select(Permission).offset(skip).limit(limit)).all()
-    return permissions
+    permissions = db.exec(select(Permission).order_by(Permission.module, Permission.slug)).all()
+    
+    grouped = {}
+    
+    for perm in permissions:
+        if perm.module not in grouped:
+            grouped[perm.module] = []
+            
+        # Transform to Item
+        # Infer properties if not present
+        label = perm.slug.split(":")[-1].replace("_", " ").title() if ":" in perm.slug else perm.slug
+        if perm.description:
+             desc = perm.description
+        else:
+             desc = f"Access to {perm.action} {perm.module}"
+             
+        item = rbac_schema.PermissionItem(
+            id=perm.slug,
+            label=label,
+            description=desc,
+            resource=perm.module,
+            action=perm.action,
+            scope="all" # Default as requested
+        )
+        grouped[perm.module].append(item)
+        
+    modules = []
+    for module_name, items in grouped.items():
+        # Clean module label
+        mod_label = module_name.replace("_", " ").title()
+        modules.append(rbac_schema.PermissionModule(
+            module=module_name,
+            label=mod_label,
+            permissions=items
+        ))
+        
+    return rbac_schema.PermissionListResponse(modules=modules)
 
 @router.post("/users/{user_id}/roles", response_model=Any)
 def assign_roles_to_user(
