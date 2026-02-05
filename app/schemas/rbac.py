@@ -21,14 +21,24 @@ class PermissionRead(PermissionBase):
 class RoleBase(BaseModel):
     name: str
     description: Optional[str] = None
+    category: str = "system"
+    level: int = 0
+
 
 class RoleCreate(RoleBase):
     permissions: List[str] # List of Permission Slugs
+    parent_role_id: Optional[int] = None
+
 
 class RoleRead(RoleBase):
     id: int
     is_system_role: bool
-    permissions: List[PermissionRead] = []
+    permissions: Optional[List[PermissionRead]] = None
+    permission_count: int = 0
+    category: str
+    level: int
+    parent_role_id: Optional[int] = None
+
 
     class Config:
         from_attributes = True

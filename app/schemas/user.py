@@ -59,7 +59,7 @@ class UserStatusUpdate(BaseModel):
     status: str # active, suspended, banned
     reason: str
 
-from app.schemas.role import RoleResponse
+from app.schemas.rbac import RoleRead as RoleResponse
 
 class UserResponse(UserBase):
     id: int

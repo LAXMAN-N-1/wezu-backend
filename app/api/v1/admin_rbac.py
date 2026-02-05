@@ -12,14 +12,42 @@ router = APIRouter()
 def read_roles(
     skip: int = 0,
     limit: int = 100,
+    category: str | None = None,
+    include_permissions: bool = True,
     db: Session = Depends(deps.get_db),
     current_user: AdminUser = Depends(deps.get_current_active_superuser),
 ) -> Any:
     """
     Retrieve roles.
     """
-    roles = db.exec(select(Role).offset(skip).limit(limit)).all()
-    return roles
+    query = select(Role)
+    
+    if category:
+        query = query.where(Role.category == category)
+        
+    # TODO: Implement stricter RBAC for non-superusers if needed
+    # For now, Super Admin sees all. 
+    # Logic for future: if not current_user.is_superuser: query = query.where(Role.level < current_user.role.level)
+
+    roles = db.exec(query.offset(skip).limit(limit)).all()
+    
+    # Enrichment
+    results = []
+    for role in roles:
+        # Load permissions if needed for count or return
+        # Using a separate query or relationship load depending on optimization needs
+        # Here accessing role.permissions lazy loads it
+        perms = role.permissions
+        
+        role_data = rbac_schema.RoleRead.model_validate(role)
+        role_data.permission_count = len(perms)
+        
+        if not include_permissions:
+            role_data.permissions = None
+        
+        results.append(role_data)
+        
+    return results
 
 @router.post("/roles", response_model=rbac_schema.RoleRead)
 def create_role(
@@ -31,21 +59,46 @@ def create_role(
     """
     Create new role.
     """
-    role = Role.from_orm(role_in)
+    # 1. Check uniqueness
+    existing = db.exec(select(Role).where(Role.name == role_in.name)).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Role name already exists")
+        
+    role_data = role_in.dict(exclude={"permissions", "parent_role_id"})
+    
+    # 2. Inheritance Logic
+    permissions_to_assign = set(role_in.permissions)
+    
+    if role_in.parent_role_id:
+        parent_role = db.get(Role, role_in.parent_role_id)
+        if not parent_role:
+             raise HTTPException(status_code=404, detail="Parent role not found")
+        
+        # Load parent permissions
+        # Note: SQLModel relationship access might require eager load or session attached
+        # We can query link table directly
+        parent_perms = db.exec(select(Permission.slug).join(RolePermission).where(RolePermission.role_id == parent_role.id)).all()
+        permissions_to_assign.update(parent_perms)
+        
+        role_data["parent_role_id"] = role_in.parent_role_id
+
+    role = Role(**role_data)
     db.add(role)
     db.commit()
     db.refresh(role)
     
-    # Assign permissions
-    for slug in role_in.permissions:
+    # 3. Assign Permissions
+    for slug in permissions_to_assign:
         permission = db.exec(select(Permission).where(Permission.slug == slug)).first()
         if permission:
+            # Check if link exists (unlikely for new role but safe)
             link = RolePermission(role_id=role.id, permission_id=permission.id)
             db.add(link)
     
     db.commit()
     db.refresh(role)
     return role
+
 
 @router.get("/permissions", response_model=List[rbac_schema.PermissionRead])
 def read_permissions(
