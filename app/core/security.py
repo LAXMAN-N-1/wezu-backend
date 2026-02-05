@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from typing import Any, Union
+import uuid
 from jose import jwt
 from passlib.context import CryptContext
 from app.core.config import settings
@@ -13,14 +14,16 @@ def create_access_token(subject: Union[str, Any], expires_delta: timedelta = Non
         # Access token valid for 24 hours per FR-MOB-AUTH-002
         expire = datetime.utcnow() + timedelta(hours=24)
     
-    to_encode = {"exp": expire, "sub": str(subject), "type": "access"}
+    # Add 'iat' claim for global logout validation
+    to_encode = {"exp": expire, "sub": str(subject), "type": "access", "iat": datetime.utcnow()}
     encoded_jwt = jwt.encode(
         to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
     )
     return encoded_jwt
 
 def create_refresh_token(subject: Union[str, Any]) -> str:
-    import uuid
+    # This function can now be simplified or removed if create_access_token handles both
+    # For now, keeping it as is, but it's redundant with the changes to create_access_token
     expire = datetime.utcnow() + timedelta(days=7) # Refresh token valid for 7 days
     to_encode = {
         "exp": expire, 

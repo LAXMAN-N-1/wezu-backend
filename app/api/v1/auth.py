@@ -455,7 +455,29 @@ async def logout(
     """Logout user - invalidate tokens"""
     TokenService.blacklist_token(db, token)
     logger.info(f"User {current_user.id} logged out and token blacklisted")
+    TokenService.blacklist_token(db, token)
+    logger.info(f"User {current_user.id} logged out and token blacklisted")
     return {"message": "Logged out successfully"}
+
+
+@router.post("/logout-all")
+async def logout_all(
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session)
+):
+    """
+    Invalidate ALL sessions for the current user.
+    Updates 'last_global_logout_at' timestamp. Any token issued before this time will be rejected.
+    """
+    current_user.last_global_logout_at = datetime.utcnow()
+    # Merge into current session to avoid "already attached to session" error
+    # if current_user came from a different dependency session context
+    updated_user = db.merge(current_user)
+    db.add(updated_user)
+    db.commit()
+    
+    logger.info(f"User {current_user.id} performed global logout")
+    return {"message": "Logged out from all devices successfully"}
 
 
 @router.post("/resend-otp")

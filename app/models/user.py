@@ -48,6 +48,7 @@ class User(SQLModel, table=True):
     security_answer: Optional[str] = None
     reset_token: Optional[str] = Field(default=None, index=True)
     reset_token_expires: Optional[datetime] = None
+    last_global_logout_at: Optional[datetime] = None
 
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
