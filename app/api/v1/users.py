@@ -3,6 +3,7 @@ from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
 from typing import List, Optional
+from datetime import datetime
 from app.api import deps
 from app.db.session import get_session
 from app.models.user import User
@@ -354,3 +355,231 @@ async def set_default_address(
     db.commit()
     db.refresh(address)
     return address
+
+
+# ===== ADMIN ENDPOINTS =====
+
+# Admin Response Schemas
+class KYCDocumentInfo(BaseModel):
+    id: int
+    document_type: str
+    document_number: Optional[str] = None
+    file_url: str
+    status: str
+    uploaded_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ActivityLogEntry(BaseModel):
+    action: str
+    resource_type: str
+    resource_id: Optional[str] = None
+    details: Optional[str] = None
+    ip_address: Optional[str] = None
+    timestamp: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class LoginHistoryEntry(BaseModel):
+    ip_address: Optional[str] = None
+    timestamp: datetime
+    details: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AdminUserProfileResponse(BaseModel):
+    """Complete user profile for admin view"""
+    # Basic Info
+    id: int
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone_number: Optional[str] = None
+    profile_picture: Optional[str] = None
+    address: Optional[str] = None
+    
+    # Status
+    is_active: bool
+    is_superuser: bool
+    kyc_status: str
+    
+    # Roles & Permissions
+    roles: List[str] = []
+    permissions: List[str] = []
+    
+    # Financial
+    wallet_balance: float = 0.0
+    
+    # Staff Info (if applicable)
+    staff_assignment: Optional[StaffAssignmentInfo] = None
+    
+    # KYC Documents
+    kyc_documents: List[KYCDocumentInfo] = []
+    
+    # Activity & Login History
+    activity_history: List[ActivityLogEntry] = []
+    login_history: List[LoginHistoryEntry] = []
+    
+    # Timestamps
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+from datetime import datetime
+from app.models.audit_log import AuditLog
+from app.models.kyc import KYCDocument
+
+
+@router.get("/{user_id}", response_model=AdminUserProfileResponse)
+async def get_user_by_id(
+    user_id: int,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Get user profile by ID (Admin Only).
+    
+    Authorization:
+    - Super Admin: Can view all users
+    - Regional Manager: Can view users in their region
+    - Vendor Owner: Can view their staff only
+    """
+    # Get current user's roles
+    current_user_roles = [r.name for r in current_user.roles] if current_user.roles else []
+    
+    # Check admin authorization
+    is_super_admin = "super_admin" in current_user_roles or current_user.is_superuser
+    is_admin = "admin" in current_user_roles
+    is_regional_manager = "regional_manager" in current_user_roles
+    is_vendor_owner = "vendor_owner" in current_user_roles
+    
+    if not any([is_super_admin, is_admin, is_regional_manager, is_vendor_owner]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can view other user profiles"
+        )
+    
+    # Fetch target user with relationships
+    statement = select(User).where(User.id == user_id).options(
+        selectinload(User.roles),
+        selectinload(User.wallet),
+        selectinload(User.staff_profile),
+        selectinload(User.kyc_documents)
+    )
+    target_user = db.exec(statement).first()
+    
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Authorization checks based on role
+    if is_vendor_owner and not is_super_admin and not is_admin:
+        # Vendor owner can only see their staff
+        if target_user.staff_profile:
+            if target_user.staff_profile.dealer_id != current_user.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You can only view your own staff profiles"
+                )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only view staff profiles"
+            )
+    
+    # Note: Regional manager check would require region data on users
+    # For now, regional managers have same access as admin
+    
+    # Get roles and permissions
+    user_roles = [r.name for r in target_user.roles] if target_user.roles else []
+    primary_role = user_roles[0] if user_roles else None
+    permissions = AuthService.get_permissions_for_role(primary_role) if primary_role else []
+    
+    # Get wallet balance
+    wallet_balance = target_user.wallet.balance if target_user.wallet else 0.0
+    
+    # Get staff assignment
+    staff_assignment = None
+    if target_user.staff_profile:
+        staff_assignment = StaffAssignmentInfo(
+            staff_type=target_user.staff_profile.staff_type,
+            station_id=target_user.staff_profile.station_id,
+            dealer_id=target_user.staff_profile.dealer_id,
+            employment_id=target_user.staff_profile.employment_id,
+            is_active=target_user.staff_profile.is_active
+        )
+    
+    # Get KYC documents
+    kyc_docs = [
+        KYCDocumentInfo(
+            id=doc.id,
+            document_type=doc.document_type,
+            document_number=doc.document_number,
+            file_url=doc.file_url,
+            status=doc.status,
+            uploaded_at=doc.uploaded_at
+        )
+        for doc in (target_user.kyc_documents or [])
+    ]
+    
+    # Get activity history (last 50 actions)
+    activity_statement = select(AuditLog).where(
+        AuditLog.user_id == user_id
+    ).order_by(AuditLog.timestamp.desc()).limit(50)
+    activities = db.exec(activity_statement).all()
+    
+    activity_history = [
+        ActivityLogEntry(
+            action=a.action,
+            resource_type=a.resource_type,
+            resource_id=a.resource_id,
+            details=a.details,
+            ip_address=a.ip_address,
+            timestamp=a.timestamp
+        )
+        for a in activities
+    ]
+    
+    # Get login history (filter activities for login actions)
+    login_statement = select(AuditLog).where(
+        (AuditLog.user_id == user_id) & 
+        (AuditLog.action.in_(["login", "login_success", "login_failed"]))
+    ).order_by(AuditLog.timestamp.desc()).limit(20)
+    logins = db.exec(login_statement).all()
+    
+    login_history = [
+        LoginHistoryEntry(
+            ip_address=l.ip_address,
+            timestamp=l.timestamp,
+            details=l.details
+        )
+        for l in logins
+    ]
+    
+    return AdminUserProfileResponse(
+        id=target_user.id,
+        full_name=target_user.full_name,
+        email=target_user.email,
+        phone_number=target_user.phone_number,
+        profile_picture=target_user.profile_picture,
+        address=target_user.address,
+        is_active=target_user.is_active,
+        is_superuser=target_user.is_superuser,
+        kyc_status=target_user.kyc_status,
+        roles=user_roles,
+        permissions=permissions,
+        wallet_balance=wallet_balance,
+        staff_assignment=staff_assignment,
+        kyc_documents=kyc_docs,
+        activity_history=activity_history,
+        login_history=login_history,
+        created_at=target_user.created_at,
+        updated_at=target_user.updated_at
+    )
