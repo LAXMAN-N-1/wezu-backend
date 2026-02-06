@@ -1,9 +1,10 @@
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select, func, col
+from sqlmodel import Session, select, func, col, update
 from app.api import deps
 from app.models.admin_user import AdminUser
 from app.models.rbac import Role, Permission, RolePermission, AdminUserRole, UserRole
+from app.models.session import UserSession
 from app.schemas import rbac as rbac_schema
 
 router = APIRouter()
@@ -317,12 +318,18 @@ def assign_permissions_to_role(
     db.commit()
     db.refresh(role)
     
-    # 3. Session Invalidation (Mock/Placeholder for now as Redis isn't fully hooked in this context)
-    # real logic: find all users with this role -> invalidate sessions
-    # users_affected = len(role.users) + len(role.admin_users)
-    # In a real app we'd broadcast an event or delete keys
+    # 3. Session Invalidation
+    users_affected = 0
     
-    users_affected = 0 # Placeholder
+    # Invalidate sessions for regular users with this role
+    if role.users:
+        user_ids = [u.id for u in role.users]
+        if user_ids:
+            # Bulk update session status
+            statement = update(UserSession).where(col(UserSession.user_id).in_(user_ids)).values(is_active=False)
+            result = db.exec(statement)
+            users_affected = len(user_ids)
+            db.commit()
     
     return rbac_schema.RolePermissionUpdateResponse(
         role_id=role.id,
