@@ -150,3 +150,15 @@ class BulkRoleAssignResponse(BaseModel):
     total_success: int
     total_failed: int
     results: List[BulkAssignmentResult]
+
+# Role Transfer Schemas
+class RoleTransferRequest(BaseModel):
+    new_user_id: int
+    role_id: int
+    reason: Optional[str] = None
+
+class RoleTransferResponse(BaseModel):
+    success: bool
+    message: str
+    old_assignment_id: Optional[int] = None
+    new_assignment_id: int

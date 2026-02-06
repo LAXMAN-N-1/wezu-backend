@@ -589,6 +589,111 @@ def get_users_by_role(
     }
 
 
+@router.post("/users/{source_user_id}/roles/transfer", response_model=rbac_schema.RoleTransferResponse)
+def transfer_role_assignment(
+    source_user_id: int,
+    transfer_req: rbac_schema.RoleTransferRequest,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Transfer a role from one user to another.
+    Removes role from source user and assigns to target user.
+    """
+    from app.models.user import User
+    from app.models.audit_log import AuditLog
+    from app.services.notification_service import NotificationService
+    
+    # 1. Validate Source User
+    source_user = db.get(User, source_user_id)
+    if not source_user:
+        raise HTTPException(status_code=404, detail="Source user not found")
+        
+    # 2. Validate Target User
+    target_user = db.get(User, transfer_req.new_user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Target user not found")
+        
+    # 3. Validate Role
+    role = db.get(Role, transfer_req.role_id)
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+        
+    # 4. Check Source has Role
+    source_link = db.exec(
+        select(UserRole)
+        .where(UserRole.user_id == source_user_id)
+        .where(UserRole.role_id == role.id)
+    ).first()
+    
+    if not source_link:
+        raise HTTPException(status_code=400, detail="Source user does not have this role")
+        
+    # 5. Check Target doesn't have Role
+    target_link = db.exec(
+        select(UserRole)
+        .where(UserRole.user_id == target_user.id)
+        .where(UserRole.role_id == role.id)
+    ).first()
+    
+    if target_link:
+        raise HTTPException(status_code=400, detail="Target user already has this role")
+
+    try:
+        # --- Transaction Start ---
+        
+        # A. Remove from source
+        db.delete(source_link)
+        
+        # B. Add to target
+        new_link = UserRole(
+            user_id=target_user.id,
+            role_id=role.id,
+            assigned_by=current_user.id,
+            notes=f"Transferred from User {source_user_id}. Reason: {transfer_req.reason or 'No reason provided'}"
+        )
+        db.add(new_link)
+        db.flush() 
+        
+        # C. Audit Logs
+        db.add(AuditLog(
+            action="ROLE_TRANSFER_REMOVE",
+            resource_type="user_role",
+            resource_id=str(source_user_id),
+            details=f"Role {role.name} transferred TO user {target_user.id}",
+            user_id=current_user.id
+        ))
+        
+        db.add(AuditLog(
+            action="ROLE_TRANSFER_ADD",
+            resource_type="user_role",
+            resource_id=str(target_user.id),
+            details=f"Role {role.name} transferred FROM user {source_user_id}",
+            user_id=current_user.id
+        ))
+        
+        # D. Invalidate Sessions
+        for uid in [source_user_id, target_user.id]:
+            sessions = db.exec(select(UserSession).where(UserSession.user_id == uid).where(UserSession.is_active == True)).all()
+            for s in sessions:
+                s.is_active = False
+                db.add(s)
+                
+        db.commit()
+        # No ID to refresh for new_link
+            
+        return rbac_schema.RoleTransferResponse(
+            success=True,
+            message="Role transferred successfully",
+            old_assignment_id=None,
+            new_assignment_id=0 # No specific ID for link table
+        )
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Transfer failed: {str(e)}")
+
+
 @router.delete("/users/{user_id}/roles/{role_id}", response_model=rbac_schema.UserRoleAssignmentResponse)
 def assign_roles_to_user(
     *,
