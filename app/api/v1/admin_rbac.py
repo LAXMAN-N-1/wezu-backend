@@ -591,6 +591,71 @@ def check_user_permission(
     return rbac_schema.PermissionCheckResponse(has_permission=False)
 
 
+    return rbac_schema.PermissionCheckResponse(has_permission=False)
+
+
+@router.get("/users/{user_id}/permissions", response_model=rbac_schema.PermissionListResponse)
+def get_user_permissions(
+    user_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Get complete set of permissions for a user (direct + inherited).
+    Grouped by module.
+    """
+    from app.models.user import User
+    
+    target_user = db.get(User, user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    unique_perms = {}
+    
+    # Traverse all roles
+    for role in target_user.roles:
+        current = role
+        while current:
+            for p in current.permissions:
+                if p.slug not in unique_perms:
+                    unique_perms[p.slug] = p
+            
+            if current.parent_role_id:
+                current = db.get(Role, current.parent_role_id)
+            else:
+                break
+                
+    # Group by module
+    grouped = {}
+    for p in unique_perms.values():
+        if p.module not in grouped:
+            grouped[p.module] = []
+            
+        # Re-use logic to create item or helper function
+        label = p.slug.split(":")[-1].replace("_", " ").title() if ":" in p.slug else p.slug
+        desc = p.description or f"Access to {p.action} {p.module}"
+        
+        item = rbac_schema.PermissionItem(
+            id=p.slug,
+            label=label,
+            description=desc,
+            resource=p.module,
+            action=p.action,
+            scope=p.scope
+        )
+        grouped[p.module].append(item)
+        
+    modules = []
+    for mod_name, items in grouped.items():
+        modules.append(rbac_schema.PermissionModule(
+            module=mod_name,
+            label=mod_name.title(),
+            permissions=items
+        ))
+        
+    return rbac_schema.PermissionListResponse(modules=modules)
+
+
 @router.post("/roles/{role_id}/duplicate", response_model=rbac_schema.RoleRead)
 def duplicate_role(
     *,
