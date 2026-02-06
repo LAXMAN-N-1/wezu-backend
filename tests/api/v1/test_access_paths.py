@@ -96,3 +96,56 @@ def test_get_user_access_paths(client: TestClient, session: Session):
     assert data[0]["path_pattern"] == "Region/A/%"
     assert data[0]["created_by"] == admin.id
     assert data[0]["created_by_name"] == admin.email
+
+def test_update_access_path(client: TestClient, session: Session):
+    admin = create_superuser_path(session)
+    user = User(email="path_update@test.com", is_active=True)
+    session.add(user)
+    session.commit()
+    
+    path = UserAccessPath(
+        user_id=user.id,
+        path_pattern="Region/B/%",
+        access_level="view",
+        created_by=admin.id
+    )
+    session.add(path)
+    session.commit()
+    
+    app = client.app
+    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    
+    payload = {"access_level": "admin"}
+    resp = client.put(f"/api/v1/admin/rbac/users/{user.id}/access-paths/{path.id}", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["access_level"] == "admin"
+    
+    # Verify DB
+    session.refresh(path)
+    assert path.access_level == "admin"
+
+def test_remove_access_path(client: TestClient, session: Session):
+    admin = create_superuser_path(session)
+    user = User(email="path_del@test.com", is_active=True)
+    session.add(user)
+    session.commit()
+    
+    path = UserAccessPath(
+        user_id=user.id,
+        path_pattern="Region/C/%",
+        access_level="view",
+        created_by=admin.id
+    )
+    session.add(path)
+    session.commit()
+    
+    app = client.app
+    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    
+    resp = client.delete(f"/api/v1/admin/rbac/users/{user.id}/access-paths/{path.id}")
+    assert resp.status_code == 200
+    
+    # Verify DB
+    path_check = session.get(UserAccessPath, path.id)
+    assert path_check is None

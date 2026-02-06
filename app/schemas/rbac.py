@@ -168,6 +168,9 @@ class AccessPathCreate(BaseModel):
     path_pattern: str # e.g. "Asia/India/Telangana/%"
     access_level: str = "view" # view, manage, admin
 
+class AccessPathUpdate(BaseModel):
+    access_level: str # view, manage, admin
+
 class AccessPathRead(AccessPathCreate):
     id: int
     user_id: int

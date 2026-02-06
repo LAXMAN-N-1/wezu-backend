@@ -1310,3 +1310,60 @@ def get_user_access_paths(
         results.append(item)
         
     return results
+
+
+@router.delete("/users/{user_id}/access-paths/{path_id}", response_model=Any)
+def remove_access_path(
+    user_id: int,
+    path_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Revoke a specific access path.
+    """
+    from app.models.rbac import UserAccessPath
+    
+    path = db.get(UserAccessPath, path_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="Access path not found")
+        
+    if path.user_id != user_id:
+        raise HTTPException(status_code=400, detail="Access path does not belong to this user")
+        
+    db.delete(path)
+    db.commit()
+    
+    return {"status": "success", "message": "Access path revoked"}
+
+
+@router.put("/users/{user_id}/access-paths/{path_id}", response_model=rbac_schema.AccessPathRead)
+def update_access_path(
+    user_id: int,
+    path_id: int,
+    path_in: rbac_schema.AccessPathUpdate,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Update access level for a specific path.
+    """
+    from app.models.rbac import UserAccessPath
+    
+    path = db.get(UserAccessPath, path_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="Access path not found")
+        
+    if path.user_id != user_id:
+        raise HTTPException(status_code=400, detail="Access path does not belong to this user")
+        
+    # Validate Access Level
+    if path_in.access_level not in ["view", "manage", "admin"]:
+        raise HTTPException(status_code=422, detail="Invalid access level. Must be view, manage, or admin.")
+        
+    path.access_level = path_in.access_level
+    db.add(path)
+    db.commit()
+    db.refresh(path)
+    
+    return path
