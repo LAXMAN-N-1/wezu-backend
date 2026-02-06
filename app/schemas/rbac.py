@@ -162,3 +162,16 @@ class RoleTransferResponse(BaseModel):
     message: str
     old_assignment_id: Optional[int] = None
     new_assignment_id: int
+
+# Access Path Schemas
+class AccessPathCreate(BaseModel):
+    path_pattern: str # e.g. "Asia/India/Telangana/%"
+    access_level: str = "view" # view, manage, admin
+
+class AccessPathRead(AccessPathCreate):
+    id: int
+    user_id: int
+    created_at: datetime
+    created_by: Optional[int] = None
+    
+    model_config = ConfigDict(from_attributes=True)

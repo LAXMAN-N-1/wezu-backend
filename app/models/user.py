@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from app.models.driver_profile import DriverProfile
     from app.models.staff import StaffProfile
     from app.models.staff import StaffProfile
-    from app.models.rbac import Role
+    from app.models.rbac import Role, UserAccessPath
     from app.models.session import UserSession
 
 class User(SQLModel, table=True):
@@ -87,6 +87,9 @@ class User(SQLModel, table=True):
     
     # Sessions
     sessions: List["UserSession"] = Relationship(back_populates="user")
+
+    # Access Paths
+    access_paths: List["UserAccessPath"] = Relationship(back_populates="user")
 
 # OTP class removed (moved to app/models/otp.py)
 

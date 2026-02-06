@@ -1243,3 +1243,39 @@ def get_role_hierarchy(
             roots.append(node)
             
     return roots
+
+
+@router.post("/users/{user_id}/access-paths", response_model=rbac_schema.AccessPathRead)
+def assign_access_path(
+    *,
+    user_id: int,
+    path_in: rbac_schema.AccessPathCreate,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Assign a geographic or hierarchical access path to a user.
+    """
+    from app.models.user import User
+    from app.models.rbac import UserAccessPath
+    
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Validate Access Level
+    if path_in.access_level not in ["view", "manage", "admin"]:
+        raise HTTPException(status_code=422, detail="Invalid access level. Must be view, manage, or admin.")
+
+    access_path = UserAccessPath(
+        user_id=user_id,
+        path_pattern=path_in.path_pattern,
+        access_level=path_in.access_level,
+        created_by=current_user.id
+    )
+    
+    db.add(access_path)
+    db.commit()
+    db.refresh(access_path)
+    
+    return access_path

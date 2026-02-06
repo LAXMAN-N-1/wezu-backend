@@ -1,0 +1,70 @@
+import pytest
+from fastapi.testclient import TestClient
+from sqlmodel import Session, select
+from app.api import deps
+from app.models.admin_user import AdminUser
+from app.models.user import User
+from app.models.rbac import UserAccessPath
+
+def create_superuser_path(session):
+    user = session.exec(select(AdminUser).where(AdminUser.email == "admin@path.com")).first()
+    if user:
+        return user
+    user = AdminUser(
+        email="admin@path.com",
+        hashed_password="hashed",
+        is_active=True,
+        is_superuser=True
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+
+def test_assign_access_path(client: TestClient, session: Session):
+    admin = create_superuser_path(session)
+    
+    # Target User
+    user = User(email="path_user@test.com", is_active=True)
+    session.add(user)
+    session.commit()
+    
+    app = client.app
+    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    
+    # Action
+    payload = {
+        "path_pattern": "Asia/India/Telangana/%",
+        "access_level": "manage"
+    }
+    
+    resp = client.post(f"/api/v1/admin/rbac/users/{user.id}/access-paths", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    
+    assert data["path_pattern"] == "Asia/India/Telangana/%"
+    assert data["access_level"] == "manage"
+    assert data["user_id"] == user.id
+    
+    # Verify DB
+    path = session.exec(select(UserAccessPath).where(UserAccessPath.user_id == user.id)).first()
+    assert path is not None
+    assert path.path_pattern == "Asia/India/Telangana/%"
+    assert path.created_by == admin.id
+
+def test_assign_access_path_invalid_level(client: TestClient, session: Session):
+    admin = create_superuser_path(session)
+    user = User(email="path_invalid@test.com", is_active=True)
+    session.add(user)
+    session.commit()
+    
+    app = client.app
+    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    
+    payload = {
+        "path_pattern": "Global/%",
+        "access_level": "super_god_mode"
+    }
+    
+    resp = client.post(f"/api/v1/admin/rbac/users/{user.id}/access-paths", json=payload)
+    assert resp.status_code == 422 # Validator should catch enum or logic check if manually implemented
