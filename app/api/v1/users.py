@@ -8,10 +8,15 @@ from app.api import deps
 from app.db.session import get_session
 from app.models.user import User
 from app.models.address import Address
-from app.schemas.user import UserResponse, UserUpdate, AddressCreate, AddressResponse, AddressUpdate, DeviceCreate, DeviceResponse, UserProfileResponse, StaffAssignmentInfo, UserStatusUpdate, ActivityLogEntry, ActivityLogResponse
+from app.services.notification_service import NotificationService
 from app.services.user_service import UserService
 from app.services.auth_service import AuthService
-from app.services.notification_service import NotificationService
+from app.core.menu_config import MASTER_MENU
+from app.schemas.user import (
+    UserResponse, UserUpdate, AddressCreate, AddressResponse, AddressUpdate, 
+    DeviceCreate, DeviceResponse, UserProfileResponse, StaffAssignmentInfo, 
+    UserStatusUpdate, ActivityLogEntry, ActivityLogResponse, MenuItem, MenuConfigResponse
+)
 import os
 import shutil
 
@@ -299,6 +304,64 @@ async def read_addresses(
     db: Session = Depends(deps.get_db),
 ):
     return UserService.get_addresses(db, current_user.id)
+
+
+def _filter_menu_items(items: List[dict], permissions: set, has_all_access: bool) -> List[MenuItem]:
+    valid_items = []
+    for item in items:
+        # Check permission
+        required_perm = item.get("permission")
+        if required_perm and not has_all_access and required_perm not in permissions:
+            continue
+            
+        # Create MenuItem
+        menu_item = MenuItem(
+            id=item["id"],
+            label=item["label"],
+            icon=item.get("icon"),
+            route=item["route"],
+            order=item.get("order", 0),
+            enabled=item.get("enabled", True),
+            permission=required_perm
+        )
+        
+        # Process Submenu
+        if item.get("submenu"):
+            submenu = _filter_menu_items(item["submenu"], permissions, has_all_access)
+            if submenu:
+                menu_item.submenu = submenu
+        
+        valid_items.append(menu_item)
+        
+    return sorted(valid_items, key=lambda x: x.order)
+
+
+@router.get("/me/menu-config", response_model=MenuConfigResponse)
+def get_user_menu_config(
+    current_user: User = Depends(deps.get_current_user),
+):
+    """
+    Generate dynamic menu configuration based on user permissions.
+    """
+    # 1. Get User Permissions
+    user_roles = [r.name for r in current_user.roles] if current_user.roles else []
+    current_role = user_roles[0] if user_roles else None
+    
+    # Use AuthService to get permissions, handling "all" wildcard logic usually found there
+    # For now, simplistic retrieval assuming AuthService has this logic or we rely on Role permissions
+    
+    permissions_list = []
+    if current_role:
+        permissions_list = AuthService.get_permissions_for_role(current_role)
+    
+    user_permissions = set(permissions_list)
+    has_all_access = "all" in user_permissions
+    
+    # 2. Filter Master Menu
+    filtered_menu = _filter_menu_items(MASTER_MENU, user_permissions, has_all_access)
+    
+    return MenuConfigResponse(menu=filtered_menu)
+
 
 # ===== MISSING PROFILE ENDPOINTS =====
 
