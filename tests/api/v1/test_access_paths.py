@@ -68,3 +68,31 @@ def test_assign_access_path_invalid_level(client: TestClient, session: Session):
     
     resp = client.post(f"/api/v1/admin/rbac/users/{user.id}/access-paths", json=payload)
     assert resp.status_code == 422 # Validator should catch enum or logic check if manually implemented
+
+def test_get_user_access_paths(client: TestClient, session: Session):
+    admin = create_superuser_path(session)
+    user = User(email="path_get@test.com", is_active=True)
+    session.add(user)
+    session.commit()
+    
+    # Create Path
+    path = UserAccessPath(
+        user_id=user.id,
+        path_pattern="Region/A/%",
+        access_level="view",
+        created_by=admin.id
+    )
+    session.add(path)
+    session.commit()
+    
+    app = client.app
+    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    
+    resp = client.get(f"/api/v1/admin/rbac/users/{user.id}/access-paths")
+    assert resp.status_code == 200
+    data = resp.json()
+    
+    assert len(data) == 1
+    assert data[0]["path_pattern"] == "Region/A/%"
+    assert data[0]["created_by"] == admin.id
+    assert data[0]["created_by_name"] == admin.email

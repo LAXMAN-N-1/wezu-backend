@@ -1279,3 +1279,34 @@ def assign_access_path(
     db.refresh(access_path)
     
     return access_path
+
+
+@router.get("/users/{user_id}/access-paths", response_model=List[rbac_schema.AccessPathRead])
+def get_user_access_paths(
+    user_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Get all access paths assigned to a user.
+    """
+    from app.models.user import User
+    from app.models.rbac import UserAccessPath
+    
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    paths = db.exec(select(UserAccessPath).where(UserAccessPath.user_id == user_id)).all()
+    
+    # Enrich with Creator Name
+    results = []
+    for p in paths:
+        item = rbac_schema.AccessPathRead.model_validate(p)
+        if p.created_by:
+            admin = db.get(AdminUser, p.created_by)
+            if admin:
+                item.created_by_name = admin.email # Or full_name if available
+        results.append(item)
+        
+    return results
