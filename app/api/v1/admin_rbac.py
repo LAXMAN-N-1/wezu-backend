@@ -1,6 +1,7 @@
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, func, col, update
+from datetime import datetime
 from app.api import deps
 from app.models.admin_user import AdminUser
 from app.models.rbac import Role, Permission, RolePermission, AdminUserRole, UserRole
@@ -338,36 +339,87 @@ def assign_permissions_to_role(
     )
 
 
-@router.post("/users/{user_id}/roles", response_model=Any)
+@router.post("/users/{user_id}/roles", response_model=rbac_schema.UserRoleAssignmentResponse)
 def assign_roles_to_user(
     *,
-    db: Session = Depends(deps.get_db),
     user_id: int,
     assignment: rbac_schema.UserRoleAssign,
+    db: Session = Depends(deps.get_db),
     current_user: AdminUser = Depends(deps.get_current_active_superuser),
 ) -> Any:
     """
-    Assign roles to a user.
+    Assign a role to a user.
+    Supports effective dates and expiration.
+    Auth: Super Admin only (for now).
     """
-    user = db.get(AdminUser, user_id)
+    from app.models.user import User
+    from app.services.auth_service import AuthService
+    
+    # 1. Validate User & Role
+    user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
-    # Clear existing roles (simple replacement specific logic)
-    # Ideally we might want to Add or Remove specific roles, but replacement is easier for now
-    existing_links = db.exec(select(AdminUserRole).where(AdminUserRole.admin_id == user_id)).all()
-    for link in existing_links:
-        db.delete(link)
+    role = db.get(Role, assignment.role_id)
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
         
-    for role_id in assignment.role_ids:
-        role = db.get(Role, role_id)
-        if not role:
-            continue
-        link = AdminUserRole(admin_id=user_id, role_id=role_id, assigned_by=current_user.id)
-        db.add(link)
+    # 2. Check/Create Assignment
+    # Check if assignment already exists
+    existing_link = db.exec(
+        select(UserRole)
+        .where(UserRole.user_id == user_id)
+        .where(UserRole.role_id == assignment.role_id)
+    ).first()
+    
+    if existing_link:
+        # Update existing
+        existing_link.assigned_by = current_user.id
+        existing_link.notes = assignment.notes
+        if assignment.expires_at:
+            existing_link.expires_at = assignment.expires_at
+        if assignment.effective_from:
+            existing_link.effective_from = assignment.effective_from
+        
+        db.add(existing_link)
+    else:
+        # Create new
+        new_link = UserRole(
+            user_id=user_id,
+            role_id=assignment.role_id,
+            assigned_by=current_user.id,
+            notes=assignment.notes,
+            effective_from=assignment.effective_from or datetime.utcnow(),
+            expires_at=assignment.expires_at
+        )
+        db.add(new_link)
         
     db.commit()
-    return {"status": "success", "message": "Roles updated"}
+    
+    # 3. Side Effects: Invalidate User Session
+    # Find active sessions for this user and revoke
+    user_sessions = db.exec(select(UserSession).where(UserSession.user_id == user_id).where(UserSession.is_active == True)).all()
+    if user_sessions:
+        for sess in user_sessions:
+            sess.is_active = False
+            db.add(sess)
+        db.commit()
+    
+    # 4. Prepare Response (Refresh perms)
+    db.refresh(user)
+    
+    active_perms = set()
+    for r in user.roles:
+        for p in r.permissions:
+            active_perms.add(p.slug)
+            
+    menu = AuthService.get_menu_for_role(role.name)
+    
+    return rbac_schema.UserRoleAssignmentResponse(
+        success=True,
+        active_permissions=list(active_perms),
+        menu_config=menu
+    )
 
 
 @router.put("/roles/{role_id}", response_model=rbac_schema.RoleRead)

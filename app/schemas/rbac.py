@@ -109,6 +109,16 @@ class RoleDuplicate(BaseModel):
     new_name: str
     description: Optional[str] = None
 
+from datetime import datetime
+
 # User Assignment Schema
 class UserRoleAssign(BaseModel):
-    role_ids: List[int]
+    role_id: int
+    effective_from: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    notes: Optional[str] = None
+
+class UserRoleAssignmentResponse(BaseModel):
+    success: bool
+    active_permissions: List[str]
+    menu_config: List[dict]

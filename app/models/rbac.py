@@ -23,6 +23,12 @@ class UserRole(SQLModel, table=True):
     __tablename__ = "user_roles"
     user_id: Optional[int] = Field(default=None, foreign_key="users.id", primary_key=True)
     role_id: Optional[int] = Field(default=None, foreign_key="roles.id", primary_key=True)
+    
+    assigned_by: Optional[int] = Field(default=None, foreign_key="admin_users.id")
+    notes: Optional[str] = None
+    effective_from: datetime = Field(default_factory=datetime.utcnow)
+    expires_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class Permission(SQLModel, table=True):
     __tablename__ = "permissions"
