@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Request, UploadFile, File
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 from app.api import deps
@@ -50,28 +50,8 @@ def calculate_profile_completion(user: User) -> int:
     return min(base_percentage + kyc_bonus, 100)
 
 
-@router.get("/me", response_model=UserProfileResponse)
-async def read_user_me(
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
-):
-    """
-    Get current user's full profile including:
-    - Basic info
-    - Roles and permissions
-    - Menu configuration
-    - Wallet balance
-    - Staff assignments (if applicable)
-    - Profile completion percentage
-    """
-    # Reload user with relationships
-    statement = select(User).where(User.id == current_user.id).options(
-        selectinload(User.roles),
-        selectinload(User.wallet),
-        selectinload(User.staff_profile)
-    )
-    user = db.exec(statement).first()
-    
+def _build_user_profile_response(user: User, db: Session = None) -> UserProfileResponse:
+    """Helper to build consistent UserProfileResponse"""
     # Get roles
     user_roles = [r.name for r in user.roles] if user.roles else []
     current_role = user_roles[0] if user_roles else None
@@ -80,7 +60,8 @@ async def read_user_me(
     permissions = AuthService.get_permissions_for_role(current_role) if current_role else []
     menu = AuthService.get_menu_for_role(current_role) if current_role else []
     
-    # Get wallet balance
+    # Get wallet balance (handle if wallet relationship not loaded but available in session?)
+    # Ideally user.wallet should be loaded.
     wallet_balance = user.wallet.balance if user.wallet else 0.0
     
     # Get staff assignment info
@@ -116,6 +97,31 @@ async def read_user_me(
         created_at=user.created_at,
         updated_at=user.updated_at
     )
+
+
+@router.get("/me", response_model=UserProfileResponse)
+async def read_user_me(
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Get current user's full profile including:
+    - Basic info
+    - Roles and permissions
+    - Menu configuration
+    - Wallet balance
+    - Staff assignments (if applicable)
+    - Profile completion percentage
+    """
+    # Reload user with relationships
+    statement = select(User).where(User.id == current_user.id).options(
+        selectinload(User.roles),
+        selectinload(User.wallet),
+        selectinload(User.staff_profile)
+    )
+    user = db.exec(statement).first()
+    
+    return _build_user_profile_response(user, db)
 
 @router.put("/me", response_model=UserProfileResponse)
 async def update_user_me(
@@ -156,42 +162,7 @@ async def update_user_me(
     db.commit()
     db.refresh(user)
     
-    # Return full profile response
-    user_roles = [r.name for r in user.roles] if user.roles else []
-    current_role = user_roles[0] if user_roles else None
-    permissions = AuthService.get_permissions_for_role(current_role) if current_role else []
-    menu = AuthService.get_menu_for_role(current_role) if current_role else []
-    wallet_balance = user.wallet.balance if user.wallet else 0.0
-    
-    staff_assignment = None
-    if user.staff_profile:
-        staff_assignment = StaffAssignmentInfo(
-            staff_type=user.staff_profile.staff_type,
-            station_id=user.staff_profile.station_id,
-            dealer_id=user.staff_profile.dealer_id,
-            employment_id=user.staff_profile.employment_id,
-            is_active=user.staff_profile.is_active
-        )
-    
-    return UserProfileResponse(
-        id=user.id,
-        full_name=user.full_name,
-        email=user.email,
-        phone_number=user.phone_number,
-        profile_picture=user.profile_picture,
-        is_active=user.is_active,
-        is_superuser=user.is_superuser,
-        kyc_status=user.kyc_status,
-        current_role=current_role,
-        available_roles=user_roles,
-        permissions=permissions,
-        menu=menu,
-        wallet_balance=wallet_balance,
-        staff_assignment=staff_assignment,
-        profile_completion_percentage=calculate_profile_completion(user),
-        created_at=user.created_at,
-        updated_at=user.updated_at
-    )
+    return _build_user_profile_response(user, db)
 
 # Profile Picture Upload Response
 class ProfilePictureResponse(BaseModel):
@@ -506,8 +477,7 @@ class UserSearchItem(BaseModel):
     created_at: Optional[datetime] = None
     last_login: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserSearchResponse(BaseModel):
