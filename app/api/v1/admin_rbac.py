@@ -477,8 +477,119 @@ def bulk_assign_roles(
         results=results
     )
 
+    
+    return rbac_schema.BulkRoleAssignResponse(
+        total_requested=len(assignment.user_ids),
+        total_success=success_count,
+        total_failed=fail_count,
+        results=results
+    )
 
-@router.post("/users/{user_id}/roles", response_model=rbac_schema.UserRoleAssignmentResponse)
+
+@router.get("/roles/{role_id}/users")
+def get_users_by_role(
+    role_id: int,
+    skip: int = 0,
+    limit: int = 100,
+    active_only: bool = False,
+    region: Optional[str] = None,
+    export_csv: bool = False,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Get all users with a specific role.
+    Supports filtering by active status and region (state/city).
+    Supports CSV export.
+    """
+    from app.models.user import User
+    from app.models.address import Address
+    
+    role = db.get(Role, role_id)
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+        
+    
+    # Start Query - Select both User and UserRole to get assignment details
+    query = select(User, UserRole).join(UserRole).where(UserRole.role_id == role_id)
+    
+    if active_only:
+        query = query.where(User.is_active == True)
+        
+    if region:
+        query = query.join(Address).where(
+            (col(Address.state).ilike(f"%{region}%")) | 
+            (col(Address.city).ilike(f"%{region}%"))
+        ).distinct()
+        
+    # Count total
+    # Use subquery for count to handle joins correctly
+    count_query = select(func.count()).select_from(query.subquery())
+    total = db.exec(count_query).one()
+    
+    if export_csv:
+        # Fetch all
+        results = db.exec(query).all()
+        
+        import csv
+        import io
+        from fastapi.responses import StreamingResponse
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Headers
+        headers = ["User ID", "Full Name", "Email", "Phone", "Status", "Joined At", "Assigned At", "Assigned By (ID)"]
+        writer.writerow(headers)
+        
+        for user, ur in results:
+            writer.writerow([
+                user.id,
+                user.full_name or "",
+                user.email or "",
+                user.phone_number or "",
+                "Active" if user.is_active else "Inactive",
+                user.created_at,
+                ur.created_at,
+                ur.assigned_by or ""
+            ])
+            
+        output.seek(0)
+        
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=role_{role.name}_users.csv"}
+        )
+        
+    # Standard JSON Response
+    results = db.exec(query.offset(skip).limit(limit)).all()
+    
+    items = []
+    for user, ur in results:
+        # Enrich with assignment info
+        item = {
+            "id": user.id,
+            "full_name": user.full_name,
+            "email": user.email,
+            "phone_number": user.phone_number,
+            "is_active": user.is_active,
+            "assigned_at": ur.created_at,
+            "assigned_by": ur.assigned_by,
+            "expires_at": ur.expires_at
+        }
+        items.append(item)
+        
+    return {
+        "total": total,
+        "items": items,
+        "role_name": role.name,
+        "skip": skip,
+        "limit": limit
+    }
+
+
+@router.delete("/users/{user_id}/roles/{role_id}", response_model=rbac_schema.UserRoleAssignmentResponse)
 def assign_roles_to_user(
     *,
     user_id: int,
