@@ -182,10 +182,7 @@ def read_permissions(
         
     return rbac_schema.PermissionListResponse(modules=modules)
 
-            permissions=items
-        ))
-        
-    return rbac_schema.PermissionListResponse(modules=modules)
+
 
 
 @router.get("/roles/{role_id}/permissions", response_model=rbac_schema.RolePermissionsResponse)
