@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator, ValidationInfo
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator, ValidationInfo, ConfigDict
 from typing import Optional, List, Any, Dict
 
 class LoginRequest(BaseModel):

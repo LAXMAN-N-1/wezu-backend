@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
@@ -19,8 +19,7 @@ class WarehouseCreate(WarehouseBase):
 class WarehouseResponse(WarehouseBase):
     id: int
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Transfer Schemas ---
 class BatteryTransferBase(BaseModel):
@@ -40,5 +39,4 @@ class BatteryTransferResponse(BatteryTransferBase):
     created_at: datetime
     completed_at: Optional[datetime] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

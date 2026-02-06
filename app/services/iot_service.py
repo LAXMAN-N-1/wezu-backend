@@ -15,7 +15,7 @@ from app.models.battery import Battery
 logger = logging.getLogger(__name__)
 
 class IoTService:
-    client = mqtt.Client()
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 
     @staticmethod
     def on_connect(client, userdata, flags, rc):

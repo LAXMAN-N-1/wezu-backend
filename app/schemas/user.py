@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 from app.models.user import User
@@ -71,8 +71,7 @@ class UserResponse(UserBase):
     addresses: List[AddressResponse] = []
     roles: List[RoleResponse] = []
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class DeviceCreate(BaseModel):
     fcm_token: str
@@ -94,8 +93,7 @@ class StaffAssignmentInfo(BaseModel):
     employment_id: Optional[str] = None
     is_active: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MenuConfig(BaseModel):
@@ -139,8 +137,7 @@ class UserProfileResponse(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ActivityLogEntry(BaseModel):
     action: str
@@ -150,8 +147,7 @@ class ActivityLogEntry(BaseModel):
     ip_address: Optional[str] = None
     timestamp: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ActivityLogResponse(BaseModel):
     logs: List[ActivityLogEntry]
@@ -171,6 +167,5 @@ class UserSessionResponse(BaseModel):
     created_at: datetime
     is_current: bool = False # Helper field
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 

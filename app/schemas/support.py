@@ -1,6 +1,6 @@
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 class TicketCreate(BaseModel):
     subject: str
@@ -19,8 +19,7 @@ class TicketMessageResponse(BaseModel):
     created_at: datetime
     is_internal_note: bool
     
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SupportTicketResponse(BaseModel):
     id: int
@@ -32,8 +31,7 @@ class SupportTicketResponse(BaseModel):
     created_at: datetime
     assigned_to_id: Optional[int] = None
     
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class SupportTicketDetailResponse(SupportTicketResponse):
     messages: List[TicketMessageResponse]
@@ -47,7 +45,6 @@ class NotificationResponse(BaseModel):
     created_at: datetime
     payload: Optional[str] = None
     
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 

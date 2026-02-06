@@ -2,7 +2,7 @@
 Analytics-related Pydantic schemas
 Advanced analytics, forecasting, and insights
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict
 from datetime import datetime, date
 
@@ -117,8 +117,7 @@ class DemandForecastResponse(BaseModel):
     accuracy_score: Optional[float]
     generated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ChurnPredictionResponse(BaseModel):
     """Churn prediction response"""
@@ -134,8 +133,7 @@ class ChurnPredictionResponse(BaseModel):
     model_version: str
     confidence_score: float
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class PricingRecommendationResponse(BaseModel):
     """Pricing recommendation response"""
@@ -156,8 +154,7 @@ class PricingRecommendationResponse(BaseModel):
     risk_assessment: str
     recommendation_date: date
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class PerformanceDashboardResponse(BaseModel):
     """Overall performance dashboard"""

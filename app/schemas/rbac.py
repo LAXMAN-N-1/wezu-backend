@@ -1,5 +1,5 @@
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 # Permission Schemas
 class PermissionBase(BaseModel):
@@ -15,8 +15,8 @@ class PermissionCreate(PermissionBase):
 class PermissionRead(PermissionBase):
     id: int
     
-    class Config:
-        from_attributes = True
+    
+    model_config = ConfigDict(from_attributes=True)
 
 # Permission Grouping Schemas
 class PermissionItem(BaseModel):
@@ -69,8 +69,8 @@ class RoleRead(RoleBase):
     parent_role_id: Optional[int] = None
 
 
-    class Config:
-        from_attributes = True
+    
+    model_config = ConfigDict(from_attributes=True)
 
 class RoleDetail(RoleRead):
     user_count: int = 0

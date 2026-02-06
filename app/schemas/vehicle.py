@@ -1,6 +1,6 @@
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 class VehicleBase(BaseModel):
     make: str
@@ -25,8 +25,7 @@ class VehicleResponse(VehicleBase):
     is_verified: bool
     created_at: datetime
     
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class VehicleList(BaseModel):
     items: List[VehicleResponse]
