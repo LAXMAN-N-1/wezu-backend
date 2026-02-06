@@ -2,7 +2,7 @@
 Base Repository Pattern
 Provides generic CRUD operations for all models
 """
-from typing import TypeVar, Generic, Type, Optional, List, Dict, Any
+from typing import TypeVar, Generic, Type, Optional, List, Dict, Any, Union
 from sqlmodel import Session, select, func
 from sqlalchemy import desc, asc
 from pydantic import BaseModel
@@ -85,7 +85,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         db: Session,
         *,
         db_obj: ModelType,
-        obj_in: UpdateSchemaType | Dict[str, Any]
+        obj_in: Union[UpdateSchemaType, Dict[str, Any]]
     ) -> ModelType:
         """Update an existing record"""
         obj_data = db_obj.dict() if hasattr(db_obj, 'dict') else {}
