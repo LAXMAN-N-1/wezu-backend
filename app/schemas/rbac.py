@@ -35,6 +35,16 @@ class PermissionModule(BaseModel):
 class PermissionListResponse(BaseModel):
     modules: List[PermissionModule]
 
+class InheritedPermissions(BaseModel):
+    source_role_id: int
+    source_role_name: str
+    permissions: List[PermissionItem]
+
+class RolePermissionsResponse(BaseModel):
+    direct_permissions: List[PermissionItem]
+    inherited_permissions: List[InheritedPermissions]
+    all_permissions_grouped: List[PermissionModule]
+
 # Role Schemas
 class RoleBase(BaseModel):
     name: str

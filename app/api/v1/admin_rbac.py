@@ -182,6 +182,95 @@ def read_permissions(
         
     return rbac_schema.PermissionListResponse(modules=modules)
 
+            permissions=items
+        ))
+        
+    return rbac_schema.PermissionListResponse(modules=modules)
+
+
+@router.get("/roles/{role_id}/permissions", response_model=rbac_schema.RolePermissionsResponse)
+def get_role_permissions(
+    role_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Get all permissions for a role, including inherited ones.
+    """
+    role = db.get(Role, role_id)
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+    
+    def perm_to_item(perm):
+        label = perm.slug.split(":")[-1].replace("_", " ").title() if ":" in perm.slug else perm.slug
+        desc = perm.description or f"Access to {perm.action} {perm.module}"
+        return rbac_schema.PermissionItem(
+            id=perm.slug,
+            label=label,
+            description=desc,
+            resource=perm.module,
+            action=perm.action,
+            scope=perm.scope
+        )
+
+    # 1. Direct Permissions
+    direct_perms = [perm_to_item(p) for p in role.permissions]
+    
+    # 2. Inherited Permissions
+    inherited_list = []
+    
+    # Traverse Parents
+    current = role
+    while current.parent_role_id:
+        parent = db.get(Role, current.parent_role_id)
+        if not parent:
+            break
+            
+        p_items = [perm_to_item(p) for p in parent.permissions]
+        if p_items:
+             inherited_list.append(rbac_schema.InheritedPermissions(
+                 source_role_id=parent.id,
+                 source_role_name=parent.name,
+                 permissions=p_items
+             ))
+        current = parent
+
+    # 3. Aggregated View (Grouped)
+    all_perms_map = {}
+    
+    # Add direct
+    for p in direct_perms:
+        all_perms_map[p.id] = p
+        
+    # Add inherited (overwriting if same slug? usually union. Inherited permissions shouldn't conflict, if they do, direct might override or just exist)
+    # We just want unique set.
+    for group in inherited_list:
+        for p in group.permissions:
+            if p.id not in all_perms_map:
+                all_perms_map[p.id] = p
+                
+    # Group by module
+    grouped_map = {}
+    for p in all_perms_map.values():
+        if p.resource not in grouped_map:
+            grouped_map[p.resource] = []
+        grouped_map[p.resource].append(p)
+        
+    modules = []
+    for mod_name, items in grouped_map.items():
+        modules.append(rbac_schema.PermissionModule(
+            module=mod_name,
+            label=mod_name.replace("_", " ").title(),
+            permissions=items
+        ))
+        
+    return rbac_schema.RolePermissionsResponse(
+        direct_permissions=direct_perms,
+        inherited_permissions=inherited_list,
+        all_permissions_grouped=modules
+    )
+
+
 @router.post("/users/{user_id}/roles", response_model=Any)
 def assign_roles_to_user(
     *,
