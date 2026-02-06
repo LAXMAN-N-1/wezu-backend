@@ -694,7 +694,7 @@ def transfer_role_assignment(
         raise HTTPException(status_code=500, detail=f"Transfer failed: {str(e)}")
 
 
-@router.delete("/users/{user_id}/roles/{role_id}", response_model=rbac_schema.UserRoleAssignmentResponse)
+@router.post("/users/{user_id}/roles", response_model=rbac_schema.UserRoleAssignmentResponse)
 def assign_roles_to_user(
     *,
     user_id: int,
