@@ -14,7 +14,7 @@ router = APIRouter()
 def read_roles(
     skip: int = 0,
     limit: int = 100,
-    category: str | None = None,
+    category: Optional[str] = None,
     active_only: bool = False,
     include_permissions: bool = True,
     db: Session = Depends(deps.get_db),
