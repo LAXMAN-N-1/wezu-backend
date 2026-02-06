@@ -338,6 +338,72 @@ def assign_permissions_to_role(
         active_permissions=[p.slug for p in role.permissions]
     )
 
+    
+    return rbac_schema.RolePermissionUpdateResponse(
+        role_id=role.id,
+        users_affected=users_affected,
+        active_permissions=[p.slug for p in role.permissions]
+    )
+
+
+@router.get("/users/{user_id}/roles", response_model=List[rbac_schema.UserRoleDetail])
+def get_user_roles(
+    user_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    List all roles assigned to a user with details.
+    """
+    from app.models.user import User
+    
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Query UserRole with Role and AdminUser (assigned_by)
+    # We can fetch UserRoles and then join or just iterate since likely small number
+    user_roles = db.exec(select(UserRole).where(UserRole.user_id == user_id)).all()
+    
+    results = []
+    now = datetime.utcnow()
+    
+    for ur in user_roles:
+        role = db.get(Role, ur.role_id)
+        if not role:
+            # Should not happen with FK constraint but safe check
+            continue
+            
+        assigned_by_name = None
+        if ur.assigned_by:
+            admin = db.get(AdminUser, ur.assigned_by)
+            if admin:
+                assigned_by_name = admin.full_name or admin.email
+        
+        # Calculate Active Status
+        is_active = True
+        if not role.is_active:
+             is_active = False # Role itself disabled
+        elif ur.expires_at and ur.expires_at < now:
+             is_active = False
+        elif ur.effective_from and ur.effective_from > now:
+             is_active = False
+             
+        results.append(rbac_schema.UserRoleDetail(
+            role_id=role.id,
+            role_name=role.name,
+            role_description=role.description,
+            assigned_at=ur.created_at,
+            assigned_by=ur.assigned_by,
+            assigned_by_name=assigned_by_name,
+            effective_from=ur.effective_from,
+            expires_at=ur.expires_at,
+            notes=ur.notes,
+            is_active=is_active
+        ))
+        
+    return results
+
 
 @router.post("/users/{user_id}/roles", response_model=rbac_schema.UserRoleAssignmentResponse)
 def assign_roles_to_user(

@@ -122,3 +122,15 @@ class UserRoleAssignmentResponse(BaseModel):
     success: bool
     active_permissions: List[str]
     menu_config: List[dict]
+
+class UserRoleDetail(BaseModel):
+    role_id: int
+    role_name: str
+    role_description: Optional[str] = None
+    assigned_at: Optional[datetime] = None
+    assigned_by: Optional[int] = None
+    assigned_by_name: Optional[str] = None
+    effective_from: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    notes: Optional[str] = None
+    is_active: bool
