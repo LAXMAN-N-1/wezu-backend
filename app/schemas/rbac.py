@@ -7,6 +7,7 @@ class PermissionBase(BaseModel):
     module: str
     action: str
     description: Optional[str] = None
+    scope: str = "all"
 
 class PermissionCreate(PermissionBase):
     pass

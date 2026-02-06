@@ -31,6 +31,7 @@ class Permission(SQLModel, table=True):
     module: str  # e.g., "vendor", "finance"
     action: str  # e.g., "create", "read"
     description: Optional[str] = None
+    scope: str = Field(default="all") # e.g., "all", "own", "region"
     
     roles: List["Role"] = Relationship(back_populates="permissions", link_model=RolePermission)
 

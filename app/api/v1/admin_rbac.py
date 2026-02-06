@@ -104,6 +104,36 @@ def create_role(
     return role
 
 
+    db.delete(role)
+    db.commit()
+    
+    return {"status": "success", "message": "Role unassigned from user"}
+
+
+@router.post("/permissions", response_model=rbac_schema.PermissionRead)
+def create_permission(
+    *,
+    permission_in: rbac_schema.PermissionCreate,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Create a new custom permission.
+    """
+    # 1. Check Uniqueness
+    existing = db.exec(select(Permission).where(Permission.slug == permission_in.slug)).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Permission slug already exists")
+        
+    # 2. Create Permission
+    permission = Permission.model_validate(permission_in)
+    db.add(permission)
+    db.commit()
+    db.refresh(permission)
+    
+    return permission
+
+
 @router.get("/permissions", response_model=rbac_schema.PermissionListResponse)
 def read_permissions(
     skip: int = 0,
