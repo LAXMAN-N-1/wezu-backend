@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, func, col, update
 from app.api import deps
@@ -531,6 +531,64 @@ def delete_role(
     db.commit()
     
     return {"status": "success", "message": "Role deleted successfully"}
+
+
+    db.commit()
+    
+    return Any
+
+
+@router.get("/users/{user_id}/permissions/check", response_model=rbac_schema.PermissionCheckResponse)
+def check_user_permission(
+    user_id: int,
+    permission: str,
+    resource_id: Optional[int] = None,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Verify if a user has a specific permission.
+    Traverses all assigned roles and their hierarchy.
+    """
+    # 1. Get User explicitly (Assuming User model, not AdminUser for this check as per req)
+    # The requirement says "users/{user_id}", implying the app Users.
+    # However, AdminUser might also implement RBAC.
+    # Since existing RBAC models link to "User" via UserRole and "AdminUser" via AdminUserRole,
+    # and the prompt context heavily implied "User" (frontend UI), checks.
+    
+    # We need to import User model inside function or at top to avoid loops if any
+    from app.models.user import User
+    
+    target_user = db.get(User, user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # 2. Collect all roles (direct)
+    user_roles = target_user.roles
+    
+    # 3. Check permissions
+    # We need to traverse up for each role
+    
+    for role in user_roles:
+        # Check current role hierarchy
+        current = role
+        while current:
+            # Check permissions in current role
+            for p in current.permissions:
+                if p.slug == permission:
+                    return rbac_schema.PermissionCheckResponse(
+                        has_permission=True,
+                        granted_by_role=role.name, # The direct role assigned to user
+                        scope=p.scope
+                    )
+            
+            # Move to parent
+            if current.parent_role_id:
+                current = db.get(Role, current.parent_role_id)
+            else:
+                break
+                
+    return rbac_schema.PermissionCheckResponse(has_permission=False)
 
 
 @router.post("/roles/{role_id}/duplicate", response_model=rbac_schema.RoleRead)

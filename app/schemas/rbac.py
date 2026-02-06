@@ -54,6 +54,12 @@ class RolePermissionUpdateResponse(BaseModel):
     role_id: int
     active_permissions: List[str] # Slugs
 
+class PermissionCheckResponse(BaseModel):
+    has_permission: bool
+    granted_by_role: Optional[str] = None
+    scope: Optional[str] = None
+    conditions: Optional[dict] = None
+
 # Role Schemas
 class RoleBase(BaseModel):
     name: str
