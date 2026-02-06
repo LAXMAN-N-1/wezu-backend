@@ -3,7 +3,7 @@ Apple Sign-In Authentication Service
 Handles Apple OAuth authentication for customer app
 """
 import jwt
-import requests
+import httpx
 from datetime import datetime, timedelta
 from typing import Optional, Dict
 from cryptography.hazmat.primitives import serialization
@@ -21,7 +21,7 @@ class AppleAuthService:
     APPLE_ISSUER = "https://appleid.apple.com"
     
     @staticmethod
-    def verify_identity_token(identity_token: str) -> Optional[Dict]:
+    async def verify_identity_token(identity_token: str) -> Optional[Dict]:
         """
         Verify Apple identity token
         
@@ -33,7 +33,8 @@ class AppleAuthService:
         """
         try:
             # Get Apple's public keys
-            response = requests.get(AppleAuthService.APPLE_PUBLIC_KEYS_URL)
+            async with httpx.AsyncClient() as client:
+                response = await client.get(AppleAuthService.APPLE_PUBLIC_KEYS_URL)
             apple_keys = response.json()
             
             # Decode token header to get key ID
@@ -118,7 +119,7 @@ class AppleAuthService:
             raise
     
     @staticmethod
-    def exchange_authorization_code(authorization_code: str) -> Optional[Dict]:
+    async def exchange_authorization_code(authorization_code: str) -> Optional[Dict]:
         """
         Exchange authorization code for tokens
         
@@ -138,11 +139,12 @@ class AppleAuthService:
                 'grant_type': 'authorization_code'
             }
             
-            response = requests.post(
-                AppleAuthService.APPLE_TOKEN_URL,
-                data=data,
-                headers={'Content-Type': 'application/x-www-form-urlencoded'}
-            )
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    AppleAuthService.APPLE_TOKEN_URL,
+                    data=data,
+                    headers={'Content-Type': 'application/x-www-form-urlencoded'}
+                )
             
             if response.status_code == 200:
                 return response.json()
@@ -155,7 +157,7 @@ class AppleAuthService:
             return None
     
     @staticmethod
-    def revoke_token(token: str, token_type: str = 'access_token') -> bool:
+    async def revoke_token(token: str, token_type: str = 'access_token') -> bool:
         """
         Revoke Apple token
         
@@ -176,11 +178,12 @@ class AppleAuthService:
                 'token_type_hint': token_type
             }
             
-            response = requests.post(
-                'https://appleid.apple.com/auth/revoke',
-                data=data,
-                headers={'Content-Type': 'application/x-www-form-urlencoded'}
-            )
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    'https://appleid.apple.com/auth/revoke',
+                    data=data,
+                    headers={'Content-Type': 'application/x-www-form-urlencoded'}
+                )
             
             return response.status_code == 200
             

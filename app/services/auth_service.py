@@ -5,33 +5,38 @@ from fastapi import HTTPException, status
 
 class AuthService:
     @staticmethod
-    def verify_google_token(token: str):
-        try:
-            # Specify the CLIENT_ID of the app that accesses the backend:
-            idinfo = id_token.verify_oauth2_token(
-                token, 
-                requests.Request(), 
-                settings.GOOGLE_OAUTH_CLIENT_ID
-            )
-
-            # ID token is valid. Get the user's Google Account ID from the decoded token.
-            return idinfo
-        except ValueError:
-            # Invalid token
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid Google token",
-            )
+    async def verify_google_token(token: str):
+        from fastapi.concurrency import run_in_threadpool
+        
+        def _verify():
+            try:
+                # Specify the CLIENT_ID of the app that accesses the backend:
+                idinfo = id_token.verify_oauth2_token(
+                    token, 
+                    requests.Request(), 
+                    settings.GOOGLE_OAUTH_CLIENT_ID
+                )
+                return idinfo
+            except ValueError:
+                # Invalid token
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid Google token",
+                )
+        
+        return await run_in_threadpool(_verify)
 
     @staticmethod
-    def verify_apple_token(token: str):
+    async def verify_apple_token(token: str):
         try:
-            import requests
+            import httpx
             from jose import jwt
             
             # 1. Fetch Apple's public keys
             apple_keys_url = "https://appleid.apple.com/auth/keys"
-            apple_keys = requests.get(apple_keys_url).json()
+            async with httpx.AsyncClient() as client:
+                response = await client.get(apple_keys_url)
+            apple_keys = response.json()
 
             # 2. Decode the header to find the 'kid'
             unverified_header = jwt.get_unverified_header(token)
@@ -58,20 +63,17 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=f"Invalid Apple token: {str(e)}",
             )
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=f"Invalid Apple token: {str(e)}",
-            )
 
     @staticmethod
-    def verify_facebook_token(token: str):
+    async def verify_facebook_token(token: str):
         try:
-            import requests
+            import httpx
             
             # Verify token via Graph API
             # Fields: id, name, email, picture
             url = f"https://graph.facebook.com/me?access_token={token}&fields=id,name,email,picture"
-            response = requests.get(url)
+            async with httpx.AsyncClient() as client:
+                response = await client.get(url)
             
             if response.status_code != 200:
                  raise ValueError("Invalid Facebook token")

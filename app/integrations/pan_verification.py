@@ -2,7 +2,7 @@
 PAN Verification Integration
 Handles PAN card verification
 """
-import requests
+import httpx
 from typing import Dict, Any, Optional
 from app.core.config import settings
 import logging
@@ -17,7 +17,7 @@ class PANVerificationIntegration:
         self.api_key = settings.PAN_API_KEY
         self.base_url = "https://api.panverification.io/v1"  # Example URL
     
-    def verify_pan(
+    async def verify_pan(
         self,
         pan_number: str,
         name: Optional[str] = None,
@@ -41,12 +41,13 @@ class PANVerificationIntegration:
             if dob:
                 payload["dob"] = dob
             
-            response = requests.post(
-                f"{self.base_url}/verify",
-                json=payload,
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                timeout=30
-            )
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.base_url}/verify",
+                    json=payload,
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    timeout=30
+                )
             
             if response.status_code == 200:
                 data = response.json()
@@ -71,7 +72,7 @@ class PANVerificationIntegration:
             logger.error(f"PAN verification request failed: {str(e)}")
             return None
     
-    def get_pan_details(self, pan_number: str) -> Optional[Dict[str, Any]]:
+    async def get_pan_details(self, pan_number: str) -> Optional[Dict[str, Any]]:
         """
         Get detailed PAN information
         
@@ -82,11 +83,12 @@ class PANVerificationIntegration:
             Detailed PAN information
         """
         try:
-            response = requests.get(
-                f"{self.base_url}/details/{pan_number.upper()}",
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                timeout=30
-            )
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.base_url}/details/{pan_number.upper()}",
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    timeout=30
+                )
             
             if response.status_code == 200:
                 data = response.json()
