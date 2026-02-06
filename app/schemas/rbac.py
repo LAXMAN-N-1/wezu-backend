@@ -134,3 +134,19 @@ class UserRoleDetail(BaseModel):
     expires_at: Optional[datetime] = None
     notes: Optional[str] = None
     is_active: bool
+
+# Bulk Assignment Schemas
+class BulkRoleAssignRequest(BaseModel):
+    role_id: int
+    user_ids: List[int]
+
+class BulkAssignmentResult(BaseModel):
+    user_id: int
+    success: bool
+    message: str
+
+class BulkRoleAssignResponse(BaseModel):
+    total_requested: int
+    total_success: int
+    total_failed: int
+    results: List[BulkAssignmentResult]

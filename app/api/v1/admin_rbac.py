@@ -404,6 +404,79 @@ def get_user_roles(
         
     return results
 
+    return results
+
+
+@router.post("/roles/bulk-assign", response_model=rbac_schema.BulkRoleAssignResponse)
+def bulk_assign_roles(
+    *,
+    assignment: rbac_schema.BulkRoleAssignRequest,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Assign a role to multiple users.
+    """
+    from app.models.user import User
+    
+    # 1. Validate Role
+    role = db.get(Role, assignment.role_id)
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+        
+    results = []
+    success_count = 0
+    fail_count = 0
+    
+    for uid in assignment.user_ids:
+        try:
+            user = db.get(User, uid)
+            if not user:
+                results.append(rbac_schema.BulkAssignmentResult(user_id=uid, success=False, message="User not found"))
+                fail_count += 1
+                continue
+                
+            # Check existing
+            existing_link = db.exec(
+                select(UserRole)
+                .where(UserRole.user_id == uid)
+                .where(UserRole.role_id == role.id)
+            ).first()
+            
+            if existing_link:
+                 # Already assigned, consider success or updated
+                 results.append(rbac_schema.BulkAssignmentResult(user_id=uid, success=True, message="Already assigned"))
+                 success_count += 1
+            else:
+                new_link = UserRole(
+                    user_id=uid,
+                    role_id=role.id,
+                    assigned_by=current_user.id,
+                    effective_from=datetime.utcnow()
+                )
+                db.add(new_link)
+                # Invalidate Session
+                user_sessions = db.exec(select(UserSession).where(UserSession.user_id == uid).where(UserSession.is_active == True)).all()
+                for sess in user_sessions:
+                     sess.is_active = False
+                     db.add(sess)
+                     
+                results.append(rbac_schema.BulkAssignmentResult(user_id=uid, success=True, message="Assigned successfully"))
+                success_count += 1
+                
+        except Exception as e:
+            results.append(rbac_schema.BulkAssignmentResult(user_id=uid, success=False, message=str(e)))
+            fail_count += 1
+            
+    db.commit()
+    
+    return rbac_schema.BulkRoleAssignResponse(
+        total_requested=len(assignment.user_ids),
+        total_success=success_count,
+        total_failed=fail_count,
+        results=results
+    )
+
 
 @router.post("/users/{user_id}/roles", response_model=rbac_schema.UserRoleAssignmentResponse)
 def assign_roles_to_user(
