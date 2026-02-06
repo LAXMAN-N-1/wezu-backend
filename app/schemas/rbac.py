@@ -45,6 +45,15 @@ class RolePermissionsResponse(BaseModel):
     inherited_permissions: List[InheritedPermissions]
     all_permissions_grouped: List[PermissionModule]
 
+class RolePermissionAssign(BaseModel):
+    permissions: List[str] # List of Permission Slugs
+    mode: str = "overwrite" # "overwrite" | "append"
+
+class RolePermissionUpdateResponse(BaseModel):
+    users_affected: int
+    role_id: int
+    active_permissions: List[str] # Slugs
+
 # Role Schemas
 class RoleBase(BaseModel):
     name: str

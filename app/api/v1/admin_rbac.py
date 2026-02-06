@@ -1,6 +1,6 @@
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, col
 from app.api import deps
 from app.models.admin_user import AdminUser
 from app.models.rbac import Role, Permission, RolePermission, AdminUserRole, UserRole
@@ -265,6 +265,69 @@ def get_role_permissions(
         direct_permissions=direct_perms,
         inherited_permissions=inherited_list,
         all_permissions_grouped=modules
+    )
+
+
+    return rbac_schema.RolePermissionsResponse(
+        direct_permissions=direct_perms,
+        inherited_permissions=inherited_list,
+        all_permissions_grouped=modules
+    )
+
+
+@router.post("/roles/{role_id}/permissions", response_model=rbac_schema.RolePermissionUpdateResponse)
+def assign_permissions_to_role(
+    role_id: int,
+    assignment: rbac_schema.RolePermissionAssign,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Assign permissions to a role.
+    Mode: "overwrite" (replace all) or "append" (add to existing).
+    """
+    role = db.get(Role, role_id)
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+    
+    # 1. Validate permissions exist
+    req_slugs = set(assignment.permissions)
+    if not req_slugs:
+        found_perms = []
+    else:
+        found_perms = db.exec(select(Permission).where(col(Permission.slug).in_(req_slugs))).all()
+    
+    found_slugs = {p.slug for p in found_perms}
+    missing = req_slugs - found_slugs
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Invalid permission slugs: {', '.join(missing)}")
+        
+    # 2. Update Logic
+    if assignment.mode == "overwrite":
+         role.permissions = found_perms
+    elif assignment.mode == "append":
+         # Add ones that don't exist
+         current_ids = {p.id for p in role.permissions}
+         for p in found_perms:
+             if p.id not in current_ids:
+                 role.permissions.append(p)
+    else:
+        raise HTTPException(status_code=400, detail="Invalid mode. Use 'overwrite' or 'append'.")
+        
+    db.commit()
+    db.refresh(role)
+    
+    # 3. Session Invalidation (Mock/Placeholder for now as Redis isn't fully hooked in this context)
+    # real logic: find all users with this role -> invalidate sessions
+    # users_affected = len(role.users) + len(role.admin_users)
+    # In a real app we'd broadcast an event or delete keys
+    
+    users_affected = 0 # Placeholder
+    
+    return rbac_schema.RolePermissionUpdateResponse(
+        role_id=role.id,
+        users_affected=users_affected,
+        active_permissions=[p.slug for p in role.permissions]
     )
 
 
