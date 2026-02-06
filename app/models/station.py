@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 # Import Zone and Vendor for Relationship
 from .location import Zone
 from .vendor import Vendor
+from .dealer import DealerProfile
 from .battery import Battery
 
 class Station(SQLModel, table=True):

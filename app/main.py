@@ -18,7 +18,25 @@ from app.middleware.rate_limit import limiter
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-app = FastAPI(title=settings.PROJECT_NAME, openapi_url=f"{settings.API_V1_STR}/openapi.json")
+# Background Workers
+from app.workers import start_scheduler, stop_scheduler
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Start background scheduler on app startup and init DB"""
+    from app.db.session import init_db
+    init_db()
+    start_scheduler()
+    yield
+    """Stop background scheduler on app shutdown"""
+    stop_scheduler()
+
+app = FastAPI(
+    title=settings.PROJECT_NAME, 
+    openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    lifespan=lifespan
+)
 
 # Rate Limit
 app.state.limiter = limiter
@@ -132,18 +150,3 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
-
-# Background Workers
-from app.workers import start_scheduler, stop_scheduler
-
-@app.on_event("startup")
-async def startup_event():
-    """Start background scheduler on app startup and init DB"""
-    from app.db.session import init_db
-    init_db()
-    start_scheduler()
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Stop background scheduler on app shutdown"""
-    stop_scheduler()

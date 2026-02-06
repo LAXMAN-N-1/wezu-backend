@@ -1,6 +1,6 @@
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from app.schemas.battery_catalog import BatterySpecResponse, BatteryBatchResponse
 
 # --- Lifecycle Event Schemas ---
@@ -16,8 +16,7 @@ class BatteryLifecycleEventResponse(BatteryLifecycleEventBase):
     id: int
     timestamp: datetime
     
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 # --- Battery Schemas ---
 class BatteryBase(BaseModel):
@@ -57,8 +56,7 @@ class BatteryResponse(BatteryBase):
     spec: Optional["BatterySpecResponse"] = None
     batch: Optional["BatteryBatchResponse"] = None
     
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class BatteryDetailResponse(BatteryResponse):
     lifecycle_events: List[BatteryLifecycleEventResponse] = []

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 from app.models.user import User
@@ -42,13 +42,24 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(BaseModel):
+    """
+    Allowed fields for self-profile update.
+    NOT allowed: phone_number (requires verification), role (admin only), verification status
+    """
     full_name: Optional[str] = None
     email: Optional[EmailStr] = None
     profile_picture: Optional[str] = None
+    address: Optional[str] = None
+    emergency_contact: Optional[str] = None
+    notification_preferences: Optional[str] = None  # JSON: {"push": true, "email": true, "sms": false}
     security_question: Optional[str] = None
     security_answer: Optional[str] = None
 
-from app.schemas.role import RoleResponse
+class UserStatusUpdate(BaseModel):
+    status: str # active, suspended, banned
+    reason: str
+
+from app.schemas.rbac import RoleRead as RoleResponse
 
 class UserResponse(UserBase):
     id: int
@@ -60,8 +71,7 @@ class UserResponse(UserBase):
     addresses: List[AddressResponse] = []
     roles: List[RoleResponse] = []
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UserNavigationResponse(BaseModel):
     user_id: int
@@ -79,3 +89,90 @@ class DeviceResponse(DeviceCreate):
     id: int
     is_active: bool
     last_active_at: datetime
+
+
+# Enhanced User Profile Response
+class StaffAssignmentInfo(BaseModel):
+    """Staff assignment details for profile"""
+    staff_type: Optional[str] = None
+    station_id: Optional[int] = None
+    dealer_id: Optional[int] = None
+    employment_id: Optional[str] = None
+    is_active: bool = False
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MenuConfig(BaseModel):
+    """Menu configuration for role"""
+    label: str
+    icon: Optional[str] = None
+    path: str
+    children: Optional[List["MenuConfig"]] = None
+
+
+class UserProfileResponse(BaseModel):
+    """Complete user profile with all details"""
+    # Basic Info
+    id: int
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone_number: Optional[str] = None
+    profile_picture: Optional[str] = None
+    
+    # Status
+    is_active: bool
+    is_superuser: bool
+    kyc_status: str
+    
+    # Roles & Permissions
+    current_role: Optional[str] = None
+    available_roles: List[str] = []
+    permissions: List[str] = []
+    menu: List[MenuConfig] = []
+    
+    # Financial
+    wallet_balance: float = 0.0
+    
+    # Staff Info (if applicable)
+    staff_assignment: Optional[StaffAssignmentInfo] = None
+    
+    # Profile Completion
+    profile_completion_percentage: int = 0
+    
+    # Timestamps
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ActivityLogEntry(BaseModel):
+    action: str
+    resource_type: str
+    resource_id: Optional[str] = None
+    details: Optional[str] = None
+    ip_address: Optional[str] = None
+    timestamp: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ActivityLogResponse(BaseModel):
+    logs: List[ActivityLogEntry]
+    total_count: int
+    page: int
+    limit: int
+
+class UserSessionResponse(BaseModel):
+    id: int
+    # user_id: int # Implicit from context
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    location: Optional[str] = None
+    device_type: str
+    is_active: bool
+    last_active_at: datetime
+    created_at: datetime
+    is_current: bool = False # Helper field
+
+    model_config = ConfigDict(from_attributes=True)
+

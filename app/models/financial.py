@@ -42,7 +42,7 @@ class Transaction(SQLModel, table=True):
     # Relationships
     wallet: Wallet = Relationship(back_populates="transactions")
     invoice: Optional["Invoice"] = Relationship(back_populates="transaction")
-    refund: Optional["Refund"] = Relationship(back_populates="transaction")
+    # refund: Optional["Refund"] = Relationship(back_populates="transaction")
 
 class WalletWithdrawalRequest(SQLModel, table=True):
     __tablename__ = "wallet_withdrawal_requests"

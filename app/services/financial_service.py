@@ -2,7 +2,7 @@ from sqlmodel import Session, select
 from app.core.database import engine
 from app.models.invoice import Invoice
 from app.models.financial import Transaction
-from app.models.commission import CommissionLog as Commission
+from app.models.commission import CommissionLog
 from app.models.settlement import Settlement
 from datetime import datetime, timedelta
 import uuid
@@ -40,11 +40,11 @@ class FinancialService:
     def generate_settlement(dealer_id: int, start_date: datetime, end_date: datetime) -> Settlement:
         with Session(engine) as session:
             # Find unpaid commissions
-            commissions = session.exec(select(Commission).where(
-                Commission.dealer_id == dealer_id,
-                Commission.status == "pending",
-                Commission.created_at >= start_date,
-                Commission.created_at <= end_date
+            commissions = session.exec(select(CommissionLog).where(
+                CommissionLog.dealer_id == dealer_id,
+                CommissionLog.status == "pending",
+                CommissionLog.created_at >= start_date,
+                CommissionLog.created_at <= end_date
             )).all()
             
             total = sum(c.amount for c in commissions)

@@ -23,6 +23,12 @@ class UserRole(SQLModel, table=True):
     __tablename__ = "user_roles"
     user_id: Optional[int] = Field(default=None, foreign_key="users.id", primary_key=True)
     role_id: Optional[int] = Field(default=None, foreign_key="roles.id", primary_key=True)
+    
+    assigned_by: Optional[int] = Field(default=None, foreign_key="admin_users.id")
+    notes: Optional[str] = None
+    effective_from: datetime = Field(default_factory=datetime.utcnow)
+    expires_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class Permission(SQLModel, table=True):
     __tablename__ = "permissions"
@@ -34,6 +40,7 @@ class Permission(SQLModel, table=True):
     scope: str = Field(default="global") # global, regional, organizational, own
     constraints: Optional[str] = None # JSON string for action-level rules
     description: Optional[str] = None
+    scope: str = Field(default="all") # e.g., "all", "own", "region"
     
     roles: List["Role"] = Relationship(back_populates="permissions", link_model=RolePermission)
 
@@ -42,8 +49,11 @@ class Role(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(unique=True, index=True)
     description: Optional[str] = None
-    category: str = Field(default="system") # system, vendor, staff
-    level: int = Field(default=0) # Smaller is higher priority/authority
+    category: str = Field(default="system") # powerfill_staff, vendor_staff, customer, system
+    level: int = Field(default=0) # Hierarchy level (e.g. 100=Admin, 10=User)
+    parent_role_id: Optional[int] = Field(default=None, foreign_key="roles.id")
+    is_system_role: bool = Field(default=False)  # If True, cannot be deleted (e.g., Super Admin)
+    is_active: bool = Field(default=True)
     
     parent_id: Optional[int] = Field(default=None, foreign_key="roles.id")
     is_system_role: bool = Field(default=False)

@@ -2,8 +2,8 @@
 Maintenance-related Pydantic schemas
 Maintenance schedules, records, and station downtime
 """
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional, List
 from datetime import datetime
 
 # Request Models
@@ -65,8 +65,7 @@ class MaintenanceScheduleResponse(BaseModel):
     notes: Optional[str]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class MaintenanceRecordResponse(BaseModel):
     """Maintenance record response"""
@@ -86,8 +85,7 @@ class MaintenanceRecordResponse(BaseModel):
     battery_health_before: Optional[float]
     battery_health_after: Optional[float]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class StationDowntimeResponse(BaseModel):
     """Station downtime response"""
@@ -106,8 +104,7 @@ class StationDowntimeResponse(BaseModel):
     resolution_notes: Optional[str]
     reported_by: Optional[int]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class BatteryHealthSummaryResponse(BaseModel):
     """Battery health summary"""

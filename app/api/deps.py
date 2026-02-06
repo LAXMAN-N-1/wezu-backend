@@ -45,6 +45,24 @@ def get_current_user(
         raise HTTPException(status_code=404, detail="User not found")
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
+        
+    # Global Logout Check
+    
+    # Global Logout Check
+    if user.last_global_logout_at:
+        # Get 'iat' (Issued At) from token
+        iat = payload.get("iat")
+        if iat:
+            from datetime import datetime
+            # Use utcfromtimestamp to compare with utcnow() stored in DB
+            token_issued_at = datetime.utcfromtimestamp(iat)
+             
+            if token_issued_at < user.last_global_logout_at:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Session expired (Logged out from all devices)",
+                )
+    
     return user
 
 def get_current_active_superuser(

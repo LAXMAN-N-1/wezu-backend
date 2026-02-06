@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 from app.schemas.battery import BatteryResponse
@@ -28,8 +28,7 @@ class RentalResponse(BaseModel):
     total_price: float
     events: List[RentalEventResponse] = []
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ActiveRentalResponse(RentalResponse):
     pass

@@ -1,6 +1,6 @@
 from typing import Optional, Dict, Any, List
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 class TelemeticsDataBase(BaseModel):
     battery_id: int
@@ -30,8 +30,7 @@ class TelemeticsDataResponse(TelemeticsDataBase):
     timestamp: datetime
     received_at: datetime
     
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes=True)
 
 class TelemeticsHistoryResponse(BaseModel):
     items: List[TelemeticsDataResponse]

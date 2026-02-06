@@ -2,7 +2,7 @@ from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from datetime import datetime
 from sqlmodel import Session, select
-from app.api.deps import get_current_active_user
+from app.api.deps import get_current_user
 from app.db.session import get_session
 from app.models.user import User
 from app.models.swap import SwapSession
@@ -18,7 +18,7 @@ def initiate_swap(
     *,
     session: Session = Depends(get_session),
     swap_in: SwapInitRequest,
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_user),
 ) -> Any:
     """
     User initiates a swap at a station.
@@ -59,7 +59,7 @@ def complete_swap(
     swap_id: int,
     complete_in: SwapCompleteRequest,
     # In production, this endpoint might be protected for IoT Station Callbacks only
-    current_user: User = Depends(get_current_active_user), 
+    current_user: User = Depends(get_current_user), 
 ) -> Any:
     """
     Finalize swap: hardware confirmed dispense. Deduct money.
