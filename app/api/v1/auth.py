@@ -14,7 +14,7 @@ from app.api import deps
 from pydantic import BaseModel, EmailStr, Field
 from fastapi.security import OAuth2PasswordRequestForm
 import logging
-from typing import Optional
+from typing import Any, List, Optional
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
 

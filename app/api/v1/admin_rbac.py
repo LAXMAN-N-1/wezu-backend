@@ -422,6 +422,99 @@ def assign_roles_to_user(
     )
 
 
+@router.delete("/users/{user_id}/roles/{role_id}", response_model=rbac_schema.UserRoleAssignmentResponse)
+def remove_role_from_user(
+    *,
+    user_id: int,
+    role_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Remove a role from a user.
+    Prevents removing the last role.
+    """
+    from app.models.user import User
+    from app.models.audit_log import AuditLog
+    from app.services.auth_service import AuthService
+    
+    # 1. Validate User & Role
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    role = db.get(Role, role_id)
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+        
+    # 2. Check if assignment exists
+    link = db.exec(
+        select(UserRole)
+        .where(UserRole.user_id == user_id)
+        .where(UserRole.role_id == role_id)
+    ).first()
+    
+    if not link:
+        raise HTTPException(status_code=404, detail="Role not assigned to user")
+        
+    # 3. Prevent removing last role
+    role_count = db.exec(select(func.count()).select_from(UserRole).where(UserRole.user_id == user_id)).one()
+    if role_count <= 1:
+        raise HTTPException(status_code=400, detail="Cannot remove the last role from a user")
+        
+    # 4. Remove Assignment
+    db.delete(link)
+    db.commit()
+    db.refresh(user)
+    
+    # 5. Invalidate Session
+    user_sessions = db.exec(select(UserSession).where(UserSession.user_id == user_id).where(UserSession.is_active == True)).all()
+    if user_sessions:
+        for sess in user_sessions:
+            sess.is_active = False
+            db.add(sess)
+        db.commit()
+        
+    # 6. Log Activity
+    audit_log = AuditLog(
+        user_id=current_user.id,
+        action="remove_role_from_user",
+        resource_type="user",
+        resource_id=str(user_id),
+        details=f"Removed role {role.name} ({role.id}) from user {user.email}",
+        ip_address=None # Not readily available in this context without Request
+    )
+    db.add(audit_log)
+    db.commit()
+
+    # 7. Prepare Response (Refresh perms)
+    # Re-calculate permissions
+    active_perms = set()
+    first_role_name = None
+    
+    # Reload user.roles
+    user_roles = db.exec(select(UserRole).where(UserRole.user_id == user_id)).all()
+    # Need to fetch Role objects
+    for ur in user_roles:
+        r = db.get(Role, ur.role_id)
+        if r and r.is_active:
+            if not first_role_name:
+                first_role_name = r.name
+            for p in r.permissions:
+                active_perms.add(p.slug)
+    
+    # Fallback for menu if roles exist (which they should)
+    menu = []
+    if first_role_name:
+         menu = AuthService.get_menu_for_role(first_role_name)
+    
+    return rbac_schema.UserRoleAssignmentResponse(
+        success=True,
+        active_permissions=list(active_perms),
+        menu_config=menu
+    )
+
+
 @router.put("/roles/{role_id}", response_model=rbac_schema.RoleRead)
 def update_role(
     *,
