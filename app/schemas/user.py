@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, ConfigDict
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import datetime
 from app.models.user import User
 
@@ -117,6 +117,11 @@ class MenuItem(BaseModel):
 
 class MenuConfigResponse(BaseModel):
     menu: List[MenuItem]
+
+
+class FeatureFlagsResponse(BaseModel):
+    features: Dict[str, bool]
+
 
 
 

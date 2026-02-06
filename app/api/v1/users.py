@@ -15,8 +15,10 @@ from app.core.menu_config import MASTER_MENU
 from app.schemas.user import (
     UserResponse, UserUpdate, AddressCreate, AddressResponse, AddressUpdate, 
     DeviceCreate, DeviceResponse, UserProfileResponse, StaffAssignmentInfo, 
-    UserStatusUpdate, ActivityLogEntry, ActivityLogResponse, MenuItem, MenuConfigResponse
+    UserStatusUpdate, ActivityLogEntry, ActivityLogResponse, MenuItem, MenuConfigResponse,
+    FeatureFlagsResponse
 )
+from app.schemas.dashboard import DashboardConfigResponse
 import os
 import shutil
 
@@ -419,6 +421,72 @@ async def set_default_address(
     db.commit()
     db.refresh(address)
     return address
+
+    return address
+
+
+# ===== FEATURE FLAGS & DASHBOARD =====
+
+@router.get("/me/feature-flags", response_model=FeatureFlagsResponse)
+def get_user_feature_flags(
+    current_user: User = Depends(deps.get_current_user),
+):
+    """
+    Get feature flags status for the current user based on their role.
+    """
+    user_roles = [r.name for r in current_user.roles] if current_user.roles else []
+    
+    # Permission checks
+    is_admin = any(r in ["admin", "super_admin", "regional_manager"] for r in user_roles)
+    is_vendor = "vendor_owner" in user_roles
+    
+    # Default flags
+    features = {
+        "dynamic_pricing": True, # Enabled for everyone
+        "ml_predictions": True, # Enabled for everyone
+        "bulk_transfers": False,
+        "advanced_analytics": False
+    }
+    
+    # Role-based overrides
+    if is_admin:
+        features["advanced_analytics"] = True
+        features["bulk_transfers"] = True
+        
+    if is_vendor:
+        features["bulk_transfers"] = True
+        
+    return FeatureFlagsResponse(features=features)
+
+
+@router.get("/me/dashboard-widgets", response_model=DashboardConfigResponse)
+def get_user_dashboard_config(
+    current_user: User = Depends(deps.get_current_user),
+):
+    """
+    Get personalized dashboard widget configuration for the current user.
+    """
+    from app.core.dashboard_config import MASTER_DASHBOARD_CONFIG
+    from app.schemas.dashboard import DashboardWidget
+
+    user_roles = [r.name for r in current_user.roles] if current_user.roles else []
+    
+    # Determine primary role for dashboard layout
+    # Priority: Admin > Vendor > Customer
+    layout_key = "default"
+    
+    if any(r in ["admin", "super_admin", "regional_manager"] for r in user_roles):
+        layout_key = "admin"
+    elif "vendor_owner" in user_roles:
+        layout_key = "vendor_owner"
+    elif "customer" in user_roles:
+        layout_key = "customer"
+        
+    widgets_data = MASTER_DASHBOARD_CONFIG.get(layout_key, MASTER_DASHBOARD_CONFIG["default"])
+    
+    widgets = [DashboardWidget(**w) for w in widgets_data]
+    
+    return DashboardConfigResponse(layout=widgets)
 
 
 # ===== ADMIN ENDPOINTS =====
