@@ -7,19 +7,98 @@ from app.models.otp import OTP
 from app.services.auth_service import AuthService
 from app.services.otp_service import OTPService
 from app.services.fraud_service import FraudService
-from app.core.security import create_access_token, create_refresh_token
+from app.services.token_service import TokenService
+from app.core.security import create_access_token, create_refresh_token, get_password_hash, verify_password
 from app.core.config import settings
 from app.api import deps
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
+from fastapi.security import OAuth2PasswordRequestForm
 import logging
 from typing import Optional
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
-from app.services.token_service import TokenService
 
 router = APIRouter()
 logger = logging.getLogger("wezu_auth")
 logging.basicConfig(level=logging.INFO)
+
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
+    phone_number: str
+
+@router.post("/register", response_model=User)
+async def register(
+    user_in: UserCreate,
+    db: Session = Depends(get_session)
+):
+    """
+    Register a new user with email and password.
+    """
+    user = db.exec(select(User).where(User.email == user_in.email)).first()
+    if user:
+        raise HTTPException(
+            status_code=400,
+            detail="The user with this email already exists in the system",
+        )
+    
+    user = User(
+        email=user_in.email,
+        hashed_password=get_password_hash(user_in.password),
+        full_name=user_in.full_name,
+        phone_number=user_in.phone_number,
+        is_active=True
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    # Assign default role
+    from app.models.rbac import Role
+    from sqlalchemy.orm import selectinload
+    customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
+    if customer_role:
+        user.roles.append(customer_role)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        
+    return user
+
+@router.post("/login", response_model=Token)
+@router.post("/token", response_model=Token)
+async def login_access_token(
+    db: Session = Depends(get_session),
+    form_data: OAuth2PasswordRequestForm = Depends()
+) -> Any:
+    """
+    OAuth2 compatible token login, get an access token for future requests
+    """
+    # Try by email
+    statement = select(User).where(User.email == form_data.username)
+    user = db.exec(statement).first()
+    
+    if not user:
+        # Try by phone number if email fails (optional, but good UX)
+        statement = select(User).where(User.phone_number == form_data.username)
+        user = db.exec(statement).first()
+
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
+    
+    if not user.is_active:
+        raise HTTPException(status_code=400, detail="Inactive user")
+        
+    access_token = create_access_token(subject=user.id)
+    refresh_token = create_refresh_token(subject=user.id)
+    
+    return Token(
+        access_token=access_token,
+        token_type="bearer",
+        refresh_token=refresh_token,
+        user=user # Helper: include user info
+    )
 
 class GoogleAuthRequest(BaseModel):
     token: str

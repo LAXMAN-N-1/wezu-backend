@@ -2,6 +2,7 @@ from sqlmodel import SQLModel, Field
 from typing import Optional
 from datetime import datetime
 import sqlalchemy as sa
+from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
 
 class TelemeticsData(SQLModel, table=True):
@@ -29,8 +30,8 @@ class TelemeticsData(SQLModel, table=True):
     gps_speed: Optional[float] = None
     
     # Advanced Data
-    error_codes: Optional[dict] = Field(default=None, sa_column=sa.Column(JSONB))
-    raw_payload: Optional[dict] = Field(default=None, sa_column=sa.Column(JSONB))
+    error_codes: Optional[dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
+    raw_payload: Optional[dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
     # Internal Metadata
     received_at: datetime = Field(default_factory=datetime.utcnow)

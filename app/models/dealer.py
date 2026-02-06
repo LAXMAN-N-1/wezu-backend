@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from app.models.staff import StaffProfile
 # from pydantic import EmailStr
 import sqlalchemy as sa
+from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
 
 class DealerProfile(SQLModel, table=True):
@@ -65,7 +66,7 @@ class DealerApplication(SQLModel, table=True):
     risk_score: float = Field(default=0.0)
     
     # Using JSON for history log: [{"stage": "SUBMITTED", "timestamp": "...", "notes": ""}]
-    status_history: List[Dict] = Field(default_factory=list, sa_column=sa.Column(JSONB))
+    status_history: List[Dict] = Field(default_factory=list, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -84,8 +85,8 @@ class FieldVisit(SQLModel, table=True):
     
     status: str = Field(default="SCHEDULED") # SCHEDULED, COMPLETED, CANCELLED
     
-    report_data: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSONB))
-    images: Optional[List[str]] = Field(default=None, sa_column=sa.Column(JSONB))
+    report_data: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
+    images: Optional[List[str]] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
     

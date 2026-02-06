@@ -1,4 +1,7 @@
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .rbac import Role
 from datetime import datetime
 from sqlmodel import SQLModel, Field, Relationship
 

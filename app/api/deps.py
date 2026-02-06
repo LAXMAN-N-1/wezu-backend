@@ -73,3 +73,16 @@ def get_current_active_superuser(
             status_code=400, detail="The user doesn't have enough privileges"
         )
     return current_user
+
+# Alias for compatibility
+get_current_active_user = get_current_user
+
+from fastapi import Header
+
+def get_current_tenant(
+    x_tenant_id: str = Header(default="default")
+) -> str:
+    """
+    Extract tenant_id from the 'X-Tenant-ID' header.
+    """
+    return x_tenant_id

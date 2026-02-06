@@ -33,9 +33,12 @@ class UserRole(SQLModel, table=True):
 class Permission(SQLModel, table=True):
     __tablename__ = "permissions"
     id: Optional[int] = Field(default=None, primary_key=True)
-    slug: str = Field(unique=True, index=True)  # e.g., "vendor:create"
-    module: str  # e.g., "vendor", "finance"
-    action: str  # e.g., "create", "read"
+    slug: str = Field(unique=True, index=True)  # e.g., "battery:view:all"
+    module: str  # e.g., "battery", "station"
+    resource_type: Optional[str] = None # e.g., "Battery", "StationSlot"
+    action: str  # e.g., "view", "create", "delete"
+    scope: str = Field(default="global") # global, regional, organizational, own
+    constraints: Optional[str] = None # JSON string for action-level rules
     description: Optional[str] = None
     scope: str = Field(default="all") # e.g., "all", "own", "region"
     
@@ -52,6 +55,18 @@ class Role(SQLModel, table=True):
     is_system_role: bool = Field(default=False)  # If True, cannot be deleted (e.g., Super Admin)
     is_active: bool = Field(default=True)
     
+    parent_id: Optional[int] = Field(default=None, foreign_key="roles.id")
+    is_system_role: bool = Field(default=False)
+    
+    # Hierarchy relationships
+    parent: Optional["Role"] = Relationship(
+        sa_relationship_kwargs={
+            "remote_side": "Role.id",
+            "back_populates": "children"
+        }
+    )
+    children: List["Role"] = Relationship(back_populates="parent")
+
     permissions: List[Permission] = Relationship(back_populates="roles", link_model=RolePermission)
     
     admin_users: List["AdminUser"] = Relationship(

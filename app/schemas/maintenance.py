@@ -141,4 +141,4 @@ class MaintenanceHistoryResponse(BaseModel):
     maintenance_records: List[MaintenanceRecordResponse]
     upcoming_schedules: List[MaintenanceScheduleResponse]
 
-from typing import Dict
+

@@ -2,6 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
 from datetime import datetime
 import sqlalchemy as sa
+from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
 
 class DeliveryRoute(SQLModel, table=True):
@@ -22,7 +23,7 @@ class DeliveryRoute(SQLModel, table=True):
     actual_duration_minutes: Optional[int] = None
     
     # Optimized waypoints as GeoJSON or array of coordinates
-    optimized_path: Optional[dict] = Field(default=None, sa_column=sa.Column(JSONB))
+    optimized_path: Optional[dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

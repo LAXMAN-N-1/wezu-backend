@@ -11,6 +11,8 @@ class Battery(SQLModel, table=True):
     __tablename__ = "batteries"
     id: Optional[int] = Field(default=None, primary_key=True)
     serial_number: str = Field(index=True, unique=True)
+    tenant_id: Optional[str] = Field(default="default", index=True)
+
     
     # Specs & Inventory (New)
     spec_id: Optional[int] = Field(default=None, foreign_key="battery_specs.id")

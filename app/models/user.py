@@ -26,6 +26,8 @@ class User(SQLModel, table=True):
     is_active: bool = Field(default=True)
     status: str = Field(default="active") # active, suspended, banned
     is_superuser: bool = Field(default=False)
+    tenant_id: Optional[str] = Field(default="default", index=True)
+
     
     # OAuth specific
     google_id: Optional[str] = Field(default=None, index=True)

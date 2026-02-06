@@ -1,6 +1,9 @@
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
 from sqlmodel import SQLModel, Field, Relationship
+
+if TYPE_CHECKING:
+    from app.models.dealer import DealerProfile
 
 # Import Zone and Vendor for Relationship
 from .location import Zone
@@ -12,6 +15,8 @@ class Station(SQLModel, table=True):
     __tablename__ = "stations"
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
+    tenant_id: Optional[str] = Field(default="default", index=True)
+
     
     # Location
     address: str
