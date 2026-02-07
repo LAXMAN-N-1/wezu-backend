@@ -8,7 +8,12 @@ from math import radians, cos, sin, asin, sqrt
 class StationService:
     @staticmethod
     def get_stations(db: Session, skip: int = 0, limit: int = 100) -> List[Station]:
-        return db.exec(select(Station).offset(skip).limit(limit)).all()
+        from sqlalchemy.orm import selectinload
+        return db.exec(
+            select(Station)
+            .options(selectinload(Station.images))
+            .offset(skip).limit(limit)
+        ).all()
 
     @staticmethod
     def get_nearby(db: Session, lat: float, lon: float, radius_km: float = 50.0) -> List[Station]:

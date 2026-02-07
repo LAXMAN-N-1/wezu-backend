@@ -1,5 +1,5 @@
 from app.core.config import settings
-import requests
+# import requests  # Removed unused import
 
 class SMSService:
     @staticmethod

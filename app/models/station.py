@@ -20,8 +20,8 @@ class Station(SQLModel, table=True):
     
     # Location
     address: str
-    latitude: float
-    longitude: float
+    latitude: float = Field(index=True)
+    longitude: float = Field(index=True)
     zone_id: Optional[int] = Field(default=None, foreign_key="zones.id")
     
     # Ownership
