@@ -12,6 +12,7 @@ class KYCDocument(SQLModel, table=True):
     file_url: str
     status: str = "pending" # pending, verified, rejected
     verification_response: Optional[str] = None # JSON string or similar
+    metadata_: Optional[str] = Field(default=None, sa_column_kwargs={"name": "metadata"}) # JSON string: {"side": "front"}
     uploaded_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Relationship

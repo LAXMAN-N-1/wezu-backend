@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Request, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Request, UploadFile, File, Form
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel, ConfigDict
@@ -1390,3 +1390,82 @@ async def revoke_session(
         TokenService.blacklist_token(db, session.token_id)
         
     return {"message": "Session revoked"}
+@router.post("/me/kyc", response_model=UserResponse)
+async def submit_kyc(
+    document_type: str = Form(...), # aadhaar, pan, driving_license, passport
+    document_number: str = Form(...),
+    front_image: UploadFile = File(...),
+    back_image: Optional[UploadFile] = File(None),
+    selfie: UploadFile = File(...),
+    current_user: User = Depends(deps.get_current_active_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Submit KYC documents for verification.
+    """
+    from app.services.storage_service import StorageService
+    from app.models.kyc import KYCDocument
+    import json
+    
+    # 1. Validate Input
+    valid_types = ["aadhaar", "pan", "driving_license", "passport"]
+    if document_type not in valid_types:
+        raise HTTPException(status_code=400, detail=f"Invalid document type. Must be one of {valid_types}")
+        
+    # 2. Upload Files & Create Records
+    uploaded_docs = []
+    
+    # helper
+    async def process_file(file: UploadFile, side_meta: dict):
+        if not file: return
+        
+        # Validation (Size/Type) - simplified for now, assuming frontend limits
+        if file.size and file.size > 5 * 1024 * 1024: # 5MB
+             raise HTTPException(status_code=400, detail=f"File {file.filename} too large")
+
+        url = await StorageService.upload_file(file, directory=f"kyc/{current_user.id}")
+        
+        doc = KYCDocument(
+            user_id=current_user.id,
+            document_type=document_type if side_meta.get("type") != "selfie" else "selfie",
+            document_number=document_number if side_meta.get("type") != "selfie" else None,
+            file_url=url,
+            status="pending",
+            metadata_=json.dumps(side_meta)
+        )
+        db.add(doc)
+        uploaded_docs.append(doc)
+
+    # Process Front
+    await process_file(front_image, {"side": "front"})
+    
+    # Process Back (if applicable)
+    if back_image:
+        await process_file(back_image, {"side": "back"})
+        
+    # Process Selfie
+    await process_file(selfie, {"type": "selfie"})
+    
+    # 3. Update User Status
+    current_user.kyc_status = "pending_verification"
+    # Also save specific doc numbers if fit in user model (optional, user model has aadhaar/pan fields)
+    if document_type == "aadhaar":
+        current_user.aadhaar_number = document_number
+    elif document_type == "pan":
+        current_user.pan_number = document_number
+        
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    
+    # 4. Notify Admin/Verification Team (Log for now)
+    # create a notification for the user confirming submission
+    NotificationService.send_notification(
+        db, 
+        current_user, 
+        "KYC Submitted", 
+        "Your KYC documents have been received and are under review.",
+        type="kyc"
+    )
+    
+    return current_user
