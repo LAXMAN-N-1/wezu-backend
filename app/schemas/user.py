@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, ConfigDict
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import datetime
 from app.models.user import User
 
@@ -103,12 +103,26 @@ class StaffAssignmentInfo(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class MenuConfig(BaseModel):
-    """Menu configuration for role"""
+
+class MenuItem(BaseModel):
+    """Menu item for role"""
+    id: str
     label: str
     icon: Optional[str] = None
-    path: str
-    children: Optional[List["MenuConfig"]] = None
+    route: str
+    order: int = 0
+    enabled: bool = True
+    submenu: Optional[List["MenuItem"]] = None
+    permission: Optional[str] = None
+
+class MenuConfigResponse(BaseModel):
+    menu: List[MenuItem]
+
+
+class FeatureFlagsResponse(BaseModel):
+    features: Dict[str, bool]
+
+
 
 
 class UserProfileResponse(BaseModel):
@@ -129,7 +143,7 @@ class UserProfileResponse(BaseModel):
     current_role: Optional[str] = None
     available_roles: List[str] = []
     permissions: List[str] = []
-    menu: List[MenuConfig] = []
+    menu: List[MenuItem] = []
     
     # Financial
     wallet_balance: float = 0.0

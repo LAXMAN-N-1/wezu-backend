@@ -6,7 +6,7 @@ from app.core.config import settings
 from app.api.v1 import (
     auth, users, kyc, stations, batteries, rentals, wallet, payments, 
     notifications, support, favorites, analytics, transactions, promo, 
-    faqs, iot, swaps, i18n, fraud
+    faqs, iot, swaps, i18n, fraud, screens
 )
 # Enhanced customer endpoints
 from app.api.v1 import (
@@ -42,10 +42,14 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# GZip Compression
+from fastapi.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -71,6 +75,7 @@ app.include_router(iot.router, prefix=f"{settings.API_V1_STR}/iot", tags=["IoT"]
 app.include_router(swaps.router, prefix=f"{settings.API_V1_STR}/swaps", tags=["Swaps"])
 app.include_router(i18n.router, prefix=f"{settings.API_V1_STR}/i18n", tags=["i18n"])
 app.include_router(fraud.router, prefix=f"{settings.API_V1_STR}/fraud", tags=["Fraud Detection"])
+app.include_router(screens.router, prefix=f"{settings.API_V1_STR}/screens", tags=["UI Configuration"])
 
 # Enhanced Customer Endpoints
 app.include_router(system.router, prefix=f"{settings.API_V1_STR}", tags=["System"])

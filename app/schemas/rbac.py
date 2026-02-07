@@ -122,3 +122,60 @@ class UserRoleAssignmentResponse(BaseModel):
     success: bool
     active_permissions: List[str]
     menu_config: List[dict]
+
+class UserRoleDetail(BaseModel):
+    role_id: int
+    role_name: str
+    role_description: Optional[str] = None
+    assigned_at: Optional[datetime] = None
+    assigned_by: Optional[int] = None
+    assigned_by_name: Optional[str] = None
+    effective_from: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    notes: Optional[str] = None
+    is_active: bool
+
+# Bulk Assignment Schemas
+class BulkRoleAssignRequest(BaseModel):
+    role_id: int
+    user_ids: List[int]
+
+class BulkAssignmentResult(BaseModel):
+    user_id: int
+    success: bool
+    message: str
+
+class BulkRoleAssignResponse(BaseModel):
+    total_requested: int
+    total_success: int
+    total_failed: int
+    results: List[BulkAssignmentResult]
+
+# Role Transfer Schemas
+class RoleTransferRequest(BaseModel):
+    new_user_id: int
+    role_id: int
+    reason: Optional[str] = None
+
+class RoleTransferResponse(BaseModel):
+    success: bool
+    message: str
+    old_assignment_id: Optional[int] = None
+    new_assignment_id: int
+
+# Access Path Schemas
+class AccessPathCreate(BaseModel):
+    path_pattern: str # e.g. "Asia/India/Telangana/%"
+    access_level: str = "view" # view, manage, admin
+
+class AccessPathUpdate(BaseModel):
+    access_level: str # view, manage, admin
+
+class AccessPathRead(AccessPathCreate):
+    id: int
+    user_id: int
+    created_at: datetime
+    created_by: Optional[int] = None
+    created_by_name: Optional[str] = None
+    
+    model_config = ConfigDict(from_attributes=True)

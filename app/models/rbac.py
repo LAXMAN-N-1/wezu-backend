@@ -1,5 +1,7 @@
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, List
+from typing import List, Optional, TYPE_CHECKING
+if TYPE_CHECKING:
+    from app.models.user import User
 from datetime import datetime
 
 # Link Table for Role <-> Permission
@@ -55,17 +57,20 @@ class Role(SQLModel, table=True):
     is_system_role: bool = Field(default=False)  # If True, cannot be deleted (e.g., Super Admin)
     is_active: bool = Field(default=True)
     
-    parent_id: Optional[int] = Field(default=None, foreign_key="roles.id")
-    is_system_role: bool = Field(default=False)
-    
     # Hierarchy relationships
     parent: Optional["Role"] = Relationship(
         sa_relationship_kwargs={
             "remote_side": "Role.id",
+            "primaryjoin": "Role.parent_role_id==Role.id",
             "back_populates": "children"
         }
     )
-    children: List["Role"] = Relationship(back_populates="parent")
+    children: List["Role"] = Relationship(
+        back_populates="parent",
+        sa_relationship_kwargs={
+            "primaryjoin": "Role.parent_role_id==Role.id"
+        }
+    )
 
     permissions: List[Permission] = Relationship(back_populates="roles", link_model=RolePermission)
     
@@ -81,3 +86,22 @@ class Role(SQLModel, table=True):
     users: List["User"] = Relationship(back_populates="roles", link_model=UserRole)
 
 
+
+# Data Scoping: Path Based Access
+class UserAccessPath(SQLModel, table=True):
+    __tablename__ = "user_access_paths"
+    
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    
+    # Path Pattern e.g. "Asia/India/Telangana/%"
+    path_pattern: str = Field(index=True)
+    
+    # Access Level
+    access_level: str = Field(default="view") # view, manage, admin
+    
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_by: Optional[int] = Field(default=None, foreign_key="admin_users.id")
+    
+    # Relationships
+    user: "User" = Relationship(back_populates="access_paths")

@@ -338,6 +338,361 @@ def assign_permissions_to_role(
         active_permissions=[p.slug for p in role.permissions]
     )
 
+    
+    return rbac_schema.RolePermissionUpdateResponse(
+        role_id=role.id,
+        users_affected=users_affected,
+        active_permissions=[p.slug for p in role.permissions]
+    )
+
+
+@router.get("/users/{user_id}/roles", response_model=List[rbac_schema.UserRoleDetail])
+def get_user_roles(
+    user_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    List all roles assigned to a user with details.
+    """
+    from app.models.user import User
+    
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Query UserRole with Role and AdminUser (assigned_by)
+    # We can fetch UserRoles and then join or just iterate since likely small number
+    user_roles = db.exec(select(UserRole).where(UserRole.user_id == user_id)).all()
+    
+    results = []
+    now = datetime.utcnow()
+    
+    for ur in user_roles:
+        role = db.get(Role, ur.role_id)
+        if not role:
+            # Should not happen with FK constraint but safe check
+            continue
+            
+        assigned_by_name = None
+        if ur.assigned_by:
+            admin = db.get(AdminUser, ur.assigned_by)
+            if admin:
+                assigned_by_name = admin.full_name or admin.email
+        
+        # Calculate Active Status
+        is_active = True
+        if not role.is_active:
+             is_active = False # Role itself disabled
+        elif ur.expires_at and ur.expires_at < now:
+             is_active = False
+        elif ur.effective_from and ur.effective_from > now:
+             is_active = False
+             
+        results.append(rbac_schema.UserRoleDetail(
+            role_id=role.id,
+            role_name=role.name,
+            role_description=role.description,
+            assigned_at=ur.created_at,
+            assigned_by=ur.assigned_by,
+            assigned_by_name=assigned_by_name,
+            effective_from=ur.effective_from,
+            expires_at=ur.expires_at,
+            notes=ur.notes,
+            is_active=is_active
+        ))
+        
+    return results
+
+    return results
+
+
+@router.post("/roles/bulk-assign", response_model=rbac_schema.BulkRoleAssignResponse)
+def bulk_assign_roles(
+    *,
+    assignment: rbac_schema.BulkRoleAssignRequest,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Assign a role to multiple users.
+    """
+    from app.models.user import User
+    
+    # 1. Validate Role
+    role = db.get(Role, assignment.role_id)
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+        
+    results = []
+    success_count = 0
+    fail_count = 0
+    
+    for uid in assignment.user_ids:
+        try:
+            user = db.get(User, uid)
+            if not user:
+                results.append(rbac_schema.BulkAssignmentResult(user_id=uid, success=False, message="User not found"))
+                fail_count += 1
+                continue
+                
+            # Check existing
+            existing_link = db.exec(
+                select(UserRole)
+                .where(UserRole.user_id == uid)
+                .where(UserRole.role_id == role.id)
+            ).first()
+            
+            if existing_link:
+                 # Already assigned, consider success or updated
+                 results.append(rbac_schema.BulkAssignmentResult(user_id=uid, success=True, message="Already assigned"))
+                 success_count += 1
+            else:
+                new_link = UserRole(
+                    user_id=uid,
+                    role_id=role.id,
+                    assigned_by=current_user.id,
+                    effective_from=datetime.utcnow()
+                )
+                db.add(new_link)
+                # Invalidate Session
+                user_sessions = db.exec(select(UserSession).where(UserSession.user_id == uid).where(UserSession.is_active == True)).all()
+                for sess in user_sessions:
+                     sess.is_active = False
+                     db.add(sess)
+                     
+                results.append(rbac_schema.BulkAssignmentResult(user_id=uid, success=True, message="Assigned successfully"))
+                success_count += 1
+                
+        except Exception as e:
+            results.append(rbac_schema.BulkAssignmentResult(user_id=uid, success=False, message=str(e)))
+            fail_count += 1
+            
+    db.commit()
+    
+    return rbac_schema.BulkRoleAssignResponse(
+        total_requested=len(assignment.user_ids),
+        total_success=success_count,
+        total_failed=fail_count,
+        results=results
+    )
+
+    
+    return rbac_schema.BulkRoleAssignResponse(
+        total_requested=len(assignment.user_ids),
+        total_success=success_count,
+        total_failed=fail_count,
+        results=results
+    )
+
+
+@router.get("/roles/{role_id}/users")
+def get_users_by_role(
+    role_id: int,
+    skip: int = 0,
+    limit: int = 100,
+    active_only: bool = False,
+    region: Optional[str] = None,
+    export_csv: bool = False,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Get all users with a specific role.
+    Supports filtering by active status and region (state/city).
+    Supports CSV export.
+    """
+    from app.models.user import User
+    from app.models.address import Address
+    
+    role = db.get(Role, role_id)
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+        
+    
+    # Start Query - Select both User and UserRole to get assignment details
+    query = select(User, UserRole).join(UserRole).where(UserRole.role_id == role_id)
+    
+    if active_only:
+        query = query.where(User.is_active == True)
+        
+    if region:
+        query = query.join(Address).where(
+            (col(Address.state).ilike(f"%{region}%")) | 
+            (col(Address.city).ilike(f"%{region}%"))
+        ).distinct()
+        
+    # Count total
+    # Use subquery for count to handle joins correctly
+    count_query = select(func.count()).select_from(query.subquery())
+    total = db.exec(count_query).one()
+    
+    if export_csv:
+        # Fetch all
+        results = db.exec(query).all()
+        
+        import csv
+        import io
+        from fastapi.responses import StreamingResponse
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Headers
+        headers = ["User ID", "Full Name", "Email", "Phone", "Status", "Joined At", "Assigned At", "Assigned By (ID)"]
+        writer.writerow(headers)
+        
+        for user, ur in results:
+            writer.writerow([
+                user.id,
+                user.full_name or "",
+                user.email or "",
+                user.phone_number or "",
+                "Active" if user.is_active else "Inactive",
+                user.created_at,
+                ur.created_at,
+                ur.assigned_by or ""
+            ])
+            
+        output.seek(0)
+        
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=role_{role.name}_users.csv"}
+        )
+        
+    # Standard JSON Response
+    results = db.exec(query.offset(skip).limit(limit)).all()
+    
+    items = []
+    for user, ur in results:
+        # Enrich with assignment info
+        item = {
+            "id": user.id,
+            "full_name": user.full_name,
+            "email": user.email,
+            "phone_number": user.phone_number,
+            "is_active": user.is_active,
+            "assigned_at": ur.created_at,
+            "assigned_by": ur.assigned_by,
+            "expires_at": ur.expires_at
+        }
+        items.append(item)
+        
+    return {
+        "total": total,
+        "items": items,
+        "role_name": role.name,
+        "skip": skip,
+        "limit": limit
+    }
+
+
+@router.post("/users/{source_user_id}/roles/transfer", response_model=rbac_schema.RoleTransferResponse)
+def transfer_role_assignment(
+    source_user_id: int,
+    transfer_req: rbac_schema.RoleTransferRequest,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Transfer a role from one user to another.
+    Removes role from source user and assigns to target user.
+    """
+    from app.models.user import User
+    from app.models.audit_log import AuditLog
+    from app.services.notification_service import NotificationService
+    
+    # 1. Validate Source User
+    source_user = db.get(User, source_user_id)
+    if not source_user:
+        raise HTTPException(status_code=404, detail="Source user not found")
+        
+    # 2. Validate Target User
+    target_user = db.get(User, transfer_req.new_user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="Target user not found")
+        
+    # 3. Validate Role
+    role = db.get(Role, transfer_req.role_id)
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+        
+    # 4. Check Source has Role
+    source_link = db.exec(
+        select(UserRole)
+        .where(UserRole.user_id == source_user_id)
+        .where(UserRole.role_id == role.id)
+    ).first()
+    
+    if not source_link:
+        raise HTTPException(status_code=400, detail="Source user does not have this role")
+        
+    # 5. Check Target doesn't have Role
+    target_link = db.exec(
+        select(UserRole)
+        .where(UserRole.user_id == target_user.id)
+        .where(UserRole.role_id == role.id)
+    ).first()
+    
+    if target_link:
+        raise HTTPException(status_code=400, detail="Target user already has this role")
+
+    try:
+        # --- Transaction Start ---
+        
+        # A. Remove from source
+        db.delete(source_link)
+        
+        # B. Add to target
+        new_link = UserRole(
+            user_id=target_user.id,
+            role_id=role.id,
+            assigned_by=current_user.id,
+            notes=f"Transferred from User {source_user_id}. Reason: {transfer_req.reason or 'No reason provided'}"
+        )
+        db.add(new_link)
+        db.flush() 
+        
+        # C. Audit Logs
+        db.add(AuditLog(
+            action="ROLE_TRANSFER_REMOVE",
+            resource_type="user_role",
+            resource_id=str(source_user_id),
+            details=f"Role {role.name} transferred TO user {target_user.id}",
+            user_id=current_user.id
+        ))
+        
+        db.add(AuditLog(
+            action="ROLE_TRANSFER_ADD",
+            resource_type="user_role",
+            resource_id=str(target_user.id),
+            details=f"Role {role.name} transferred FROM user {source_user_id}",
+            user_id=current_user.id
+        ))
+        
+        # D. Invalidate Sessions
+        for uid in [source_user_id, target_user.id]:
+            sessions = db.exec(select(UserSession).where(UserSession.user_id == uid).where(UserSession.is_active == True)).all()
+            for s in sessions:
+                s.is_active = False
+                db.add(s)
+                
+        db.commit()
+        # No ID to refresh for new_link
+            
+        return rbac_schema.RoleTransferResponse(
+            success=True,
+            message="Role transferred successfully",
+            old_assignment_id=None,
+            new_assignment_id=0 # No specific ID for link table
+        )
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Transfer failed: {str(e)}")
+
 
 @router.post("/users/{user_id}/roles", response_model=rbac_schema.UserRoleAssignmentResponse)
 def assign_roles_to_user(
@@ -414,6 +769,99 @@ def assign_roles_to_user(
             active_perms.add(p.slug)
             
     menu = AuthService.get_menu_for_role(role.name)
+    
+    return rbac_schema.UserRoleAssignmentResponse(
+        success=True,
+        active_permissions=list(active_perms),
+        menu_config=menu
+    )
+
+
+@router.delete("/users/{user_id}/roles/{role_id}", response_model=rbac_schema.UserRoleAssignmentResponse)
+def remove_role_from_user(
+    *,
+    user_id: int,
+    role_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Remove a role from a user.
+    Prevents removing the last role.
+    """
+    from app.models.user import User
+    from app.models.audit_log import AuditLog
+    from app.services.auth_service import AuthService
+    
+    # 1. Validate User & Role
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    role = db.get(Role, role_id)
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+        
+    # 2. Check if assignment exists
+    link = db.exec(
+        select(UserRole)
+        .where(UserRole.user_id == user_id)
+        .where(UserRole.role_id == role_id)
+    ).first()
+    
+    if not link:
+        raise HTTPException(status_code=404, detail="Role not assigned to user")
+        
+    # 3. Prevent removing last role
+    role_count = db.exec(select(func.count()).select_from(UserRole).where(UserRole.user_id == user_id)).one()
+    if role_count <= 1:
+        raise HTTPException(status_code=400, detail="Cannot remove the last role from a user")
+        
+    # 4. Remove Assignment
+    db.delete(link)
+    db.commit()
+    db.refresh(user)
+    
+    # 5. Invalidate Session
+    user_sessions = db.exec(select(UserSession).where(UserSession.user_id == user_id).where(UserSession.is_active == True)).all()
+    if user_sessions:
+        for sess in user_sessions:
+            sess.is_active = False
+            db.add(sess)
+        db.commit()
+        
+    # 6. Log Activity
+    audit_log = AuditLog(
+        user_id=current_user.id,
+        action="remove_role_from_user",
+        resource_type="user",
+        resource_id=str(user_id),
+        details=f"Removed role {role.name} ({role.id}) from user {user.email}",
+        ip_address=None # Not readily available in this context without Request
+    )
+    db.add(audit_log)
+    db.commit()
+
+    # 7. Prepare Response (Refresh perms)
+    # Re-calculate permissions
+    active_perms = set()
+    first_role_name = None
+    
+    # Reload user.roles
+    user_roles = db.exec(select(UserRole).where(UserRole.user_id == user_id)).all()
+    # Need to fetch Role objects
+    for ur in user_roles:
+        r = db.get(Role, ur.role_id)
+        if r and r.is_active:
+            if not first_role_name:
+                first_role_name = r.name
+            for p in r.permissions:
+                active_perms.add(p.slug)
+    
+    # Fallback for menu if roles exist (which they should)
+    menu = []
+    if first_role_name:
+         menu = AuthService.get_menu_for_role(first_role_name)
     
     return rbac_schema.UserRoleAssignmentResponse(
         success=True,
@@ -795,3 +1243,127 @@ def get_role_hierarchy(
             roots.append(node)
             
     return roots
+
+
+@router.post("/users/{user_id}/access-paths", response_model=rbac_schema.AccessPathRead)
+def assign_access_path(
+    *,
+    user_id: int,
+    path_in: rbac_schema.AccessPathCreate,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Assign a geographic or hierarchical access path to a user.
+    """
+    from app.models.user import User
+    from app.models.rbac import UserAccessPath
+    
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Validate Access Level
+    if path_in.access_level not in ["view", "manage", "admin"]:
+        raise HTTPException(status_code=422, detail="Invalid access level. Must be view, manage, or admin.")
+
+    access_path = UserAccessPath(
+        user_id=user_id,
+        path_pattern=path_in.path_pattern,
+        access_level=path_in.access_level,
+        created_by=current_user.id
+    )
+    
+    db.add(access_path)
+    db.commit()
+    db.refresh(access_path)
+    
+    return access_path
+
+
+@router.get("/users/{user_id}/access-paths", response_model=List[rbac_schema.AccessPathRead])
+def get_user_access_paths(
+    user_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Get all access paths assigned to a user.
+    """
+    from app.models.user import User
+    from app.models.rbac import UserAccessPath
+    
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    paths = db.exec(select(UserAccessPath).where(UserAccessPath.user_id == user_id)).all()
+    
+    # Enrich with Creator Name
+    results = []
+    for p in paths:
+        item = rbac_schema.AccessPathRead.model_validate(p)
+        if p.created_by:
+            admin = db.get(AdminUser, p.created_by)
+            if admin:
+                item.created_by_name = admin.email # Or full_name if available
+        results.append(item)
+        
+    return results
+
+
+@router.delete("/users/{user_id}/access-paths/{path_id}", response_model=Any)
+def remove_access_path(
+    user_id: int,
+    path_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Revoke a specific access path.
+    """
+    from app.models.rbac import UserAccessPath
+    
+    path = db.get(UserAccessPath, path_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="Access path not found")
+        
+    if path.user_id != user_id:
+        raise HTTPException(status_code=400, detail="Access path does not belong to this user")
+        
+    db.delete(path)
+    db.commit()
+    
+    return {"status": "success", "message": "Access path revoked"}
+
+
+@router.put("/users/{user_id}/access-paths/{path_id}", response_model=rbac_schema.AccessPathRead)
+def update_access_path(
+    user_id: int,
+    path_id: int,
+    path_in: rbac_schema.AccessPathUpdate,
+    db: Session = Depends(deps.get_db),
+    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Update access level for a specific path.
+    """
+    from app.models.rbac import UserAccessPath
+    
+    path = db.get(UserAccessPath, path_id)
+    if not path:
+        raise HTTPException(status_code=404, detail="Access path not found")
+        
+    if path.user_id != user_id:
+        raise HTTPException(status_code=400, detail="Access path does not belong to this user")
+        
+    # Validate Access Level
+    if path_in.access_level not in ["view", "manage", "admin"]:
+        raise HTTPException(status_code=422, detail="Invalid access level. Must be view, manage, or admin.")
+        
+    path.access_level = path_in.access_level
+    db.add(path)
+    db.commit()
+    db.refresh(path)
+    
+    return path

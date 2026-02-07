@@ -46,7 +46,7 @@ class TwoFactorVerifyRequest(BaseModel):
 
 # Apple Sign-In
 @router.post("/apple", response_model=DataResponse[dict])
-def apple_sign_in(
+async def apple_sign_in(
     request: AppleSignInRequest,
     session: Session = Depends(get_session)
 ):
@@ -55,7 +55,7 @@ def apple_sign_in(
     Creates new user or logs in existing user
     """
     # Verify identity token
-    apple_data = AppleAuthService.verify_identity_token(request.identity_token)
+    apple_data = await AppleAuthService.verify_identity_token(request.identity_token)
     if not apple_data:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

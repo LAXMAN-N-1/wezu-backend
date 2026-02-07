@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     REDIS_CACHE_DB: int = 2
     
     # Security
-    SECRET_KEY: str = "yd0b7447cbdd06c5586e20d5093121fbfbde37268d664dac666884cfe79cb3d1f"
+    SECRET_KEY: str  # Must be loaded from env
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
@@ -113,7 +113,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Wezu Battery App"
     DEBUG: bool = False
     ENVIRONMENT: str = "production"
-    CORS_ORIGINS: list = ["*"]  # Configure properly in production
+    CORS_ORIGINS: list[str] = []
     
     # Customer Support
     SUPPORT_EMAIL: str = "support@wezu.com"

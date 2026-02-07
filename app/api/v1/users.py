@@ -1,17 +1,24 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Request, UploadFile, File
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 from app.api import deps
 from app.db.session import get_session
 from app.models.user import User
 from app.models.address import Address
-from app.schemas.user import UserResponse, UserUpdate, AddressCreate, AddressResponse, AddressUpdate, DeviceCreate, DeviceResponse, UserProfileResponse, StaffAssignmentInfo, UserStatusUpdate, ActivityLogEntry, ActivityLogResponse
+from app.services.notification_service import NotificationService
 from app.services.user_service import UserService
 from app.services.auth_service import AuthService
-from app.services.notification_service import NotificationService
+from app.core.menu_config import MASTER_MENU
+from app.schemas.user import (
+    UserResponse, UserUpdate, AddressCreate, AddressResponse, AddressUpdate, 
+    DeviceCreate, DeviceResponse, UserProfileResponse, StaffAssignmentInfo, 
+    UserStatusUpdate, ActivityLogEntry, ActivityLogResponse, MenuItem, MenuConfigResponse,
+    FeatureFlagsResponse
+)
+from app.schemas.dashboard import DashboardConfigResponse
 import os
 import shutil
 
@@ -43,28 +50,8 @@ def calculate_profile_completion(user: User) -> int:
     return min(base_percentage + kyc_bonus, 100)
 
 
-@router.get("/me", response_model=UserProfileResponse)
-async def read_user_me(
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
-):
-    """
-    Get current user's full profile including:
-    - Basic info
-    - Roles and permissions
-    - Menu configuration
-    - Wallet balance
-    - Staff assignments (if applicable)
-    - Profile completion percentage
-    """
-    # Reload user with relationships
-    statement = select(User).where(User.id == current_user.id).options(
-        selectinload(User.roles),
-        selectinload(User.wallet),
-        selectinload(User.staff_profile)
-    )
-    user = db.exec(statement).first()
-    
+def _build_user_profile_response(user: User, db: Session = None) -> UserProfileResponse:
+    """Helper to build consistent UserProfileResponse"""
     # Get roles
     user_roles = [r.name for r in user.roles] if user.roles else []
     current_role = user_roles[0] if user_roles else None
@@ -73,7 +60,8 @@ async def read_user_me(
     permissions = AuthService.get_permissions_for_role(current_role) if current_role else []
     menu = AuthService.get_menu_for_role(current_role) if current_role else []
     
-    # Get wallet balance
+    # Get wallet balance (handle if wallet relationship not loaded but available in session?)
+    # Ideally user.wallet should be loaded.
     wallet_balance = user.wallet.balance if user.wallet else 0.0
     
     # Get staff assignment info
@@ -109,6 +97,31 @@ async def read_user_me(
         created_at=user.created_at,
         updated_at=user.updated_at
     )
+
+
+@router.get("/me", response_model=UserProfileResponse)
+async def read_user_me(
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Get current user's full profile including:
+    - Basic info
+    - Roles and permissions
+    - Menu configuration
+    - Wallet balance
+    - Staff assignments (if applicable)
+    - Profile completion percentage
+    """
+    # Reload user with relationships
+    statement = select(User).where(User.id == current_user.id).options(
+        selectinload(User.roles),
+        selectinload(User.wallet),
+        selectinload(User.staff_profile)
+    )
+    user = db.exec(statement).first()
+    
+    return _build_user_profile_response(user, db)
 
 @router.put("/me", response_model=UserProfileResponse)
 async def update_user_me(
@@ -149,42 +162,7 @@ async def update_user_me(
     db.commit()
     db.refresh(user)
     
-    # Return full profile response
-    user_roles = [r.name for r in user.roles] if user.roles else []
-    current_role = user_roles[0] if user_roles else None
-    permissions = AuthService.get_permissions_for_role(current_role) if current_role else []
-    menu = AuthService.get_menu_for_role(current_role) if current_role else []
-    wallet_balance = user.wallet.balance if user.wallet else 0.0
-    
-    staff_assignment = None
-    if user.staff_profile:
-        staff_assignment = StaffAssignmentInfo(
-            staff_type=user.staff_profile.staff_type,
-            station_id=user.staff_profile.station_id,
-            dealer_id=user.staff_profile.dealer_id,
-            employment_id=user.staff_profile.employment_id,
-            is_active=user.staff_profile.is_active
-        )
-    
-    return UserProfileResponse(
-        id=user.id,
-        full_name=user.full_name,
-        email=user.email,
-        phone_number=user.phone_number,
-        profile_picture=user.profile_picture,
-        is_active=user.is_active,
-        is_superuser=user.is_superuser,
-        kyc_status=user.kyc_status,
-        current_role=current_role,
-        available_roles=user_roles,
-        permissions=permissions,
-        menu=menu,
-        wallet_balance=wallet_balance,
-        staff_assignment=staff_assignment,
-        profile_completion_percentage=calculate_profile_completion(user),
-        created_at=user.created_at,
-        updated_at=user.updated_at
-    )
+    return _build_user_profile_response(user, db)
 
 # Profile Picture Upload Response
 class ProfilePictureResponse(BaseModel):
@@ -300,6 +278,64 @@ async def read_addresses(
 ):
     return UserService.get_addresses(db, current_user.id)
 
+
+def _filter_menu_items(items: List[dict], permissions: set, has_all_access: bool) -> List[MenuItem]:
+    valid_items = []
+    for item in items:
+        # Check permission
+        required_perm = item.get("permission")
+        if required_perm and not has_all_access and required_perm not in permissions:
+            continue
+            
+        # Create MenuItem
+        menu_item = MenuItem(
+            id=item["id"],
+            label=item["label"],
+            icon=item.get("icon"),
+            route=item["route"],
+            order=item.get("order", 0),
+            enabled=item.get("enabled", True),
+            permission=required_perm
+        )
+        
+        # Process Submenu
+        if item.get("submenu"):
+            submenu = _filter_menu_items(item["submenu"], permissions, has_all_access)
+            if submenu:
+                menu_item.submenu = submenu
+        
+        valid_items.append(menu_item)
+        
+    return sorted(valid_items, key=lambda x: x.order)
+
+
+@router.get("/me/menu-config", response_model=MenuConfigResponse)
+def get_user_menu_config(
+    current_user: User = Depends(deps.get_current_user),
+):
+    """
+    Generate dynamic menu configuration based on user permissions.
+    """
+    # 1. Get User Permissions
+    user_roles = [r.name for r in current_user.roles] if current_user.roles else []
+    current_role = user_roles[0] if user_roles else None
+    
+    # Use AuthService to get permissions, handling "all" wildcard logic usually found there
+    # For now, simplistic retrieval assuming AuthService has this logic or we rely on Role permissions
+    
+    permissions_list = []
+    if current_role:
+        permissions_list = AuthService.get_permissions_for_role(current_role)
+    
+    user_permissions = set(permissions_list)
+    has_all_access = "all" in user_permissions
+    
+    # 2. Filter Master Menu
+    filtered_menu = _filter_menu_items(MASTER_MENU, user_permissions, has_all_access)
+    
+    return MenuConfigResponse(menu=filtered_menu)
+
+
 # ===== MISSING PROFILE ENDPOINTS =====
 
 @router.patch("/me", response_model=UserResponse)
@@ -357,6 +393,72 @@ async def set_default_address(
     db.refresh(address)
     return address
 
+    return address
+
+
+# ===== FEATURE FLAGS & DASHBOARD =====
+
+@router.get("/me/feature-flags", response_model=FeatureFlagsResponse)
+def get_user_feature_flags(
+    current_user: User = Depends(deps.get_current_user),
+):
+    """
+    Get feature flags status for the current user based on their role.
+    """
+    user_roles = [r.name for r in current_user.roles] if current_user.roles else []
+    
+    # Permission checks
+    is_admin = any(r in ["admin", "super_admin", "regional_manager"] for r in user_roles)
+    is_vendor = "vendor_owner" in user_roles
+    
+    # Default flags
+    features = {
+        "dynamic_pricing": True, # Enabled for everyone
+        "ml_predictions": True, # Enabled for everyone
+        "bulk_transfers": False,
+        "advanced_analytics": False
+    }
+    
+    # Role-based overrides
+    if is_admin:
+        features["advanced_analytics"] = True
+        features["bulk_transfers"] = True
+        
+    if is_vendor:
+        features["bulk_transfers"] = True
+        
+    return FeatureFlagsResponse(features=features)
+
+
+@router.get("/me/dashboard-widgets", response_model=DashboardConfigResponse)
+def get_user_dashboard_config(
+    current_user: User = Depends(deps.get_current_user),
+):
+    """
+    Get personalized dashboard widget configuration for the current user.
+    """
+    from app.core.dashboard_config import MASTER_DASHBOARD_CONFIG
+    from app.schemas.dashboard import DashboardWidget
+
+    user_roles = [r.name for r in current_user.roles] if current_user.roles else []
+    
+    # Determine primary role for dashboard layout
+    # Priority: Admin > Vendor > Customer
+    layout_key = "default"
+    
+    if any(r in ["admin", "super_admin", "regional_manager"] for r in user_roles):
+        layout_key = "admin"
+    elif "vendor_owner" in user_roles:
+        layout_key = "vendor_owner"
+    elif "customer" in user_roles:
+        layout_key = "customer"
+        
+    widgets_data = MASTER_DASHBOARD_CONFIG.get(layout_key, MASTER_DASHBOARD_CONFIG["default"])
+    
+    widgets = [DashboardWidget(**w) for w in widgets_data]
+    
+    return DashboardConfigResponse(layout=widgets)
+
 
 # ===== ADMIN ENDPOINTS =====
 
@@ -375,8 +477,7 @@ class UserSearchItem(BaseModel):
     created_at: Optional[datetime] = None
     last_login: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserSearchResponse(BaseModel):

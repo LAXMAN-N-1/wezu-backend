@@ -2,7 +2,13 @@ from sqlmodel import create_engine, Session, SQLModel
 from app.core.config import settings
 from app.models import *
 
-engine = create_engine(settings.DATABASE_URL, echo=True)
+engine = create_engine(
+    settings.DATABASE_URL, 
+    echo=True,
+    pool_size=20,
+    max_overflow=40,
+    pool_pre_ping=True
+)
 
 def init_db():
     from sqlmodel import Session, text
