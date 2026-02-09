@@ -93,6 +93,19 @@ async def login_access_token(
     access_token = create_access_token(subject=user.id)
     refresh_token = create_refresh_token(subject=user.id)
     
+    from app.services.audit_service import AuditService
+    
+    # Audit Log
+    AuditService.log_action(
+        db=db,
+        user_id=user.id,
+        action="login",
+        resource_type="user",
+        resource_id=str(user.id),
+        details="User logged in via OAuth2 form",
+        ip_address=None # Request object not available in this dependency context easily without change
+    )
+
     return Token(
         access_token=access_token,
         token_type="bearer",
@@ -527,6 +540,18 @@ async def login(
     # 3. Generate Response for Selected Role
     access_token = create_access_token(subject=user.id)
     refresh_token = create_refresh_token(subject=user.id)
+    
+    # Audit Log
+    # We can get IP from context if needed, but for now simplistic
+    AuditService.log_action(
+        db=db,
+        user_id=user.id,
+        action="login",
+        resource_type="user",
+        resource_id=str(user.id),
+        details=f"User logged in with role: {selected_role_name}",
+        ip_address=None 
+    )
     
     # Get Permissions & Menu from AuthService
     permissions = AuthService.get_permissions_for_role(selected_role_name)

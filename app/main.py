@@ -130,6 +130,10 @@ app.include_router(ml.router, prefix=f"{settings.API_V1_STR}/ml", tags=["Machine
 app.include_router(admin_roles.router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin Role Management"])
 app.include_router(admin_kyc.router, prefix=f"{settings.API_V1_STR}/admin/kyc", tags=["Admin KYC Management"])
 
+# Audit Logs
+from app.api.v1 import audit
+app.include_router(audit.router, prefix=f"{settings.API_V1_STR}/audit", tags=["Audit Logs"])
+
 
 # Webhooks
 # Webhooks
