@@ -461,6 +461,102 @@ def get_user_dashboard_config(
     return DashboardConfigResponse(layout=widgets)
 
 
+# ===== NOTIFICATION PREFERENCES =====
+
+from app.schemas.notification import (
+    NotificationPreferencesResponse,
+    NotificationPreferencesUpdate,
+    EmailPreferences,
+    SMSPreferences,
+    PushPreferences,
+)
+import json
+
+
+def _get_default_notification_preferences() -> dict:
+    """Return default preferences structure."""
+    return {
+        "email": EmailPreferences().model_dump(),
+        "sms": SMSPreferences().model_dump(),
+        "push": PushPreferences().model_dump(),
+    }
+
+
+@router.get("/me/notification-preferences", response_model=NotificationPreferencesResponse)
+def get_notification_preferences(
+    current_user: User = Depends(deps.get_current_user),
+):
+    """
+    Get current user's notification preferences.
+    
+    Returns structured preferences for:
+    - Email notifications
+    - SMS notifications
+    - Push notifications
+    """
+    prefs = _get_default_notification_preferences()
+    
+    if current_user.notification_preferences:
+        try:
+            stored = json.loads(current_user.notification_preferences)
+            # Merge stored prefs with defaults (in case new fields were added)
+            for channel in ["email", "sms", "push"]:
+                if channel in stored:
+                    prefs[channel].update(stored[channel])
+        except json.JSONDecodeError:
+            pass  # Fallback to defaults
+    
+    return NotificationPreferencesResponse(
+        email=EmailPreferences(**prefs["email"]),
+        sms=SMSPreferences(**prefs["sms"]),
+        push=PushPreferences(**prefs["push"]),
+    )
+
+
+@router.put("/me/notification-preferences", response_model=NotificationPreferencesResponse)
+def update_notification_preferences(
+    prefs_in: NotificationPreferencesUpdate,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Update current user's notification preferences.
+    
+    Supports partial updates - only provide channels you want to change.
+    """
+    # Load existing or defaults
+    current_prefs = _get_default_notification_preferences()
+    
+    if current_user.notification_preferences:
+        try:
+            stored = json.loads(current_user.notification_preferences)
+            for channel in ["email", "sms", "push"]:
+                if channel in stored:
+                    current_prefs[channel].update(stored[channel])
+        except json.JSONDecodeError:
+            pass
+    
+    # Merge updates
+    if prefs_in.email:
+        current_prefs["email"].update(prefs_in.email.model_dump())
+    if prefs_in.sms:
+        current_prefs["sms"].update(prefs_in.sms.model_dump())
+    if prefs_in.push:
+        current_prefs["push"].update(prefs_in.push.model_dump())
+    
+    # Persist
+    current_user.notification_preferences = json.dumps(current_prefs)
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    
+    return NotificationPreferencesResponse(
+        email=EmailPreferences(**current_prefs["email"]),
+        sms=SMSPreferences(**current_prefs["sms"]),
+        push=PushPreferences(**current_prefs["push"]),
+    )
+
+
 # ===== ADMIN ENDPOINTS =====
 
 
