@@ -125,10 +125,11 @@ app.include_router(purchases_enhanced.router, prefix=f"{settings.API_V1_STR}/pur
 app.include_router(analytics_enhanced.router, prefix=f"{settings.API_V1_STR}/analytics", tags=["Analytics Enhanced"])
 
 # ML & Dynamics (Phase 5)
-from app.api.v1 import ml, admin_roles, admin_kyc
+from app.api.v1 import ml, admin_roles, admin_kyc, admin_users
 app.include_router(ml.router, prefix=f"{settings.API_V1_STR}/ml", tags=["Machine Learning"])
 app.include_router(admin_roles.router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin Role Management"])
 app.include_router(admin_kyc.router, prefix=f"{settings.API_V1_STR}/admin/kyc", tags=["Admin KYC Management"])
+app.include_router(admin_users.router, prefix=f"{settings.API_V1_STR}/admin/users", tags=["Admin User Analytics"])
 
 # Audit Logs
 from app.api.v1 import audit
