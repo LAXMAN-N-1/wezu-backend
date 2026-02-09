@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status, Request, U
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 from app.api import deps
 from app.db.session import get_session
