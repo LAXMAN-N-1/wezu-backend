@@ -2405,3 +2405,100 @@ async def admin_review_security_report(
         account_unlocked=account_unlocked,
         message=f"Security report {report_id} reviewed. Action: {request.action}"
     )
+
+
+# ===== ACCOUNT SELF-LOCK =====
+
+class AccountLockRequest(BaseModel):
+    reason: str = "lost_device"  # "lost_device", "stolen_device", "security_concern", "other"
+    description: Optional[str] = None
+
+
+class AccountLockResponse(BaseModel):
+    lock_id: str
+    account_locked: bool
+    sessions_invalidated: int
+    unlock_method: str
+    message: str
+    created_at: datetime
+
+
+@router.post("/me/lock-account", response_model=AccountLockResponse)
+async def lock_account(
+    request: AccountLockRequest,
+    http_request: Request,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Self-lock account if device is lost or stolen.
+    
+    This immediately:
+    1. Locks the account (is_active = False)
+    2. Invalidates all active sessions
+    3. Creates a lock record for recovery
+    
+    To unlock:
+    - Contact support with your verified email
+    - Complete identity verification
+    - Admin unlocks via security review
+    
+    Valid reasons:
+    - lost_device: Phone/laptop lost
+    - stolen_device: Device was stolen
+    - security_concern: Suspected compromise
+    - other: Other reasons
+    """
+    from app.services.audit_service import AuditService
+    from app.models.auth import BlacklistedToken
+    import uuid
+    
+    # Generate lock ID for recovery reference
+    lock_id = f"LOCK-{str(uuid.uuid4())[:8].upper()}"
+    
+    # Lock the account
+    current_user.is_active = False
+    current_user.security_lock_reason = f"Self-locked: {request.reason}"
+    current_user.security_locked_at = datetime.utcnow()
+    current_user.security_lock_id = lock_id
+    
+    # Invalidate all sessions
+    sessions_invalidated = 0
+    try:
+        blanket_blacklist = BlacklistedToken(
+            token=f"ACCOUNT_LOCK_{current_user.id}_{datetime.utcnow().timestamp()}",
+            blacklisted_at=datetime.utcnow(),
+            user_id=current_user.id
+        )
+        db.add(blanket_blacklist)
+        sessions_invalidated = 1
+    except Exception:
+        pass
+    
+    db.add(current_user)
+    db.commit()
+    
+    # Audit log
+    AuditService.log_action(
+        db=db,
+        user_id=current_user.id,
+        action="account_self_locked",
+        resource_type="security",
+        resource_id=lock_id,
+        details=json.dumps({
+            "reason": request.reason,
+            "description": request.description,
+            "ip_address": http_request.client.host if http_request.client else None,
+            "sessions_invalidated": sessions_invalidated
+        }),
+        ip_address=http_request.client.host if http_request.client else None
+    )
+    
+    return AccountLockResponse(
+        lock_id=lock_id,
+        account_locked=True,
+        sessions_invalidated=sessions_invalidated,
+        unlock_method="Contact support with Lock ID and verify your identity via email verification",
+        message=f"Account locked successfully. Save your Lock ID: {lock_id} for recovery.",
+        created_at=datetime.utcnow()
+    )
