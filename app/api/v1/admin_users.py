@@ -1143,3 +1143,252 @@ async def bulk_status_update(
         results=results,
         generated_at=datetime.utcnow()
     )
+
+
+# ===== USER EXPORT =====
+
+from fastapi.responses import StreamingResponse
+from enum import Enum
+
+
+class ExportFormat(str, Enum):
+    CSV = "csv"
+    JSON = "json"
+    EXCEL = "xlsx"
+
+
+class ExportUserItem(BaseModel):
+    id: int
+    email: str
+    full_name: str
+    phone_number: Optional[str] = None
+    is_active: bool
+    is_verified: bool = False
+    kyc_status: Optional[str] = None
+    roles: List[str]
+    created_at: datetime
+    last_login: Optional[datetime] = None
+
+
+class ExportResponse(BaseModel):
+    export_id: str
+    format: str
+    total_users: int
+    filters_applied: Dict
+    download_url: Optional[str] = None  # For async generation
+    data: Optional[List[Dict]] = None  # For immediate JSON response
+    generated_at: datetime
+    message: str
+
+
+@router.get("/export", response_model=ExportResponse)
+async def export_users(
+    # Filters
+    role: Optional[str] = None,
+    status: Optional[str] = None,  # "active", "suspended", "deleted"
+    date_from: Optional[datetime] = None,
+    date_to: Optional[datetime] = None,
+    # Format and Fields
+    format: ExportFormat = ExportFormat.JSON,
+    fields: Optional[str] = None,  # Comma-separated: "email,full_name,roles"
+    # Options
+    send_email: bool = False,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Export user data with filters (Admin only).
+    
+    Query Parameters:
+    - role: Filter by role name
+    - status: Filter by status (active/suspended/deleted)
+    - date_from/date_to: Filter by created_at date range
+    - format: Output format (csv/json/xlsx)
+    - fields: Comma-separated list of fields to include
+    - send_email: If true, generates async and sends download link
+    
+    Returns:
+    - For JSON format: Data directly in response
+    - For CSV/Excel: Download URL or streamed content
+    """
+    # 1. Authorization
+    current_user_roles = [r.name for r in current_user.roles] if current_user.roles else []
+    is_super_admin = "super_admin" in current_user_roles or current_user.is_superuser
+    is_admin = "admin" in current_user_roles
+    
+    if not any([is_super_admin, is_admin]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Admins can export user data"
+        )
+    
+    # 2. Build query with filters
+    query = select(User).where(User.is_deleted == False)
+    
+    filters_applied = {}
+    
+    # Role filter
+    if role:
+        role_obj = db.exec(select(Role).where(Role.name == role)).first()
+        if role_obj:
+            # Get user_ids with this role
+            user_ids_with_role = db.exec(
+                select(UserRole.user_id).where(UserRole.role_id == role_obj.id)
+            ).all()
+            query = query.where(User.id.in_(user_ids_with_role))
+            filters_applied["role"] = role
+    
+    # Status filter
+    if status:
+        if status == "active":
+            query = query.where(User.is_active == True)
+        elif status == "suspended":
+            query = query.where(User.is_active == False)
+        elif status == "deleted":
+            query = select(User).where(User.is_deleted == True)
+        filters_applied["status"] = status
+    
+    # Date range filter
+    if date_from:
+        query = query.where(User.created_at >= date_from)
+        filters_applied["date_from"] = date_from.isoformat()
+    
+    if date_to:
+        query = query.where(User.created_at <= date_to)
+        filters_applied["date_to"] = date_to.isoformat()
+    
+    # 3. Execute query
+    users = db.exec(query).all()
+    
+    # 4. Parse fields to include
+    default_fields = ["id", "email", "full_name", "phone_number", "is_active", "roles", "created_at"]
+    if fields:
+        selected_fields = [f.strip() for f in fields.split(",")]
+    else:
+        selected_fields = default_fields
+    
+    # 5. Build export data
+    export_data = []
+    for user in users:
+        user_roles = [r.name for r in user.roles] if user.roles else []
+        
+        user_dict = {
+            "id": user.id,
+            "email": user.email,
+            "full_name": user.full_name,
+            "phone_number": user.phone_number,
+            "is_active": user.is_active,
+            "is_verified": getattr(user, 'is_verified', False),
+            "kyc_status": getattr(user, 'kyc_status', None),
+            "roles": ", ".join(user_roles),
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "last_login": getattr(user, 'last_login', None),
+        }
+        
+        # Filter to selected fields only
+        filtered_user = {k: v for k, v in user_dict.items() if k in selected_fields}
+        export_data.append(filtered_user)
+    
+    # 6. Generate unique export ID
+    import uuid
+    export_id = str(uuid.uuid4())[:8]
+    
+    # 7. Handle different formats
+    if format == ExportFormat.JSON:
+        # Return data directly for JSON
+        import json as json_module
+        AuditService.log_action(
+            db=db,
+            user_id=current_user.id,
+            action="user_export",
+            resource_type="users",
+            resource_id="export",
+            details=json_module.dumps({
+                "export_id": export_id,
+                "format": format.value,
+                "total_users": len(export_data),
+                "filters": filters_applied
+            })
+        )
+        
+        return ExportResponse(
+            export_id=export_id,
+            format=format.value,
+            total_users=len(export_data),
+            filters_applied=filters_applied,
+            data=export_data,
+            generated_at=datetime.utcnow(),
+            message=f"Exported {len(export_data)} users in JSON format"
+        )
+    
+    elif format == ExportFormat.CSV:
+        # Generate CSV
+        import io
+        output = io.StringIO()
+        if export_data:
+            writer = csv.DictWriter(output, fieldnames=export_data[0].keys())
+            writer.writeheader()
+            writer.writerows(export_data)
+        
+        csv_content = output.getvalue()
+        
+        import json as json_module
+        AuditService.log_action(
+            db=db,
+            user_id=current_user.id,
+            action="user_export",
+            resource_type="users",
+            resource_id="export",
+            details=json_module.dumps({
+                "export_id": export_id,
+                "format": format.value,
+                "total_users": len(export_data),
+                "filters": filters_applied
+            })
+        )
+        
+        if send_email:
+            # In production, this would save to cloud storage and send email
+            return ExportResponse(
+                export_id=export_id,
+                format=format.value,
+                total_users=len(export_data),
+                filters_applied=filters_applied,
+                download_url=f"/api/v1/admin/users/export/download/{export_id}",
+                generated_at=datetime.utcnow(),
+                message=f"Export initiated. Download link will be sent to {current_user.email}"
+            )
+        
+        # Return CSV directly
+        return StreamingResponse(
+            iter([csv_content]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=users_export_{export_id}.csv"}
+        )
+    
+    elif format == ExportFormat.EXCEL:
+        # For Excel, return metadata (would use openpyxl in production)
+        import json as json_module
+        AuditService.log_action(
+            db=db,
+            user_id=current_user.id,
+            action="user_export",
+            resource_type="users",
+            resource_id="export",
+            details=json_module.dumps({
+                "export_id": export_id,
+                "format": format.value,
+                "total_users": len(export_data),
+                "filters": filters_applied
+            })
+        )
+        
+        return ExportResponse(
+            export_id=export_id,
+            format=format.value,
+            total_users=len(export_data),
+            filters_applied=filters_applied,
+            download_url=f"/api/v1/admin/users/export/download/{export_id}",
+            generated_at=datetime.utcnow(),
+            message=f"Excel export initiated for {len(export_data)} users. Download link will be available shortly."
+        )

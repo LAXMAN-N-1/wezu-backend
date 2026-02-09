@@ -161,3 +161,30 @@ def test_bulk_status_update(client, session: Session):
     assert data["action"] == "suspend"
     assert data["success_count"] == 2
     assert data["failure_count"] == 0
+
+
+def test_user_export_json(client, session: Session):
+    """Test GET /admin/users/export returns JSON data."""
+    email = "export_admin@test.com"
+    headers = get_admin_auth_headers(client, email=email)
+    
+    user = session.exec(select(User).where(User.email == email)).first()
+    user.is_superuser = True
+    session.add(user)
+    session.commit()
+    
+    # Export users
+    resp = client.get(
+        f"{settings.API_V1_STR}/admin/users/export?format=json",
+        headers=headers
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    
+    # Check response structure
+    assert "export_id" in data
+    assert "format" in data
+    assert data["format"] == "json"
+    assert "total_users" in data
+    assert "data" in data
+    assert isinstance(data["data"], list)
