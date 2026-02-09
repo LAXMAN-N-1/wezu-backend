@@ -132,3 +132,73 @@ def test_partial_update_preserves_other_channels(client, session: Session):
     # Others unchanged
     assert data["email"]["promotional"] == True
     assert data["push"]["promotional"] == True
+
+
+def test_quiet_hours_configuration(client, session: Session):
+    """Test quiet hours can be configured."""
+    email = "notif_pref_test_quiet@test.com"
+    headers = get_auth_headers(client, email=email)
+    
+    # 1. Check defaults
+    resp = client.get(f"{settings.API_V1_STR}/users/me/notification-preferences", headers=headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "quiet_hours" in data
+    assert data["quiet_hours"]["enabled"] == False
+    assert data["quiet_hours"]["start_time"] == "22:00"
+    assert data["quiet_hours"]["end_time"] == "07:00"
+    
+    # 2. Enable quiet hours with custom times
+    resp = client.put(
+        f"{settings.API_V1_STR}/users/me/notification-preferences",
+        json={
+            "quiet_hours": {
+                "enabled": True,
+                "start_time": "23:30",
+                "end_time": "06:00",
+                "timezone": "Asia/Kolkata"
+            }
+        },
+        headers=headers
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["quiet_hours"]["enabled"] == True
+    assert data["quiet_hours"]["start_time"] == "23:30"
+    assert data["quiet_hours"]["end_time"] == "06:00"
+    assert data["quiet_hours"]["timezone"] == "Asia/Kolkata"
+
+
+def test_channel_master_toggles(client, session: Session):
+    """Test channel-level enable/disable toggles."""
+    email = "notif_pref_test_toggle@test.com"
+    headers = get_auth_headers(client, email=email)
+    
+    # 1. Check defaults (all enabled)
+    resp = client.get(f"{settings.API_V1_STR}/users/me/notification-preferences", headers=headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["email"]["enabled"] == True
+    assert data["sms"]["enabled"] == True
+    assert data["push"]["enabled"] == True
+    
+    # 2. Disable email channel
+    resp = client.put(
+        f"{settings.API_V1_STR}/users/me/notification-preferences",
+        json={
+            "email": {
+                "enabled": False,
+                "rental_confirmations": True,
+                "payment_receipts": True,
+                "promotional": False,
+                "security_alerts": True
+            }
+        },
+        headers=headers
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["email"]["enabled"] == False
+    # Other channels unchanged
+    assert data["sms"]["enabled"] == True
+    assert data["push"]["enabled"] == True

@@ -469,6 +469,7 @@ from app.schemas.notification import (
     EmailPreferences,
     SMSPreferences,
     PushPreferences,
+    QuietHours,
 )
 import json
 
@@ -479,6 +480,7 @@ def _get_default_notification_preferences() -> dict:
         "email": EmailPreferences().model_dump(),
         "sms": SMSPreferences().model_dump(),
         "push": PushPreferences().model_dump(),
+        "quiet_hours": QuietHours().model_dump(),
     }
 
 
@@ -490,9 +492,10 @@ def get_notification_preferences(
     Get current user's notification preferences.
     
     Returns structured preferences for:
-    - Email notifications
-    - SMS notifications
-    - Push notifications
+    - Email notifications (with master toggle)
+    - SMS notifications (with master toggle)
+    - Push notifications (with master toggle)
+    - Quiet hours settings
     """
     prefs = _get_default_notification_preferences()
     
@@ -500,9 +503,9 @@ def get_notification_preferences(
         try:
             stored = json.loads(current_user.notification_preferences)
             # Merge stored prefs with defaults (in case new fields were added)
-            for channel in ["email", "sms", "push"]:
-                if channel in stored:
-                    prefs[channel].update(stored[channel])
+            for key in ["email", "sms", "push", "quiet_hours"]:
+                if key in stored:
+                    prefs[key].update(stored[key])
         except json.JSONDecodeError:
             pass  # Fallback to defaults
     
@@ -510,6 +513,7 @@ def get_notification_preferences(
         email=EmailPreferences(**prefs["email"]),
         sms=SMSPreferences(**prefs["sms"]),
         push=PushPreferences(**prefs["push"]),
+        quiet_hours=QuietHours(**prefs["quiet_hours"]),
     )
 
 
@@ -522,7 +526,12 @@ def update_notification_preferences(
     """
     Update current user's notification preferences.
     
-    Supports partial updates - only provide channels you want to change.
+    Supports:
+    - Enable/disable channels (email, SMS, push) with master toggle
+    - Enable/disable individual notification categories
+    - Configure quiet hours (start/end time, timezone)
+    
+    Partial updates supported - only provide fields you want to change.
     """
     # Load existing or defaults
     current_prefs = _get_default_notification_preferences()
@@ -530,9 +539,9 @@ def update_notification_preferences(
     if current_user.notification_preferences:
         try:
             stored = json.loads(current_user.notification_preferences)
-            for channel in ["email", "sms", "push"]:
-                if channel in stored:
-                    current_prefs[channel].update(stored[channel])
+            for key in ["email", "sms", "push", "quiet_hours"]:
+                if key in stored:
+                    current_prefs[key].update(stored[key])
         except json.JSONDecodeError:
             pass
     
@@ -543,6 +552,8 @@ def update_notification_preferences(
         current_prefs["sms"].update(prefs_in.sms.model_dump())
     if prefs_in.push:
         current_prefs["push"].update(prefs_in.push.model_dump())
+    if prefs_in.quiet_hours:
+        current_prefs["quiet_hours"].update(prefs_in.quiet_hours.model_dump())
     
     # Persist
     current_user.notification_preferences = json.dumps(current_prefs)
@@ -554,6 +565,7 @@ def update_notification_preferences(
         email=EmailPreferences(**current_prefs["email"]),
         sms=SMSPreferences(**current_prefs["sms"]),
         push=PushPreferences(**current_prefs["push"]),
+        quiet_hours=QuietHours(**current_prefs["quiet_hours"]),
     )
 
 

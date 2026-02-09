@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, time
 from typing import Optional
 
 class NotificationResponse(BaseModel):
@@ -18,7 +18,16 @@ class NotificationResponse(BaseModel):
 
 
 # Notification Preferences Schemas
+class QuietHours(BaseModel):
+    """Quiet hours settings - when user should not be disturbed."""
+    enabled: bool = False
+    start_time: str = "22:00"  # 24-hour format HH:MM
+    end_time: str = "07:00"    # 24-hour format HH:MM
+    timezone: str = "UTC"
+
+
 class EmailPreferences(BaseModel):
+    enabled: bool = True  # Master toggle for email channel
     rental_confirmations: bool = True
     payment_receipts: bool = True
     promotional: bool = False
@@ -26,12 +35,14 @@ class EmailPreferences(BaseModel):
 
 
 class SMSPreferences(BaseModel):
+    enabled: bool = True  # Master toggle for SMS channel
     rental_confirmations: bool = True
     payment_receipts: bool = False
     otp: bool = True
 
 
 class PushPreferences(BaseModel):
+    enabled: bool = True  # Master toggle for push channel
     battery_available: bool = True
     payment_reminders: bool = True
     promotional: bool = False
@@ -41,6 +52,7 @@ class NotificationPreferencesResponse(BaseModel):
     email: EmailPreferences
     sms: SMSPreferences
     push: PushPreferences
+    quiet_hours: QuietHours
 
 
 class NotificationPreferencesUpdate(BaseModel):
@@ -48,3 +60,4 @@ class NotificationPreferencesUpdate(BaseModel):
     email: Optional[EmailPreferences] = None
     sms: Optional[SMSPreferences] = None
     push: Optional[PushPreferences] = None
+    quiet_hours: Optional[QuietHours] = None
