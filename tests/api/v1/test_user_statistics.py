@@ -137,3 +137,79 @@ def test_user_engagement_endpoint(client, session: Session):
     assert "daily_avg" in login
     assert "weekly_avg" in login
     assert "monthly_avg" in login
+
+
+def test_impersonate_user_endpoint(client, session: Session):
+    """Test POST /admin/users/{user_id}/impersonate returns token."""
+    admin_email = "impersonate_admin@test.com"
+    target_email = "impersonate_target@test.com"
+    
+    # Create admin
+    admin_headers = get_admin_auth_headers(client, email=admin_email)
+    
+    # Create target user
+    client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": target_email,
+            "password": "Password123!",
+            "full_name": "Target User",
+            "phone_number": "9876543210"
+        },
+    )
+    
+    # Ensure admin is super admin
+    admin = session.exec(select(User).where(User.email == admin_email)).first()
+    admin.is_superuser = True
+    session.add(admin)
+    session.commit()
+    
+    # Get target user
+    target = session.exec(select(User).where(User.email == target_email)).first()
+    
+    # Impersonate
+    resp = client.post(
+        f"{settings.API_V1_STR}/admin/users/{target.id}/impersonate",
+        json={"reason": "Testing impersonation"},
+        headers=admin_headers
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    
+    # Check response structure
+    assert "impersonation_token" in data
+    assert "expires_at" in data
+    assert "impersonated_user_id" in data
+    assert data["impersonated_user_id"] == target.id
+    assert "user_roles" in data
+    assert "user_permissions" in data
+    assert "menu_config" in data
+    assert "warning" in data
+
+
+def test_impersonate_requires_super_admin(client, session: Session):
+    """Test that regular admins cannot impersonate."""
+    email = "regular_admin_imp@test.com"
+    target_email = "target_for_imp@test.com"
+    
+    headers = get_admin_auth_headers(client, email=email)
+    
+    # Register target
+    client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": target_email,
+            "password": "Password123!",
+            "full_name": "Target",
+            "phone_number": "1234567890"
+        },
+    )
+    target = session.exec(select(User).where(User.email == target_email)).first()
+    
+    # Regular user (not super admin)
+    resp = client.post(
+        f"{settings.API_V1_STR}/admin/users/{target.id}/impersonate",
+        json={"reason": "Testing"},
+        headers=headers
+    )
+    assert resp.status_code == 403

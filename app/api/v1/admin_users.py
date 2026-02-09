@@ -421,3 +421,175 @@ async def get_user_engagement(
         retention_rate_30d=round(retention_30d, 2),
         generated_at=datetime.utcnow()
     )
+
+
+# ===== USER IMPERSONATION =====
+
+from app.core.security import create_access_token
+from app.services.audit_service import AuditService
+
+
+class ImpersonateRequest(BaseModel):
+    reason: str  # Required reason for audit
+
+
+class PermissionInfo(BaseModel):
+    name: str
+    resource: Optional[str] = None
+    action: Optional[str] = None
+
+
+class MenuItemConfig(BaseModel):
+    id: str
+    label: str
+    path: str
+    icon: Optional[str] = None
+
+
+class ImpersonationResponse(BaseModel):
+    impersonation_token: str
+    expires_at: datetime
+    impersonated_user_id: int
+    impersonated_user_email: str
+    user_roles: List[str]
+    user_permissions: List[PermissionInfo]
+    menu_config: List[MenuItemConfig]
+    warning: str
+
+
+@router.post("/{user_id}/impersonate", response_model=ImpersonationResponse)
+async def impersonate_user(
+    user_id: int,
+    request: ImpersonateRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Impersonate a user (Super Admin only).
+    
+    Generates a special time-limited token (30 minutes) that gives the admin
+    the same view as the target user. All actions are logged as "impersonated by Admin".
+    
+    Authorization:
+    - Super Admin only
+    - Reason is required for audit trail
+    """
+    # 1. Authorization - Super Admin only
+    current_user_roles = [r.name for r in current_user.roles] if current_user.roles else []
+    is_super_admin = "super_admin" in current_user_roles or current_user.is_superuser
+    
+    if not is_super_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Super Admins can impersonate users"
+        )
+    
+    # 2. Get target user
+    target_user = db.exec(select(User).where(User.id == user_id)).first()
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # 3. Cannot impersonate yourself
+    if target_user.id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot impersonate yourself"
+        )
+    
+    # 4. Generate impersonation token (30 minutes)
+    expires_delta = timedelta(minutes=30)
+    expires_at = datetime.utcnow() + expires_delta
+    
+    # Create token with special claims for impersonation
+    from jose import jwt
+    from app.core.config import settings
+    
+    impersonation_payload = {
+        "sub": str(target_user.id),
+        "exp": expires_at,
+        "iat": datetime.utcnow(),
+        "type": "impersonation",
+        "impersonated_by": current_user.id,
+        "impersonated_by_email": current_user.email,
+        "reason": request.reason
+    }
+    
+    impersonation_token = jwt.encode(
+        impersonation_payload,
+        settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM
+    )
+    
+    # 5. Log impersonation action
+    import json as json_module
+    AuditService.log_action(
+        db=db,
+        user_id=current_user.id,
+        action="user_impersonation_start",
+        resource_type="user",
+        resource_id=str(target_user.id),
+        details=json_module.dumps({
+            "target_user_id": target_user.id,
+            "target_user_email": target_user.email,
+            "reason": request.reason,
+            "expires_at": expires_at.isoformat()
+        })
+    )
+    
+    # 6. Get user's roles and permissions
+    user_roles = [r.name for r in target_user.roles] if target_user.roles else []
+    
+    user_permissions = []
+    if target_user.roles:
+        for role in target_user.roles:
+            if role.permissions:
+                for perm in role.permissions:
+                    user_permissions.append(PermissionInfo(
+                        name=perm.name,
+                        resource=perm.resource,
+                        action=perm.action
+                    ))
+    
+    # 7. Generate menu config based on roles
+    menu_config = []
+    
+    # Base menu items for all users
+    base_menu = [
+        {"id": "dashboard", "label": "Dashboard", "path": "/dashboard", "icon": "home"},
+        {"id": "profile", "label": "Profile", "path": "/profile", "icon": "user"},
+    ]
+    
+    # Role-specific menu items
+    if "customer" in user_roles:
+        base_menu.extend([
+            {"id": "rentals", "label": "My Rentals", "path": "/rentals", "icon": "battery"},
+            {"id": "wallet", "label": "Wallet", "path": "/wallet", "icon": "wallet"},
+        ])
+    
+    if any(r in ["admin", "super_admin"] for r in user_roles):
+        base_menu.extend([
+            {"id": "admin_users", "label": "User Management", "path": "/admin/users", "icon": "users"},
+            {"id": "admin_analytics", "label": "Analytics", "path": "/admin/analytics", "icon": "chart"},
+        ])
+    
+    if "vendor_owner" in user_roles:
+        base_menu.extend([
+            {"id": "stations", "label": "My Stations", "path": "/vendor/stations", "icon": "station"},
+            {"id": "inventory", "label": "Inventory", "path": "/vendor/inventory", "icon": "box"},
+        ])
+    
+    menu_config = [MenuItemConfig(**item) for item in base_menu]
+    
+    return ImpersonationResponse(
+        impersonation_token=impersonation_token,
+        expires_at=expires_at,
+        impersonated_user_id=target_user.id,
+        impersonated_user_email=target_user.email,
+        user_roles=user_roles,
+        user_permissions=user_permissions,
+        menu_config=menu_config,
+        warning="This is an impersonation token. All actions will be logged as 'impersonated by Admin'. Token expires in 30 minutes."
+    )
