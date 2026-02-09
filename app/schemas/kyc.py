@@ -26,3 +26,20 @@ class KYCStatusResponse(BaseModel):
 class KYCSubmitRequest(BaseModel):
     aadhaar_number: Optional[str] = None
     pan_number: Optional[str] = None
+
+class KYCQueueItem(BaseModel):
+    user_id: int
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone_number: Optional[str] = None
+    user_type: Optional[str] = "customer" # Derived from role
+    submitted_at: Optional[datetime] = None
+    documents: List[KYCDocumentResponse]
+    
+    model_config = ConfigDict(from_attributes=True)
+
+class KYCQueueResponse(BaseModel):
+    items: List[KYCQueueItem]
+    total: int
+    page: int
+    size: int
