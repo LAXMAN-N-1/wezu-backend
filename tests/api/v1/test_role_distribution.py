@@ -119,3 +119,54 @@ def test_role_test_configuration(client, session: Session):
     assert "data_visibility" in data
     assert "total_permissions" in data
     assert "access_level" in data
+
+
+def test_bulk_role_assignment(client, session: Session):
+    """Test POST /admin/roles/bulk-assign works."""
+    email = "bulk_role_admin@test.com"
+    headers = get_admin_auth_headers(client, email=email)
+    
+    # Ensure admin
+    user = session.exec(select(User).where(User.email == email)).first()
+    user.is_superuser = True
+    session.add(user)
+    session.commit()
+    
+    # Create test users
+    target_emails = ["bulkrole1@test.com", "bulkrole2@test.com"]
+    target_ids = []
+    for target_email in target_emails:
+        client.post(
+            "/api/v1/auth/register",
+            json={
+                "email": target_email,
+                "password": "Password123!",
+                "full_name": "Bulk Target",
+                "phone_number": str(abs(hash(target_email)))[:10].ljust(10, '0')
+            },
+        )
+        target = session.exec(select(User).where(User.email == target_email)).first()
+        target_ids.append(target.id)
+    
+    # Get or create a role
+    role = session.exec(select(Role).where(Role.name == "customer")).first()
+    if not role:
+        role = Role(name="customer", slug="customer", description="Customer")
+        session.add(role)
+        session.commit()
+        session.refresh(role)
+    
+    # Bulk assign
+    resp = client.post(
+        f"{settings.API_V1_STR}/admin/roles/bulk-assign",
+        json={
+            "user_ids": target_ids,
+            "role_id": role.id,
+            "replace_existing": False
+        },
+        headers=headers
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success_count"] == 2
+    assert data["failure_count"] == 0

@@ -436,3 +436,139 @@ async def test_role_configuration(
         access_level=access_level,
         generated_at=datetime.utcnow()
     )
+
+
+# ===== BULK ROLE ASSIGNMENT =====
+
+from app.services.audit_service import AuditService
+import json as json_module
+
+
+class BulkRoleAssignRequest(BaseModel):
+    user_ids: List[int]
+    role_id: int
+    replace_existing: bool = False  # If true, replace all roles; if false, add to existing
+
+
+class BulkRoleAssignResultItem(BaseModel):
+    user_id: int
+    success: bool
+    error: Optional[str] = None
+
+
+class BulkRoleAssignResponse(BaseModel):
+    success_count: int
+    failure_count: int
+    role_name: str
+    results: List[BulkRoleAssignResultItem]
+    generated_at: datetime
+
+
+@router.post("/roles/bulk-assign", response_model=BulkRoleAssignResponse)
+async def bulk_assign_role(
+    request: BulkRoleAssignRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Assign a role to multiple users (Admin only).
+    
+    Options:
+    - replace_existing: If true, removes all existing roles and assigns only the specified role
+    - If false (default), adds the role to user's existing roles
+    """
+    # 1. Authorization
+    current_user_roles = [r.name for r in current_user.roles] if current_user.roles else []
+    is_super_admin = "super_admin" in current_user_roles or current_user.is_superuser
+    is_admin = "admin" in current_user_roles
+    
+    if not any([is_super_admin, is_admin]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Admins can bulk assign roles"
+        )
+    
+    # 2. Get role
+    role = db.exec(select(Role).where(Role.id == request.role_id)).first()
+    if not role:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Role not found"
+        )
+    
+    # 3. Process each user
+    results = []
+    success_count = 0
+    failure_count = 0
+    
+    for user_id in request.user_ids:
+        try:
+            user = db.exec(select(User).where(User.id == user_id)).first()
+            if not user:
+                results.append(BulkRoleAssignResultItem(
+                    user_id=user_id,
+                    success=False,
+                    error="User not found"
+                ))
+                failure_count += 1
+                continue
+            
+            # Check if preventing self-role-modification for non-superadmins
+            if user.id == current_user.id and not is_super_admin:
+                results.append(BulkRoleAssignResultItem(
+                    user_id=user_id,
+                    success=False,
+                    error="Cannot modify own roles"
+                ))
+                failure_count += 1
+                continue
+            
+            if request.replace_existing:
+                # Clear existing roles
+                user.roles = [role]
+            else:
+                # Add role if not already assigned
+                if role not in user.roles:
+                    user.roles.append(role)
+            
+            db.add(user)
+            db.commit()
+            
+            results.append(BulkRoleAssignResultItem(
+                user_id=user_id,
+                success=True
+            ))
+            success_count += 1
+            
+        except Exception as e:
+            db.rollback()
+            results.append(BulkRoleAssignResultItem(
+                user_id=user_id,
+                success=False,
+                error=str(e)
+            ))
+            failure_count += 1
+    
+    # 4. Log the bulk action
+    AuditService.log_action(
+        db=db,
+        user_id=current_user.id,
+        action="bulk_role_assign",
+        resource_type="roles",
+        resource_id=str(role.id),
+        details=json_module.dumps({
+            "role_name": role.name,
+            "user_count": len(request.user_ids),
+            "success_count": success_count,
+            "failure_count": failure_count,
+            "replace_existing": request.replace_existing
+        })
+    )
+    
+    return BulkRoleAssignResponse(
+        success_count=success_count,
+        failure_count=failure_count,
+        role_name=role.name,
+        results=results,
+        generated_at=datetime.utcnow()
+    )

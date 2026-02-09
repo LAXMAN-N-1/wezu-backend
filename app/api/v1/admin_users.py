@@ -972,3 +972,174 @@ async def bulk_import_users(
         notifications_sent=notifications_sent,
         generated_at=datetime.utcnow()
     )
+
+
+# ===== BULK STATUS UPDATE =====
+
+class BulkStatusUpdateRequest(BaseModel):
+    user_ids: List[int]
+    action: str  # "activate", "suspend", "delete"
+    reason: str
+
+
+class BulkStatusResultItem(BaseModel):
+    user_id: int
+    email: Optional[str] = None
+    success: bool
+    previous_status: Optional[str] = None
+    new_status: Optional[str] = None
+    error: Optional[str] = None
+
+
+class BulkStatusUpdateResponse(BaseModel):
+    action: str
+    success_count: int
+    failure_count: int
+    results: List[BulkStatusResultItem]
+    generated_at: datetime
+
+
+@router.post("/bulk-status-update", response_model=BulkStatusUpdateResponse)
+async def bulk_status_update(
+    request: BulkStatusUpdateRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Bulk suspend/activate/delete multiple users (Admin only).
+    
+    Actions:
+    - activate: Set is_active=True
+    - suspend: Set is_active=False
+    - delete: Soft delete (is_deleted=True)
+    
+    Use Cases:
+    - Seasonal staff activation
+    - Mass suspension for policy violation
+    - Offboarding terminated employees
+    """
+    # 1. Authorization
+    current_user_roles = [r.name for r in current_user.roles] if current_user.roles else []
+    is_super_admin = "super_admin" in current_user_roles or current_user.is_superuser
+    is_admin = "admin" in current_user_roles
+    
+    if not any([is_super_admin, is_admin]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Admins can bulk update user status"
+        )
+    
+    # 2. Validate action
+    valid_actions = ["activate", "suspend", "delete"]
+    if request.action not in valid_actions:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Action must be one of: {', '.join(valid_actions)}"
+        )
+    
+    # 3. Process each user
+    results = []
+    success_count = 0
+    failure_count = 0
+    
+    for user_id in request.user_ids:
+        try:
+            user = db.exec(select(User).where(User.id == user_id)).first()
+            if not user:
+                results.append(BulkStatusResultItem(
+                    user_id=user_id,
+                    success=False,
+                    error="User not found"
+                ))
+                failure_count += 1
+                continue
+            
+            # Prevent self-modification
+            if user.id == current_user.id:
+                results.append(BulkStatusResultItem(
+                    user_id=user_id,
+                    email=user.email,
+                    success=False,
+                    error="Cannot modify own status"
+                ))
+                failure_count += 1
+                continue
+            
+            # Prevent modifying super admins (unless you're a super admin)
+            user_roles_names = [r.name for r in user.roles] if user.roles else []
+            if "super_admin" in user_roles_names and not is_super_admin:
+                results.append(BulkStatusResultItem(
+                    user_id=user_id,
+                    email=user.email,
+                    success=False,
+                    error="Cannot modify super admin status"
+                ))
+                failure_count += 1
+                continue
+            
+            # Get previous status
+            if user.is_deleted:
+                previous = "deleted"
+            elif user.is_active:
+                previous = "active"
+            else:
+                previous = "suspended"
+            
+            # Apply action
+            if request.action == "activate":
+                user.is_active = True
+                user.is_deleted = False
+                new_status = "active"
+            elif request.action == "suspend":
+                user.is_active = False
+                new_status = "suspended"
+            elif request.action == "delete":
+                user.is_deleted = True
+                user.is_active = False
+                new_status = "deleted"
+            
+            db.add(user)
+            db.commit()
+            
+            results.append(BulkStatusResultItem(
+                user_id=user_id,
+                email=user.email,
+                success=True,
+                previous_status=previous,
+                new_status=new_status
+            ))
+            success_count += 1
+            
+        except Exception as e:
+            db.rollback()
+            results.append(BulkStatusResultItem(
+                user_id=user_id,
+                success=False,
+                error=str(e)
+            ))
+            failure_count += 1
+    
+    # 4. Log the bulk action
+    import json as json_module
+    AuditService.log_action(
+        db=db,
+        user_id=current_user.id,
+        action=f"bulk_user_{request.action}",
+        resource_type="users",
+        resource_id="bulk",
+        details=json_module.dumps({
+            "action": request.action,
+            "user_count": len(request.user_ids),
+            "success_count": success_count,
+            "failure_count": failure_count,
+            "reason": request.reason
+        })
+    )
+    
+    return BulkStatusUpdateResponse(
+        action=request.action,
+        success_count=success_count,
+        failure_count=failure_count,
+        results=results,
+        generated_at=datetime.utcnow()
+    )
