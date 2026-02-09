@@ -22,7 +22,7 @@ async def get_kyc_status(
     return KYCStatusResponse(
         kyc_status=current_user.kyc_status,
         documents=docs,
-        rejection_reason=None # Implement logic to get reason if rejected
+        rejection_reason=current_user.kyc_rejection_reason
     )
 
 @router.post("/me/kyc/documents", response_model=KYCDocumentResponse)
@@ -67,10 +67,46 @@ def schedule_video_kyc(
     # I should stick to that or refactor. Sticking to it for consistency in this turn.
     return VideoKYCService.schedule_session(current_user.id, req.scheduled_at)
 
-@router.post("/me/kyc/video/start", response_model=VideoKYCSession)
-def start_video_kyc(
-    current_user: User = Depends(deps.get_current_user),
-):
     # Find scheduled session
     # For now, just create one immediately if not exists?
     return VideoKYCService.schedule_session(current_user.id, datetime.utcnow())
+
+@router.post("/me/kyc/video-kyc/request", response_model=VideoKYCSession)
+def request_video_kyc(
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    """
+    Request a live video KYC session.
+    """
+    # Create an immediate session (or schedule for "now")
+    session = VideoKYCService.schedule_session(current_user.id, datetime.utcnow(), db=db)
+    return session
+
+@router.post("/me/kyc/resubmit", response_model=UserResponse)
+async def resubmit_kyc(
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    """
+    Resubmit KYC after rejection. Resets status to pending.
+    """
+    if current_user.kyc_status != "rejected":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="Can only resubmit if current status is rejected"
+        )
+    
+    # Reset status
+    current_user.kyc_status = "pending_verification"
+    # Keep the rejection reason for history? Or clear it? 
+    # Usually better to clear it to indicate a fresh start, or move to history table.
+    # For this simple implementation, we can clear it or leave it. 
+    # Let's clear it to show "clean slate" on UI.
+    current_user.kyc_rejection_reason = None
+    
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    
+    return current_user

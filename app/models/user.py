@@ -41,6 +41,7 @@ class User(SQLModel, table=True):
     pan_number: Optional[str] = None
     kyc_video_url: Optional[str] = None
     utility_bill_url: Optional[str] = None
+    kyc_rejection_reason: Optional[str] = None # Reason for overall rejection
     
     # Contact & Preferences
     emergency_contact: Optional[str] = None  # Emergency contact phone/name

@@ -13,7 +13,9 @@ class KYCAction(BaseModel):
     reason: str = None
 
 from datetime import datetime
+from datetime import datetime
 from app.schemas.kyc import KYCDocumentResponse, KYCQueueItem, KYCQueueResponse, KYCVerifyRequest
+from app.schemas.kyc_admin import KYCRejectRequest
 from app.models.user import User
 
 @router.get("/pending", response_model=KYCQueueResponse)
@@ -170,3 +172,86 @@ def reject_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
     return doc
+
+@router.post("/{user_id}/reject", response_model=Any)
+def reject_kyc_submission(
+    user_id: int,
+    request: KYCRejectRequest,
+    db: Session = Depends(deps.get_db),
+    current_user: Any = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Reject a KYC submission with a mandatory reason.
+    """
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Update User Status and Reason
+    user.kyc_status = "rejected"
+    user.kyc_rejection_reason = request.reason
+    db.add(user)
+    
+    # Process Documents (Optional granular rejection)
+    if request.rejection_reasons:
+        # Re-fetch docs to be sure
+        docs = db.exec(select(KYCDocument).where(KYCDocument.user_id == user_id)).all()
+        doc_map = {d.id: d for d in docs}
+        
+        for doc_id, reason in request.rejection_reasons.items():
+            if doc_id in doc_map:
+                doc = doc_map[doc_id]
+                doc.status = "rejected"
+                doc.verification_response = reason
+                db.add(doc)
+                
+    db.commit()
+    db.refresh(user)
+    
+    # TODO: Send Notification (Email/SMS/Push)
+    # NotificationService.send_kyc_rejection(user_id, reason=request.reason)
+    
+    
+    return {"status": "success", "user_status": user.kyc_status, "reason": user.kyc_rejection_reason}
+
+from app.schemas.video_kyc import VideoKYCCompleteRequest
+from app.services.video_kyc_service import VideoKYCService
+
+@router.post("/video-kyc/{session_id}/complete", response_model=Any)
+def complete_video_kyc(
+    session_id: int,
+    request: VideoKYCCompleteRequest,
+    db: Session = Depends(deps.get_db),
+    current_user: Any = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Mark a Video KYC session as complete/verified.
+    """
+    # 1. Update Session
+    status = "completed" if request.verification_result == "approved" else "rejected"
+    vks = VideoKYCService.update_status(
+        session_id=session_id, 
+        status=status, 
+        recording_url=request.recording_link,
+        notes=request.agent_notes,
+        db=db
+    )
+    
+    if not vks:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    # 2. Update User KYC Status
+    user = db.get(User, vks.user_id)
+    if user:
+        if request.verification_result == "approved":
+            user.kyc_status = "verified"
+            # user.kyc_video_url = request.recording_link 
+        elif request.verification_result == "rejected":
+            user.kyc_status = "rejected"
+            if request.agent_notes:
+                user.kyc_rejection_reason = request.agent_notes
+        
+        db.add(user)
+        db.commit()
+            
+    return {"status": "success", "session_status": vks.status}

@@ -22,6 +22,7 @@ class VideoKYCSession(SQLModel, table=True):
     # Scheduling
     scheduled_at: Optional[datetime] = None
     agent_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    agent_notes: Optional[str] = None
     
     # Relationships
     user: "User" = Relationship(sa_relationship_kwargs={"foreign_keys": "VideoKYCSession.user_id"})
