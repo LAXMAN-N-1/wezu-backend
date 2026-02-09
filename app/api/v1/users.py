@@ -1870,3 +1870,247 @@ async def get_two_factor_status(
         created_at=enabled_at,
         backup_codes_remaining=backup_codes_remaining
     )
+
+
+# ===== ENHANCED 2FA FEATURES =====
+
+# Simple in-memory rate limiting (use Redis in production)
+_2fa_attempt_tracker: Dict[int, Dict] = {}
+
+
+def _check_rate_limit(user_id: int, max_attempts: int = 5, window_seconds: int = 300) -> bool:
+    """
+    Check if user has exceeded rate limit for 2FA attempts.
+    Returns True if allowed, False if rate limited.
+    """
+    import time
+    now = time.time()
+    
+    if user_id not in _2fa_attempt_tracker:
+        _2fa_attempt_tracker[user_id] = {"attempts": 0, "window_start": now}
+    
+    tracker = _2fa_attempt_tracker[user_id]
+    
+    # Reset window if expired
+    if now - tracker["window_start"] > window_seconds:
+        tracker["attempts"] = 0
+        tracker["window_start"] = now
+    
+    if tracker["attempts"] >= max_attempts:
+        return False
+    
+    return True
+
+
+def _record_attempt(user_id: int):
+    """Record a 2FA verification attempt."""
+    import time
+    now = time.time()
+    
+    if user_id not in _2fa_attempt_tracker:
+        _2fa_attempt_tracker[user_id] = {"attempts": 0, "window_start": now}
+    
+    _2fa_attempt_tracker[user_id]["attempts"] += 1
+
+
+def _reset_attempts(user_id: int):
+    """Reset attempts after successful verification."""
+    if user_id in _2fa_attempt_tracker:
+        del _2fa_attempt_tracker[user_id]
+
+
+def _consume_backup_code(backup_codes_json: str, code: str) -> tuple[bool, str]:
+    """
+    Check if code is a valid backup code and consume it if so.
+    Returns (is_valid, updated_codes_json).
+    """
+    try:
+        codes = json.loads(backup_codes_json)
+        code_upper = code.upper().replace("-", "").replace(" ", "")
+        
+        for i, stored_code in enumerate(codes):
+            if stored_code and stored_code.upper() == code_upper:
+                # Consume the code by setting it to empty
+                codes[i] = ""
+                return True, json.dumps(codes)
+        
+        return False, backup_codes_json
+    except Exception:
+        return False, backup_codes_json
+
+
+class TwoFactorVerifyWithBackupRequest(BaseModel):
+    code: str  # 6-digit TOTP code OR backup code
+    is_backup_code: bool = False
+
+
+class BackupCodeVerifyResponse(BaseModel):
+    success: bool
+    message: str
+    backup_codes_remaining: int
+
+
+@router.post("/me/2fa/verify-code", response_model=BackupCodeVerifyResponse)
+async def verify_2fa_code(
+    request: TwoFactorVerifyWithBackupRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Verify a 2FA code (TOTP or backup code) with rate limiting.
+    
+    Features:
+    - Rate limiting: Max 5 attempts per 5 minutes
+    - Supports both TOTP and backup codes
+    - Backup codes are consumed on use
+    - Audit logging for security events
+    """
+    from app.services.audit_service import AuditService
+    
+    # 1. Check rate limit
+    if not _check_rate_limit(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many verification attempts. Please try again in 5 minutes."
+        )
+    
+    # 2. Check if 2FA is enabled
+    if not getattr(current_user, 'two_factor_enabled', False):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Two-factor authentication is not enabled"
+        )
+    
+    secret = getattr(current_user, 'two_factor_secret', '')
+    backup_codes_json = getattr(current_user, 'two_factor_backup_codes', '[]')
+    
+    # 3. Try to verify
+    verified = False
+    used_backup = False
+    backup_codes_remaining = 0
+    
+    if request.is_backup_code:
+        # Try backup code
+        is_valid, updated_codes = _consume_backup_code(backup_codes_json, request.code)
+        if is_valid:
+            verified = True
+            used_backup = True
+            current_user.two_factor_backup_codes = updated_codes
+            db.add(current_user)
+            db.commit()
+    else:
+        # Try TOTP code
+        verified = _verify_totp(secret, request.code)
+    
+    # 4. Record attempt
+    _record_attempt(current_user.id)
+    
+    # Count remaining backup codes
+    try:
+        codes = json.loads(getattr(current_user, 'two_factor_backup_codes', '[]'))
+        backup_codes_remaining = len([c for c in codes if c])
+    except Exception:
+        pass
+    
+    # 5. Audit log
+    AuditService.log_action(
+        db=db,
+        user_id=current_user.id,
+        action="2fa_verification_attempt",
+        resource_type="security",
+        resource_id="2fa",
+        details=json.dumps({
+            "success": verified,
+            "used_backup_code": used_backup,
+            "backup_codes_remaining": backup_codes_remaining
+        })
+    )
+    
+    if not verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification code"
+        )
+    
+    # Reset attempts on success
+    _reset_attempts(current_user.id)
+    
+    message = "Verification successful"
+    if used_backup:
+        message = f"Verification successful using backup code. {backup_codes_remaining} backup codes remaining."
+    
+    return BackupCodeVerifyResponse(
+        success=True,
+        message=message,
+        backup_codes_remaining=backup_codes_remaining
+    )
+
+
+class RegenerateBackupCodesRequest(BaseModel):
+    password: str
+    code: str  # Current 2FA code to verify
+
+
+class RegenerateBackupCodesResponse(BaseModel):
+    backup_codes: List[str]
+    message: str
+
+
+@router.post("/me/2fa/backup-codes/regenerate", response_model=RegenerateBackupCodesResponse)
+async def regenerate_backup_codes(
+    request: RegenerateBackupCodesRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Regenerate backup codes (invalidates all existing codes).
+    
+    Requires:
+    - Current password
+    - Valid 2FA code
+    """
+    from app.core.security import verify_password
+    from app.services.audit_service import AuditService
+    
+    if not getattr(current_user, 'two_factor_enabled', False):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Two-factor authentication is not enabled"
+        )
+    
+    # Verify password
+    if not verify_password(request.password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect password"
+        )
+    
+    # Verify 2FA code
+    secret = getattr(current_user, 'two_factor_secret', '')
+    if not _verify_totp(secret, request.code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid 2FA code"
+        )
+    
+    # Generate new backup codes
+    new_codes = _generate_backup_codes()
+    current_user.two_factor_backup_codes = json.dumps(new_codes)
+    
+    db.add(current_user)
+    db.commit()
+    
+    # Audit log
+    AuditService.log_action(
+        db=db,
+        user_id=current_user.id,
+        action="2fa_backup_codes_regenerated",
+        resource_type="security",
+        resource_id="2fa",
+        details=json.dumps({"new_codes_count": len(new_codes)})
+    )
+    
+    return RegenerateBackupCodesResponse(
+        backup_codes=new_codes,
+        message="New backup codes generated. Previous codes are no longer valid. Store these securely."
+    )
