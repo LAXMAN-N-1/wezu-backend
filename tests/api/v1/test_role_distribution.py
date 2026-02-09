@@ -82,3 +82,40 @@ def test_role_distribution_requires_admin(client, session: Session):
     # User is registered but NOT an admin
     resp = client.get(f"{settings.API_V1_STR}/admin/roles/distribution", headers=headers)
     assert resp.status_code == 403
+
+
+def test_role_test_configuration(client, session: Session):
+    """Test POST /admin/roles/{role_id}/test returns role preview."""
+    email = "role_test_admin@test.com"
+    headers = get_admin_auth_headers(client, email=email)
+    
+    # Ensure admin role
+    user = session.exec(select(User).where(User.email == email)).first()
+    admin_role = session.exec(select(Role).where(Role.name == "admin")).first()
+    if not admin_role:
+        admin_role = Role(name="admin", slug="admin", description="Admin")
+        session.add(admin_role)
+        session.commit()
+    
+    if admin_role not in user.roles:
+        user.roles.append(admin_role)
+    
+    user.is_superuser = True
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    
+    # Test the admin role
+    resp = client.post(f"{settings.API_V1_STR}/admin/roles/{admin_role.id}/test", headers=headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    
+    # Check structure
+    assert "role_id" in data
+    assert "role_name" in data
+    assert "menu_structure" in data
+    assert "available_screens" in data
+    assert "actions_enabled" in data
+    assert "data_visibility" in data
+    assert "total_permissions" in data
+    assert "access_level" in data

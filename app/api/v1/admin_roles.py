@@ -200,3 +200,239 @@ async def get_role_distribution(
         empty_roles=empty_roles,
         generated_at=datetime.utcnow()
     )
+
+
+# ===== ROLE TESTING =====
+
+class MenuItemPreview(BaseModel):
+    id: str
+    label: str
+    path: str
+    icon: Optional[str] = None
+    visible: bool = True
+
+
+class ScreenAccess(BaseModel):
+    screen_id: str
+    screen_name: str
+    accessible: bool
+    actions: List[str]
+
+
+class ActionEnabled(BaseModel):
+    action_name: str
+    enabled: bool
+    resource: Optional[str] = None
+
+
+class DataVisibility(BaseModel):
+    data_type: str
+    visibility_level: str  # "full", "partial", "none"
+    filters: Optional[List[str]] = None
+
+
+class RoleTestResponse(BaseModel):
+    role_id: int
+    role_name: str
+    role_description: Optional[str]
+    
+    # Menu structure
+    menu_structure: List[MenuItemPreview]
+    
+    # Available screens
+    available_screens: List[ScreenAccess]
+    
+    # Actions enabled
+    actions_enabled: List[ActionEnabled]
+    
+    # Data visibility
+    data_visibility: List[DataVisibility]
+    
+    # Summary
+    total_permissions: int
+    access_level: str  # "full", "restricted", "minimal"
+    
+    generated_at: datetime
+
+
+@router.post("/roles/{role_id}/test", response_model=RoleTestResponse)
+async def test_role_configuration(
+    role_id: int,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Test/preview a role configuration without activating (Admin only).
+    
+    Returns:
+    - Sample menu structure this role would see
+    - Available screens and their access levels
+    - Actions enabled by this role
+    - Data visibility settings
+    """
+    # 1. Authorization
+    current_user_roles = [r.name for r in current_user.roles] if current_user.roles else []
+    is_super_admin = "super_admin" in current_user_roles or current_user.is_superuser
+    is_admin = "admin" in current_user_roles
+    
+    if not any([is_super_admin, is_admin]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Admins can test role configurations"
+        )
+    
+    # 2. Get role
+    role = db.exec(select(Role).where(Role.id == role_id)).first()
+    if not role:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Role not found"
+        )
+    
+    # 3. Get role permissions
+    permissions = role.permissions if role.permissions else []
+    permission_names = [p.name for p in permissions]
+    
+    # 4. Build menu structure based on role
+    menu_structure = []
+    
+    # Base menu items
+    base_items = [
+        {"id": "dashboard", "label": "Dashboard", "path": "/dashboard", "icon": "home"},
+        {"id": "profile", "label": "Profile", "path": "/profile", "icon": "user"},
+    ]
+    
+    # Role-specific menu items
+    role_menu_mapping = {
+        "super_admin": [
+            {"id": "admin_users", "label": "User Management", "path": "/admin/users", "icon": "users"},
+            {"id": "admin_roles", "label": "Role Management", "path": "/admin/roles", "icon": "shield"},
+            {"id": "admin_settings", "label": "System Settings", "path": "/admin/settings", "icon": "settings"},
+            {"id": "admin_analytics", "label": "Analytics", "path": "/admin/analytics", "icon": "chart"},
+            {"id": "admin_audit", "label": "Audit Logs", "path": "/admin/audit", "icon": "history"},
+        ],
+        "admin": [
+            {"id": "admin_users", "label": "User Management", "path": "/admin/users", "icon": "users"},
+            {"id": "admin_analytics", "label": "Analytics", "path": "/admin/analytics", "icon": "chart"},
+            {"id": "admin_kyc", "label": "KYC Queue", "path": "/admin/kyc", "icon": "id-card"},
+        ],
+        "customer": [
+            {"id": "rentals", "label": "My Rentals", "path": "/rentals", "icon": "battery"},
+            {"id": "wallet", "label": "Wallet", "path": "/wallet", "icon": "wallet"},
+            {"id": "history", "label": "History", "path": "/history", "icon": "clock"},
+        ],
+        "vendor_owner": [
+            {"id": "stations", "label": "My Stations", "path": "/vendor/stations", "icon": "store"},
+            {"id": "inventory", "label": "Inventory", "path": "/vendor/inventory", "icon": "box"},
+            {"id": "earnings", "label": "Earnings", "path": "/vendor/earnings", "icon": "dollar"},
+        ],
+    }
+    
+    role_items = role_menu_mapping.get(role.name, [])
+    all_items = base_items + role_items
+    
+    for item in all_items:
+        menu_structure.append(MenuItemPreview(**item))
+    
+    # 5. Available screens
+    screen_definitions = [
+        {"id": "dashboard", "name": "Dashboard", "required_perm": None},
+        {"id": "profile", "name": "User Profile", "required_perm": None},
+        {"id": "users_list", "name": "Users List", "required_perm": "users:read"},
+        {"id": "users_edit", "name": "Edit User", "required_perm": "users:write"},
+        {"id": "roles_manage", "name": "Role Management", "required_perm": "roles:admin"},
+        {"id": "kyc_queue", "name": "KYC Queue", "required_perm": "kyc:review"},
+        {"id": "analytics", "name": "Analytics Dashboard", "required_perm": "analytics:read"},
+        {"id": "audit_logs", "name": "Audit Logs", "required_perm": "audit:read"},
+        {"id": "rentals", "name": "Rentals", "required_perm": "rentals:read"},
+        {"id": "wallet", "name": "Wallet", "required_perm": "wallet:read"},
+    ]
+    
+    available_screens = []
+    for screen in screen_definitions:
+        accessible = screen["required_perm"] is None or screen["required_perm"] in permission_names
+        actions = []
+        if accessible:
+            if "write" in (screen["required_perm"] or ""):
+                actions = ["view", "edit", "create"]
+            elif "admin" in (screen["required_perm"] or ""):
+                actions = ["view", "edit", "create", "delete", "configure"]
+            else:
+                actions = ["view"]
+        
+        available_screens.append(ScreenAccess(
+            screen_id=screen["id"],
+            screen_name=screen["name"],
+            accessible=accessible,
+            actions=actions
+        ))
+    
+    # 6. Actions enabled
+    action_definitions = [
+        {"name": "Create User", "perm": "users:create", "resource": "users"},
+        {"name": "Edit User", "perm": "users:write", "resource": "users"},
+        {"name": "Delete User", "perm": "users:delete", "resource": "users"},
+        {"name": "Approve KYC", "perm": "kyc:approve", "resource": "kyc"},
+        {"name": "Reject KYC", "perm": "kyc:reject", "resource": "kyc"},
+        {"name": "Manage Roles", "perm": "roles:admin", "resource": "roles"},
+        {"name": "View Analytics", "perm": "analytics:read", "resource": "analytics"},
+        {"name": "Export Data", "perm": "data:export", "resource": "data"},
+        {"name": "Impersonate User", "perm": "users:impersonate", "resource": "users"},
+    ]
+    
+    actions_enabled = []
+    for action in action_definitions:
+        enabled = action["perm"] in permission_names
+        actions_enabled.append(ActionEnabled(
+            action_name=action["name"],
+            enabled=enabled,
+            resource=action["resource"]
+        ))
+    
+    # 7. Data visibility
+    data_visibility = []
+    
+    # User data
+    if "users:admin" in permission_names or is_super_admin:
+        data_visibility.append(DataVisibility(data_type="User Data", visibility_level="full"))
+    elif "users:read" in permission_names:
+        data_visibility.append(DataVisibility(data_type="User Data", visibility_level="partial", filters=["own_data", "assigned_users"]))
+    else:
+        data_visibility.append(DataVisibility(data_type="User Data", visibility_level="none"))
+    
+    # Financial data
+    if "finance:admin" in permission_names:
+        data_visibility.append(DataVisibility(data_type="Financial Data", visibility_level="full"))
+    elif "finance:read" in permission_names:
+        data_visibility.append(DataVisibility(data_type="Financial Data", visibility_level="partial", filters=["own_transactions"]))
+    else:
+        data_visibility.append(DataVisibility(data_type="Financial Data", visibility_level="none"))
+    
+    # Analytics data
+    if "analytics:admin" in permission_names:
+        data_visibility.append(DataVisibility(data_type="Analytics", visibility_level="full"))
+    elif "analytics:read" in permission_names:
+        data_visibility.append(DataVisibility(data_type="Analytics", visibility_level="partial", filters=["aggregated_only"]))
+    else:
+        data_visibility.append(DataVisibility(data_type="Analytics", visibility_level="none"))
+    
+    # 8. Determine access level
+    if role.name == "super_admin" or len(permissions) > 20:
+        access_level = "full"
+    elif len(permissions) > 5:
+        access_level = "restricted"
+    else:
+        access_level = "minimal"
+    
+    return RoleTestResponse(
+        role_id=role.id,
+        role_name=role.name,
+        role_description=role.description,
+        menu_structure=menu_structure,
+        available_screens=available_screens,
+        actions_enabled=actions_enabled,
+        data_visibility=data_visibility,
+        total_permissions=len(permissions),
+        access_level=access_level,
+        generated_at=datetime.utcnow()
+    )

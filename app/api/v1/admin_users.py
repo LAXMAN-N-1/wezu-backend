@@ -593,3 +593,125 @@ async def impersonate_user(
         menu_config=menu_config,
         warning="This is an impersonation token. All actions will be logged as 'impersonated by Admin'. Token expires in 30 minutes."
     )
+
+
+# ===== END IMPERSONATION =====
+
+class EndImpersonationResponse(BaseModel):
+    message: str
+    admin_user_id: int
+    admin_email: str
+    impersonated_user_id: int
+    session_duration_seconds: float
+    actions_performed: int
+    new_admin_token: str
+
+
+@router.post("/impersonation/end", response_model=EndImpersonationResponse)
+async def end_impersonation(
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+    authorization: str = Depends(deps.oauth2_scheme),
+):
+    """
+    End an active impersonation session and return to admin session.
+    
+    This endpoint should be called with the impersonation token.
+    It will log the end of impersonation and return a new admin token.
+    """
+    from jose import jwt, JWTError
+    from app.core.config import settings
+    
+    # 1. Decode the current token to check if it's an impersonation token
+    try:
+        payload = jwt.decode(
+            authorization,
+            settings.SECRET_KEY,
+            algorithms=[settings.ALGORITHM]
+        )
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token"
+        )
+    
+    token_type = payload.get("type")
+    
+    if token_type != "impersonation":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Not an impersonation session. Use regular logout instead."
+        )
+    
+    # 2. Get impersonation details from token
+    impersonated_by = payload.get("impersonated_by")
+    impersonated_by_email = payload.get("impersonated_by_email")
+    impersonated_user_id = int(payload.get("sub"))
+    reason = payload.get("reason", "Not specified")
+    iat = payload.get("iat")
+    
+    if not impersonated_by:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid impersonation token"
+        )
+    
+    # 3. Get original admin user
+    admin_user = db.exec(select(User).where(User.id == impersonated_by)).first()
+    if not admin_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Original admin user not found"
+        )
+    
+    # 4. Calculate session duration
+    import time
+    if iat:
+        session_duration = time.time() - iat
+    else:
+        session_duration = 0
+    
+    # 5. Count actions performed during impersonation (from audit logs)
+    from app.models.audit_log import AuditLog
+    
+    try:
+        actions_count = db.exec(
+            select(func.count(AuditLog.id)).where(
+                AuditLog.user_id == impersonated_user_id,
+                AuditLog.details.contains("impersonated")
+            )
+        ).one()
+    except Exception:
+        actions_count = 0
+    
+    # 6. Log end of impersonation
+    import json as json_module
+    AuditService.log_action(
+        db=db,
+        user_id=impersonated_by,
+        action="user_impersonation_end",
+        resource_type="user",
+        resource_id=str(impersonated_user_id),
+        details=json_module.dumps({
+            "impersonated_user_id": impersonated_user_id,
+            "session_duration_seconds": round(session_duration, 2),
+            "actions_performed": actions_count,
+            "original_reason": reason
+        })
+    )
+    
+    # 7. Generate new admin token
+    new_admin_token = create_access_token(
+        subject=admin_user.id,
+        expires_delta=timedelta(hours=24)
+    )
+    
+    return EndImpersonationResponse(
+        message="Impersonation session ended successfully",
+        admin_user_id=admin_user.id,
+        admin_email=admin_user.email,
+        impersonated_user_id=impersonated_user_id,
+        session_duration_seconds=round(session_duration, 2),
+        actions_performed=actions_count,
+        new_admin_token=new_admin_token
+    )
