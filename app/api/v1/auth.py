@@ -85,9 +85,31 @@ async def login_access_token(
         user = db.exec(statement).first()
 
     if not user or not verify_password(form_data.password, user.hashed_password):
+        # Log Failure
+        from app.services.audit_service import AuditService
+        AuditService.log_action(
+            db=db,
+            user_id=user.id if user else None,
+            action="login_failed",
+            resource_type="user",
+            resource_id=str(user.id) if user else form_data.username,
+            details=f"Login failed for {form_data.username}. Reason: Incorrect credentials",
+            ip_address=None
+        )
         raise HTTPException(status_code=400, detail="Incorrect email or password")
     
     if not user.is_active:
+        # Log Failure
+        from app.services.audit_service import AuditService
+        AuditService.log_action(
+            db=db,
+            user_id=user.id,
+            action="login_failed",
+            resource_type="user",
+            resource_id=str(user.id),
+            details=f"Login failed for {form_data.username}. Reason: Inactive user",
+            ip_address=None
+        )
         raise HTTPException(status_code=400, detail="Inactive user")
         
     access_token = create_access_token(subject=user.id)
@@ -497,13 +519,43 @@ async def login(
     user = db.exec(statement).first()
     
     if not user:
-        # Avoid user enumeration
+        # Avoid user enumeration but LOG it
+        from app.services.audit_service import AuditService
+        AuditService.log_action(
+            db=db,
+            user_id=None,
+            action="login_failed",
+            resource_type="user",
+            resource_id=login_data.username,
+            details=f"Login failed for {login_data.username}. Reason: User not found",
+            ip_address=None
+        )
         raise HTTPException(status_code=401, detail="Invalid credentials")
         
     if not verify_password(login_data.password, user.hashed_password):
+        from app.services.audit_service import AuditService
+        AuditService.log_action(
+            db=db,
+            user_id=user.id,
+            action="login_failed",
+            resource_type="user",
+            resource_id=str(user.id),
+            details=f"Login failed for {login_data.username}. Reason: Incorrect password",
+            ip_address=None
+        )
         raise HTTPException(status_code=401, detail="Invalid credentials")
         
     if not user.is_active:
+         from app.services.audit_service import AuditService
+         AuditService.log_action(
+            db=db,
+            user_id=user.id,
+            action="login_failed",
+            resource_type="user",
+            resource_id=str(user.id),
+            details=f"Login failed for {login_data.username}. Reason: Inactive user",
+            ip_address=None
+        )
          raise HTTPException(status_code=403, detail="Account is inactive")
 
     # 2. Determine Role

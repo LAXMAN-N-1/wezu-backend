@@ -103,6 +103,18 @@ def create_role(
     
     db.commit()
     db.refresh(role)
+    
+    # Audit Log
+    from app.services.audit_service import AuditService
+    AuditService.log_action(
+        db=db,
+        user_id=current_user.id,
+        action="create_role",
+        resource_type="role",
+        resource_id=str(role.id),
+        details=f"Created role '{role.name}'"
+    )
+    
     return role
 
 
@@ -318,6 +330,24 @@ def assign_permissions_to_role(
         
     db.commit()
     db.refresh(role)
+    
+    # Audit Log
+    from app.services.audit_service import AuditService
+    
+    details = f"Updated permissions for role '{role.name}'. Mode: {assignment.mode}."
+    if assignment.mode == "overwrite":
+         details += f" Set to: {', '.join([p.slug for p in role.permissions])}"
+    elif assignment.mode == "append":
+         details += f" Added: {', '.join([p.slug for p in found_perms])}"
+         
+    AuditService.log_action(
+        db=db,
+        user_id=current_user.id,
+        action="update_role_permissions",
+        resource_type="role",
+        resource_id=str(role.id),
+        details=details
+    )
     
     # 3. Session Invalidation
     users_affected = 0
@@ -893,22 +923,27 @@ def update_role(
              raise HTTPException(status_code=400, detail="Cannot change category of system roles")
              
     # 2. Update Basic Fields
-    if role_in.name is not None:
+    changes = []
+    if role_in.name is not None and role_in.name != role.name:
         # Check uniqueness
-        if role_in.name != role.name:
-             existing = db.exec(select(Role).where(Role.name == role_in.name)).first()
-             if existing:
-                 raise HTTPException(status_code=400, detail="Role name already exists")
+        existing = db.exec(select(Role).where(Role.name == role_in.name)).first()
+        if existing:
+             raise HTTPException(status_code=400, detail="Role name already exists")
+        changes.append(f"Name: '{role.name}' -> '{role_in.name}'")
         role.name = role_in.name
         
-    if role_in.description is not None:
+    if role_in.description is not None and role_in.description != role.description:
+        changes.append(f"Description changed")
         role.description = role_in.description
-    if role_in.category is not None:
+    if role_in.category is not None and role_in.category != role.category:
+        changes.append(f"Category: '{role.category}' -> '{role_in.category}'")
         role.category = role_in.category
-    if role_in.level is not None:
+    if role_in.level is not None and role_in.level != role.level:
+        changes.append(f"Level: {role.level} -> {role_in.level}")
         role.level = role_in.level
-    if role_in.parent_role_id is not None:
+    if role_in.parent_role_id is not None and role_in.parent_role_id != role.parent_role_id:
         # Prevent circular logic usually, but keep simple for now
+        changes.append(f"Parent Role ID: {role.parent_role_id} -> {role_in.parent_role_id}")
         role.parent_role_id = role_in.parent_role_id
         
     db.add(role)
@@ -922,10 +957,13 @@ def update_role(
             db.delete(link)
             
         # Add new
+        added_perms = []
         for slug in role_in.permissions:
             permission = db.exec(select(Permission).where(Permission.slug == slug)).first()
             if permission:
                  db.add(RolePermission(role_id=role.id, permission_id=permission.id))
+                 added_perms.append(slug)
+        changes.append(f"Permissions set to: {', '.join(added_perms)}")
         
         # 4. Session Invalidation (Security)
         # Invalidate sessions for users having this role
@@ -944,6 +982,18 @@ def update_role(
         db.commit()
         
     db.refresh(role)
+    
+    # Audit Log
+    from app.services.audit_service import AuditService
+    AuditService.log_action(
+        db=db,
+        user_id=current_user.id,
+        action="update_role",
+        resource_type="role",
+        resource_id=str(role.id),
+        details=f"Updated role '{role.name}'. Changes: {'; '.join(changes)}" if changes else f"Updated role '{role.name}' (No field changes, possibly permissions)"
+    )
+    
     return role
 
 
@@ -1030,6 +1080,17 @@ def delete_role(
     db.add(role)
     db.commit()
     
+    # Audit Log
+    from app.services.audit_service import AuditService
+    AuditService.log_action(
+        db=db,
+        user_id=current_user.id,
+        action="delete_role",
+        resource_type="role",
+        resource_id=str(role.id),
+        details=f"Deleted role '{role.name}' (Soft Delete)"
+    )
+    
     return {"status": "success", "message": "Role deleted successfully"}
 
 
@@ -1076,6 +1137,17 @@ def check_user_permission(
             # Check permissions in current role
             for p in current.permissions:
                 if p.slug == permission:
+                    # Log Grant
+                    from app.services.audit_service import AuditService
+                    AuditService.log_action(
+                        db=db,
+                        user_id=current_user.id,
+                        action="permission_check",
+                        resource_type="permission",
+                        resource_id=permission,
+                        details=f"Check for user {user_id}. Granted: True. Role: {role.name}"
+                    )
+                    
                     return rbac_schema.PermissionCheckResponse(
                         has_permission=True,
                         granted_by_role=role.name, # The direct role assigned to user
@@ -1088,8 +1160,16 @@ def check_user_permission(
             else:
                 break
                 
-    return rbac_schema.PermissionCheckResponse(has_permission=False)
-
+    # Log Denial
+    from app.services.audit_service import AuditService
+    AuditService.log_action(
+        db=db,
+        user_id=current_user.id,
+        action="permission_check",
+        resource_type="permission",
+        resource_id=permission,
+        details=f"Check for user {user_id}. Granted: False"
+    )
 
     return rbac_schema.PermissionCheckResponse(has_permission=False)
 
