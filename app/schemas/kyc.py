@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import datetime
 
 class KYCDocumentBase(BaseModel):
@@ -43,3 +43,9 @@ class KYCQueueResponse(BaseModel):
     total: int
     page: int
     size: int
+
+class KYCVerifyRequest(BaseModel):
+    decision: str # "approved", "rejected"
+    notes: Optional[str] = None
+    rejection_reasons: Optional[Dict[int, str]] = None # map of doc_id -> reason
+

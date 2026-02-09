@@ -13,7 +13,7 @@ class KYCAction(BaseModel):
     reason: str = None
 
 from datetime import datetime
-from app.schemas.kyc import KYCDocumentResponse, KYCQueueItem, KYCQueueResponse
+from app.schemas.kyc import KYCDocumentResponse, KYCQueueItem, KYCQueueResponse, KYCVerifyRequest
 from app.models.user import User
 
 @router.get("/pending", response_model=KYCQueueResponse)
@@ -69,6 +69,64 @@ def get_pending_kyc_queue(
         page=page,
         size=size
     )
+
+    return KYCQueueResponse(
+        items=items,
+        total=total,
+        page=page,
+        size=size
+    )
+
+@router.post("/{user_id}/verify", response_model=Any)
+def verify_kyc_submission(
+    user_id: int,
+    request: KYCVerifyRequest,
+    db: Session = Depends(deps.get_db),
+    current_user: Any = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """
+    Approve or reject a KYC submission.
+    """
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Update User Status
+    if request.decision == "approved":
+        user.kyc_status = "verified"
+    elif request.decision == "rejected":
+        user.kyc_status = "rejected"
+    else:
+        raise HTTPException(status_code=400, detail="Invalid decision")
+    
+    db.add(user)
+    
+    # Process Documents
+    docs = db.exec(select(KYCDocument).where(KYCDocument.user_id == user_id)).all()
+    doc_map = {d.id: d for d in docs}
+    
+    if request.rejection_reasons:
+        for doc_id, reason in request.rejection_reasons.items():
+            if doc_id in doc_map:
+                doc = doc_map[doc_id]
+                doc.status = "rejected"
+                doc.verification_response = reason
+                db.add(doc)
+    
+    # If approved, mark all non-rejected docs as verified
+    if request.decision == "approved":
+        for doc in docs:
+            if doc.status != "rejected":
+                doc.status = "verified"
+                db.add(doc)
+                
+    db.commit()
+    db.refresh(user)
+    
+    # TODO: Send Notification (Email/SMS/Push)
+    # NotificationService.send_kyc_update(user_id, status=user.kyc_status, notes=request.notes)
+    
+    return {"status": "success", "user_status": user.kyc_status}
 
 @router.get("/documents/pending", response_model=List[KYCDocumentResponse])
 def get_pending_documents(

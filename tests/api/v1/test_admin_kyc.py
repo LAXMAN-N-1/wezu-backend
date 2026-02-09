@@ -81,3 +81,46 @@ def test_get_kyc_queue(client: TestClient, session: Session):
             assert item["documents"][0]["document_type"] == "aadhaar"
     
     assert found
+
+def test_verify_kyc_submission(client: TestClient, session: Session):
+    # 1. Setup: User with pending KYC
+    email = "verify_kyc_user@test.com"
+    headers = get_auth_headers(client, email=email)
+    
+    user = session.exec(select(User).where(User.email == email)).first()
+    user.kyc_status = "pending_verification"
+    session.add(user)
+    session.commit()
+    
+    doc = KYCDocument(
+        user_id=user.id,
+        document_type="pan",
+        file_url="http://s3/pan.jpg",
+        status="pending"
+    )
+    session.add(doc)
+    session.commit()
+    session.refresh(doc)
+    
+    # 2. Admin Auth
+    su_email = "admin_verifier@test.com"
+    su_headers = get_auth_headers(client, email=su_email)
+    su_user = session.exec(select(User).where(User.email == su_email)).first()
+    su_user.is_superuser = True
+    session.add(su_user)
+    session.commit()
+    
+    # 3. Approve
+    resp = client.post(
+        f"/api/v1/admin/kyc/{user.id}/verify",
+        headers=su_headers,
+        json={"decision": "approved", "notes": "Looks good"}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "success"
+    
+    # 4. Verify DB updates
+    session.refresh(user)
+    session.refresh(doc)
+    assert user.kyc_status == "verified"
+    assert doc.status == "verified"
