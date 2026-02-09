@@ -92,3 +92,48 @@ def test_user_statistics_requires_admin(client, session: Session):
     # Call endpoint
     resp = client.get(f"{settings.API_V1_STR}/admin/users/statistics", headers=headers)
     assert resp.status_code == 403
+
+
+def test_user_engagement_endpoint(client, session: Session):
+    """Test GET /admin/users/engagement returns expected structure."""
+    email = "user_engage_admin@test.com"
+    headers = get_admin_auth_headers(client, email=email)
+    
+    # Ensure admin role
+    user = session.exec(select(User).where(User.email == email)).first()
+    admin_role = session.exec(select(Role).where(Role.name == "admin")).first()
+    if not admin_role:
+        admin_role = Role(name="admin", slug="admin", description="Admin")
+        session.add(admin_role)
+        session.commit()
+    
+    if admin_role not in user.roles:
+        user.roles.append(admin_role)
+    
+    user.is_superuser = True
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    
+    # Call endpoint
+    resp = client.get(f"{settings.API_V1_STR}/admin/users/engagement", headers=headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    
+    # Check structure
+    assert "daily_active_users" in data
+    assert "weekly_active_users" in data
+    assert "monthly_active_users" in data
+    assert "stickiness_ratio" in data
+    assert "login_frequency" in data
+    assert "feature_usage" in data
+    assert "churn_rate_30d" in data
+    assert "retention_rate_7d" in data
+    assert "retention_rate_30d" in data
+    assert "generated_at" in data
+    
+    # Login frequency structure
+    login = data["login_frequency"]
+    assert "daily_avg" in login
+    assert "weekly_avg" in login
+    assert "monthly_avg" in login

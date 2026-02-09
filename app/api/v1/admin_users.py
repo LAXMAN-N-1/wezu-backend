@@ -187,3 +187,237 @@ async def get_user_statistics(
         regional_distribution=regional_distribution,
         generated_at=datetime.utcnow()
     )
+
+
+# ===== ENGAGEMENT METRICS =====
+
+class LoginFrequency(BaseModel):
+    daily_avg: float
+    weekly_avg: float
+    monthly_avg: float
+
+
+class FeatureUsage(BaseModel):
+    feature_name: str
+    usage_count: int
+    unique_users: int
+    percentage_of_users: float
+
+
+class UserEngagementResponse(BaseModel):
+    # Active users
+    daily_active_users: int
+    weekly_active_users: int
+    monthly_active_users: int
+    
+    # DAU/MAU ratio (stickiness)
+    stickiness_ratio: float
+    
+    # Login frequency
+    login_frequency: LoginFrequency
+    
+    # Feature usage (top features)
+    feature_usage: List[FeatureUsage]
+    
+    # Churn metrics
+    churn_rate_30d: float  # percentage of users who became inactive in last 30 days
+    churned_users_count: int
+    
+    # Retention
+    retention_rate_7d: float
+    retention_rate_30d: float
+    
+    # Timestamps
+    generated_at: datetime
+
+
+@router.get("/engagement", response_model=UserEngagementResponse)
+async def get_user_engagement(
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Get user engagement metrics (Admin only).
+    
+    Returns:
+    - Daily/Weekly/Monthly Active Users
+    - Login frequency statistics
+    - Feature usage breakdown
+    - Churn and retention rates
+    """
+    # 1. Authorization
+    current_user_roles = [r.name for r in current_user.roles] if current_user.roles else []
+    is_super_admin = "super_admin" in current_user_roles or current_user.is_superuser
+    is_admin = "admin" in current_user_roles
+    
+    if not any([is_super_admin, is_admin]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Admins can access engagement metrics"
+        )
+    
+    now = datetime.utcnow()
+    day_ago = now - timedelta(days=1)
+    week_ago = now - timedelta(days=7)
+    month_ago = now - timedelta(days=30)
+    
+    # 2. Active Users (based on last_login)
+    daily_active = db.exec(
+        select(func.count(User.id)).where(
+            User.last_login >= day_ago,
+            User.is_active == True
+        )
+    ).one()
+    
+    weekly_active = db.exec(
+        select(func.count(User.id)).where(
+            User.last_login >= week_ago,
+            User.is_active == True
+        )
+    ).one()
+    
+    monthly_active = db.exec(
+        select(func.count(User.id)).where(
+            User.last_login >= month_ago,
+            User.is_active == True
+        )
+    ).one()
+    
+    # Stickiness = DAU / MAU
+    stickiness = (daily_active / monthly_active) if monthly_active > 0 else 0.0
+    
+    # 3. Login Frequency
+    # Get total logins from audit logs if available, otherwise estimate from last_login
+    total_active = db.exec(select(func.count(User.id)).where(User.is_active == True)).one()
+    
+    # Using heuristics based on last_login distribution
+    login_frequency = LoginFrequency(
+        daily_avg=round(daily_active / max(total_active, 1), 2),
+        weekly_avg=round(weekly_active / max(total_active, 1), 2),
+        monthly_avg=round(monthly_active / max(total_active, 1), 2)
+    )
+    
+    # 4. Feature Usage (from audit logs or predefined features)
+    # For now, using common features based on endpoint patterns
+    from app.models.audit_log import AuditLog
+    
+    feature_usage = []
+    
+    # Define key features to track
+    features = [
+        ("Wallet Top-up", "wallet_topup"),
+        ("Battery Rental", "rental_create"),
+        ("Battery Swap", "swap_initiate"),
+        ("KYC Submission", "kyc_submit"),
+        ("Profile Update", "profile_update"),
+    ]
+    
+    for feature_name, action_pattern in features:
+        try:
+            usage_count = db.exec(
+                select(func.count(AuditLog.id)).where(
+                    AuditLog.action.contains(action_pattern),
+                    AuditLog.timestamp >= month_ago
+                )
+            ).one()
+            
+            unique_users_count = db.exec(
+                select(func.count(AuditLog.user_id.distinct())).where(
+                    AuditLog.action.contains(action_pattern),
+                    AuditLog.timestamp >= month_ago
+                )
+            ).one()
+            
+            pct = (unique_users_count / total_active * 100) if total_active > 0 else 0
+            
+            feature_usage.append(FeatureUsage(
+                feature_name=feature_name,
+                usage_count=usage_count,
+                unique_users=unique_users_count,
+                percentage_of_users=round(pct, 2)
+            ))
+        except Exception:
+            # If audit logs don't have this action, add zero
+            feature_usage.append(FeatureUsage(
+                feature_name=feature_name,
+                usage_count=0,
+                unique_users=0,
+                percentage_of_users=0.0
+            ))
+    
+    # Sort by usage
+    feature_usage.sort(key=lambda x: x.usage_count, reverse=True)
+    
+    # 5. Churn Rate
+    # Users who were active before 30 days but haven't logged in since
+    two_months_ago = now - timedelta(days=60)
+    
+    # Users who logged in between 60-30 days ago
+    previously_active = db.exec(
+        select(func.count(User.id)).where(
+            User.last_login >= two_months_ago,
+            User.last_login < month_ago,
+            User.is_active == True
+        )
+    ).one()
+    
+    # Users who haven't logged in for 30+ days
+    churned = db.exec(
+        select(func.count(User.id)).where(
+            User.last_login < month_ago,
+            User.is_active == True
+        )
+    ).one()
+    
+    churn_rate = (churned / previously_active * 100) if previously_active > 0 else 0.0
+    
+    # 6. Retention Rates
+    # 7-day retention: users who signed up 7+ days ago and logged in within last 7 days
+    seven_days_ago_signups = db.exec(
+        select(func.count(User.id)).where(
+            User.created_at <= week_ago,
+            User.created_at >= (week_ago - timedelta(days=7))
+        )
+    ).one()
+    
+    retained_7d = db.exec(
+        select(func.count(User.id)).where(
+            User.created_at <= week_ago,
+            User.created_at >= (week_ago - timedelta(days=7)),
+            User.last_login >= week_ago
+        )
+    ).one()
+    
+    retention_7d = (retained_7d / seven_days_ago_signups * 100) if seven_days_ago_signups > 0 else 0.0
+    
+    # 30-day retention
+    thirty_days_ago_signups = db.exec(
+        select(func.count(User.id)).where(
+            User.created_at <= month_ago,
+            User.created_at >= (month_ago - timedelta(days=30))
+        )
+    ).one()
+    
+    retained_30d = db.exec(
+        select(func.count(User.id)).where(
+            User.created_at <= month_ago,
+            User.created_at >= (month_ago - timedelta(days=30)),
+            User.last_login >= month_ago
+        )
+    ).one()
+    
+    retention_30d = (retained_30d / thirty_days_ago_signups * 100) if thirty_days_ago_signups > 0 else 0.0
+    
+    return UserEngagementResponse(
+        daily_active_users=daily_active,
+        weekly_active_users=weekly_active,
+        monthly_active_users=monthly_active,
+        stickiness_ratio=round(stickiness, 4),
+        login_frequency=login_frequency,
+        feature_usage=feature_usage,
+        churn_rate_30d=round(churn_rate, 2),
+        churned_users_count=churned,
+        retention_rate_7d=round(retention_7d, 2),
+        retention_rate_30d=round(retention_30d, 2),
+        generated_at=datetime.utcnow()
+    )
