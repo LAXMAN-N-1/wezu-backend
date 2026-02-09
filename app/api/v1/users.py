@@ -16,7 +16,8 @@ from app.schemas.user import (
     UserResponse, UserUpdate, AddressCreate, AddressResponse, AddressUpdate, 
     DeviceCreate, DeviceResponse, UserProfileResponse, StaffAssignmentInfo, 
     UserStatusUpdate, ActivityLogEntry, ActivityLogResponse, MenuItem, MenuConfigResponse,
-    FeatureFlagsResponse
+    UserStatusUpdate, ActivityLogEntry, ActivityLogResponse, MenuItem, MenuConfigResponse,
+    FeatureFlagsResponse, KYCDocumentResponse, KYCStatusDetailsResponse
 )
 from app.schemas.dashboard import DashboardConfigResponse
 import os
@@ -1469,3 +1470,42 @@ async def submit_kyc(
     )
     
     return current_user
+
+@router.get("/me/kyc/status", response_model=KYCStatusDetailsResponse)
+def get_kyc_status(
+    current_user: User = Depends(deps.get_current_active_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Get current KYC verification status and documents.
+    """
+    from app.models.kyc import KYCDocument
+    
+    docs = db.exec(select(KYCDocument).where(KYCDocument.user_id == current_user.id)).all()
+    
+    # Determine next steps
+    next_steps = "Please wait for verification."
+    if current_user.kyc_status == "rejected":
+        next_steps = "Some documents were rejected. Please check the reasons and re-upload."
+    elif current_user.kyc_status == "verified":
+        next_steps = "Your account is fully verified."
+    elif not docs:
+        next_steps = "Please submit your KYC documents to activate your account."
+
+    # Manually construct list to avoid metadata collision
+    doc_responses = []
+    for doc in docs:
+        doc_responses.append(KYCDocumentResponse(
+            id=doc.id,
+            document_type=doc.document_type,
+            status=doc.status,
+            rejection_reason=doc.verification_response if doc.status == "rejected" else None,
+            uploaded_at=doc.uploaded_at,
+            metadata=doc.metadata_ # Explicit mapping
+        ))
+
+    return KYCStatusDetailsResponse(
+        overall_status=current_user.kyc_status or "pending",
+        documents=doc_responses,
+        next_steps=next_steps
+    )

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from typing import Optional, List, Dict
 from datetime import datetime
 from app.models.user import User
@@ -189,4 +189,21 @@ class UserSessionResponse(BaseModel):
     is_current: bool = False # Helper field
 
     model_config = ConfigDict(from_attributes=True)
+
+from typing import Any
+
+class KYCDocumentResponse(BaseModel):
+    id: int
+    document_type: str
+    status: str
+    rejection_reason: Optional[str] = None
+    uploaded_at: datetime
+    metadata_: Optional[Any] = Field(default=None, alias="metadata") 
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+class KYCStatusDetailsResponse(BaseModel):
+    overall_status: str
+    documents: List[KYCDocumentResponse]
+    next_steps: str
 
