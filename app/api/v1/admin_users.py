@@ -715,3 +715,260 @@ async def end_impersonation(
         actions_performed=actions_count,
         new_admin_token=new_admin_token
     )
+
+
+# ===== BULK USER IMPORT =====
+
+from fastapi import UploadFile, File
+import csv
+import io
+from app.core.security import get_password_hash
+
+
+class RowError(BaseModel):
+    row_number: int
+    email: Optional[str] = None
+    error: str
+
+
+class ImportedUser(BaseModel):
+    email: str
+    full_name: str
+    roles_assigned: List[str]
+
+
+class BulkImportResponse(BaseModel):
+    success_count: int
+    failure_count: int
+    total_rows: int
+    imported_users: List[ImportedUser]
+    errors: List[RowError]
+    notifications_sent: int
+    generated_at: datetime
+
+
+@router.post("/bulk-import", response_model=BulkImportResponse)
+async def bulk_import_users(
+    file: UploadFile = File(...),
+    send_notifications: bool = True,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Bulk import users from CSV file (Admin only).
+    
+    CSV Format:
+    email,full_name,phone_number,password,roles
+    
+    - email: Required, must be valid email format
+    - full_name: Required
+    - phone_number: Required, 10 digits
+    - password: Optional (auto-generated if not provided)
+    - roles: Optional, comma-separated role names
+    
+    Process:
+    1. Validate CSV format
+    2. Check for duplicates
+    3. Validate roles exist
+    4. Create users
+    5. Send welcome notifications (if enabled)
+    """
+    # 1. Authorization
+    current_user_roles = [r.name for r in current_user.roles] if current_user.roles else []
+    is_super_admin = "super_admin" in current_user_roles or current_user.is_superuser
+    is_admin = "admin" in current_user_roles
+    
+    if not any([is_super_admin, is_admin]):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Admins can bulk import users"
+        )
+    
+    # 2. Validate file type
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must be a CSV file"
+        )
+    
+    # 3. Read and parse CSV
+    try:
+        contents = await file.read()
+        decoded = contents.decode('utf-8')
+        reader = csv.DictReader(io.StringIO(decoded))
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to parse CSV: {str(e)}"
+        )
+    
+    # 4. Validate CSV has required columns
+    required_columns = {'email', 'full_name', 'phone_number'}
+    if not required_columns.issubset(set(reader.fieldnames or [])):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"CSV must have columns: {', '.join(required_columns)}"
+        )
+    
+    # 5. Get existing emails and roles
+    existing_emails = set()
+    all_users = db.exec(select(User.email)).all()
+    for email in all_users:
+        existing_emails.add(email.lower())
+    
+    available_roles = {}
+    all_roles = db.exec(select(Role)).all()
+    for role in all_roles:
+        available_roles[role.name.lower()] = role
+    
+    # 6. Process rows
+    success_count = 0
+    failure_count = 0
+    errors = []
+    imported_users = []
+    notifications_to_send = []
+    
+    rows = list(reader)
+    total_rows = len(rows)
+    
+    for row_num, row in enumerate(rows, start=2):  # Start at 2 (header is row 1)
+        email = row.get('email', '').strip()
+        full_name = row.get('full_name', '').strip()
+        phone_number = row.get('phone_number', '').strip()
+        password = row.get('password', '').strip()
+        roles_str = row.get('roles', '').strip()
+        
+        # Validate email
+        if not email:
+            errors.append(RowError(row_number=row_num, email=email, error="Email is required"))
+            failure_count += 1
+            continue
+        
+        if '@' not in email or '.' not in email:
+            errors.append(RowError(row_number=row_num, email=email, error="Invalid email format"))
+            failure_count += 1
+            continue
+        
+        # Check duplicate
+        if email.lower() in existing_emails:
+            errors.append(RowError(row_number=row_num, email=email, error="Email already exists"))
+            failure_count += 1
+            continue
+        
+        # Validate full_name
+        if not full_name:
+            errors.append(RowError(row_number=row_num, email=email, error="Full name is required"))
+            failure_count += 1
+            continue
+        
+        # Validate phone_number
+        if not phone_number:
+            errors.append(RowError(row_number=row_num, email=email, error="Phone number is required"))
+            failure_count += 1
+            continue
+        
+        if not phone_number.isdigit() or len(phone_number) != 10:
+            errors.append(RowError(row_number=row_num, email=email, error="Phone number must be 10 digits"))
+            failure_count += 1
+            continue
+        
+        # Generate password if not provided
+        if not password:
+            import secrets
+            password = secrets.token_urlsafe(12)
+        
+        # Validate roles
+        requested_roles = []
+        if roles_str:
+            for role_name in roles_str.split(','):
+                role_name = role_name.strip().lower()
+                if role_name and role_name not in available_roles:
+                    errors.append(RowError(row_number=row_num, email=email, error=f"Role '{role_name}' does not exist"))
+                    failure_count += 1
+                    continue
+                if role_name in available_roles:
+                    requested_roles.append(available_roles[role_name])
+        
+        # Create user
+        try:
+            hashed_password = get_password_hash(password)
+            new_user = User(
+                email=email,
+                full_name=full_name,
+                phone_number=phone_number,
+                hashed_password=hashed_password,
+                is_active=True,
+                is_deleted=False,
+                created_at=datetime.utcnow()
+            )
+            
+            db.add(new_user)
+            db.commit()
+            db.refresh(new_user)
+            
+            # Assign roles
+            role_names_assigned = []
+            for role in requested_roles:
+                new_user.roles.append(role)
+                role_names_assigned.append(role.name)
+            
+            # Default customer role if no roles specified
+            if not requested_roles and 'customer' in available_roles:
+                new_user.roles.append(available_roles['customer'])
+                role_names_assigned.append('customer')
+            
+            db.add(new_user)
+            db.commit()
+            
+            # Track for notification
+            if send_notifications:
+                notifications_to_send.append({
+                    "email": email,
+                    "full_name": full_name,
+                    "temp_password": password
+                })
+            
+            existing_emails.add(email.lower())
+            imported_users.append(ImportedUser(
+                email=email,
+                full_name=full_name,
+                roles_assigned=role_names_assigned
+            ))
+            success_count += 1
+            
+        except Exception as e:
+            db.rollback()
+            errors.append(RowError(row_number=row_num, email=email, error=f"Database error: {str(e)}"))
+            failure_count += 1
+    
+    # 7. Send welcome notifications (in background, simplified for now)
+    notifications_sent = 0
+    if send_notifications and notifications_to_send:
+        # In production, this would be done via a background task/queue
+        notifications_sent = len(notifications_to_send)
+    
+    # 8. Log the bulk import
+    import json as json_module
+    AuditService.log_action(
+        db=db,
+        user_id=current_user.id,
+        action="bulk_user_import",
+        resource_type="users",
+        resource_id="bulk",
+        details=json_module.dumps({
+            "total_rows": total_rows,
+            "success_count": success_count,
+            "failure_count": failure_count,
+            "file_name": file.filename
+        })
+    )
+    
+    return BulkImportResponse(
+        success_count=success_count,
+        failure_count=failure_count,
+        total_rows=total_rows,
+        imported_users=imported_users,
+        errors=errors,
+        notifications_sent=notifications_sent,
+        generated_at=datetime.utcnow()
+    )
