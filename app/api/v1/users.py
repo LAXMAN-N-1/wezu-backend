@@ -1617,3 +1617,256 @@ def get_kyc_status(
         documents=doc_responses,
         next_steps=next_steps
     )
+
+
+# ===== TWO-FACTOR AUTHENTICATION =====
+
+import secrets
+import base64
+import hashlib
+
+
+class TwoFactorSetupResponse(BaseModel):
+    secret: str  # Base32 encoded secret
+    qr_code_uri: str  # otpauth:// URI for QR code
+    backup_codes: List[str]  # One-time backup codes
+    message: str
+
+
+class TwoFactorVerifyRequest(BaseModel):
+    code: str  # 6-digit TOTP code
+
+
+class TwoFactorVerifyResponse(BaseModel):
+    success: bool
+    message: str
+    two_factor_enabled: bool
+
+
+class TwoFactorDisableRequest(BaseModel):
+    password: str
+    code: str  # Current TOTP code to verify
+
+
+class TwoFactorStatusResponse(BaseModel):
+    enabled: bool
+    created_at: Optional[datetime] = None
+    backup_codes_remaining: int
+
+
+def _generate_totp_secret() -> str:
+    """Generate a random base32 encoded secret for TOTP."""
+    random_bytes = secrets.token_bytes(20)
+    return base64.b32encode(random_bytes).decode('utf-8').rstrip('=')
+
+
+def _generate_backup_codes(count: int = 10) -> List[str]:
+    """Generate backup codes for 2FA recovery."""
+    return [secrets.token_hex(4).upper() for _ in range(count)]
+
+
+def _generate_qr_uri(email: str, secret: str, issuer: str = "Wezu") -> str:
+    """Generate otpauth:// URI for QR code scanning."""
+    return f"otpauth://totp/{issuer}:{email}?secret={secret}&issuer={issuer}&digits=6&period=30"
+
+
+def _verify_totp(secret: str, code: str) -> bool:
+    """
+    Verify a TOTP code against the secret.
+    Simple implementation - in production use pyotp library.
+    """
+    import time
+    import hmac
+    
+    # Pad secret back to proper base32
+    padded_secret = secret + '=' * (8 - len(secret) % 8) if len(secret) % 8 else secret
+    
+    try:
+        key = base64.b32decode(padded_secret, casefold=True)
+    except Exception:
+        return False
+    
+    # Get current time step (30 second intervals)
+    time_step = int(time.time()) // 30
+    
+    # Check current and adjacent time steps (for clock drift)
+    for step_offset in [-1, 0, 1]:
+        step = time_step + step_offset
+        
+        # Create HMAC-SHA1 hash
+        msg = step.to_bytes(8, 'big')
+        hmac_hash = hmac.new(key, msg, hashlib.sha1).digest()
+        
+        # Dynamic truncation
+        offset = hmac_hash[-1] & 0x0F
+        truncated = hmac_hash[offset:offset + 4]
+        code_int = int.from_bytes(truncated, 'big') & 0x7FFFFFFF
+        totp = str(code_int % 10**6).zfill(6)
+        
+        if totp == code:
+            return True
+    
+    return False
+
+
+@router.post("/me/2fa/enable", response_model=TwoFactorSetupResponse)
+async def enable_two_factor(
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Enable Two-Factor Authentication for the current user.
+    
+    Process:
+    1. Generate TOTP secret
+    2. Return QR code URI for authenticator app
+    3. Return backup codes
+    4. User must verify with code to complete setup
+    
+    Note: 2FA is not fully enabled until verified via POST /me/2fa/verify
+    """
+    # Check if 2FA is already enabled
+    if getattr(current_user, 'two_factor_enabled', False):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Two-factor authentication is already enabled"
+        )
+    
+    # Generate secret and backup codes
+    secret = _generate_totp_secret()
+    backup_codes = _generate_backup_codes()
+    qr_uri = _generate_qr_uri(current_user.email, secret)
+    
+    # Store secret temporarily (not enabled until verified)
+    # In production, encrypt the secret before storing
+    current_user.two_factor_secret = secret
+    current_user.two_factor_backup_codes = json.dumps(backup_codes)
+    current_user.two_factor_pending = True  # Pending verification
+    
+    db.add(current_user)
+    db.commit()
+    
+    return TwoFactorSetupResponse(
+        secret=secret,
+        qr_code_uri=qr_uri,
+        backup_codes=backup_codes,
+        message="Scan the QR code with your authenticator app, then verify with a code from the app"
+    )
+
+
+@router.post("/me/2fa/verify", response_model=TwoFactorVerifyResponse)
+async def verify_two_factor(
+    request: TwoFactorVerifyRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Verify 2FA setup with a code from the authenticator app.
+    
+    This completes the 2FA setup process.
+    Must be called after POST /me/2fa/enable.
+    """
+    secret = getattr(current_user, 'two_factor_secret', None)
+    
+    if not secret:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="2FA setup not initiated. Call POST /me/2fa/enable first"
+        )
+    
+    # Verify the code
+    if not _verify_totp(secret, request.code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification code"
+        )
+    
+    # Enable 2FA
+    current_user.two_factor_enabled = True
+    current_user.two_factor_pending = False
+    current_user.two_factor_enabled_at = datetime.utcnow()
+    
+    db.add(current_user)
+    db.commit()
+    
+    return TwoFactorVerifyResponse(
+        success=True,
+        message="Two-factor authentication has been enabled successfully",
+        two_factor_enabled=True
+    )
+
+
+@router.post("/me/2fa/disable", response_model=TwoFactorVerifyResponse)
+async def disable_two_factor(
+    request: TwoFactorDisableRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Disable Two-Factor Authentication.
+    
+    Requires:
+    - Current password
+    - Valid 2FA code from authenticator
+    """
+    from app.core.security import verify_password
+    
+    if not getattr(current_user, 'two_factor_enabled', False):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Two-factor authentication is not enabled"
+        )
+    
+    # Verify password
+    if not verify_password(request.password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect password"
+        )
+    
+    # Verify 2FA code
+    secret = getattr(current_user, 'two_factor_secret', '')
+    if not _verify_totp(secret, request.code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid 2FA code"
+        )
+    
+    # Disable 2FA
+    current_user.two_factor_enabled = False
+    current_user.two_factor_secret = None
+    current_user.two_factor_backup_codes = None
+    current_user.two_factor_enabled_at = None
+    
+    db.add(current_user)
+    db.commit()
+    
+    return TwoFactorVerifyResponse(
+        success=True,
+        message="Two-factor authentication has been disabled",
+        two_factor_enabled=False
+    )
+
+
+@router.get("/me/2fa/status", response_model=TwoFactorStatusResponse)
+async def get_two_factor_status(
+    current_user: User = Depends(deps.get_current_user),
+):
+    """Get current 2FA status for the user."""
+    enabled = getattr(current_user, 'two_factor_enabled', False)
+    enabled_at = getattr(current_user, 'two_factor_enabled_at', None)
+    backup_codes_json = getattr(current_user, 'two_factor_backup_codes', None)
+    
+    backup_codes_remaining = 0
+    if backup_codes_json:
+        try:
+            codes = json.loads(backup_codes_json)
+            backup_codes_remaining = len([c for c in codes if c])  # Count non-empty codes
+        except Exception:
+            pass
+    
+    return TwoFactorStatusResponse(
+        enabled=enabled,
+        created_at=enabled_at,
+        backup_codes_remaining=backup_codes_remaining
+    )
