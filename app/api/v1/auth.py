@@ -764,6 +764,138 @@ async def resend_otp(
     return {"message": "OTP resent successfully"}
 
 
+# ===== EMAIL VERIFICATION =====
+
+class SendEmailVerificationRequest(BaseModel):
+    """Request to send email verification link."""
+    pass  # Uses current user's email
+
+
+class VerifyEmailRequest(BaseModel):
+    """Verify email with token."""
+    token: str
+
+
+@router.post("/email/send-verification")
+async def send_email_verification(
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session)
+):
+    """
+    Send email verification link to user's email address.
+    
+    Process:
+    1. Generate unique verification token
+    2. Store token with expiry (24 hours)
+    3. Send verification email with link
+    """
+    import secrets
+    
+    if getattr(current_user, 'is_email_verified', False):
+        return {"message": "Email already verified", "verified": True}
+    
+    if not current_user.email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No email address associated with account"
+        )
+    
+    # Rate limit: only allow one email every 2 minutes
+    last_sent = getattr(current_user, 'email_verification_sent_at', None)
+    if last_sent and (datetime.utcnow() - last_sent).total_seconds() < 120:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Please wait 2 minutes before requesting another verification email"
+        )
+    
+    # Generate token
+    token = secrets.token_urlsafe(32)
+    
+    current_user.email_verification_token = token
+    current_user.email_verification_sent_at = datetime.utcnow()
+    
+    db.add(current_user)
+    db.commit()
+    
+    # Send email (mock for now)
+    verification_link = f"https://app.wezu.com/verify-email?token={token}"
+    logger.info(f"Verification email sent to {current_user.email}: {verification_link}")
+    # In production: await EmailService.send_verification_email(current_user.email, verification_link)
+    
+    return {
+        "message": f"Verification email sent to {current_user.email}",
+        "expires_in": "24 hours"
+    }
+
+
+@router.post("/email/verify")
+async def verify_email(
+    request: VerifyEmailRequest,
+    db: Session = Depends(get_session)
+):
+    """
+    Verify email address using the token from verification link.
+    
+    Token is valid for 24 hours from when it was sent.
+    """
+    # Find user by token
+    user = db.exec(
+        select(User).where(User.email_verification_token == request.token)
+    ).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification token"
+        )
+    
+    # Check token expiry (24 hours)
+    sent_at = getattr(user, 'email_verification_sent_at', None)
+    if sent_at and (datetime.utcnow() - sent_at).total_seconds() > 86400:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification token has expired. Please request a new one."
+        )
+    
+    # Mark as verified
+    user.is_email_verified = True
+    user.email_verification_token = None  # Clear token after use
+    
+    db.add(user)
+    db.commit()
+    
+    logger.info(f"Email verified for user {user.id}: {user.email}")
+    
+    # Audit log
+    from app.services.audit_service import AuditService
+    AuditService.log_action(
+        db=db,
+        user_id=user.id,
+        action="email_verified",
+        resource_type="user",
+        resource_id=str(user.id),
+        details=None
+    )
+    
+    return {
+        "message": "Email verified successfully",
+        "email": user.email,
+        "verified": True
+    }
+
+
+@router.get("/email/verification-status")
+async def get_email_verification_status(
+    current_user: User = Depends(deps.get_current_user)
+):
+    """Get current email verification status."""
+    return {
+        "email": current_user.email,
+        "is_verified": getattr(current_user, 'is_email_verified', False),
+        "verification_pending": getattr(current_user, 'email_verification_token', None) is not None
+    }
+
+
 
 
 

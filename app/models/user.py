@@ -61,6 +61,11 @@ class User(SQLModel, table=True):
     reset_token_expires: Optional[datetime] = None
     last_global_logout_at: Optional[datetime] = None
     last_login: Optional[datetime] = Field(default=None, index=True)
+    
+    # Email Verification
+    is_email_verified: bool = Field(default=False)
+    email_verification_token: Optional[str] = Field(default=None, index=True)
+    email_verification_sent_at: Optional[datetime] = None
 
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
