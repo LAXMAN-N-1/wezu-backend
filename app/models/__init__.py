@@ -1,4 +1,7 @@
 from app.models.user import User
+from app.models.role import Role
+from app.models.menu import Menu
+from app.models.role_right import RoleRight
 from app.models.station import Station
 from app.models.battery import Battery
 from app.models.financial import Transaction, Wallet, WalletWithdrawalRequest
@@ -35,6 +38,9 @@ from app.models.swap import SwapRequest, SwapHistory
 from app.models.fraud import RiskScore, FraudCheckLog, Blacklist
 from app.models.maintenance import MaintenanceSchedule, MaintenanceRecord, StationDowntime
 from app.models.i18n import Translation
+from app.models.branch import Branch
+from app.models.organization import Organization, OrganizationSocialLink
+from app.models.warehouse import Warehouse
 
 # New critical models
 from app.models.dealer_inventory import DealerInventory, InventoryTransaction

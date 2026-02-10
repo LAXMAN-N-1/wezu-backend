@@ -12,6 +12,8 @@ class User(SQLModel, table=True):
     is_active: bool = Field(default=True)
     is_superuser: bool = Field(default=False)
     
+    role_id: Optional[int] = Field(default=None, foreign_key="roles.id")
+    
     # OAuth specific
     google_id: Optional[str] = Field(default=None, index=True)
     apple_id: Optional[str] = Field(default=None, index=True)
@@ -42,6 +44,7 @@ class User(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     # Relationship
+    role: Optional["Role"] = Relationship(back_populates="users")
     wallet: Optional["Wallet"] = Relationship(back_populates="user")
     addresses: List["Address"] = Relationship(back_populates="user")
     kyc_documents: List["KYCDocument"] = Relationship(back_populates="user")

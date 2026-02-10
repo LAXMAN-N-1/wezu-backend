@@ -34,7 +34,7 @@ async def search_nearby_stations(
 @router.post("/", response_model=StationResponse)
 async def create_station(
     station_in: StationCreate,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.check_permission("stations", "create")),
     db: Session = Depends(deps.get_db),
 ):
     return StationService.create_station(db, station_in)

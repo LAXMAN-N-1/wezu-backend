@@ -1,0 +1,28 @@
+from sqlmodel import SQLModel, Field, Relationship
+from typing import Optional, List
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.branch import Branch
+
+class Warehouse(SQLModel, table=True):
+    __tablename__ = "warehouses"
+    
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True)
+    code: str = Field(unique=True, index=True)
+    
+    address: str
+    city: str
+    state: str
+    pincode: str
+    
+    branch_id: Optional[int] = Field(default=None, foreign_key="branches.id")
+    
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Relationships
+    branch: Optional["Branch"] = Relationship(back_populates="warehouses")

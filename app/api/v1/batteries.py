@@ -21,7 +21,7 @@ async def read_battery(
 @router.post("/", response_model=BatteryResponse)
 async def create_battery(
     battery_in: BatteryCreate,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.check_permission("batteries", "create")),
     db: Session = Depends(deps.get_db),
 ):
     # Check if exists

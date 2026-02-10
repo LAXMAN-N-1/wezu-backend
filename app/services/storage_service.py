@@ -27,3 +27,5 @@ class StorageService:
         # s3 = boto3.client(...)
         # s3.upload_fileobj(...)
         return f"https://{settings.AWS_BUCKET_NAME}.s3.amazonaws.com/{directory}/{file.filename}"
+
+storage_service = StorageService()

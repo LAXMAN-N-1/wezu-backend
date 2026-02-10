@@ -3,11 +3,12 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from pydantic import ValidationError
-from sqlalchemy.orm import Session
+from sqlmodel import Session
 from app.core import security
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.user import User, TokenPayload
+from app.models.role_right import RoleRight
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
@@ -45,3 +46,52 @@ def get_current_active_superuser(
             status_code=400, detail="The user doesn't have enough privileges"
         )
     return current_user
+
+def check_permission(menu_name: str, permission_type: str = "view"):
+    """
+    Dependency to check if user has specific permission for a menu by name
+    """
+    def permission_checker(
+        db: Session = Depends(get_db),
+        current_user: User = Depends(get_current_user)
+    ) -> User:
+        # Superuser always has access
+        if current_user.is_superuser:
+            return current_user
+        
+        if not current_user.role_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User has no role assigned"
+            )
+
+        # Check role rights by joining with Menu to filter by name
+        from app.models.menu import Menu
+        role_right = db.query(RoleRight).join(Menu).filter(
+            RoleRight.role_id == current_user.role_id,
+            Menu.name == menu_name
+        ).first()
+        
+        if not role_right:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"No access to resource: {menu_name}"
+            )
+        
+        # Check specific permission
+        permission_map = {
+            "view": role_right.can_view,
+            "create": role_right.can_create,
+            "edit": role_right.can_edit,
+            "delete": role_right.can_delete
+        }
+        
+        if not permission_map.get(permission_type, False):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Insufficient permissions: {permission_type} on {menu_name}"
+            )
+        
+        return current_user
+    
+    return permission_checker
