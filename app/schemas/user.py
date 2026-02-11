@@ -39,6 +39,8 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
     phone_number: str  # Required for creation
+    is_active: bool = True
+    role_id: Optional[int] = None
 
 
 class UserUpdate(BaseModel):
@@ -49,6 +51,8 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     email: Optional[EmailStr] = None
     profile_picture: Optional[str] = None
+    is_active: Optional[bool] = None
+    role_id: Optional[int] = None
     address: Optional[str] = None
     emergency_contact: Optional[str] = None
     notification_preferences: Optional[str] = None  # JSON: {"push": true, "email": true, "sms": false}

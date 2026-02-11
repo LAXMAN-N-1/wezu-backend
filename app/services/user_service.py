@@ -43,6 +43,16 @@ class UserService:
         return address
 
     @staticmethod
+    def create_user(db: Session, user_in: UserCreate) -> User:
+        user_data = user_in.model_dump(exclude={"password"})
+        user = User(**user_data)
+        user.hashed_password = get_password_hash(user_in.password)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        return user
+
+    @staticmethod
     def get_addresses(db: Session, user_id: int) -> List[Address]:
         statement = select(Address).where(Address.user_id == user_id)
         return db.exec(statement).all()

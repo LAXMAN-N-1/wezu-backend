@@ -26,7 +26,7 @@ class DowntimeReport(BaseModel):
 @router.post("/record", response_model=MaintenanceRecord)
 def create_maintenance_record(
     record_in: MaintenanceRecordCreate,
-    current_user: User = Depends(deps.get_current_active_superuser), # Technician/Admin
+    current_user: User = Depends(deps.check_permission("maintenance", "create")), # Technician/Admin
     db: Session = Depends(deps.get_db),
 ):
     # Pass dict
@@ -35,7 +35,7 @@ def create_maintenance_record(
 @router.post("/downtime", response_model=dict)
 def report_downtime(
     report_in: DowntimeReport,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.check_permission("maintenance", "create")),
     db: Session = Depends(deps.get_db),
 ):
     MaintenanceService.report_downtime(report_in.station_id, report_in.reason)
@@ -48,7 +48,7 @@ def get_maintenance_history(
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.check_permission("maintenance", "view")),
 ):
     query = select(MaintenanceRecord)
     if entity_type:

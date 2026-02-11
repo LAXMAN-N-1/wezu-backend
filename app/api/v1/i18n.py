@@ -29,7 +29,7 @@ def get_translations(
 @router.post("/", response_model=dict)
 def update_translation(
     t_in: TranslationUpdate,
-    current_user: User = Depends(deps.get_current_active_superuser), # Admin only
+    current_user: User = Depends(deps.check_permission("i18n", "edit")), # Admin only
 ):
     I18nService.set_translation(t_in.key, t_in.lang, t_in.value)
     return {"status": "updated"}

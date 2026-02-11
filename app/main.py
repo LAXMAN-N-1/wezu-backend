@@ -2,16 +2,18 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 
+
 # Customer-facing endpoints only
 from app.api.v1 import (
     auth, users, kyc, stations, batteries, rentals, wallet, payments, 
     notifications, support, favorites, analytics, transactions, promo, 
-    faqs, iot, swaps, i18n, fraud, screens
+    faqs, iot, swaps, i18n, fraud, branches, organizations, warehouses, screens
 )
 # Enhanced customer endpoints
 from app.api.v1 import (
     system, payments_enhanced, wallet_enhanced, notifications_enhanced,
-    support_enhanced, rentals_enhanced, purchases_enhanced, analytics_enhanced
+    support_enhanced, rentals_enhanced, purchases_enhanced, analytics_enhanced,
+    roles, menus, role_rights
 )
 from app.api.webhooks import razorpay as razorpay_webhook
 from app.middleware.rate_limit import limiter
@@ -75,6 +77,9 @@ app.include_router(iot.router, prefix=f"{settings.API_V1_STR}/iot", tags=["IoT"]
 app.include_router(swaps.router, prefix=f"{settings.API_V1_STR}/swaps", tags=["Swaps"])
 app.include_router(i18n.router, prefix=f"{settings.API_V1_STR}/i18n", tags=["i18n"])
 app.include_router(fraud.router, prefix=f"{settings.API_V1_STR}/fraud", tags=["Fraud Detection"])
+app.include_router(branches.router, prefix=f"{settings.API_V1_STR}/branches", tags=["Branches"])
+app.include_router(organizations.router, prefix=f"{settings.API_V1_STR}/organizations", tags=["Organizations"])
+app.include_router(warehouses.router, prefix=f"{settings.API_V1_STR}/warehouses", tags=["Warehouses"])
 app.include_router(screens.router, prefix=f"{settings.API_V1_STR}/screens", tags=["UI Configuration"])
 
 # Enhanced Customer Endpoints
@@ -123,6 +128,11 @@ app.include_router(support_enhanced.router, prefix=f"{settings.API_V1_STR}/suppo
 app.include_router(rentals_enhanced.router, prefix=f"{settings.API_V1_STR}/rentals", tags=["Rentals Enhanced"])
 app.include_router(purchases_enhanced.router, prefix=f"{settings.API_V1_STR}/purchases", tags=["Purchases Enhanced"])
 app.include_router(analytics_enhanced.router, prefix=f"{settings.API_V1_STR}/analytics", tags=["Analytics Enhanced"])
+
+# RBAC API Routes
+app.include_router(roles.router, prefix=f"{settings.API_V1_STR}/roles", tags=["Roles"])
+app.include_router(menus.router, prefix=f"{settings.API_V1_STR}/menus", tags=["Menus"])
+app.include_router(role_rights.router, prefix=f"{settings.API_V1_STR}/role-rights", tags=["Role Rights"])
 
 # ML & Dynamics (Phase 5)
 from app.api.v1 import ml, admin_roles, admin_kyc, admin_users

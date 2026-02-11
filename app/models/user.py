@@ -29,6 +29,8 @@ class User(SQLModel, table=True):
     tenant_id: Optional[str] = Field(default="default", index=True)
 
     
+    role_id: Optional[int] = Field(default=None, foreign_key="roles.id")
+    
     # OAuth specific
     google_id: Optional[str] = Field(default=None, index=True)
     apple_id: Optional[str] = Field(default=None, index=True)
@@ -80,6 +82,7 @@ class User(SQLModel, table=True):
     deleted_at: Optional[datetime] = None
 
     # Relationship
+    role: Optional["Role"] = Relationship(back_populates="users")
     wallet: Optional["Wallet"] = Relationship(back_populates="user")
     addresses: List["Address"] = Relationship(back_populates="user")
     kyc_documents: List["KYCDocument"] = Relationship(back_populates="user")

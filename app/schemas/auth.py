@@ -8,6 +8,7 @@ class LoginRequest(BaseModel):
     role: Optional[str] = None
     device_fingerprint: Optional[str] = None
     remember_me: bool = False
+    totp_code: Optional[str] = None
 
 class RoleSelectRequest(BaseModel):
     role: str

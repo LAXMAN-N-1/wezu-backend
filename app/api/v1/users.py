@@ -8,6 +8,7 @@ from app.api import deps
 from app.db.session import get_session
 from app.models.user import User
 from app.models.address import Address
+from app.schemas.user import UserResponse, UserCreate, UserUpdate, AddressCreate, AddressResponse, AddressUpdate, DeviceCreate, DeviceResponse
 from app.services.notification_service import NotificationService
 from app.services.user_service import UserService
 from app.services.auth_service import AuthService
@@ -26,6 +27,34 @@ import json
 from app.core.security import generate_totp_secret, verify_totp, generate_backup_codes, generate_qr_uri
 
 router = APIRouter()
+
+@router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+async def create_user(
+    user_in: UserCreate,
+    current_user: User = Depends(deps.check_permission("users", "create")),
+    db: Session = Depends(deps.get_db),
+):
+    """
+    Create a new user. Only accessible by superusers.
+    """
+    # Check if user already exists
+    if user_in.email:
+        if UserService.get_by_email(db, user_in.email):
+            raise HTTPException(
+                status_code=400,
+                detail="User with this email already exists"
+            )
+    
+    # Check phone number
+    from sqlmodel import select
+    statement = select(User).where(User.phone_number == user_in.phone_number)
+    if db.exec(statement).first():
+        raise HTTPException(
+            status_code=400,
+            detail="User with this phone number already exists"
+        )
+
+    return UserService.create_user(db, user_in)
 
 
 def calculate_profile_completion(user: User) -> int:

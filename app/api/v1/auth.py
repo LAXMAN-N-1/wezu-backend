@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
 from app.db.session import get_session
 from app.models.user import User, Token
@@ -153,6 +154,16 @@ class OTPVerifyRequest(BaseModel):
     code: str
     purpose: str = "registration"
     full_name: Optional[str] = None
+
+class PasswordRegisterRequest(BaseModel):
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
+    full_name: str
+    password: str
+
+class PasswordLoginRequest(BaseModel):
+    username: str # email or phone_number
+    password: str
 
 @router.post("/register/request-otp")
 async def request_registration_otp(
@@ -464,6 +475,89 @@ async def social_login(
 # but redirecting logic would be better. For now, replacing them completely as per plan.
 
 
+@router.post("/register/password", response_model=Token)
+async def register_with_password(
+    register_data: PasswordRegisterRequest,
+    db: Session = Depends(get_session)
+):
+    # Determine the target (email or phone)
+    if not register_data.email and not register_data.phone_number:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email or phone number is required"
+        )
+    
+    # Check if user already exists
+    if register_data.email:
+        statement = select(User).where(User.email == register_data.email)
+    else:
+        statement = select(User).where(User.phone_number == register_data.phone_number)
+    
+    user = db.exec(statement).first()
+    if user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User with this email or phone number already exists"
+        )
+    
+    # Create new user
+    from app.core.security import get_password_hash
+    new_user = User(
+        email=register_data.email,
+        phone_number=register_data.phone_number,
+        full_name=register_data.full_name,
+        hashed_password=get_password_hash(register_data.password),
+        is_active=True
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    # Check Fraud Risk
+    FraudService.calculate_risk_score(new_user.id)
+    
+    # Create Dual Tokens
+    access_token = create_access_token(subject=new_user.id)
+    refresh_token = create_refresh_token(subject=new_user.id)
+    return Token(access_token=access_token, refresh_token=refresh_token, user=new_user)
+
+@router.post("/login", response_model=Token)
+async def login_with_password(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_session)
+):
+    # Check if user exists by email or phone
+    if "@" in form_data.username:
+        statement = select(User).where(User.email == form_data.username)
+    else:
+        statement = select(User).where(User.phone_number == form_data.username)
+    
+    user = db.exec(statement).first()
+    if not user or not user.hashed_password:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+        )
+    
+    # Verify password
+    from app.core.security import verify_password
+    if not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+        )
+    
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Inactive user"
+        )
+    
+    # Create Dual Tokens
+    access_token = create_access_token(subject=user.id)
+    refresh_token = create_refresh_token(subject=user.id)
+    return Token(access_token=access_token, refresh_token=refresh_token, user=user)
+
 class RefreshRequest(BaseModel):
     refresh_token: str
 
@@ -609,6 +703,29 @@ async def login(
                     ip_address=None
                 )
                 raise HTTPException(status_code=401, detail="Invalid 2FA code")
+
+    # 2FA Check
+    if user.two_factor_enabled:
+        if not login_data.totp_code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Two-factor authentication required"
+            )
+        from app.core.security import verify_totp
+        # Ensure secret exists if 2FA is enabled
+        if not user.two_factor_secret:
+             # This is a data integrity issue, but for security we treat as invalid code or fail safe
+             logger.error(f"User {user.id} has 2FA enabled but no secret set.")
+             raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Two-factor authentication configuration error"
+            )
+            
+        if not verify_totp(user.two_factor_secret, login_data.totp_code):
+             raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid two-factor authentication code"
+            )
 
     # 2. Determine Role
     user_roles = [r.name for r in user.roles]

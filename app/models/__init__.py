@@ -1,9 +1,11 @@
 from app.models.user import User
-
+# from app.models.role import Role
+from app.models.menu import Menu
+from app.models.role_right import RoleRight
 from app.models.station import Station, StationImage, StationSlot
 from app.models.battery import Battery, BatteryLifecycleEvent
 from app.models.battery_catalog import BatterySpec, BatteryBatch
-from app.models.logistics import Warehouse, BatteryTransfer
+from app.models.logistics import BatteryTransfer
 from app.models.financial import Transaction, Wallet, WalletWithdrawalRequest
 from app.models.address import Address
 from app.models.kyc import KYCDocument, KYCRequest
@@ -37,6 +39,9 @@ from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
 from app.models.fraud import RiskScore, FraudCheckLog, Blacklist
 from app.models.maintenance import MaintenanceSchedule, MaintenanceRecord, StationDowntime
 from app.models.i18n import Translation
+from app.models.branch import Branch
+from app.models.organization import Organization, OrganizationSocialLink
+from app.models.warehouse import Warehouse
 
 # New critical models
 from app.models.dealer_inventory import DealerInventory, InventoryTransaction

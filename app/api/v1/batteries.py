@@ -93,6 +93,18 @@ def read_battery(
         raise HTTPException(status_code=404, detail="Battery not found")
     return battery
 
+# <<<<<<< HEAD
+# @router.post("/", response_model=BatteryResponse)
+# async def create_battery(
+#     battery_in: BatteryCreate,
+#     current_user: User = Depends(deps.check_permission("batteries", "create")),
+#     db: Session = Depends(deps.get_db),
+# ):
+#     # Check if exists
+#     if BatteryService.get_by_serial(db, battery_in.serial_number):
+#          raise HTTPException(status_code=400, detail="Battery already exists")
+#     return BatteryService.create_battery(db, battery_in)
+# =======
 @router.put("/{battery_id}/lifecycle", response_model=BatteryResponse)
 def update_battery_lifecycle(
     *,
@@ -127,3 +139,4 @@ def update_battery_lifecycle(
     session.commit()
     session.refresh(battery)
     return battery
+# >>>>>>> origin/main
