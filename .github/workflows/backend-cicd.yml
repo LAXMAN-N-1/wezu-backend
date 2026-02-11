@@ -2,13 +2,18 @@ name: Backend Production CI/CD
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, mohith ]
   pull_request:
     branches: [ main ]
 
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: testing
+      DATABASE_URL: sqlite:///./test.db
+      PYTHONPATH: .
+      SECRET_KEY: "super-secret-key-for-testing"
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python
@@ -27,11 +32,6 @@ jobs:
         
       - name: Run tests with pytest
         run: pytest
-        env:
-          ENVIRONMENT: testing
-          DATABASE_URL: sqlite:///./test.db
-          PYTHONPATH: .
-          SECRET_KEY: "super-secret-key-for-testing"
 
   build-and-push:
     needs: lint-and-test
