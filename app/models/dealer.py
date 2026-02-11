@@ -1,8 +1,14 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List, Dict
 from datetime import datetime
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from app.models.station import Station
+    from app.models.commission import Commission # If it existed
+    from app.models.staff import StaffProfile
 # from pydantic import EmailStr
 import sqlalchemy as sa
+from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
 
 class DealerProfile(SQLModel, table=True):
@@ -23,6 +29,9 @@ class DealerProfile(SQLModel, table=True):
     state: str
     pincode: str
     
+    # Financial Details
+    bank_details: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSONB))
+    
     is_active: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
@@ -30,7 +39,20 @@ class DealerProfile(SQLModel, table=True):
     user: "User" = Relationship(back_populates="dealer_profile")
     stations: List["Station"] = Relationship(back_populates="dealer")
     application: Optional["DealerApplication"] = Relationship(back_populates="dealer")
-    commissions: List["Commission"] = Relationship(back_populates="dealer")
+    # commissions: List["Commission"] = Relationship(back_populates="dealer")
+    documents: List["DealerDocument"] = Relationship(back_populates="dealer")
+    staff_members: List["StaffProfile"] = Relationship(back_populates="dealer")
+
+class DealerDocument(SQLModel, table=True):
+    __tablename__ = "dealer_documents"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    dealer_id: int = Field(foreign_key="dealer_profiles.id")
+    document_type: str = Field(index=True) # gst, pan, registration, cancelled_cheque
+    file_url: str
+    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+    is_verified: bool = Field(default=False)
+    
+    dealer: DealerProfile = Relationship(back_populates="documents")
 
 class DealerApplication(SQLModel, table=True):
     __tablename__ = "dealer_applications"
@@ -44,7 +66,7 @@ class DealerApplication(SQLModel, table=True):
     risk_score: float = Field(default=0.0)
     
     # Using JSON for history log: [{"stage": "SUBMITTED", "timestamp": "...", "notes": ""}]
-    status_history: List[Dict] = Field(default_factory=list, sa_column=sa.Column(JSONB))
+    status_history: List[Dict] = Field(default_factory=list, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -63,8 +85,8 @@ class FieldVisit(SQLModel, table=True):
     
     status: str = Field(default="SCHEDULED") # SCHEDULED, COMPLETED, CANCELLED
     
-    report_data: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSONB))
-    images: Optional[List[str]] = Field(default=None, sa_column=sa.Column(JSONB))
+    report_data: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
+    images: Optional[List[str]] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
     

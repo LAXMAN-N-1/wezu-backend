@@ -3,8 +3,8 @@ from sqlmodel import Session
 from typing import List
 from app.api import deps
 from app.models.user import User
-from app.schemas.support import NotificationResponse
-from app.services.support_service import NotificationService
+from app.schemas.notification import NotificationResponse
+from app.services.notification_service import NotificationService
 
 router = APIRouter()
 

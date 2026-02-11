@@ -2,7 +2,7 @@
 Dealer-related Pydantic schemas
 Request and response models for dealer operations
 """
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 from enum import Enum
@@ -100,8 +100,7 @@ class DealerProfileResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class DealerApplicationResponse(BaseModel):
     """Dealer application response"""
@@ -115,8 +114,7 @@ class DealerApplicationResponse(BaseModel):
     rejection_reason: Optional[str]
     notes: Optional[str]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class FieldVisitResponse(BaseModel):
     """Field visit response"""
@@ -129,8 +127,7 @@ class FieldVisitResponse(BaseModel):
     findings: Optional[str]
     recommendation: Optional[str]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class DealerInventoryResponse(BaseModel):
     """Dealer inventory response"""
@@ -145,8 +142,7 @@ class DealerInventoryResponse(BaseModel):
     last_restocked_at: Optional[datetime]
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class DealerPromotionResponse(BaseModel):
     """Dealer promotion response"""
@@ -165,8 +161,7 @@ class DealerPromotionResponse(BaseModel):
     min_order_value: Optional[float]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class DealerDashboardResponse(BaseModel):
     """Dealer dashboard statistics"""

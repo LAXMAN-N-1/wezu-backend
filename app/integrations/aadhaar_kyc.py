@@ -2,7 +2,7 @@
 Aadhaar KYC Verification Integration
 Handles Aadhaar e-KYC verification
 """
-import requests
+import httpx
 from typing import Dict, Any, Optional
 from app.core.config import settings
 import logging
@@ -17,7 +17,7 @@ class AadhaarKYCIntegration:
         self.api_key = settings.AADHAAR_API_KEY
         self.base_url = "https://api.aadhaarkyc.io/v1"  # Example URL
     
-    def send_otp(self, aadhaar_number: str) -> Optional[Dict[str, Any]]:
+    async def send_otp(self, aadhaar_number: str) -> Optional[Dict[str, Any]]:
         """
         Send OTP to Aadhaar-linked mobile
         
@@ -28,12 +28,13 @@ class AadhaarKYCIntegration:
             Transaction details with request_id
         """
         try:
-            response = requests.post(
-                f"{self.base_url}/otp/send",
-                json={"aadhaar_number": aadhaar_number},
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                timeout=30
-            )
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.base_url}/otp/send",
+                    json={"aadhaar_number": aadhaar_number},
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    timeout=30
+                )
             
             if response.status_code == 200:
                 data = response.json()
@@ -47,7 +48,7 @@ class AadhaarKYCIntegration:
             logger.error(f"Aadhaar OTP request failed: {str(e)}")
             return None
     
-    def verify_otp(
+    async def verify_otp(
         self,
         request_id: str,
         otp: str
@@ -63,15 +64,16 @@ class AadhaarKYCIntegration:
             KYC details if successful
         """
         try:
-            response = requests.post(
-                f"{self.base_url}/otp/verify",
-                json={
-                    "request_id": request_id,
-                    "otp": otp
-                },
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                timeout=30
-            )
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.base_url}/otp/verify",
+                    json={
+                        "request_id": request_id,
+                        "otp": otp
+                    },
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    timeout=30
+                )
             
             if response.status_code == 200:
                 data = response.json()
@@ -103,7 +105,7 @@ class AadhaarKYCIntegration:
             logger.error(f"Aadhaar verification request failed: {str(e)}")
             return None
     
-    def verify_aadhaar(
+    async def verify_aadhaar(
         self,
         aadhaar_number: str,
         name: str,
@@ -121,16 +123,17 @@ class AadhaarKYCIntegration:
             True if details match
         """
         try:
-            response = requests.post(
-                f"{self.base_url}/verify/offline",
-                json={
-                    "aadhaar_number": aadhaar_number,
-                    "name": name,
-                    "dob": dob
-                },
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                timeout=30
-            )
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    f"{self.base_url}/verify/offline",
+                    json={
+                        "aadhaar_number": aadhaar_number,
+                        "name": name,
+                        "dob": dob
+                    },
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    timeout=30
+                )
             
             if response.status_code == 200:
                 data = response.json()

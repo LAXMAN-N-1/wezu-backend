@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
@@ -24,8 +24,7 @@ class StationResponse(StationBase):
     total_reviews: int
     images: List[StationImageResponse] = []
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class NearbyStationResponse(StationResponse):
     distance: float # km

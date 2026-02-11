@@ -15,4 +15,4 @@ class Refund(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Relationships
-    transaction: "Transaction" = Relationship()
+    transaction: "Transaction" = Relationship(back_populates="refund")

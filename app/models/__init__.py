@@ -2,19 +2,21 @@ from app.models.user import User
 from app.models.role import Role
 from app.models.menu import Menu
 from app.models.role_right import RoleRight
-from app.models.station import Station
-from app.models.battery import Battery
+from app.models.station import Station, StationImage, StationSlot
+from app.models.battery import Battery, BatteryLifecycleEvent
+from app.models.battery_catalog import BatterySpec, BatteryBatch
+from app.models.logistics import Warehouse, BatteryTransfer
 from app.models.financial import Transaction, Wallet, WalletWithdrawalRequest
 from app.models.address import Address
 from app.models.kyc import KYCDocument, KYCRequest
+from app.models.vehicle import Vehicle
 from app.models.device import Device
 from app.models.review import Review
-from app.models.station import Station, StationImage
 from app.models.rental import Rental, Purchase
 from app.models.rental_event import RentalEvent
 from app.models.invoice import Invoice
 from app.models.notification import Notification
-from app.models.support import SupportTicket, ChatSession, ChatMessage, FAQCategory, FAQItem, AutoResponse
+
 from app.models.battery_health_log import BatteryHealthLog
 from app.models.otp import OTP
 from app.models.geofence import Geofence
@@ -30,11 +32,10 @@ from app.models.refund import Refund
 from app.models.gps_log import GPSTrackingLog
 from app.models.video_kyc import VideoKYCSession
 from app.models.audit_log import AuditLog, SecurityEvent
-from app.models.commission import Commission, Settlement
 from app.models.iot import IoTDevice, DeviceCommand, FirmwareUpdate
 from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
-from app.models.logistics import DriverProfile, DeliveryAssignment
-from app.models.swap import SwapRequest, SwapHistory
+
+
 from app.models.fraud import RiskScore, FraudCheckLog, Blacklist
 from app.models.maintenance import MaintenanceSchedule, MaintenanceRecord, StationDowntime
 from app.models.i18n import Translation
@@ -54,5 +55,15 @@ from app.models.swap_suggestion import SwapSuggestion, SwapPreference
 from app.models.batch_job import BatchJob, JobExecution
 from app.models.notification_preference import NotificationPreference
 from app.models.search_history import SearchHistory
-from app.models.analytics import DemandForecast, ChurnPrediction, PricingRecommendation
-
+# Phase 1.5 & Phase 1 PowerFill Models
+from app.models.rbac import Role, Permission, RolePermission, AdminUserRole, UserRole
+from app.models.location import Continent, Country, Region, City, Zone
+from app.models.telematics import TelemeticsData
+from app.models.vendor import Vendor, VendorDocument
+from app.models.swap import SwapSession
+from app.models.settlement import Settlement
+from app.models.support import SupportTicket, TicketMessage
+from app.models.driver_profile import DriverProfile
+from app.models.delivery_assignment import DeliveryAssignment
+from app.models.oauth import BlacklistedToken
+from app.models.commission import CommissionConfig, CommissionLog

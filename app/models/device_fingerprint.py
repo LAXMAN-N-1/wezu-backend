@@ -2,6 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
 from datetime import datetime
 import sqlalchemy as sa
+from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
 
 class DeviceFingerprint(SQLModel, table=True):
@@ -40,7 +41,7 @@ class DeviceFingerprint(SQLModel, table=True):
     audio_fingerprint: Optional[str] = None
     
     # Additional metadata
-    device_metadata: Optional[dict] = Field(default=None, sa_column=sa.Column(JSONB))
+    device_metadata: Optional[dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
     # Risk indicators
     is_suspicious: bool = Field(default=False)

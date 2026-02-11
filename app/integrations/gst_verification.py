@@ -1,8 +1,8 @@
 """
 GST Verification Integration
-Handles GST number verification
+Handles GSTIN verification
 """
-import requests
+import httpx
 from typing import Dict, Any, Optional
 from app.core.config import settings
 import logging
@@ -15,24 +15,28 @@ class GSTVerificationIntegration:
     
     def __init__(self):
         self.api_key = settings.GST_API_KEY
-        self.base_url = "https://api.gstverification.io/v1"  # Example URL
+        self.base_url = "https://api.gstverify.io/v1"  # Example URL
     
-    def verify_gstin(self, gstin: str) -> Optional[Dict[str, Any]]:
+    async def verify_gstin(
+        self,
+        gstin: str
+    ) -> Optional[Dict[str, Any]]:
         """
-        Verify GSTIN (GST Identification Number)
+        Verify GSTIN details
         
         Args:
-            gstin: 15-character GSTIN
+            gstin: GSTIN number
             
         Returns:
             GST details if valid
         """
         try:
-            response = requests.get(
-                f"{self.base_url}/verify/{gstin.upper()}",
-                headers={"Authorization": f"Bearer {self.api_key}"},
-                timeout=30
-            )
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"{self.base_url}/verify/{gstin.upper()}",
+                    headers={"Authorization": f"Bearer {self.api_key}"},
+                    timeout=30
+                )
             
             if response.status_code == 200:
                 data = response.json()
@@ -43,18 +47,8 @@ class GSTVerificationIntegration:
                         "gstin": data.get('gstin'),
                         "legal_name": data.get('legal_name'),
                         "trade_name": data.get('trade_name'),
-                        "status": data.get('status'),  # Active, Cancelled, etc.
-                        "registration_date": data.get('registration_date'),
-                        "taxpayer_type": data.get('taxpayer_type'),
-                        "constitution": data.get('constitution'),
-                        "address": {
-                            "building": data.get('principal_place', {}).get('building'),
-                            "street": data.get('principal_place', {}).get('street'),
-                            "locality": data.get('principal_place', {}).get('locality'),
-                            "city": data.get('principal_place', {}).get('city'),
-                            "state": data.get('principal_place', {}).get('state'),
-                            "pincode": data.get('principal_place', {}).get('pincode')
-                        },
+                        "status": data.get('status'),  # Active, Inactive
+                        "address": data.get('address'),
                         "verified": True
                     }
                 else:

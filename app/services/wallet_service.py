@@ -2,6 +2,9 @@ from sqlmodel import Session, select
 from app.models.financial import Wallet, Transaction, WalletWithdrawalRequest
 from app.models.user import User
 from fastapi import HTTPException
+from app.services.security_service import SecurityService
+from app.models.refund import Refund
+from typing import Optional, List
 
 class WalletService:
     @staticmethod
@@ -25,7 +28,9 @@ class WalletService:
         txn = Transaction(
             wallet_id=wallet.id,
             amount=amount,
-            type="deposit",
+            balance_after=wallet.balance,
+            type="credit",
+            category="deposit",
             status="success",
             description=description
         )
@@ -48,7 +53,9 @@ class WalletService:
         txn = Transaction(
             wallet_id=wallet.id,
             amount=-amount,
-            type="withdrawal", # or rental_payment
+            balance_after=wallet.balance,
+            type="debit",
+            category="withdrawal", # or rental_payment
             status="success",
             description=description
         )
@@ -81,7 +88,9 @@ class WalletService:
         txn = Transaction(
             wallet_id=wallet.id,
             amount=-amount,
-            type="withdrawal_request",
+            balance_after=wallet.balance,
+            type="debit",
+            category="withdrawal_request",
             status="pending",
             description=f"Withdrawal Request"
         )
@@ -89,8 +98,41 @@ class WalletService:
         
         db.commit()
         db.refresh(req)
+
+        # Log Security Event for withdrawal
+        SecurityService.log_event(
+            db,
+            event_type="withdrawal_request",
+            severity="medium",
+            details=f"User {user_id} requested withdrawal of {amount}",
+            user_id=user_id
+        )
+
         return req
 
     @staticmethod
     def apply_cashback(db: Session, user_id: int, amount: float, reason: str = "Cashback"):
         return WalletService.add_balance(db, user_id, amount, description=reason)
+
+    @staticmethod
+    def initiate_refund(db: Session, transaction_id: int, amount: Optional[float] = None, reason: str = "Customer Request") -> Optional[Refund]:
+        """
+        Record a refund request for a specific transaction.
+        """
+        orig_txn = db.get(Transaction, transaction_id)
+        if not orig_txn or orig_txn.type != "credit":
+            return None
+        
+        refund_amount = amount if amount else orig_txn.amount
+        
+        refund = Refund(
+            transaction_id=transaction_id,
+            amount=refund_amount,
+            reason=reason,
+            status="pending"
+        )
+        db.add(refund)
+        db.commit()
+        db.refresh(refund)
+        return refund
+

@@ -2,7 +2,7 @@
 Fraud detection and security Pydantic schemas
 Risk scores, verification, and device fingerprinting
 """
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, ConfigDict
 from typing import Optional, List, Dict
 from datetime import datetime
 
@@ -63,8 +63,7 @@ class RiskScoreResponse(BaseModel):
     last_updated: datetime
     recommendations: Optional[List[str]]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class VerificationResponse(BaseModel):
     """Verification result"""
@@ -85,8 +84,7 @@ class FraudCheckLogResponse(BaseModel):
     performed_at: datetime
     ip_address: Optional[str]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class DeviceFingerprintResponse(BaseModel):
     """Device fingerprint response"""
@@ -104,8 +102,7 @@ class DeviceFingerprintResponse(BaseModel):
     last_seen: datetime
     total_logins: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class DuplicateAccountResponse(BaseModel):
     """Duplicate account detection response"""
@@ -121,8 +118,7 @@ class DuplicateAccountResponse(BaseModel):
     investigated_at: Optional[datetime]
     notes: Optional[str]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class BlacklistResponse(BaseModel):
     """Blacklist entry response"""
@@ -135,8 +131,7 @@ class BlacklistResponse(BaseModel):
     created_by: Optional[int]
     expires_at: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class HighRiskUserResponse(BaseModel):
     """High-risk user summary"""

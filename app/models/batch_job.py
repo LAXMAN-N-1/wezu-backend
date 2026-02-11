@@ -2,6 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
 from datetime import datetime
 import sqlalchemy as sa
+from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
 
 class BatchJob(SQLModel, table=True):
@@ -61,7 +62,7 @@ class JobExecution(SQLModel, table=True):
     failed_items: int = Field(default=0)
     
     # Results and logs
-    result_summary: Optional[dict] = Field(default=None, sa_column=sa.Column(JSONB))
+    result_summary: Optional[dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     error_message: Optional[str] = None
     error_stack_trace: Optional[str] = None
     

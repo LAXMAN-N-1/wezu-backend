@@ -2,6 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
 from datetime import datetime
 import sqlalchemy as sa
+from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
 
 class RiskScore(SQLModel, table=True):
@@ -10,7 +11,7 @@ class RiskScore(SQLModel, table=True):
     user_id: Optional[int] = Field(default=None, foreign_key="users.id", unique=True)
     
     total_score: float = Field(default=0.0) # 0-100 (High is bad)
-    breakdown: Optional[dict] = Field(default=None, sa_column=sa.Column(JSONB))
+    breakdown: Optional[dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
     last_updated: datetime = Field(default_factory=datetime.utcnow)
     

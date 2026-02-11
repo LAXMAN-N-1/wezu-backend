@@ -6,7 +6,7 @@ from sqlmodel import Session, select
 from typing import List, Dict, Optional
 from datetime import datetime
 import uuid
-from app.models.catalog import CatalogOrder, CatalogOrderItem, DeliveryTracking, DeliveryEvent, CatalogProduct, CatalogProductVariant
+from app.models.catalog import CatalogOrder, CatalogOrderItem, DeliveryTracking, DeliveryEvent, CatalogProduct, CatalogProductVariant as ProductVariant
 from app.services.catalog_service import CatalogService
 import logging
 

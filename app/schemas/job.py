@@ -2,7 +2,7 @@
 Background job-related Pydantic schemas
 Job status, execution history, and monitoring
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict
 from datetime import datetime
 
@@ -55,8 +55,7 @@ class BatchJobResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class JobExecutionResponse(BaseModel):
     """Job execution response"""
@@ -79,8 +78,7 @@ class JobExecutionResponse(BaseModel):
     parent_execution_id: Optional[str]
     resource_usage: Optional[Dict]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class JobExecutionLogResponse(BaseModel):
     """Detailed job execution log"""

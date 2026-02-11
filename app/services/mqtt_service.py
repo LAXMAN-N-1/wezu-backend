@@ -12,6 +12,7 @@ from app.core.config import settings
 from app.core.database import engine
 from app.models.battery import Battery
 from app.models.battery_health_log import BatteryHealthLog
+from app.services.telematics_service import TelematicsService
 import redis
 
 logger = logging.getLogger(__name__)
@@ -170,32 +171,9 @@ class MQTTService:
                 json.dumps(data)
             )
             
-            # Store in PostgreSQL for historical data
+            # Use centralized TelematicsService for DB updates and advanced logic
             with Session(engine) as session:
-                battery = session.get(Battery, int(battery_id))
-                if not battery:
-                    logger.warning(f"Battery {battery_id} not found")
-                    return
-                
-                # Create health log entry
-                health_log = BatteryHealthLog(
-                    battery_id=int(battery_id),
-                    voltage=data.get('voltage'),
-                    current=data.get('current'),
-                    temperature=data.get('temperature'),
-                    soc=data.get('soc'),
-                    health_percentage=data.get('health'),
-                    cycle_count=data.get('cycle_count', 0),
-                    timestamp=datetime.fromisoformat(data.get('timestamp', datetime.utcnow().isoformat()))
-                )
-                session.add(health_log)
-                
-                # Update battery current status
-                battery.current_soc = data.get('soc')
-                battery.health_percentage = data.get('health')
-                session.add(battery)
-                
-                session.commit()
+                TelematicsService.process_telemetry(session, battery_id, data)
             
             # Check for alerts
             self._check_alerts(battery_id, data)
