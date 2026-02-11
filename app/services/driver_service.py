@@ -1,6 +1,6 @@
 from sqlmodel import Session, select
 from app.core.database import engine
-from app.models.logistics import DriverProfile
+from app.models.driver_profile import DriverProfile
 from datetime import datetime
 from typing import List
 

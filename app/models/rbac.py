@@ -2,6 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from typing import List, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from app.models.user import User
+    from app.models.role_right import RoleRight
 from datetime import datetime
 
 # Link Table for Role <-> Permission
@@ -84,6 +85,9 @@ class Role(SQLModel, table=True):
     )
 
     users: List["User"] = Relationship(back_populates="roles", link_model=UserRole)
+    
+    # Merged from app/models/role.py (Legacy/Chandu branch)
+    role_rights: List["RoleRight"] = Relationship(back_populates="role", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
 
 
 

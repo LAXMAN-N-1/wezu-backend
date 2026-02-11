@@ -2,22 +2,7 @@ from typing import Optional, List
 from datetime import datetime
 from sqlmodel import SQLModel, Field, Relationship
 
-class Warehouse(SQLModel, table=True):
-    __tablename__ = "warehouses"
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(index=True)
-    address: Optional[str] = None
-    city: str
-    state: str
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    
-    manager_id: Optional[int] = Field(default=None, foreign_key="users.id")
-    is_active: bool = Field(default=True)
-    
-    # Relationships
-    manager: Optional["User"] = Relationship()
-    # inventory: List["Battery"] = Relationship() # Implied by battery.location_id
+# Warehouse moved to app/models/warehouse.py
 
 class BatteryTransfer(SQLModel, table=True):
     __tablename__ = "battery_transfers"

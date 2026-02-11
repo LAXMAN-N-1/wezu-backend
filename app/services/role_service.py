@@ -1,12 +1,12 @@
 from typing import List, Optional
 from sqlmodel import Session, select
-from app.models.role import Role
+from app.models.rbac import Role
 from app.schemas.role import RoleCreate, RoleUpdate
 
 class RoleService:
     @staticmethod
     def create_role(db: Session, role_in: RoleCreate) -> Role:
-        db_role = Role.from_orm(role_in)
+        db_role = Role(name=role_in.name, description=role_in.description) # Explicit mapping for safety
         db.add(db_role)
         db.commit()
         db.refresh(db_role)

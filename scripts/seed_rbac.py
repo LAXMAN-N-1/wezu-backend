@@ -8,7 +8,7 @@ from sqlmodel import Session, select, SQLModel
 from app.core.database import engine
 
 # Imports for Menu-Based RBAC (HEAD)
-from app.models.role import Role as RoleLegacy
+# from app.models.role import Role as RoleLegacy # DEPRECATED
 from app.models.menu import Menu
 from app.models.role_right import RoleRight
 
@@ -29,9 +29,11 @@ def seed_menu_rbac():
         for role_name in roles_data:
             # Note: Role model might overlap with RBAC Role model if table names same
             # Assuming they map to same table or allow co-existence
-            role = session.exec(select(RoleLegacy).where(RoleLegacy.name == role_name)).first()
+            # Note: Role model might overlap with RBAC Role model if table names same
+            # Assuming they map to same table or allow co-existence
+            role = session.exec(select(Role).where(Role.name == role_name)).first()
             if not role:
-                role = RoleLegacy(name=role_name)
+                role = Role(name=role_name)
                 session.add(role)
                 session.flush()
                 print(f"Created role (legacy): {role_name}")

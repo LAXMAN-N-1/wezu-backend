@@ -4,7 +4,8 @@ from datetime import datetime
 from sqlmodel import Session, select
 from app.api import deps
 from app.db.session import get_session
-from app.models.logistics import Warehouse, BatteryTransfer
+from app.models.logistics import BatteryTransfer
+from app.models.warehouse import Warehouse
 from app.models.battery import Battery
 from app.models.user import User
 from app.schemas.logistics import (

@@ -1,11 +1,11 @@
 from app.models.user import User
-from app.models.role import Role
+# from app.models.role import Role
 from app.models.menu import Menu
 from app.models.role_right import RoleRight
 from app.models.station import Station, StationImage, StationSlot
 from app.models.battery import Battery, BatteryLifecycleEvent
 from app.models.battery_catalog import BatterySpec, BatteryBatch
-from app.models.logistics import Warehouse, BatteryTransfer
+from app.models.logistics import BatteryTransfer
 from app.models.financial import Transaction, Wallet, WalletWithdrawalRequest
 from app.models.address import Address
 from app.models.kyc import KYCDocument, KYCRequest
