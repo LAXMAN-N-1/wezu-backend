@@ -23,10 +23,15 @@ async def test_login_success_no_2fa(session):
     # Mock role
     from app.models.rbac import Role
     role = Role(name="user", description="User role", is_system_role=True)
-    user.roles = [role]
-    
     session.add(role)
     session.add(user)
+    session.commit()
+    session.refresh(user)
+    session.refresh(role)
+
+    from app.models.rbac import UserRole
+    ur = UserRole(user_id=user.id, role_id=role.id)
+    session.add(ur)
     session.commit()
     
     # Login
@@ -53,10 +58,15 @@ async def test_login_requires_2fa_fail(session):
     )
     from app.models.rbac import Role
     role = Role(name="user_2fa", description="User role", is_system_role=True)
-    user.roles = [role]
-    
     session.add(role)
     session.add(user)
+    session.commit()
+    session.refresh(user)
+    session.refresh(role)
+
+    from app.models.rbac import UserRole
+    ur = UserRole(user_id=user.id, role_id=role.id)
+    session.add(ur)
     session.commit()
     
     # Login without code
@@ -83,10 +93,15 @@ async def test_login_2fa_success(session):
     )
     from app.models.rbac import Role
     role = Role(name="user_2fa_ok", description="User role", is_system_role=True)
-    user.roles = [role]
-    
     session.add(role)
     session.add(user)
+    session.commit()
+    session.refresh(user)
+    session.refresh(role)
+
+    from app.models.rbac import UserRole
+    ur = UserRole(user_id=user.id, role_id=role.id)
+    session.add(ur)
     session.commit()
     
     # Generate valid code

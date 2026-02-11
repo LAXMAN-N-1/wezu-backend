@@ -54,6 +54,7 @@ class User(SQLModel, table=True):
 
     # Security
     two_factor_enabled: bool = Field(default=False)
+    two_factor_secret: Optional[str] = None
     biometric_login_enabled: bool = Field(default=False)
     security_question: Optional[str] = None
     security_answer: Optional[str] = None

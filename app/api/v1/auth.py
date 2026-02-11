@@ -587,6 +587,29 @@ async def login(
     if not user.is_active:
          raise HTTPException(status_code=403, detail="Account is inactive")
 
+    # 2FA Check
+    if user.two_factor_enabled:
+        if not login_data.totp_code:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Two-factor authentication required"
+            )
+        from app.core.security import verify_totp
+        # Ensure secret exists if 2FA is enabled
+        if not user.two_factor_secret:
+             # This is a data integrity issue, but for security we treat as invalid code or fail safe
+             logger.error(f"User {user.id} has 2FA enabled but no secret set.")
+             raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Two-factor authentication configuration error"
+            )
+            
+        if not verify_totp(user.two_factor_secret, login_data.totp_code):
+             raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid two-factor authentication code"
+            )
+
     # 2. Determine Role
     user_roles = [r.name for r in user.roles]
     selected_role_name = None
