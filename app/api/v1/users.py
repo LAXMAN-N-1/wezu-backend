@@ -22,6 +22,8 @@ from app.schemas.user import (
 from app.schemas.dashboard import DashboardConfigResponse
 import os
 import shutil
+import json
+from app.core.security import generate_totp_secret, verify_totp, generate_backup_codes, generate_qr_uri
 
 router = APIRouter()
 
@@ -1654,59 +1656,7 @@ class TwoFactorStatusResponse(BaseModel):
     backup_codes_remaining: int
 
 
-def _generate_totp_secret() -> str:
-    """Generate a random base32 encoded secret for TOTP."""
-    random_bytes = secrets.token_bytes(20)
-    return base64.b32encode(random_bytes).decode('utf-8').rstrip('=')
 
-
-def _generate_backup_codes(count: int = 10) -> List[str]:
-    """Generate backup codes for 2FA recovery."""
-    return [secrets.token_hex(4).upper() for _ in range(count)]
-
-
-def _generate_qr_uri(email: str, secret: str, issuer: str = "Wezu") -> str:
-    """Generate otpauth:// URI for QR code scanning."""
-    return f"otpauth://totp/{issuer}:{email}?secret={secret}&issuer={issuer}&digits=6&period=30"
-
-
-def _verify_totp(secret: str, code: str) -> bool:
-    """
-    Verify a TOTP code against the secret.
-    Simple implementation - in production use pyotp library.
-    """
-    import time
-    import hmac
-    
-    # Pad secret back to proper base32
-    padded_secret = secret + '=' * (8 - len(secret) % 8) if len(secret) % 8 else secret
-    
-    try:
-        key = base64.b32decode(padded_secret, casefold=True)
-    except Exception:
-        return False
-    
-    # Get current time step (30 second intervals)
-    time_step = int(time.time()) // 30
-    
-    # Check current and adjacent time steps (for clock drift)
-    for step_offset in [-1, 0, 1]:
-        step = time_step + step_offset
-        
-        # Create HMAC-SHA1 hash
-        msg = step.to_bytes(8, 'big')
-        hmac_hash = hmac.new(key, msg, hashlib.sha1).digest()
-        
-        # Dynamic truncation
-        offset = hmac_hash[-1] & 0x0F
-        truncated = hmac_hash[offset:offset + 4]
-        code_int = int.from_bytes(truncated, 'big') & 0x7FFFFFFF
-        totp = str(code_int % 10**6).zfill(6)
-        
-        if totp == code:
-            return True
-    
-    return False
 
 
 @router.post("/me/2fa/enable", response_model=TwoFactorSetupResponse)
@@ -1733,9 +1683,9 @@ async def enable_two_factor(
         )
     
     # Generate secret and backup codes
-    secret = _generate_totp_secret()
-    backup_codes = _generate_backup_codes()
-    qr_uri = _generate_qr_uri(current_user.email, secret)
+    secret = generate_totp_secret()
+    backup_codes = generate_backup_codes()
+    qr_uri = generate_qr_uri(current_user.email, secret)
     
     # Store secret temporarily (not enabled until verified)
     # In production, encrypt the secret before storing
@@ -1775,7 +1725,7 @@ async def verify_two_factor(
         )
     
     # Verify the code
-    if not _verify_totp(secret, request.code):
+    if not verify_totp(secret, request.code):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid verification code"
@@ -1826,7 +1776,7 @@ async def disable_two_factor(
     
     # Verify 2FA code
     secret = getattr(current_user, 'two_factor_secret', '')
-    if not _verify_totp(secret, request.code):
+    if not verify_totp(secret, request.code):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid 2FA code"
@@ -2000,7 +1950,7 @@ async def verify_2fa_code(
             db.commit()
     else:
         # Try TOTP code
-        verified = _verify_totp(secret, request.code)
+        verified = verify_totp(secret, request.code)
     
     # 4. Record attempt
     _record_attempt(current_user.id)
@@ -2087,14 +2037,14 @@ async def regenerate_backup_codes(
     
     # Verify 2FA code
     secret = getattr(current_user, 'two_factor_secret', '')
-    if not _verify_totp(secret, request.code):
+    if not verify_totp(secret, request.code):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid 2FA code"
         )
     
     # Generate new backup codes
-    new_codes = _generate_backup_codes()
+    new_codes = generate_backup_codes()
     current_user.two_factor_backup_codes = json.dumps(new_codes)
     
     db.add(current_user)

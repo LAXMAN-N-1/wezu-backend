@@ -53,6 +53,10 @@ class User(SQLModel, table=True):
 
     # Security
     two_factor_enabled: bool = Field(default=False)
+    two_factor_secret: Optional[str] = None
+    two_factor_backup_codes: Optional[str] = None # JSON string
+    two_factor_enabled_at: Optional[datetime] = None
+    two_factor_pending: bool = Field(default=False)
     biometric_login_enabled: bool = Field(default=False)
     security_question: Optional[str] = None
     security_answer: Optional[str] = None

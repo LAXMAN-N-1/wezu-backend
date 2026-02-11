@@ -4,6 +4,7 @@ from typing import Optional, List, Any, Dict
 class LoginRequest(BaseModel):
     username: str # email or phone
     password: str
+    totp_code: Optional[str] = None # For 2FA
     role: Optional[str] = None
     device_fingerprint: Optional[str] = None
     remember_me: bool = False

@@ -41,3 +41,27 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
+
+# TOTP Utilities
+import secrets
+import pyotp
+
+def generate_totp_secret() -> str:
+    return pyotp.random_base32()
+
+def verify_totp(secret: str, code: str) -> bool:
+    if not secret or not code:
+        return False
+    try:
+        totp = pyotp.TOTP(secret)
+        return totp.verify(code, valid_window=1)
+    except Exception:
+        return False
+
+def generate_backup_codes(count: int = 10) -> list[str]:
+    """Generate backup codes for 2FA recovery."""
+    return [secrets.token_hex(4).upper() for _ in range(count)]
+
+def generate_qr_uri(email: str, secret: str, issuer: str = "Wezu") -> str:
+    """Generate otpauth:// URI for QR code scanning."""
+    return f"otpauth://totp/{issuer}:{email}?secret={secret}&issuer={issuer}&digits=6&period=30"
