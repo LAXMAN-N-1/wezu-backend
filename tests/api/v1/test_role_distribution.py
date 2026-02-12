@@ -43,8 +43,18 @@ def test_role_distribution_endpoint(client, session: Session):
         session.add(admin_role)
         session.commit()
     
-    if admin_role not in user.roles:
-        user.roles.append(admin_role)
+    # Assign role safely
+    from app.models.rbac import UserRole
+    from sqlalchemy.exc import IntegrityError
+    
+    link = UserRole(user_id=user.id, role_id=admin_role.id)
+    session.add(link)
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        
+    session.refresh(user)
     
     user.is_superuser = True
     session.add(user)
@@ -97,8 +107,18 @@ def test_role_test_configuration(client, session: Session):
         session.add(admin_role)
         session.commit()
     
-    if admin_role not in user.roles:
-        user.roles.append(admin_role)
+    # Assign role safely
+    from app.models.rbac import UserRole
+    from sqlalchemy.exc import IntegrityError
+    
+    link = UserRole(user_id=user.id, role_id=admin_role.id)
+    session.add(link)
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        
+    session.refresh(user)
     
     user.is_superuser = True
     session.add(user)
@@ -149,9 +169,10 @@ def test_bulk_role_assignment(client, session: Session):
         target_ids.append(target.id)
     
     # Get or create a role
-    role = session.exec(select(Role).where(Role.name == "customer")).first()
+    role_name = "bulk_assigned_role"
+    role = session.exec(select(Role).where(Role.name == role_name)).first()
     if not role:
-        role = Role(name="customer", slug="customer", description="Customer")
+        role = Role(name=role_name, slug="bulk_assigned", description="Bulk Assigned")
         session.add(role)
         session.commit()
         session.refresh(role)

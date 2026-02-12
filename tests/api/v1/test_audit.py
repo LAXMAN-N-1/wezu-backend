@@ -57,11 +57,27 @@ def test_audit_log_flow(client, session: Session):
         session.commit()
         session.refresh(admin_role)
     
-    if admin_user and admin_role not in admin_user.roles:
-        admin_user.roles.append(admin_role)
-        session.add(admin_user)
+    # Check if role already assigned using direct query to avoid loading issues
+    from app.models.rbac import UserRole
+    existing_link = session.exec(
+        select(UserRole).where(
+            UserRole.user_id == admin_user.id,
+            UserRole.role_id == admin_role.id
+        )
+    ).first()
+    
+    # Assign role safely
+    from app.models.rbac import UserRole
+    from sqlalchemy.exc import IntegrityError
+    
+    link = UserRole(user_id=admin_user.id, role_id=admin_role.id)
+    session.add(link)
+    try:
         session.commit()
-        session.refresh(admin_user)
+    except IntegrityError:
+        session.rollback()
+        
+    session.refresh(admin_user)
         
     admin = admin_user
     

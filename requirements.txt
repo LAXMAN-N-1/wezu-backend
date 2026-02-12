@@ -30,7 +30,7 @@ google-auth-oauthlib>=1.2.0
 google-api-python-client>=2.110.0
 
 # Other
-httpx>=0.25.2
+httpx>=0.25.2,<0.28.0
 redis>=5.0.1
 celery>=5.3.4
 transactions
@@ -40,7 +40,6 @@ reportlab
 slowapi
 pytest
 paho-mqtt
-reportlab
 psutil
 apscheduler
 bcrypt==3.2.2

@@ -41,9 +41,16 @@ def test_permission_analytics_flow(client, session: Session):
         session.add(admin_role)
         session.commit()
     
-    if admin_role not in user.roles:
-        user.roles.append(admin_role)
-        session.add(user)
+    # Assign role safely
+    from app.models.rbac import UserRole
+    from sqlalchemy.exc import IntegrityError
+    
+    link = UserRole(user_id=user.id, role_id=admin_role.id)
+    session.add(link)
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
     
     user.is_superuser = True
     session.add(user)

@@ -14,7 +14,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = 'ade992443985'
-down_revision: Union[str, None] = '977e543b1c75'
+down_revision: Union[str, None] = 'ff53599f1426'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -63,6 +63,30 @@ def upgrade() -> None:
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_countries_name'), 'countries', ['name'], unique=True)
+    op.create_table('roles',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('description', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+    sa.Column('is_system_role', sa.Boolean(), nullable=False),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_roles_name'), 'roles', ['name'], unique=True)
+    op.create_table('permissions',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('slug', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('module', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('action', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+    sa.Column('description', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_permissions_slug'), 'permissions', ['slug'], unique=True)
+    op.create_table('role_permissions',
+    sa.Column('role_id', sa.Integer(), nullable=False),
+    sa.Column('permission_id', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['permission_id'], ['permissions.id'], ),
+    sa.ForeignKeyConstraint(['role_id'], ['roles.id'], ),
+    sa.PrimaryKeyConstraint('role_id', 'permission_id')
+    )
     op.create_table('user_roles',
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('role_id', sa.Integer(), nullable=False),
@@ -688,6 +712,11 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_vehicles_registration_number'), table_name='vehicles')
     op.drop_table('vehicles')
     op.drop_table('user_roles')
+    op.drop_table('role_permissions')
+    op.drop_index(op.f('ix_permissions_slug'), table_name='permissions')
+    op.drop_table('permissions')
+    op.drop_index(op.f('ix_roles_name'), table_name='roles')
+    op.drop_table('roles')
     op.drop_index(op.f('ix_countries_name'), table_name='countries')
     op.drop_table('countries')
     op.drop_index(op.f('ix_battery_batches_batch_number'), table_name='battery_batches')
