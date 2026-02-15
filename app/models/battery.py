@@ -24,6 +24,9 @@ class Battery(SQLModel, table=True):
     last_swap_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
+    # Location tracking
+    warehouse_id: Optional[int] = Field(default=None, foreign_key="warehouses.id")
+
     # Relationships
     rentals: List["Rental"] = Relationship(back_populates="battery")
     purchases: List["Purchase"] = Relationship(back_populates="battery")

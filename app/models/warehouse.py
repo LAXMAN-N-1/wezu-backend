@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.models.branch import Branch
+    from app.models.user import User
 
 class Warehouse(SQLModel, table=True):
     __tablename__ = "warehouses"
@@ -19,6 +20,7 @@ class Warehouse(SQLModel, table=True):
     pincode: str
     
     branch_id: Optional[int] = Field(default=None, foreign_key="branches.id")
+    manager_id: Optional[int] = Field(default=None, foreign_key="users.id")
     
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -26,3 +28,5 @@ class Warehouse(SQLModel, table=True):
     
     # Relationships
     branch: Optional["Branch"] = Relationship(back_populates="warehouses")
+    manager: Optional["User"] = Relationship()
+    stocks: List["Stock"] = Relationship(back_populates="warehouse")

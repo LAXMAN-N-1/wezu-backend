@@ -71,6 +71,7 @@ class CatalogProduct(SQLModel, table=True):
     # Relationships
     images: List["CatalogProductImage"] = Relationship(back_populates="product")
     variants: List["CatalogProductVariant"] = Relationship(back_populates="product")
+    stocks: List["Stock"] = Relationship(back_populates="product")
 
 class CatalogProductImage(SQLModel, table=True):
     """Product images"""

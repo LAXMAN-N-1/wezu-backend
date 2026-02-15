@@ -4,5 +4,7 @@ from app.schemas.warehouse import WarehouseCreate, WarehouseUpdate
 from sqlmodel import Session
 
 class WarehouseRepository(BaseRepository[Warehouse, WarehouseCreate, WarehouseUpdate]):
-    def __init__(self, session: Session):
+    def __init__(self):
         super().__init__(model=Warehouse)
+
+warehouse_repository = WarehouseRepository()

@@ -10,6 +10,7 @@ class WarehouseBase(BaseModel):
     state: str
     pincode: str
     branch_id: Optional[int] = None
+    manager_id: Optional[int] = None
     is_active: bool = True
 
 class WarehouseCreate(WarehouseBase):
@@ -23,6 +24,7 @@ class WarehouseUpdate(BaseModel):
     state: Optional[str] = None
     pincode: Optional[str] = None
     branch_id: Optional[int] = None
+    manager_id: Optional[int] = None
     is_active: Optional[bool] = None
 
 class WarehouseRead(WarehouseBase):
