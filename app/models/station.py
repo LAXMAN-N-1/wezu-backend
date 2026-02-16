@@ -38,7 +38,16 @@ class Station(SQLModel, table=True):
     # Status
     status: str = Field(default="active")
     contact_phone: Optional[str] = None
-    opening_hours: Optional[str] = None
+    contact_email: Optional[str] = None
+    
+    opening_time: Optional[datetime] = None # Or str if just time
+    closing_time: Optional[datetime] = None
+    is_24x7: bool = Field(default=False)
+    
+    # Store amenities as a JSON string or use sa_column for JSON type if strictly Postgres
+    amenities: Optional[str] = None # JSON string: ["parking", "wifi"]
+    
+    opening_hours: Optional[str] = None # Keep for display text
     rating: float = Field(default=0.0)
     total_reviews: int = Field(default=0)
     last_maintenance_date: Optional[datetime] = None

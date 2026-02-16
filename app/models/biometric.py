@@ -32,23 +32,4 @@ class BiometricToken(SQLModel, table=True):
     device_model: Optional[str] = None
     os_version: Optional[str] = None
 
-class TwoFactorAuth(SQLModel, table=True):
-    """Two-factor authentication settings"""
-    __tablename__ = "two_factor_auth"
-    
-    id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id", index=True, unique=True)
-    is_enabled: bool = Field(default=False)
-    secret_key: str  # TOTP secret key (encrypted)
-    backup_codes: Optional[str] = None  # Encrypted backup codes
-    
-    # Settings
-    method: str = Field(default="TOTP")  # TOTP, SMS, EMAIL
-    phone_number: Optional[str] = None
-    email: Optional[str] = None
-    
-    # Timestamps
-    enabled_at: Optional[datetime] = None
-    last_verified_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+

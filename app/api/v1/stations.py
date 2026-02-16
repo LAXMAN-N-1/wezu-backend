@@ -1,11 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session
+from app.models.station import Station
+from app.models.favorite import Favorite
+from app.models.battery import Battery
+from app.schemas.battery import BatteryResponse
+from sqlmodel import Session, select
 from typing import List, Optional
 from app.api import deps
 from app.models.user import User
 from app.schemas.station import StationResponse, StationCreate, NearbyStationResponse
 from app.schemas.review import ReviewResponse, ReviewCreate
 from app.services.station_service import StationService
+from fastapi import APIRouter, Depends, HTTPException, Query
 from app.services.review_service import ReviewService
 
 router = APIRouter()
@@ -23,12 +27,16 @@ async def search_nearby_stations(
     lat: float,
     lon: float,
     radius: float = 50.0,
+    min_rating: Optional[float] = Query(None, description="Minimum rating (1-5)"),
+    status: Optional[str] = Query(None, description="Station status (active, maintenance)"),
+    is_24x7: Optional[bool] = Query(None, description="Filter only 24x7 stations"),
+    sort_by: str = Query("distance", description="Sort by: distance, rating, availability"),
     db: Session = Depends(deps.get_db),
 ):
-    stations = StationService.get_nearby(db, lat, lon, radius)
-    # Convert to response model (should populate distance dynamically)
-    # Pydantic will handle the conversion from Station object to NearbyStationResponse 
-    # IF the Station object has 'distance' attribute set (which we did in service)
+    stations = StationService.get_nearby(
+        db, lat, lon, radius,
+        min_rating=min_rating, status=status, is_24x7=is_24x7, sort_by=sort_by
+    )
     return stations
 
 @router.post("/", response_model=StationResponse)
@@ -44,9 +52,6 @@ async def read_station(
     station_id: int,
     db: Session = Depends(deps.get_db),
 ):
-    station = db.get("Station", station_id) # Won't work with string "Station", need model
-    # Wait, db.get needs Model class.
-    from app.models.station import Station
     station = db.get(Station, station_id)
     if not station:
         raise HTTPException(status_code=404, detail="Station not found")
@@ -68,3 +73,38 @@ async def create_review(
 ):
     review_in.station_id = station_id
     return ReviewService.create_review(db, current_user.id, review_in)
+
+@router.post("/{station_id}/favorite", response_model=dict)
+async def favorite_station(
+    station_id: int,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    existing = db.exec(select(Favorite).where(Favorite.user_id == current_user.id, Favorite.station_id == station_id)).first()
+    if existing:
+        return {"status": "already_favorited"}
+    fav = Favorite(user_id=current_user.id, station_id=station_id)
+    db.add(fav)
+    db.commit()
+    return {"status": "favorited"}
+
+@router.delete("/{station_id}/favorite", response_model=dict)
+async def unfavorite_station(
+    station_id: int,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    fav = db.exec(select(Favorite).where(Favorite.user_id == current_user.id, Favorite.station_id == station_id)).first()
+    if not fav:
+         raise HTTPException(status_code=404, detail="Favorite not found")
+    db.delete(fav)
+    db.commit()
+    return {"status": "unfavorited"}
+
+@router.get("/{station_id}/batteries", response_model=List[BatteryResponse])
+async def read_station_batteries(
+    station_id: int,
+    db: Session = Depends(deps.get_db),
+):
+    query = select(Battery).where(Battery.location_type == "station", Battery.location_id == station_id)
+    return db.exec(query).all()

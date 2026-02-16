@@ -10,7 +10,7 @@ class RentalBase(BaseModel):
     duration_days: int = 1
 
 class RentalCreate(RentalBase):
-    pass
+    promo_code: Optional[str] = None
 
 class RentalEventResponse(BaseModel):
     event_type: str
@@ -25,6 +25,11 @@ class RentalResponse(BaseModel):
     status: str
     start_time: datetime
     end_time: Optional[datetime]
+    
+    rental_duration_days: int = 1
+    daily_rate: float = 0.0
+    damage_deposit: float = 0.0
+    discount_amount: float = 0.0
     total_price: float
     events: List[RentalEventResponse] = []
     

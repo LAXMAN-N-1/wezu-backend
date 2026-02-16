@@ -7,8 +7,9 @@ from sqlmodel import Session
 from app.core import security
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.user import User, TokenPayload
+from app.models.user import User
 from app.models.role_right import RoleRight
+from app.schemas.user import TokenPayload
 from app.models.oauth import BlacklistedToken
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")

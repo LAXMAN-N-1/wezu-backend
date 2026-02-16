@@ -10,6 +10,7 @@ class AuditLog(SQLModel, table=True):
     resource_type: str # user, rental, payment
     resource_id: Optional[str] = None
     details: Optional[str] = None # JSON string or text
+    device_info: Optional[str] = None
     ip_address: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 

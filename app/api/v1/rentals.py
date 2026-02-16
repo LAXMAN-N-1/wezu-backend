@@ -1,10 +1,29 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session
 from typing import List, Optional
+from pydantic import BaseModel
 from app.api import deps
 from app.models.user import User
+from app.models.rental import Rental
 from app.schemas.rental import RentalCreate, RentalResponse, ActiveRentalResponse
 from app.services.rental_service import RentalService
+
+class PriceCalculationRequest(BaseModel):
+    battery_id: int
+    duration_days: int
+    promo_code: Optional[str] = None
+
+class PriceCalculationResponse(BaseModel):
+    daily_rate: float
+    duration_days: int
+    rental_cost: float
+    discount: float
+    deposit: float
+    total_payable: float
+    promo_code_id: Optional[int] = None
+
+class ConfirmRentalRequest(BaseModel):
+    payment_reference: str
 
 router = APIRouter()
 
@@ -17,6 +36,34 @@ async def create_rental(
     # Check if user has active rental? Logic in service or here.
     # Service doesn't check, let's assume multiple rentals allowed or enforced globally.
     return RentalService.create_rental(db, current_user.id, rental_in)
+
+@router.post("/calculate-price", response_model=PriceCalculationResponse)
+async def calculate_rental_price(
+    req: PriceCalculationRequest,
+    db: Session = Depends(deps.get_db),
+):
+    return RentalService.calculate_price(db, req.battery_id, req.duration_days, req.promo_code)
+
+@router.post("/initiate", response_model=RentalResponse)
+async def initiate_rental(
+    rental_in: RentalCreate,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    return RentalService.initiate_rental(db, current_user.id, rental_in)
+
+@router.post("/{rental_id}/confirm", response_model=RentalResponse)
+async def confirm_rental(
+    rental_id: int,
+    req: ConfirmRentalRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    rental = db.get(Rental, rental_id)
+    if not rental or rental.user_id != current_user.id:
+         raise HTTPException(status_code=404, detail="Rental not found")
+         
+    return RentalService.confirm_rental(db, rental_id, req.payment_reference)
 
 @router.get("/active", response_model=List[RentalResponse])
 async def read_active_rentals(
@@ -235,4 +282,3 @@ async def request_late_fee_waiver(
     db.refresh(waiver)
     return waiver
 
-from typing import Optional

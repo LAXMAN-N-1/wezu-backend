@@ -1,4 +1,4 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 from app.models.station import Station, StationImage, StationSlot
 from app.models.battery import Battery
 from app.schemas.station import StationCreate
@@ -16,22 +16,49 @@ class StationService:
         ).all()
 
     @staticmethod
-    def get_nearby(db: Session, lat: float, lon: float, radius_km: float = 50.0) -> List[Station]:
-        # Simple Haversine approximation or usage of PostGIS if available.
-        # For MVP/Python implementation, we fetch stations and filter.
-        # Optimization: Filter by bounding box first if large dataset.
-        stations = db.exec(select(Station)).all()
+    def get_nearby(
+        db: Session, 
+        lat: float, 
+        lon: float, 
+        radius_km: float = 50.0,
+        min_rating: Optional[float] = None,
+        status: Optional[str] = None,
+        is_24x7: Optional[bool] = None,
+        sort_by: str = "distance"
+    ) -> List[Station]:
+        # 1. Base Query
+        query = select(Station)
+        if status:
+            query = query.where(Station.status == status)
+        if min_rating:
+            query = query.where(Station.rating >= min_rating)
+        if is_24x7:
+             query = query.where(Station.is_24x7 == True)
+             
+        stations = db.execute(query).scalars().all()
+        
+        # 2. Get Availability Map (Optimized)
+        availability_query = select(StationSlot.station_id, func.count(StationSlot.id)).where(StationSlot.status == "ready").group_by(StationSlot.station_id)
+        availability_results = db.execute(availability_query).all()
+        availability_map = {r[0]: r[1] for r in availability_results}
+        
         nearby = []
         for station in stations:
             dist = StationService.haversine(lat, lon, station.latitude, station.longitude)
             if dist <= radius_km:
-                # Attach distance dynamically if needed by pydantic wrapper, 
-                # but usually we return a tuple or special object.
-                # Here we just return Station objects, sorting can happen here.
-                station.distance = dist # Monkey patch for response
+                # Monkey patch for Pydantic response
+                station.distance = dist 
+                station.available_batteries = availability_map.get(station.id, 0)
                 nearby.append(station)
         
-        nearby.sort(key=lambda s: s.distance)
+        # 3. Sort
+        if sort_by == "rating":
+            nearby.sort(key=lambda s: s.rating, reverse=True)
+        elif sort_by == "availability":
+            nearby.sort(key=lambda s: s.available_batteries, reverse=True)
+        else: # distance (default)
+            nearby.sort(key=lambda s: s.distance)
+            
         return nearby
 
     @staticmethod
@@ -56,12 +83,12 @@ class StationService:
 
     @staticmethod
     def get_available_slots(db: Session, station_id: int) -> List[StationSlot]:
-        return db.exec(
+        return db.execute(
             select(StationSlot).where(
                 StationSlot.station_id == station_id, 
                 StationSlot.status == "empty"
             )
-        ).all()
+        ).scalars().all()
 
     @staticmethod
     def assign_battery_to_slot(db: Session, slot_id: int, battery_id: int):

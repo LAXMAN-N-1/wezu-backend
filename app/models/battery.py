@@ -18,6 +18,17 @@ class Battery(SQLModel, table=True):
     spec_id: Optional[int] = Field(default=None, foreign_key="battery_specs.id")
     batch_id: Optional[int] = Field(default=None, foreign_key="battery_batches.id")
     
+    qr_code_data: Optional[str] = Field(default=None, unique=True, index=True)
+    battery_type: str = Field(default="lithium_ion") # lithium_ion, lithium_polymer, lead_acid
+    capacity_mah: int = Field(default=0)
+    voltage_v: float = Field(default=0.0)
+    manufacturer: Optional[str] = None
+    model_number: Optional[str] = None
+    
+    rental_price_per_day: float = Field(default=0.0)
+    damage_deposit_amount: float = Field(default=0.0)
+    certification_details: Optional[str] = None # JSON string: {"CE": "123", "RoHS": "456"}
+    
     # State
     status: str = Field(default="new") # new, ready, rented, charging, maintenance, retired
     current_charge: float = Field(default=100.0)

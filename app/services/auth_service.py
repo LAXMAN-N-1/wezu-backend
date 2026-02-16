@@ -65,6 +65,7 @@ class AuthService:
             )
 
     @staticmethod
+    @staticmethod
     async def verify_facebook_token(token: str):
         try:
             import httpx
@@ -85,6 +86,7 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=f"Invalid Facebook token: {str(e)}",
             )
+
     @staticmethod
     def get_permissions_for_role(role_name: str) -> list[str]:
         if role_name == "customer":
@@ -121,3 +123,76 @@ class AuthService:
                 {"label": "Settings", "path": "/admin/settings", "icon": "settings"},
             ]
         return []
+
+    @staticmethod
+    def create_session(
+        db, 
+        user_id: int, 
+        access_token: str, 
+        refresh_token: str, 
+        device_info: str = None, 
+        ip_address: str = None
+    ):
+        from app.models.token import SessionToken
+        from datetime import datetime, timedelta
+        
+        # Calculate expiry based on refresh token validity (usually longer than access token)
+        # Using a default of 7 days for the session if not specified elsewhere
+        expires_at = datetime.utcnow() + timedelta(days=7)
+        
+        session = SessionToken(
+            user_id=user_id,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            device_id=None, # Extract from device_info if structured
+            device_type=device_info, # Using raw string for now
+            ip_address=ip_address,
+            expires_at=expires_at
+        )
+        db.add(session)
+        db.commit()
+        db.refresh(session)
+        return session
+
+    @staticmethod
+    def revoke_session(db, token: str):
+        from app.models.token import SessionToken
+        from datetime import datetime
+        
+        # Find session by access or refresh token
+        session = db.query(SessionToken).filter(
+            (SessionToken.access_token == token) | (SessionToken.refresh_token == token)
+        ).first()
+        
+        if session:
+            session.is_revoked = True
+            session.revoked_at = datetime.utcnow()
+            session.is_active = False
+            db.add(session)
+            db.commit()
+            return True
+        return False
+
+    @staticmethod
+    def validate_session(db, token: str, is_refresh: bool = False):
+        from app.models.token import SessionToken
+        from datetime import datetime
+        
+        query = db.query(SessionToken).filter(
+            SessionToken.is_revoked == False,
+            SessionToken.is_active == True,
+            SessionToken.expires_at > datetime.utcnow()
+        )
+        
+        if is_refresh:
+            session = query.filter(SessionToken.refresh_token == token).first()
+        else:
+            session = query.filter(SessionToken.access_token == token).first()
+            
+        if session:
+            # Update last activity
+            session.last_activity_at = datetime.utcnow()
+            db.add(session)
+            db.commit()
+            return session
+        return None

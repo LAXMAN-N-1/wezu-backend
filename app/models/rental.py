@@ -15,7 +15,21 @@ class Rental(SQLModel, table=True):
     start_time: datetime = Field(default_factory=datetime.utcnow)
     end_time: Optional[datetime] = None
     
+    # Cost Breakdown
+    rental_duration_days: int = Field(default=1)
+    daily_rate: float = Field(default=0.0)
+    damage_deposit: float = Field(default=0.0)
+    discount_amount: float = Field(default=0.0)
+    promo_code_id: Optional[int] = Field(default=None, foreign_key="promo_codes.id")
+    
     total_price: float = Field(default=0.0)
+    late_fee_amount: float = Field(default=0.0)
+    late_fee_applicable: bool = Field(default=False)
+    
+    # Verification & Flow
+    terms_accepted_at: Optional[datetime] = None
+    pickup_verified: bool = Field(default=False)
+    return_verified: bool = Field(default=False)
     
     # Relationships
     user: "User" = Relationship()

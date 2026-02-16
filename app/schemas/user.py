@@ -94,7 +94,6 @@ class DeviceResponse(DeviceCreate):
     is_active: bool
     last_active_at: datetime
 
-
 # Enhanced User Profile Response
 class StaffAssignmentInfo(BaseModel):
     """Staff assignment details for profile"""
@@ -105,8 +104,6 @@ class StaffAssignmentInfo(BaseModel):
     is_active: bool = False
 
     model_config = ConfigDict(from_attributes=True)
-
-
 
 class MenuItem(BaseModel):
     """Menu item for role"""
@@ -122,12 +119,8 @@ class MenuItem(BaseModel):
 class MenuConfigResponse(BaseModel):
     menu: List[MenuItem]
 
-
 class FeatureFlagsResponse(BaseModel):
     features: Dict[str, bool]
-
-
-
 
 class UserProfileResponse(BaseModel):
     """Complete user profile with all details"""
@@ -211,3 +204,13 @@ class KYCStatusDetailsResponse(BaseModel):
     documents: List[KYCDocumentResponse]
     next_steps: str
 
+class Token(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    user: Optional[UserResponse] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class TokenPayload(BaseModel):
+    sub: Optional[str] = None

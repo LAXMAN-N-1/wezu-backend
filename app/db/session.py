@@ -16,22 +16,18 @@ def init_db():
     
     # TimescaleDB initialization
     with Session(engine) as session:
-        # 1. Enable extension - TimescaleDB (Optional/Disabled for Dev without it)
+        # TimescaleDB initialization (Creating extension requires system install)
         # try:
         #     session.execute(text("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"))
-        # except Exception as e:
-        #     print(f"TimescaleDB extension skipped: {e}")
-        
-        # 2. Create hypertable for telematics if it doesn't exist
-        # We use a try-except block or check if it's already a hypertable
-        # try:
+        #     
+        #     # Create hypertable for telematics if it doesn't exist
         #     session.execute(text(
         #         "SELECT create_hypertable('telemetics_data', 'timestamp', if_not_exists => TRUE, migrate_data => TRUE);"
         #     ))
         #     session.commit()
         #     print("TimescaleDB hypertable 'telemetics_data' ensured.")
         # except Exception as e:
-        #     print(f"Hypertable creation info/error: {e}")
+        #     print(f"Hypertable creation info/error: {e} (TimescaleDB might not be installed, skipping)")
         #     session.rollback()
             
         # 3. Seed Initial Data (Roles)

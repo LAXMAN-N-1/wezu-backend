@@ -15,6 +15,7 @@ from app.api.v1 import (
     support_enhanced, rentals_enhanced, purchases_enhanced, analytics_enhanced,
     roles, menus, role_rights
 )
+from app.api.admin import router as admin_router
 from app.api.webhooks import razorpay as razorpay_webhook
 from app.middleware.rate_limit import limiter
 from slowapi import _rate_limit_exceeded_handler
@@ -144,6 +145,8 @@ app.include_router(admin_users.router, prefix=f"{settings.API_V1_STR}/admin/user
 # Audit Logs
 from app.api.v1 import audit
 app.include_router(audit.router, prefix=f"{settings.API_V1_STR}/audit", tags=["Audit Logs"])
+
+app.include_router(admin_router, prefix=f"{settings.API_V1_STR}/admin/main", tags=["Admin Comprehensive"])
 
 
 # Webhooks

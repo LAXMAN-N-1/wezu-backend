@@ -13,7 +13,10 @@ class StationBase(BaseModel):
     longitude: float
     status: str = "active"
     contact_phone: Optional[str] = None
+    contact_email: Optional[str] = None
     opening_hours: Optional[str] = None
+    is_24x7: bool = False
+    amenities: Optional[str] = None
 
 class StationCreate(StationBase):
     pass

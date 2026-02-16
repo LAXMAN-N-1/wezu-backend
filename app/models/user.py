@@ -86,6 +86,7 @@ class User(SQLModel, table=True):
     wallet: Optional["Wallet"] = Relationship(back_populates="user")
     addresses: List["Address"] = Relationship(back_populates="user")
     kyc_documents: List["KYCDocument"] = Relationship(back_populates="user")
+    kyc_records: List["KYCRecord"] = Relationship(back_populates="user", sa_relationship_kwargs={"foreign_keys": "[KYCRecord.user_id]"})
     devices: List["Device"] = Relationship(back_populates="user")
     vehicles: List["Vehicle"] = Relationship(back_populates="user")
     dealer_profile: Optional["DealerProfile"] = Relationship(back_populates="user")
@@ -98,19 +99,11 @@ class User(SQLModel, table=True):
     # RBAC
     roles: List["Role"] = Relationship(back_populates="users", link_model=UserRole)
     
-    # Sessions
+    # Sessions & Security
     sessions: List["UserSession"] = Relationship(back_populates="user")
-
-    # Access Paths
     access_paths: List["UserAccessPath"] = Relationship(back_populates="user")
+    two_factor_auth: Optional["TwoFactorAuth"] = Relationship(back_populates="user")
+    # session_tokens: List["SessionToken"] = Relationship(back_populates="user") # Optional alias
 
-# OTP class removed (moved to app/models/otp.py)
+# Token class moved to app/schemas/user.py
 
-class Token(SQLModel):
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-    user: Optional[User] = None
-
-class TokenPayload(SQLModel):
-    sub: Optional[str] = None

@@ -58,3 +58,13 @@ class FraudService:
         db.commit()
         db.refresh(entry)
         return entry
+
+    @staticmethod
+    def calculate_risk_score(user_id: int) -> int:
+        """
+        Calculate fraud risk score for a user.
+        0-100 scale, where 100 is confirmed fraud.
+        Placeholder implementation.
+        """
+        logger.info(f"Calculating risk score for user {user_id} (Placeholder)")
+        return 0

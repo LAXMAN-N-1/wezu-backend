@@ -11,6 +11,7 @@ class PromoCode(SQLModel, table=True):
     discount_percentage: float = Field(default=0.0) # % discount
     max_discount_amount: Optional[float] = None
     min_order_amount: float = Field(default=0.0)
+    min_rental_days: int = Field(default=0)
     
     is_active: bool = Field(default=True)
     valid_from: datetime = Field(default_factory=datetime.utcnow)

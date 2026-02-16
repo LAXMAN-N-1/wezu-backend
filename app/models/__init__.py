@@ -67,3 +67,10 @@ from app.models.driver_profile import DriverProfile
 from app.models.delivery_assignment import DeliveryAssignment
 from app.models.oauth import BlacklistedToken
 from app.models.commission import CommissionConfig, CommissionLog
+from app.models.two_factor_auth import TwoFactorAuth
+
+# Missing models identified by validation script
+from app.models.analytics import *
+from app.models.biometric import *
+from app.models.system import *
+from app.models.token import *

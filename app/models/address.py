@@ -9,7 +9,9 @@ class Address(SQLModel, table=True):
     __tablename__ = "addresses"
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id")
-    street_address: str
+    address_line1: str
+    address_line2: Optional[str] = None
+    street_address: Optional[str] = None # Deprecated, kept for backward compatibility if needed, else remove
     city: str
     state: str
     postal_code: str

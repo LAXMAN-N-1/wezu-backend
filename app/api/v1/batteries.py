@@ -1,6 +1,7 @@
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
+from pydantic import BaseModel
 from app.db.session import get_session
 from app.models.battery import Battery, BatteryLifecycleEvent
 from app.schemas.battery import (
@@ -9,6 +10,23 @@ from app.schemas.battery import (
 )
 
 router = APIRouter()
+
+class QRCodeRequest(BaseModel):
+    qr_code_data: str
+
+@router.post("/scan-qr", response_model=BatteryDetailResponse)
+def scan_battery_qr(
+    *,
+    session: Session = Depends(get_session),
+    qr_in: QRCodeRequest,
+) -> Any:
+    """
+    Scan QR code to get battery details.
+    """
+    battery = session.exec(select(Battery).where(Battery.qr_code_data == qr_in.qr_code_data)).first()
+    if not battery:
+        raise HTTPException(status_code=404, detail="Battery not found")
+    return battery
 
 @router.get("/", response_model=List[BatteryResponse])
 def read_batteries(

@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
 from app.db.session import get_session
-from app.models.user import User, Token
+from app.models.user import User
+from app.schemas.user import Token
 from app.models.session import UserSession
 from app.models.otp import OTP
 from app.services.auth_service import AuthService
@@ -10,6 +11,7 @@ from app.services.otp_service import OTPService
 from app.services.fraud_service import FraudService
 from app.services.token_service import TokenService
 from app.core.security import create_access_token, create_refresh_token, get_password_hash, verify_password
+from app.schemas.user import TokenPayload
 from app.core.config import settings
 from app.api import deps
 from pydantic import BaseModel, EmailStr, Field
@@ -24,10 +26,10 @@ logger = logging.getLogger("wezu_auth")
 logging.basicConfig(level=logging.INFO)
 
 class UserCreate(BaseModel):
-    email: EmailStr
+    email: Optional[EmailStr] = None
     password: str
     full_name: str
-    phone_number: str
+    phone_number: Optional[str] = None
 
 @router.post("/register", response_model=User)
 async def register(
@@ -35,14 +37,29 @@ async def register(
     db: Session = Depends(get_session)
 ):
     """
-    Register a new user with email and password.
+    Register a new user with email or phone and password.
     """
-    user = db.exec(select(User).where(User.email == user_in.email)).first()
-    if user:
+    if not user_in.email and not user_in.phone_number:
         raise HTTPException(
             status_code=400,
-            detail="The user with this email already exists in the system",
+            detail="Either email or phone number must be provided",
         )
+
+    if user_in.email:
+        user = db.exec(select(User).where(User.email == user_in.email)).first()
+        if user:
+            raise HTTPException(
+                status_code=400,
+                detail="The user with this email already exists in the system",
+            )
+            
+    if user_in.phone_number:
+         user = db.exec(select(User).where(User.phone_number == user_in.phone_number)).first()
+         if user:
+            raise HTTPException(
+                status_code=400,
+                detail="The user with this phone number already exists in the system",
+            )
     
     user = User(
         email=user_in.email,
@@ -126,15 +143,18 @@ async def login_access_token(
         resource_type="user",
         resource_id=str(user.id),
         details="User logged in via OAuth2 form",
-        ip_address=None # Request object not available in this dependency context easily without change
+        ip_address=None 
     )
 
+    # Create Session
+    AuthService.create_session(db, user.id, access_token, refresh_token, device_info="Unknown", ip_address=None)
     return Token(
         access_token=access_token,
         token_type="bearer",
         refresh_token=refresh_token,
         user=user # Helper: include user info
     )
+
 
 class GoogleAuthRequest(BaseModel):
     token: str
@@ -267,7 +287,6 @@ async def verify_registration_otp(
     access_token = create_access_token(subject=user.id)
     refresh_token = create_refresh_token(subject=user.id)
     
-    
     # Create Session
     try:
         # Extract JWT ID (jti) from refresh token
@@ -276,17 +295,20 @@ async def verify_registration_otp(
             token_jti = payload.get("jti")
         except:
             import uuid
-            token_jti = str(uuid.uuid4()) # Fallback if no jti in token logic yet
+            token_jti = str(uuid.uuid4()) # Fallback
             
         user_agent = request.headers.get("user-agent", "unknown")
         ip_address = request.client.host if request.client else "unknown"
-        # X-Forwarded-For if behind proxy
         forwarded = request.headers.get("x-forwarded-for")
         if forwarded:
             ip_address = forwarded.split(",")[0]
             
         device_type = "mobile" if "mobile" in user_agent.lower() else "web"
         
+        # Legacy session creation (if still needed by some parts of the system)
+        AuthService.create_session(db, user.id, access_token, refresh_token, device_info=device_type, ip_address=ip_address)
+        
+        # Newer UserSession model
         session = UserSession(
             user_id=user.id,
             token_id=token_jti,
@@ -299,7 +321,6 @@ async def verify_registration_otp(
         db.commit()
     except Exception as e:
         logger.error(f"Failed to create session: {e}")
-        
     return Token(access_token=access_token, refresh_token=refresh_token, user=user)
 
 
@@ -457,6 +478,9 @@ async def social_login(
     access_token = create_access_token(subject=user.id)
     refresh_token = create_refresh_token(subject=user.id)
     
+    # Create Session
+    AuthService.create_session(db, user.id, access_token, refresh_token, device_info=f"OAuth {auth_data.provider.capitalize()}", ip_address=None)
+
     permissions = AuthService.get_permissions_for_role(selected_role_name)
     menu_data = AuthService.get_menu_for_role(selected_role_name)
     
@@ -556,6 +580,9 @@ async def login_with_password(
     # Create Dual Tokens
     access_token = create_access_token(subject=user.id)
     refresh_token = create_refresh_token(subject=user.id)
+    # Create Session
+    AuthService.create_session(db, user.id, access_token, refresh_token, device_info="Mobile", ip_address=None)
+
     return Token(access_token=access_token, refresh_token=refresh_token, user=user)
 
 class RefreshRequest(BaseModel):
@@ -567,6 +594,11 @@ async def refresh_token(
     db: Session = Depends(get_session)
 ):
     try:
+        # Validate Session first
+        session = AuthService.validate_session(db, refresh_data.refresh_token, is_refresh=True)
+        if not session:
+             raise HTTPException(status_code=401, detail="Session expired or invalid")
+             
         payload = jwt.decode(
             refresh_data.refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
@@ -578,18 +610,33 @@ async def refresh_token(
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
-        access_token = create_access_token(subject=user.id)
-        refresh_token = create_refresh_token(subject=user.id)
+        new_access_token = create_access_token(subject=user.id)
+        # We can rotate refresh token too, or keep it. Let's rotate.
+        new_refresh_token = create_refresh_token(subject=user.id)
         
-        # Blacklist the old refresh token so it can't be reused
-        TokenService.blacklist_token(db, refresh_data.refresh_token)
+        # Revoke old session and create new one (Session Rotation)
+        AuthService.revoke_session(db, refresh_data.refresh_token)
+        AuthService.create_session(db, user.id, new_access_token, new_refresh_token, device_info=session.device_type, ip_address=session.ip_address)
         
-        return Token(access_token=access_token, refresh_token=refresh_token)
+        return Token(access_token=new_access_token, refresh_token=new_refresh_token)
     except JWTError:
         raise HTTPException(status_code=401, detail="Could not validate credentials")
     except Exception as e:
         logger.error(f"Refresh error: {str(e)}")
         raise HTTPException(status_code=401, detail="Could not validate credentials")
+
+@router.post("/logout")
+async def logout(
+    current_user: User = Depends(deps.get_current_user),
+    token: str = Depends(deps.oauth2_scheme),
+    db: Session = Depends(get_session)
+):
+    """Logout user - invalidate tokens"""
+    # New way: Revoke Session
+    AuthService.revoke_session(db, token)
+    
+    logger.info(f"User {current_user.id} logged out and session revoked")
+    return {"message": "Logged out successfully"}
 
 
 from app.schemas.auth import LoginRequest, LoginResponse, MenuConfig, RoleSelectRequest
