@@ -5,35 +5,33 @@ from typing import List
 
 class GeofenceService:
     @staticmethod
-    def check_boundary(db: Session, lat: float, lon: float) -> bool:
+    def check_boundary(db: Session, lat: float, lon: float) -> tuple[bool, str]:
         """
         Check if location is inside any active geofence.
-        Returns True if inside allowed zones (or if no zones defined), False if outside.
-        Logic can be inverted based on business requirement (Allowed Zones vs Restricted Zones).
-        Assuming Allowed Zones (Service Areas).
+        Returns (True, "OK") if valid, (False, "Violation Message") if invalid.
         """
         geofences = db.exec(select(Geofence).where(Geofence.is_active == True)).all()
         if not geofences:
-            return True 
+            return True, "OK"
 
         # 1. Check Restricted Zones (Must be outside ALL)
         restricted = [g for g in geofences if g.type == "restricted_zone"]
         for fence in restricted:
             distance_km = MapsService.haversine(lon, lat, fence.longitude, fence.latitude)
             if (distance_km * 1000) <= fence.radius_meters:
-                return False # Inside Restricted Zone -> Violation
+                return False, f"Entered Restricted Zone: {fence.name}"
 
-        # 2. Check Safe Zones (Must be inside AT LEAST ONE)
+        # 2. Check Safe Zones (Must be inside AT LEAST ONE if any safe zones exist)
         safe = [g for g in geofences if g.type == "safe_zone"]
         if not safe:
-            return True # No safe zones defined, assume everywhere is safe (except restricted)
+            return True, "OK"
 
         for fence in safe:
             distance_km = MapsService.haversine(lon, lat, fence.longitude, fence.latitude)
             if (distance_km * 1000) <= fence.radius_meters:
-                return True # Inside Safe Zone
+                return True, "OK"
 
-        return False # Outside all Safe Zones
+        return False, "Exited Safe Operational Zones"
 
     @staticmethod
     def create_geofence(db: Session, name: str, lat: float, lon: float, radius: float) -> Geofence:

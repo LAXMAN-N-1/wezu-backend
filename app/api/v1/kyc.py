@@ -86,14 +86,16 @@ async def verify_aadhaar(
     db: Session = Depends(get_session)
 ):
     """
-    Verify Aadhaar Number (Mock Integration)
-    In real world: Call API (e.g. Karza/Signzy), verify OTP sent to mobile linked to Aadhaar
+    Verify Aadhaar Number using KYCService.
     """
-    # Mock Validation
-    if len(aadhaar_number) != 12 or not aadhaar_number.isdigit():
-        raise HTTPException(status_code=400, detail="Invalid Aadhaar Number format")
+    from app.services.kyc_service import kyc_service
+    
+    # 1. Verification via service
+    result = await kyc_service.verify_aadhaar(db, current_user, aadhaar_number)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail="Aadhaar verification failed")
         
-    # Store Encrypted (Mock encryption)
+    # 2. Store Encrypted (Mock encryption)
     encrypted_val = f"ENC_{aadhaar_number}"
     
     record = db.exec(select(KYCRecord).where(KYCRecord.user_id == current_user.id)).first()
@@ -101,10 +103,11 @@ async def verify_aadhaar(
         record = KYCRecord(user_id=current_user.id)
     
     record.aadhaar_number_enc = encrypted_val
+    record.status = result["status"]
     db.add(record)
     db.commit()
     
-    return {"status": "verified", "message": "Aadhaar verified successfully"}
+    return {"status": result["status"], "message": "Aadhaar verified successfully"}
 
 @router.post("/pan-verify")
 async def verify_pan(
@@ -113,11 +116,14 @@ async def verify_pan(
     db: Session = Depends(get_session)
 ):
     """
-    Verify PAN Number (Mock Integration)
+    Verify PAN Number using KYCService.
     """
-    # Mock Validation
-    if len(pan_number) != 10:
-        raise HTTPException(status_code=400, detail="Invalid PAN Number format")
+    from app.services.kyc_service import kyc_service
+    
+    # 1. Verification via service
+    result = await kyc_service.verify_pan(db, current_user, pan_number)
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail="PAN verification failed")
         
     encrypted_val = f"ENC_{pan_number}"
     
@@ -126,10 +132,11 @@ async def verify_pan(
         record = KYCRecord(user_id=current_user.id)
     
     record.pan_number_enc = encrypted_val
+    record.status = result["status"]
     db.add(record)
     db.commit()
     
-    return {"status": "verified", "message": "PAN verified successfully"}
+    return {"status": result["status"], "message": "PAN verified successfully"}
 
 @router.post("/video-kyc")
 async def upload_video_kyc(

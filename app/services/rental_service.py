@@ -85,19 +85,40 @@ class RentalService:
         return rental
 
     @staticmethod
-    def confirm_rental(db: Session, rental_id: int, payment_ref: str) -> Rental:
+    def confirm_rental(db: Session, user_id: int, rental_id: int, payment_ref: str) -> Rental:
         rental = db.get(Rental, rental_id)
         if not rental or rental.status != "pending_payment":
             raise HTTPException(status_code=400, detail="Invalid rental state")
             
+        if rental.user_id != user_id:
+             raise HTTPException(status_code=403, detail="Not authorized")
+
+        # 1. Deduct from Wallet
+        from app.services.wallet_service import WalletService
+        from app.services.commission_service import CommissionService
+        try:
+            txn = WalletService.deduct_balance(
+                db, 
+                user_id, 
+                rental.total_price, 
+                f"Rental Payment for Battery {rental.battery_id}"
+            )
+            # 1.1 Calculate and Log Commissions
+            CommissionService.calculate_and_log(db, txn)
+        except HTTPException as e:
+            # Re-raise insufficient funds or other wallet errors
+            raise e
+            
+        # 2. Update Rental Status
         rental.status = "active"
         rental.payment_transaction_id = payment_ref
         rental.terms_accepted_at = datetime.utcnow()
         
-        # Update Battery status
+        # 3. Update Battery status
         battery = db.get(Battery, rental.battery_id)
         if battery:
             battery.status = "rented"
+            battery.current_user_id = user_id
             db.add(battery)
         
         db.add(rental)
@@ -139,8 +160,15 @@ class RentalService:
         if not rental or rental.status != "active":
              raise HTTPException(status_code=400, detail="Invalid rental")
              
+        from app.services.late_fee_service import LateFeeService
+        fee_details = LateFeeService.calculate_late_fee(rental_id, db)
+        
+        if fee_details.get("late_fee", 0) > 0:
+            LateFeeService.apply_late_fee(rental_id, db)
+            
         rental.status = "completed"
         rental.drop_station_id = station_id
+        rental.actual_end_time = datetime.utcnow()
         
         battery = db.get(Battery, rental.battery_id)
         if battery:
@@ -154,10 +182,11 @@ class RentalService:
             event_type="stop",
             station_id=station_id,
             battery_id=rental.battery_id,
-            description="Rental completed"
+            description=f"Rental completed. Late fee: ₹{fee_details.get('late_fee', 0)}"
         )
         db.add(event)
         
         db.commit()
         db.refresh(rental)
         return rental
+

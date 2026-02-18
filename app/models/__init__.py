@@ -11,12 +11,15 @@ from app.models.iot import IoTDevice
 
 # Operations
 from app.models.rental import Rental, RentalStatus
+# from app.models.swap import SwapRequest, SwapHistory
 from app.models.swap import Swap
 from app.models.telemetry import Telemetry
 from app.models.logistics import DeliveryOrder, DeliveryType, DeliveryStatus
 
 # Financial
 from app.models.financial import Transaction, Wallet, TransactionType, TransactionStatus
+from app.models.payment import PaymentTransaction
+from app.models.ecommerce import EcommerceProduct, EcommerceOrder, EcommerceOrderItem
 
 # Support & KYC
 from app.models.support import SupportTicket, TicketStatus, TicketPriority
@@ -34,7 +37,7 @@ from app.models.audit_log import AuditLog, SecurityEvent
 from app.models.admin_user import AdminUser
 from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
 from app.models.driver_profile import DriverProfile
-from app.models.logistics import DeliveryAssignment
+from app.models.delivery_assignment import DeliveryAssignment
 from app.models.staff import StaffProfile
 from app.models.vendor import Vendor
 from app.models.device import Device
@@ -42,9 +45,9 @@ from app.models.role_right import RoleRight
 from app.models.menu import Menu
 
 # Teammate Operations & IoT
-from app.models.commission import Commission, Settlement
-from app.models.iot import DeviceCommand, FirmwareUpdate
-from app.models.swap import SwapRequest, SwapHistory
+from app.models.commission import Commission
+from app.models.settlement import Settlement
+from app.models.iot import DeviceCommand, FirmwareUpdate, Telemetry as IOTTelemetry
 from app.models.fraud import RiskScore, FraudCheckLog, Blacklist
 from app.models.maintenance import MaintenanceSchedule, MaintenanceRecord, StationDowntime
 from app.models.i18n import Translation

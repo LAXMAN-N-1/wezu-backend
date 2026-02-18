@@ -22,7 +22,7 @@ scheduler = BackgroundScheduler(
 
 def register_jobs():
     """Register all scheduled jobs"""
-    from app.workers import daily_jobs, hourly_jobs, monthly_jobs
+    from app.workers import daily_jobs, hourly_jobs, monthly_jobs, rental_worker
     
     logger.info("Registering scheduled jobs...")
     
@@ -89,6 +89,14 @@ def register_jobs():
         IntervalTrigger(hours=1),
         id='hourly_stock_alerts',
         name='Hourly Low Stock Alerts',
+        replace_existing=True
+    )
+    
+    scheduler.add_job(
+        rental_worker.process_overdue_rentals,
+        IntervalTrigger(hours=1),
+        id='hourly_rental_overdue_check',
+        name='Hourly Rental Overdue Check',
         replace_existing=True
     )
     

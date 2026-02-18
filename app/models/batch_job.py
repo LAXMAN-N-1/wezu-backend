@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 class BatchJob(SQLModel, table=True):
     __tablename__ = "batch_jobs"
+    __table_args__ = {"schema": "core"}
     """Background job definitions and tracking"""
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -39,9 +40,10 @@ class BatchJob(SQLModel, table=True):
 
 class JobExecution(SQLModel, table=True):
     __tablename__ = "job_executions"
+    __table_args__ = {"schema": "core"}
     """Individual job run history"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    job_id: int = Field(foreign_key="batch_jobs.id", index=True)
+    job_id: int = Field(foreign_key="core.batch_jobs.id", index=True)
     
     execution_id: str = Field(unique=True, index=True)  # UUID for tracking
     
@@ -49,7 +51,7 @@ class JobExecution(SQLModel, table=True):
     # PENDING, RUNNING, COMPLETED, FAILED, TIMEOUT, CANCELLED, RETRYING
     
     trigger_type: str  # SCHEDULED, MANUAL, API, EVENT
-    triggered_by: Optional[int] = Field(default=None, foreign_key="users.id")
+    triggered_by: Optional[int] = Field(default=None, foreign_key="core.users.id")
     
     # Execution details
     started_at: Optional[datetime] = None
@@ -71,7 +73,7 @@ class JobExecution(SQLModel, table=True):
     
     # Retry tracking
     retry_count: int = Field(default=0)
-    parent_execution_id: Optional[int] = Field(default=None, foreign_key="job_executions.id")
+    parent_execution_id: Optional[int] = Field(default=None, foreign_key="core.job_executions.id")
     
     # Resource usage
     memory_usage_mb: Optional[float] = None

@@ -11,9 +11,11 @@ from sqlmodel import Session
 from app.core.config import settings
 from app.core.database import engine
 from app.models.battery import Battery
-from app.models.battery_health_log import BatteryHealthLog
+from app.models.telemetry import Telemetry
 from app.services.telematics_service import TelematicsService
+from app.services.websocket_service import manager
 import redis
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -90,16 +92,26 @@ class MQTTService:
     def publish(self, topic: str, payload: dict):
         """
         Publish message to MQTT topic
-        
-        Args:
-            topic: MQTT topic
-            payload: Message payload (dict)
         """
         if not self.client:
             raise Exception("MQTT client not connected")
         
         message = json.dumps(payload)
         self.client.publish(topic, message, qos=1)
+
+    def send_command(self, device_id: str, command_type: str, params: Optional[dict] = None):
+        """
+        Send command to IoT device
+        Topic: wezu/batteries/{device_id}/commands
+        """
+        topic = f"{settings.MQTT_TOPIC_PREFIX}/{device_id}/commands"
+        payload = {
+            "command": command_type,
+            "params": params or {},
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        self.publish(topic, payload)
+        logger.info(f"Command {command_type} sent to device {device_id}")
     
     def _on_connect(self, client, userdata, flags, rc):
         """Callback when connected to broker"""
@@ -178,6 +190,18 @@ class MQTTService:
             # Check for alerts
             self._check_alerts(battery_id, data)
             
+            # 3. Broadcast to WebSockets
+            try:
+                # MQTT usually runs in its own background thread, so we schedule the coroutine in the main loop
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.run_coroutine_threadsafe(
+                        manager.broadcast_battery_update(int(battery_id) if battery_id.isdigit() else 0, data),
+                        loop
+                    )
+            except Exception as e:
+                logger.error(f"Failed to broadcast WS update: {str(e)}")
+            
             logger.debug(f"Processed telemetry for battery {battery_id}")
             
         except Exception as e:
@@ -223,6 +247,18 @@ class MQTTService:
             self.redis_client.lpush(redis_key, *[json.dumps(alert) for alert in alerts])
             self.redis_client.expire(redis_key, 86400)  # 24 hours
             
+            # Broadcast alerts via WebSocket
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    for alert in alerts:
+                        asyncio.run_coroutine_threadsafe(
+                            manager.broadcast_alert(int(battery_id) if battery_id.isdigit() else 0, alert),
+                            loop
+                        )
+            except Exception as e:
+                logger.error(f"Failed to broadcast WS alert: {str(e)}")
+
             logger.warning(f"Alerts generated for battery {battery_id}: {len(alerts)}")
     
     def get_realtime_data(self, battery_id: int) -> Optional[dict]:

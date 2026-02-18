@@ -7,9 +7,10 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 class DeliveryRoute(SQLModel, table=True):
     __tablename__ = "delivery_routes"
+    __table_args__ = {"schema": "logistics"}
     """Optimized delivery routes for drivers"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    driver_id: int = Field(foreign_key="driver_profiles.id")
+    driver_id: int = Field(foreign_key="logistics.driver_profiles.id")
     
     route_name: str  # e.g., "North Delhi Route - 2024-12-22"
     status: str = Field(default="PLANNED")  # PLANNED, IN_PROGRESS, COMPLETED, CANCELLED
@@ -35,10 +36,11 @@ class DeliveryRoute(SQLModel, table=True):
 
 class RouteStop(SQLModel, table=True):
     __tablename__ = "route_stops"
+    __table_args__ = {"schema": "logistics"}
     """Individual stops in a delivery route"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    route_id: int = Field(foreign_key="delivery_routes.id")
-    delivery_assignment_id: int = Field(foreign_key="delivery_assignments.id")
+    route_id: int = Field(foreign_key="logistics.delivery_routes.id")
+    delivery_assignment_id: int = Field(foreign_key="logistics.delivery_assignments.id")
     
     stop_sequence: int  # Order in the route (1, 2, 3...)
     stop_type: str = Field(default="DELIVERY")  # PICKUP, DELIVERY, RETURN

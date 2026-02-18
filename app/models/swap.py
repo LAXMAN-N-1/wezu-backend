@@ -11,15 +11,16 @@ if TYPE_CHECKING:
 
 class Swap(SQLModel, table=True):
     __tablename__ = "swaps"
+    __table_args__ = {"schema": "rentals"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    rental_id: int = Field(foreign_key="rentals.id", index=True)
-    user_id: int = Field(foreign_key="users.id", index=True)
-    station_id: int = Field(foreign_key="stations.id", index=True)
+    rental_id: int = Field(foreign_key="rentals.rentals.id", index=True)
+    user_id: int = Field(foreign_key="core.users.id", index=True)
+    station_id: int = Field(foreign_key="stations.stations.id", index=True)
     
     # Battery Details
-    old_battery_id: int = Field(foreign_key="batteries.id")
-    new_battery_id: int = Field(foreign_key="batteries.id")
+    old_battery_id: int = Field(foreign_key="inventory.batteries.id")
+    new_battery_id: int = Field(foreign_key="inventory.batteries.id")
     
     # Metrics
     old_battery_charge: float = Field(default=0.0)

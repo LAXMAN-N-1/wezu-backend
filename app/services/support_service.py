@@ -1,4 +1,4 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 from app.models.support import SupportTicket, TicketMessage
 from app.models.user import User
 from typing import List, Optional
@@ -27,7 +27,60 @@ class SupportService:
         return None
 
     @staticmethod
+    def assign_ticket_to_agent(db: Session, ticket_id: int) -> Optional[int]:
+        """
+        Assign a ticket to an available support agent with the lowest workload.
+        (Round-Robin / Load Balancing logic)
+        """
+        from app.models.rbac import Role, UserRole
+        from app.models.user import User
+        from sqlalchemy import func
+        
+        # 1. Find all users with 'support' role
+        support_role = db.exec(select(Role).where(Role.name == "Support")).first()
+        if not support_role:
+            return None
+            
+        support_agents = db.exec(
+            select(User)
+            .join(UserRole, UserRole.user_id == User.id)
+            .where(UserRole.role_id == support_role.id)
+        ).all()
+        
+        if not support_agents:
+            return None
+            
+        # 2. Count active tickets per agent
+        # We'll pick the agent with the least 'OPEN' or 'IN_PROGRESS' tickets
+        agent_workloads = []
+        for agent in support_agents:
+            open_count = db.exec(
+                select(func.count(SupportTicket.id))
+                .where(
+                    SupportTicket.assigned_to_id == agent.id,
+                    SupportTicket.status.in_(["OPEN", "IN_PROGRESS"])
+                )
+            ).one() or 0
+            agent_workloads.append((agent.id, open_count))
+            
+        # 3. Sort by workload and pick best agent
+        agent_workloads.sort(key=lambda x: x[1])
+        best_agent_id = agent_workloads[0][0]
+        
+        # 4. Update ticket
+        ticket = db.get(SupportTicket, ticket_id)
+        if ticket:
+            ticket.assigned_to_id = best_agent_id
+            ticket.status = "IN_PROGRESS"
+            db.add(ticket)
+            db.commit()
+            return best_agent_id
+            
+        return None
+
+    @staticmethod
     def handle_new_ticket_message(db: Session, ticket_id: int, sender_id: int, message_text: str):
+        # ... logic ...
         """
         Add a message to a ticket and check for automated response.
         """

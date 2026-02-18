@@ -5,9 +5,10 @@ from app.models.vendor import Vendor
 
 class Settlement(SQLModel, table=True):
     __tablename__ = "settlements"
+    __table_args__ = {"schema": "finance"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id")
-    dealer_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    vendor_id: Optional[int] = Field(default=None, foreign_key="finance.vendors.id")
+    dealer_id: Optional[int] = Field(default=None, foreign_key="core.users.id")
     
     # Period
     start_date: datetime

@@ -95,11 +95,50 @@ class LogisticsService:
             return delivery
 
     @staticmethod
+    def create_manifest(db: Session, driver_id: int, vehicle_id: Optional[str] = None) -> Manifest:
+        manifest = Manifest(
+            driver_id=driver_id,
+            vehicle_id=vehicle_id,
+            status="draft"
+        )
+        db.add(manifest)
+        db.commit()
+        db.refresh(manifest)
+        return manifest
+
+    @staticmethod
+    def add_transfer_to_manifest(db: Session, manifest_id: int, transfer_id: int):
+        manifest = db.get(Manifest, manifest_id)
+        transfer = db.get(BatteryTransfer, transfer_id)
+        if manifest and transfer:
+            transfer.manifest_id = manifest_id
+            transfer.status = "assigned"
+            db.add(transfer)
+            db.commit()
+            db.refresh(transfer)
+        return transfer
+
+    @staticmethod
+    def start_manifest_trip(db: Session, manifest_id: int):
+        manifest = db.get(Manifest, manifest_id)
+        if manifest:
+            manifest.status = "active"
+            db.add(manifest)
+            # Update all associated transfers
+            for transfer in manifest.transfers:
+                transfer.status = "in_transit"
+                db.add(transfer)
+            db.commit()
+            db.refresh(manifest)
+        return manifest
+
+    @staticmethod
     def check_and_trigger_restock(db: Session, station_id: int, threshold: int = 2):
         """
         Check if a station needs restocking and create a transfer request if so.
         """
         # Count 'ready' batteries at this station
+        from app.models.station import StationSlot
         statement = select(func.count(StationSlot.id)).where(
             StationSlot.station_id == station_id,
             StationSlot.status == "ready"
@@ -108,15 +147,15 @@ class LogisticsService:
         
         if ready_count < threshold:
             # Need restock. Find nearest warehouse with stock.
-            # (Simplified distance logic for now)
+            from app.models.warehouse import Warehouse
             warehouse = db.exec(select(Warehouse).where(Warehouse.is_active == True)).first()
             if not warehouse:
                 return None
             
             # Find a 'ready' battery in the warehouse
+            from app.models.battery import Battery
             battery = db.exec(select(Battery).where(
-                Battery.location_type == "warehouse",
-                Battery.location_id == warehouse.id,
+                Battery.warehouse_id == warehouse.id,
                 Battery.status == "ready"
             )).first()
             
@@ -131,12 +170,37 @@ class LogisticsService:
                 )
                 db.add(transfer)
                 
-                # Update battery status to 'in_transit' effectively
-                battery.status = "in_transit" 
+                # Update battery status to 'maintenance' which acts as a 'transfer_pending' state
+                battery.status = "maintenance" 
                 db.add(battery)
                 
                 db.commit()
                 db.refresh(transfer)
                 return transfer
         return None
+
+    @staticmethod
+    def bundle_transfers_into_manifest(db: Session, driver_id: int, transfer_ids: List[int]) -> Manifest:
+        """
+        Group multiple pending transfers into a single manifest for a driver.
+        """
+        from app.models.logistics import Manifest
+        manifest = Manifest(
+            driver_id=driver_id,
+            status="assigned"
+        )
+        db.add(manifest)
+        db.flush() # Get manifest.id
+        
+        for t_id in transfer_ids:
+            transfer = db.get(BatteryTransfer, t_id)
+            if transfer and transfer.status == "pending":
+                transfer.manifest_id = manifest.id
+                transfer.status = "assigned"
+                db.add(transfer)
+        
+        db.commit()
+        db.refresh(manifest)
+        return manifest
+
 

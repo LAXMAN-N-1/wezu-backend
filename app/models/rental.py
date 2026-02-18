@@ -19,15 +19,16 @@ class RentalStatus(str, Enum):
 
 class Rental(SQLModel, table=True):
     __tablename__ = "rentals"
+    __table_args__ = {"schema": "rentals"}
     id: Optional[int] = Field(default=None, primary_key=True)
     
     # Core References
-    user_id: int = Field(foreign_key="users.id", index=True)
-    battery_id: int = Field(foreign_key="batteries.id", index=True)
+    user_id: int = Field(foreign_key="core.users.id", index=True)
+    battery_id: int = Field(foreign_key="inventory.batteries.id", index=True)
     
     # Location
-    start_station_id: int = Field(foreign_key="stations.id")
-    end_station_id: Optional[int] = Field(default=None, foreign_key="stations.id")
+    start_station_id: int = Field(foreign_key="stations.stations.id")
+    end_station_id: Optional[int] = Field(default=None, foreign_key="stations.stations.id")
     
     # Timings
     start_time: datetime = Field(default_factory=datetime.utcnow)

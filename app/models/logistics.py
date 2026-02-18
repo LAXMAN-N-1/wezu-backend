@@ -1,5 +1,5 @@
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, List
 from datetime import datetime
 from enum import Enum
 import uuid
@@ -20,8 +20,52 @@ class DeliveryStatus(str, Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
 
+class BatteryTransfer(SQLModel, table=True):
+    __tablename__ = "battery_transfers"
+    __table_args__ = {"schema": "logistics"}
+    
+    id: Optional[int] = Field(default=None, primary_key=True)
+    battery_id: int = Field(foreign_key="inventory.batteries.id")
+    
+    from_location_type: str # warehouse, station, dealer
+    from_location_id: int
+    
+    to_location_type: str
+    to_location_id: int
+    
+    status: str = Field(default="pending") # pending, pick_up, in_transit, delivered, completed
+    manifest_id: Optional[int] = Field(default=None, foreign_key="logistics.manifests.id")
+    
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Relationship
+    manifest: Optional["Manifest"] = Relationship(back_populates="transfers")
+
+class Manifest(SQLModel, table=True):
+    __tablename__ = "manifests"
+    __table_args__ = {"schema": "logistics"}
+    
+    id: Optional[int] = Field(default=None, primary_key=True)
+    manifest_number: str = Field(default_factory=lambda: f"MAN-{uuid.uuid4().hex[:8].upper()}", index=True, unique=True)
+    
+    driver_id: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    vehicle_id: Optional[str] = None
+    
+    status: str = Field(default="draft") # draft, assigned, active, closed
+    
+    transfers: List[BatteryTransfer] = Relationship(back_populates="manifest")
+    
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+# Update Relationship for User
+if TYPE_CHECKING:
+    from app.models.user import User
+    
 class DeliveryOrder(SQLModel, table=True):
     __tablename__ = "delivery_orders"
+    __table_args__ = {"schema": "logistics"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -39,7 +83,7 @@ class DeliveryOrder(SQLModel, table=True):
     destination_lng: Optional[float] = None
     
     # Assignment
-    assigned_driver_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    assigned_driver_id: Optional[int] = Field(default=None, foreign_key="core.users.id")
     
     # Payload
     battery_ids_json: Optional[str] = None # List of battery IDs being moved
@@ -58,3 +102,4 @@ class DeliveryOrder(SQLModel, table=True):
 
     # Relationships
     driver: Optional["User"] = Relationship(back_populates="delivery_orders")
+

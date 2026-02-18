@@ -3,8 +3,10 @@ from typing import Optional
 from datetime import datetime
 
 class Notification(SQLModel, table=True):
+    __tablename__ = "notifications"
+    __table_args__ = {"schema": "core"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id")
+    user_id: int = Field(foreign_key="core.users.id")
     title: str
     message: str
     type: str = Field(default="info") # info, alert, promo

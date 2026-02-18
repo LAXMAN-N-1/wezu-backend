@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from app.models.staff import StaffProfile
     from app.models.rbac import Role, UserAccessPath
     from app.models.session import UserSession
-    from app.models.token import SessionToken
     from app.models.user_profile import UserProfile
     from app.models.finance.transaction import Transaction
     from app.models.rental import Rental
@@ -42,6 +41,7 @@ class KYCStatus(str, Enum):
 
 class User(SQLModel, table=True):
     __tablename__ = "users"
+    __table_args__ = {"schema": "core"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -55,7 +55,7 @@ class User(SQLModel, table=True):
     user_type: UserType = Field(default=UserType.CUSTOMER, index=True)
     status: UserStatus = Field(default=UserStatus.ACTIVE, index=True)
     is_superuser: bool = Field(default=False)
-    role_id: Optional[int] = Field(default=None, foreign_key="roles.id")
+    role_id: Optional[int] = Field(default=None, foreign_key="core.roles.id")
     
     # Profile & Media
     profile_picture: Optional[str] = None
@@ -107,3 +107,4 @@ class User(SQLModel, table=True):
     delivery_orders: List["DeliveryOrder"] = Relationship(back_populates="driver")
     
     access_paths: List["UserAccessPath"] = Relationship(back_populates="user")
+    sessions: List["UserSession"] = Relationship(back_populates="user")

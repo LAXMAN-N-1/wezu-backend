@@ -1,70 +1,66 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
-from typing import List, Optional
 from app.db.session import get_session
-from app.models.iot import IoTDevice, DeviceCommand
-from app.services.iot_service import IoTService
-from app.schemas.common import DataResponse
-from pydantic import BaseModel
+from app.models.battery import Battery
+from app.services.mqtt_service import mqtt_service
+from app.api.deps import get_current_active_user
+from app.models.user import User
 
 router = APIRouter()
 
-class DeviceCreate(BaseModel):
-    device_id: str
-    device_type: str
-    battery_id: Optional[int] = None
-
-class CommandRequest(BaseModel):
-    command: str
-    payload: dict = {}
-
-@router.post("/devices", response_model=DataResponse[IoTDevice])
-def register_device(device_in: DeviceCreate, session: Session = Depends(get_session)):
-    """Register a new IoT device."""
-    existing = session.exec(select(IoTDevice).where(IoTDevice.device_id == device_in.device_id)).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Device ID already registered")
+@router.post("/{battery_id}/lock")
+def lock_battery(
+    battery_id: int,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Send LOCK command to battery via IoT
+    """
+    battery = db.get(Battery, battery_id)
+    if not battery:
+        raise HTTPException(status_code=404, detail="Battery not found")
     
-    device = IoTService.register_device(device_in.device_id, device_in.device_type, device_in.battery_id)
-    return DataResponse(data=device, message="Device registered successfully")
-
-@router.get("/devices", response_model=DataResponse[List[IoTDevice]])
-def list_devices(
-    skip: int = 0, 
-    limit: int = 100, 
-    session: Session = Depends(get_session)
-):
-    devices = session.exec(select(IoTDevice).offset(skip).limit(limit)).all()
-    return DataResponse(data=devices)
-
-@router.post("/devices/{device_id}/command", response_model=DataResponse[DeviceCommand])
-def send_command(
-    device_id: str, 
-    cmd_in: CommandRequest, 
-    session: Session = Depends(get_session)
-):
-    """Send a command to the device."""
-    try:
-        cmd = IoTService.send_command(device_id, cmd_in.command, cmd_in.payload)
-        return DataResponse(data=cmd, message="Command sent")
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/devices/{device_id}/pair", response_model=DataResponse[IoTDevice])
-def pair_device(
-    device_id: str, 
-    battery_id: int, 
-    session: Session = Depends(get_session)
-):
-    """Pair a device with a battery."""
-    device = session.exec(select(IoTDevice).where(IoTDevice.device_id == device_id)).first()
-    if not device:
-        raise HTTPException(status_code=404, detail="Device not found")
+    if not battery.iot_device_id:
+        raise HTTPException(status_code=400, detail="Battery has no IoT device assigned")
     
-    device.battery_id = battery_id
-    session.add(device)
-    session.commit()
-    session.refresh(device)
-    return DataResponse(data=device, message="Device paired with battery")
+    mqtt_service.send_command(battery.iot_device_id, "LOCK")
+    return {"status": "success", "message": f"Lock command sent to battery {battery_id}"}
+
+@router.post("/{battery_id}/unlock")
+def unlock_battery(
+    battery_id: int,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_active_user)
+):
+    """
+    Send UNLOCK command to battery via IoT
+    """
+    battery = db.get(Battery, battery_id)
+    if not battery:
+        raise HTTPException(status_code=404, detail="Battery not found")
+    
+    if not battery.iot_device_id:
+        raise HTTPException(status_code=400, detail="Battery has no IoT device assigned")
+    
+    mqtt_service.send_command(battery.iot_device_id, "UNLOCK")
+    return {"status": "success", "message": f"Unlock command sent to battery {battery_id}"}
+
+@router.post("/{battery_id}/shutdown")
+def shutdown_battery(
+    battery_id: int,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_active_user) # Maybe restrict to Admins later
+):
+    """
+    Send SHUTDOWN command to battery via IoT (Emergency)
+    """
+    battery = db.get(Battery, battery_id)
+    if not battery:
+        raise HTTPException(status_code=404, detail="Battery not found")
+    
+    if not battery.iot_device_id:
+        raise HTTPException(status_code=400, detail="Battery has no IoT device assigned")
+    
+    mqtt_service.send_command(battery.iot_device_id, "SHUTDOWN")
+    return {"status": "success", "message": f"Shutdown command sent to battery {battery_id}"}

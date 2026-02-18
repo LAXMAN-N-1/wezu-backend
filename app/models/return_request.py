@@ -7,10 +7,11 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 class ReturnRequest(SQLModel, table=True):
     __tablename__ = "return_requests"
+    __table_args__ = {"schema": "logistics"}
     """Reverse logistics for purchased batteries"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    order_id: int = Field(foreign_key="ecommerce_orders.id")
-    user_id: int = Field(foreign_key="users.id")
+    order_id: int = Field(foreign_key="core.ecommerce_orders.id")
+    user_id: int = Field(foreign_key="core.users.id")
     
     reason: str  # DEFECTIVE, WRONG_ITEM, NOT_NEEDED, DAMAGED_IN_TRANSIT
     detailed_reason: Optional[str] = None
@@ -31,7 +32,7 @@ class ReturnRequest(SQLModel, table=True):
     refund_completed_at: Optional[datetime] = None
     
     admin_notes: Optional[str] = None
-    approved_by: Optional[int] = Field(default=None, foreign_key="users.id")
+    approved_by: Optional[int] = Field(default=None, foreign_key="core.users.id")
     approved_at: Optional[datetime] = None
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -46,11 +47,12 @@ class ReturnRequest(SQLModel, table=True):
 
 class ReturnInspection(SQLModel, table=True):
     __tablename__ = "return_inspections"
+    __table_args__ = {"schema": "logistics"}
     """Quality check on returned items"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    return_request_id: int = Field(foreign_key="return_requests.id", unique=True)
+    return_request_id: int = Field(foreign_key="logistics.return_requests.id", unique=True)
     
-    inspector_id: int = Field(foreign_key="users.id")
+    inspector_id: int = Field(foreign_key="core.users.id")
     
     inspection_status: str  # PASSED, FAILED, PARTIAL
     

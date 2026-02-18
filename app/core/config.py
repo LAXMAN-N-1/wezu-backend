@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     REDIS_SESSION_DB: int = 1
     REDIS_CACHE_DB: int = 2
     
+    # MongoDB (Audit Logs & Unstructured Data)
+    MONGODB_URL: str = "mongodb://localhost:27017"
+    MONGODB_DB: str = "wezu_audit"
+    
     # Security
     SECRET_KEY: str  # Must be loaded from env
     ALGORITHM: str = "HS256"

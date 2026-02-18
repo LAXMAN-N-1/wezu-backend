@@ -20,10 +20,11 @@ class TicketPriority(str, Enum):
 
 class SupportTicket(SQLModel, table=True):
     __tablename__ = "support_tickets"
+    __table_args__ = {"schema": "core"}
     id: Optional[int] = Field(default=None, primary_key=True)
     
-    user_id: int = Field(foreign_key="users.id", index=True)
-    assigned_to: Optional[int] = Field(default=None, foreign_key="users.id")
+    user_id: int = Field(foreign_key="core.users.id", index=True)
+    assigned_to: Optional[int] = Field(default=None, foreign_key="core.users.id")
     
     subject: str
     description: str

@@ -91,7 +91,18 @@ class StationService:
         db.add(station)
         db.commit()
         db.refresh(station)
+        
+        # Generate QR Code Data
+        station.qr_code_data = f"wezu://station/{station.id}"
+        db.add(station)
+        db.commit()
+        db.refresh(station)
         return station
+
+    @staticmethod
+    def get_qr(station_id: int) -> str:
+        from app.services.qr_service import QRCodeService
+        return QRCodeService.generate_station_qr(station_id)
 
     @staticmethod
     def get_available_slots(db: Session, station_id: int) -> List[StationSlot]:

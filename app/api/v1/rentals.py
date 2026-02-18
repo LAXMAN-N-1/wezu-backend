@@ -63,7 +63,7 @@ async def confirm_rental(
     if not rental or rental.user_id != current_user.id:
          raise HTTPException(status_code=404, detail="Rental not found")
          
-    return RentalService.confirm_rental(db, rental_id, req.payment_reference)
+    return RentalService.confirm_rental(db, current_user.id, rental_id, req.payment_reference)
 
 @router.get("/active", response_model=List[RentalResponse])
 async def read_active_rentals(

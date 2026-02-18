@@ -80,63 +80,74 @@ class LateFeeService:
         }
     
     @staticmethod
-    def apply_late_fee(rental_id: int, session: Session) -> Optional[Transaction]:
+    def apply_late_fee(rental_id: int, db: Session) -> Optional[LateFee]:
         """
-        Apply late fee to rental and create transaction
-        
-        Args:
-            rental_id: Rental ID
-            session: Database session
-            
-        Returns:
-            Transaction record or None
+        Apply late fee to rental and create/update LateFee record.
         """
         try:
-            rental = session.get(Rental, rental_id)
+            rental = db.get(Rental, rental_id)
             if not rental:
                 return None
             
-            # Calculate late fee
-            fee_details = LateFeeService.calculate_late_fee(rental_id, session)
+            # Calculate late fee details
+            fee_details = LateFeeService.calculate_late_fee(rental_id, db)
             
             if fee_details['late_fee'] <= 0:
                 return None
             
-            # Check if late fee already applied
-            existing_fee = session.exec(
-                select(Transaction)
-                .where(Transaction.rental_id == rental_id)
-                .where(Transaction.transaction_type == "LATE_FEE")
+            from app.models.late_fee import LateFee
+            
+            # Check if late fee record already exists for this rental
+            existing_fee = db.exec(
+                select(LateFee).where(LateFee.rental_id == rental_id)
             ).first()
             
             if existing_fee:
-                logger.info(f"Late fee already applied for rental {rental_id}")
+                # Update existing record
+                existing_fee.days_overdue = int(fee_details['hours_late'] // 24)
+                existing_fee.total_late_fee = fee_details['late_fee']
+                existing_fee.amount_outstanding = existing_fee.total_late_fee - existing_fee.amount_paid - existing_fee.amount_waived
+                existing_fee.updated_at = datetime.utcnow()
+                db.add(existing_fee)
+                db.commit()
+                db.refresh(existing_fee)
                 return existing_fee
             
-            # Create late fee transaction
+            # Create new late fee record
+            new_fee = LateFee(
+                rental_id=rental_id,
+                user_id=rental.user_id,
+                original_end_date=rental.end_time,
+                days_overdue=int(fee_details['hours_late'] // 24),
+                daily_late_fee_rate=fee_details.get('hourly_rate', 0) * 24,
+                base_late_fee=fee_details['late_fee'],
+                total_late_fee=fee_details['late_fee'],
+                amount_outstanding=fee_details['late_fee'],
+                payment_status="PENDING"
+            )
+            db.add(new_fee)
+            
+            # Also register a transaction for visibility (optional, but good for financial logs)
+            from app.models.financial import Transaction
             transaction = Transaction(
                 user_id=rental.user_id,
                 rental_id=rental_id,
                 transaction_type="LATE_FEE",
                 amount=fee_details['late_fee'],
                 status="PENDING",
-                description=f"Late fee for {fee_details['chargeable_hours']:.1f} hours overdue",
+                description=f"Late fee for {fee_details['hours_late']:.1f} hours overdue",
                 metadata=str(fee_details)
             )
-            session.add(transaction)
+            db.add(transaction)
             
-            # Update rental total cost
-            rental.total_cost += fee_details['late_fee']
-            session.add(rental)
+            db.commit()
+            db.refresh(new_fee)
             
-            session.commit()
-            session.refresh(transaction)
-            
-            logger.info(f"Late fee of ₹{fee_details['late_fee']} applied to rental {rental_id}")
-            return transaction
+            logger.info(f"Late fee of ₹{fee_details['late_fee']} applied/updated for rental {rental_id}")
+            return new_fee
             
         except Exception as e:
-            session.rollback()
+            db.rollback()
             logger.error(f"Failed to apply late fee: {str(e)}")
             return None
     

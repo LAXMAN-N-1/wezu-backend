@@ -3,14 +3,15 @@ from typing import Optional
 from datetime import datetime
 
 class Telemetry(SQLModel, table=True):
-    __tablename__ = "telemetry_logs"
+    __tablename__ = "telemetry"
+    __table_args__ = {"schema": "inventory"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     
     # Source
     device_id: str = Field(index=True) # IoT Device ID
-    battery_id: Optional[int] = Field(default=None, foreign_key="batteries.id", index=True)
-    rental_id: Optional[int] = Field(default=None, foreign_key="rentals.id")
+    battery_id: Optional[int] = Field(default=None, foreign_key="inventory.batteries.id", index=True)
+    rental_id: Optional[int] = Field(default=None, foreign_key="rentals.rentals.id")
     
     # Data
     latitude: Optional[float] = None

@@ -2,11 +2,12 @@
 Enhanced Payment and Invoice API
 Invoice generation, refunds, and payment methods
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
-from sqlmodel import Session
+from sqlmodel import Session, select
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime
 
 from app.api import deps
 from app.db.session import get_session
@@ -241,3 +242,56 @@ def get_payment_methods(current_user: User = Depends(deps.get_current_user)):
             ]
         }
     )
+
+@router.post("/webhooks/razorpay")
+async def razorpay_webhook(
+    request: Request,
+    session: Session = Depends(get_session)
+):
+    """
+    Handle Razorpay Webhooks
+    Updates transaction status and confirms rentals/orders
+    """
+    from app.services.payment_service import PaymentService
+    from app.services.wallet_service import WalletService
+    from app.models.financial import Transaction, TransactionStatus
+    from app.models.catalog import CatalogOrder
+    from app.core.config import settings
+    import json
+    
+    # 1. Verify Signature
+    body = await request.body()
+    signature = request.headers.get("X-Razorpay-Signature")
+    
+    if not PaymentService.verify_webhook_signature(body, signature):
+        raise HTTPException(status_code=400, detail="Invalid signature")
+    
+    payload = json.loads(body)
+    event = payload.get("event")
+    
+    # 2. Process Event
+    if event == "payment.captured":
+        payment_id = payload["payload"]["payment"]["entity"]["id"]
+        order_id = payload["payload"]["payment"]["entity"]["order_id"]
+        
+        # Find transaction by order_id (payment_gateway_ref)
+        txn = session.exec(select(Transaction).where(Transaction.payment_gateway_ref == order_id)).first()
+        if txn:
+            txn.status = TransactionStatus.SUCCESS
+            txn.updated_at = datetime.utcnow()
+            
+            # If topup, update wallet
+            if txn.transaction_type == "wallet_topup":
+                WalletService.add_balance(session, txn.user_id, txn.amount, "Razorpay Topup Success")
+            
+            # If ecommerce order, mark as confirmed
+            if txn.order_id:
+                order = session.get(CatalogOrder, txn.order_id)
+                if order:
+                    order.status = "CONFIRMED"
+                    session.add(order)
+            
+            session.add(txn)
+            session.commit()
+            
+    return {"status": "ok"}

@@ -12,25 +12,35 @@ engine = create_engine(
 
 def init_db():
     from sqlmodel import Session, text
+    
+    # 1. Create Required Schemas
+    schemas = ["core", "inventory", "rentals", "finance", "logistics", "dealers", "stations"]
+    with engine.connect() as conn:
+        for schema in schemas:
+            conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema};"))
+        conn.commit()
+    
+    # 2. Create Tables within schemas
     SQLModel.metadata.create_all(engine)
     
-    # TimescaleDB initialization
+    # 3. TimescaleDB initialization
     with Session(engine) as session:
-        # TimescaleDB initialization (Creating extension requires system install)
-        # try:
-        #     session.execute(text("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"))
-        #     
-        #     # Create hypertable for telematics if it doesn't exist
-        #     session.execute(text(
-        #         "SELECT create_hypertable('telemetics_data', 'timestamp', if_not_exists => TRUE, migrate_data => TRUE);"
-        #     ))
-        #     session.commit()
-        #     print("TimescaleDB hypertable 'telemetics_data' ensured.")
-        # except Exception as e:
-        #     print(f"Hypertable creation info/error: {e} (TimescaleDB might not be installed, skipping)")
-        #     session.rollback()
+        try:
+            # Enable TimescaleDB extension
+            session.execute(text("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"))
             
-        # 3. Seed Initial Data (Roles)
+            # Create hypertable for telemetry data if it exists in the metadata
+            # This is specifically for the 'telemetry' table in the 'inventory' schema
+            session.execute(text(
+                "SELECT create_hypertable('inventory.telemetry', 'timestamp', if_not_exists => TRUE, migrate_data => TRUE);"
+            ))
+            session.commit()
+            print("TimescaleDB initialized and hypertable 'inventory.telemetry' ensured.")
+        except Exception as e:
+            print(f"TimescaleDB initialization skipped: {e}")
+            session.rollback()
+            
+        # 4. Seed Initial Data (Roles)
         from app.db.initial_data import seed_roles
         seed_roles(session)
 

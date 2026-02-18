@@ -23,6 +23,7 @@ class BatteryHealth(str, Enum):
 
 class Battery(SQLModel, table=True):
     __tablename__ = "batteries"
+    __table_args__ = {"schema": "inventory"}
     id: Optional[int] = Field(default=None, primary_key=True)
     
     # Identity
@@ -31,11 +32,11 @@ class Battery(SQLModel, table=True):
     iot_device_id: Optional[str] = Field(default=None, index=True)
     
     # Product Catalog Link
-    sku_id: Optional[int] = Field(default=None, foreign_key="battery_catalog.id")
+    sku_id: Optional[int] = Field(default=None, foreign_key="inventory.battery_catalog.id")
     
     # Location tracking
-    station_id: Optional[int] = Field(default=None, foreign_key="stations.id", index=True)
-    current_user_id: Optional[int] = Field(default=None, foreign_key="users.id", index=True)
+    station_id: Optional[int] = Field(default=None, foreign_key="stations.stations.id", index=True)
+    current_user_id: Optional[int] = Field(default=None, foreign_key="core.users.id", index=True)
     
     # Technical State
     status: BatteryStatus = Field(default=BatteryStatus.AVAILABLE, index=True)
@@ -57,7 +58,7 @@ class Battery(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     # Location tracking
-    warehouse_id: Optional[int] = Field(default=None, foreign_key="warehouses.id")
+    warehouse_id: Optional[int] = Field(default=None, foreign_key="logistics.warehouses.id")
 
     # Relationships
     sku: Optional["BatteryCatalog"] = Relationship(back_populates="batteries")
@@ -76,8 +77,9 @@ class Battery(SQLModel, table=True):
 
 class BatteryLifecycleEvent(SQLModel, table=True):
     __tablename__ = "battery_lifecycle_events"
+    __table_args__ = {"schema": "inventory"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    battery_id: int = Field(foreign_key="batteries.id")
+    battery_id: int = Field(foreign_key="inventory.batteries.id")
     
     event_type: str = Field(index=True) # created, assigned, maintenance_start, maintenance_end, retired
     description: Optional[str] = None

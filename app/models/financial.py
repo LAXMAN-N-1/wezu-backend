@@ -25,11 +25,12 @@ class TransactionStatus(str, Enum):
 
 class Transaction(SQLModel, table=True):
     __tablename__ = "transactions"
+    __table_args__ = {"schema": "finance"}
     id: Optional[int] = Field(default=None, primary_key=True)
     
-    user_id: int = Field(foreign_key="users.id", index=True)
-    rental_id: Optional[int] = Field(default=None, foreign_key="rentals.id")
-    wallet_id: Optional[int] = Field(default=None, foreign_key="wallets.id")
+    user_id: int = Field(foreign_key="core.users.id", index=True)
+    rental_id: Optional[int] = Field(default=None, foreign_key="rentals.rentals.id")
+    wallet_id: Optional[int] = Field(default=None, foreign_key="finance.wallets.id")
     
     amount: float
     currency: str = Field(default="INR")
@@ -52,8 +53,9 @@ class Transaction(SQLModel, table=True):
 
 class Wallet(SQLModel, table=True):
     __tablename__ = "wallets"
+    __table_args__ = {"schema": "finance"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id", unique=True, index=True)
+    user_id: int = Field(foreign_key="core.users.id", unique=True, index=True)
     
     balance: float = Field(default=0.0)
     currency: str = Field(default="INR")
@@ -69,8 +71,9 @@ class Wallet(SQLModel, table=True):
 
 class WalletWithdrawalRequest(SQLModel, table=True):
     __tablename__ = "wallet_withdrawal_requests"
+    __table_args__ = {"schema": "finance"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    wallet_id: int = Field(foreign_key="wallets.id")
+    wallet_id: int = Field(foreign_key="finance.wallets.id")
     amount: float
     status: str = Field(default="requested") # requested, approved, rejected, processed
     bank_details: str 

@@ -8,6 +8,7 @@ if TYPE_CHECKING:
 
 class BatteryCatalog(SQLModel, table=True):
     __tablename__ = "battery_catalog"
+    __table_args__ = {"schema": "inventory"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     

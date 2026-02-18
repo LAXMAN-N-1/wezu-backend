@@ -88,41 +88,29 @@ class AuthService:
             )
 
     @staticmethod
-    def get_permissions_for_role(role_name: str) -> list[str]:
-        if role_name == "customer":
-            return ["vehicle:read", "station:read"]
-        elif role_name in ["vendor_owner", "dealer"]:
-            return ["station:create", "staff:create", "finance:read"]
-        elif role_name in ["admin", "super_admin"]:
-            return ["all"]
-        return []
+    def get_permissions_for_role(db: Session, role_id: int) -> list[str]:
+        from app.services.rbac_service import rbac_service
+        permissions = rbac_service.get_user_permissions(db, role_id)
+        if not permissions and role_id:
+             # Development fallback or logging
+             pass
+        return permissions
 
     @staticmethod
-    def get_menu_for_role(role_name: str) -> list[dict]:
-        # Avoiding circular import by returning dicts or importing locally if needed
-        # But returning dicts is safer for service layer decoupling if schema isn't strictly needed here 
-        # However, for type safety let's use the schema if possible, but for now dicts are fine as they serialize to JSON
-        if role_name == "customer":
-            return [
-                {"label": "Dashboard", "path": "/dashboard", "icon": "home"},
-                {"label": "My Vehicle", "path": "/vehicle", "icon": "car"},
-                {"label": "Find Stations", "path": "/stations", "icon": "map"},
-            ]
-        elif role_name in ["vendor_owner", "dealer"]:
-            return [
-                {"label": "Dashboard", "path": "/dashboard", "icon": "home"},
-                {"label": "Stations", "path": "/stations", "icon": "fuel"},
-                {"label": "Staff", "path": "/staff", "icon": "users"},
-                {"label": "Finance", "path": "/finance", "icon": "dollar-sign"},
-            ]
-        elif role_name in ["admin", "super_admin"]:
-            return [
-                {"label": "Dashboard", "path": "/admin/dashboard", "icon": "activity"},
-                {"label": "Users", "path": "/admin/users", "icon": "users"},
-                {"label": "Dealers", "path": "/admin/users", "icon": "briefcase"},
-                {"label": "Settings", "path": "/admin/settings", "icon": "settings"},
-            ]
-        return []
+    def get_menu_for_role(db: Session, role_id: int) -> list[dict]:
+        from app.services.rbac_service import rbac_service
+        menu = rbac_service.get_menu_for_role(db, role_id)
+        if not menu and role_id:
+            # Development fallback for customer if data missing
+            from app.models.rbac import Role
+            role = db.get(Role, role_id)
+            if role and role.name == "customer":
+                return [
+                    {"label": "Dashboard", "path": "/dashboard", "icon": "home"},
+                    {"label": "My Vehicle", "path": "/vehicle", "icon": "car"},
+                    {"label": "Find Stations", "path": "/stations", "icon": "map"},
+                ]
+        return menu
 
     @staticmethod
     def create_session(
@@ -133,19 +121,16 @@ class AuthService:
         device_info: str = None, 
         ip_address: str = None
     ):
-        from app.models.token import SessionToken
+        from app.models.session import UserSession
         from datetime import datetime, timedelta
         
-        # Calculate expiry based on refresh token validity (usually longer than access token)
-        # Using a default of 7 days for the session if not specified elsewhere
         expires_at = datetime.utcnow() + timedelta(days=7)
         
-        session = SessionToken(
+        session = UserSession(
             user_id=user_id,
             access_token=access_token,
             refresh_token=refresh_token,
-            device_id=None, # Extract from device_info if structured
-            device_type=device_info, # Using raw string for now
+            device_type=device_info,
             ip_address=ip_address,
             expires_at=expires_at
         )
@@ -156,12 +141,11 @@ class AuthService:
 
     @staticmethod
     def revoke_session(db, token: str):
-        from app.models.token import SessionToken
+        from app.models.session import UserSession
         from datetime import datetime
         
-        # Find session by access or refresh token
-        session = db.query(SessionToken).filter(
-            (SessionToken.access_token == token) | (SessionToken.refresh_token == token)
+        session = db.query(UserSession).filter(
+            (UserSession.access_token == token) | (UserSession.refresh_token == token)
         ).first()
         
         if session:
@@ -175,23 +159,22 @@ class AuthService:
 
     @staticmethod
     def validate_session(db, token: str, is_refresh: bool = False):
-        from app.models.token import SessionToken
+        from app.models.session import UserSession
         from datetime import datetime
         
-        query = db.query(SessionToken).filter(
-            SessionToken.is_revoked == False,
-            SessionToken.is_active == True,
-            SessionToken.expires_at > datetime.utcnow()
+        query = db.query(UserSession).filter(
+            UserSession.is_revoked == False,
+            UserSession.is_active == True,
+            UserSession.expires_at > datetime.utcnow()
         )
         
         if is_refresh:
-            session = query.filter(SessionToken.refresh_token == token).first()
+            session = query.filter(UserSession.refresh_token == token).first()
         else:
-            session = query.filter(SessionToken.access_token == token).first()
+            session = query.filter(UserSession.access_token == token).first()
             
         if session:
-            # Update last activity
-            session.last_activity_at = datetime.utcnow()
+            session.last_active_at = datetime.utcnow()
             db.add(session)
             db.commit()
             return session

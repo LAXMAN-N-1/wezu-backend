@@ -19,7 +19,7 @@ class WalletService:
         return wallet
 
     @staticmethod
-    def add_balance(db: Session, user_id: int, amount: float, description: str = "Deposit") -> Wallet:
+    def add_balance(db: Session, user_id: int, amount: float, description: str = "Deposit") -> Transaction:
         wallet = WalletService.get_wallet(db, user_id)
         wallet.balance += amount
         db.add(wallet)
@@ -36,11 +36,11 @@ class WalletService:
         db.add(txn)
         
         db.commit()
-        db.refresh(wallet)
-        return wallet
+        db.refresh(txn)
+        return txn
 
     @staticmethod
-    def deduct_balance(db: Session, user_id: int, amount: float, description: str = "Payment") -> Wallet:
+    def deduct_balance(db: Session, user_id: int, amount: float, description: str = "Payment") -> Transaction:
         wallet = WalletService.get_wallet(db, user_id)
         if wallet.balance < amount:
             raise HTTPException(status_code=400, detail="Insufficient balance")
@@ -60,8 +60,8 @@ class WalletService:
         db.add(txn)
         
         db.commit()
-        db.refresh(wallet)
-        return wallet
+        db.refresh(txn)
+        return txn
 
     @staticmethod
     def transfer_balance(db: Session, sender_id: int, recipient_phone: str, amount: float, note: Optional[str] = None) -> Transaction:
@@ -92,21 +92,21 @@ class WalletService:
             user_id=sender_id,
             wallet_id=sender_wallet.id,
             amount=amount,
-            transaction_type="transfer_out", # Should probably add to TransactionType Enum
+            transaction_type="transfer_out", 
             status=TransactionStatus.SUCCESS,
             description=f"Transfer to {recipient.phone_number}. {note or ''}"
         )
+        
+        # Get sender phone
+        sender = db.get(User, sender_id)
         recipient_txn = Transaction(
             user_id=recipient.id,
             wallet_id=recipient_wallet.id,
             amount=amount,
             transaction_type="transfer_in",
             status=TransactionStatus.SUCCESS,
-            description=f"Transfer from {User.phone_number}. {note or ''}" # Wait, need sender phone
+            description=f"Transfer from {sender.phone_number}. {note or ''}"
         )
-        # Get sender phone
-        sender = db.get(User, sender_id)
-        recipient_txn.description = f"Transfer from {sender.phone_number}. {note or ''}"
         
         db.add(sender_txn)
         db.add(recipient_txn)
@@ -158,7 +158,7 @@ class WalletService:
         return req
 
     @staticmethod
-    def apply_cashback(db: Session, user_id: int, amount: float, reason: str = "Cashback"):
+    def apply_cashback(db: Session, user_id: int, amount: float, reason: str = "Cashback") -> Transaction:
         wallet = WalletService.get_wallet(db, user_id)
         wallet.balance += amount
         db.add(wallet)
@@ -173,7 +173,8 @@ class WalletService:
         )
         db.add(txn)
         db.commit()
-        return wallet
+        db.refresh(txn)
+        return txn
 
     @staticmethod
     def get_cashback_history(db: Session, user_id: int) -> List[Transaction]:
@@ -205,4 +206,3 @@ class WalletService:
         db.commit()
         db.refresh(refund)
         return refund
-

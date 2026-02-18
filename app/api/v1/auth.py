@@ -475,8 +475,8 @@ async def social_login(
     # Create Session
     AuthService.create_session(db, user.id, access_token, refresh_token, device_info=f"OAuth {auth_data.provider.capitalize()}", ip_address=None)
 
-    permissions = AuthService.get_permissions_for_role(selected_role_name)
-    menu_data = AuthService.get_menu_for_role(selected_role_name)
+    permissions = AuthService.get_permissions_for_role(db, user.role_id)
+    menu_data = AuthService.get_menu_for_role(db, user.role_id)
     
     return LoginResponse(
         success=True,
@@ -630,8 +630,13 @@ async def select_role(
     refresh_token = create_refresh_token(subject=current_user.id)
     
     # 3. Get Permissions & Menu
-    permissions = AuthService.get_permissions_for_role(role_data.role)
-    menu_data = AuthService.get_menu_for_role(role_data.role)
+    from app.models.rbac import Role
+    selected_role = db.exec(select(Role).where(Role.name == role_data.role)).first()
+    if not selected_role:
+         raise HTTPException(status_code=404, detail="Role not found")
+
+    permissions = AuthService.get_permissions_for_role(db, selected_role.id)
+    menu_data = AuthService.get_menu_for_role(db, selected_role.id)
     
     return LoginResponse(
         success=True,

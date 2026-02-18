@@ -19,9 +19,10 @@ class StockMovementDirection(str, Enum):
 
 class StockMovement(SQLModel, table=True):
     __tablename__ = "stock_movements"
+    __table_args__ = {"schema": "inventory"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    stock_id: int = Field(foreign_key="stocks.id", index=True)
+    stock_id: int = Field(foreign_key="inventory.stocks.id", index=True)
     
     transaction_type: StockTransactionType
     quantity: int = Field(gt=0)
@@ -34,7 +35,7 @@ class StockMovement(SQLModel, table=True):
     notes: Optional[str] = None
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    created_by: Optional[int] = Field(default=None, foreign_key="users.id")
+    created_by: Optional[int] = Field(default=None, foreign_key="core.users.id")
     
     # Relationships
     stock: "Stock" = Relationship(back_populates="movements")

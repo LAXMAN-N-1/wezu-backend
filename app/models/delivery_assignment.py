@@ -2,16 +2,22 @@ from typing import Optional
 from datetime import datetime
 from sqlmodel import SQLModel, Field, Relationship
 from app.models.driver_profile import DriverProfile
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.ecommerce import EcommerceOrder
+    from app.models.return_request import ReturnRequest
 
 class DeliveryAssignment(SQLModel, table=True):
     __tablename__ = "delivery_assignments"
+    __table_args__ = {"schema": "logistics"}
     id: Optional[int] = Field(default=None, primary_key=True)
     
     # Can be linked to an ecommerce order or a battery return
-    order_id: Optional[int] = Field(default=None, foreign_key="ecommerce_orders.id")
-    return_request_id: Optional[int] = Field(default=None, foreign_key="return_requests.id")
+    order_id: Optional[int] = Field(default=None, foreign_key="core.ecommerce_orders.id")
+    return_request_id: Optional[int] = Field(default=None, foreign_key="logistics.return_requests.id")
     
-    driver_id: Optional[int] = Field(default=None, foreign_key="driver_profiles.id")
+    driver_id: Optional[int] = Field(default=None, foreign_key="logistics.driver_profiles.id")
     status: str = Field(default="assigned") # assigned, picked_up, delivered, cancelled
     
     pickup_address: str

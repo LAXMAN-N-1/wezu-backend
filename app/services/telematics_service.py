@@ -1,6 +1,7 @@
 from datetime import datetime
 from sqlmodel import Session, select
 from app.models.battery import Battery, BatteryLifecycleEvent
+from app.services.geofence_service import GeofenceService
 import logging
 
 logger = logging.getLogger("wezu_telematics")
@@ -33,7 +34,17 @@ class TelematicsService:
         # Potential alert logic
         if battery.current_charge < 15:
             logger.warning(f"Battery {serial_number} is critically low: {battery.current_charge}%")
-            # Logic to notify user or system
+            
+        # Geofence Check
+        lat, lon = data.get("lat"), data.get("lon")
+        if lat and lon:
+            is_valid, message = GeofenceService.check_boundary(db, lat, lon)
+            if not is_valid:
+                logger.error(f"GEOFENCE VIOLATION for battery {serial_number}: {message}")
+                self.log_anomaly(db, battery.id, f"GEOFENCE_VIOLATION: {message}")
+                # We also need to notify via MQTTService/WebSocket, but MQTTService calls this, 
+                # so we can return the violation detail for MQTTService to broadcast
+                data["geofence_violation"] = message
             
         battery.updated_at = datetime.utcnow()
         db.add(battery)
@@ -43,6 +54,24 @@ class TelematicsService:
         
         db.commit()
         db.refresh(battery)
+        
+        # 3. Create Telemetry Log entry (TimescaleDB hypertable)
+        from app.models.telemetry import Telemetry
+        telemetry_log = Telemetry(
+            battery_id=battery.id,
+            device_id=battery.iot_device_id or "unknown",
+            voltage=data.get("voltage"),
+            current=data.get("current"),
+            temperature=data.get("temp") or data.get("temperature"),
+            soc=data.get("soc"),
+            soh=data.get("soh") or data.get("health"),
+            latitude=data.get("lat"),
+            longitude=data.get("lon"),
+            timestamp=datetime.utcnow()
+        )
+        db.add(telemetry_log)
+        db.commit()
+        
         return battery
 
     @staticmethod

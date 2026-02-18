@@ -123,20 +123,51 @@ class AnalyticsService:
         }
 
     @staticmethod
+    def get_station_summary(db: Session, station_id: int) -> Dict[str, Any]:
+        """
+        Get station utilization summary.
+        """
+        from app.models.swap import Swap
+        from app.models.battery import Battery
+        
+        # 1. Total swaps last 24h
+        day_ago = datetime.utcnow() - timedelta(days=1)
+        swaps_24h = db.exec(select(func.count(Swap.id)).where(
+            Swap.station_id == station_id,
+            Swap.created_at >= day_ago
+        )).one() or 0
+        
+        # 2. Current inventory health
+        batteries = db.exec(select(Battery).where(Battery.station_id == station_id)).all()
+        avg_charge = sum(b.current_charge for b in batteries) / len(batteries) if batteries else 0
+        
+        return {
+            "swaps_last_24h": swaps_24h,
+            "available_batteries": len(batteries),
+            "avg_station_charge": round(avg_charge, 1),
+            "status": "Healthy" if avg_charge > 50 else "Inventory Low"
+        }
+
+    @staticmethod
     def get_usage_patterns(user_id: int, db: Session) -> Dict[str, Any]:
-        """Analyze usage patterns"""
-        # Simple analysis of rentals
+        """Analyze usage patterns using real rental data"""
         rentals = db.exec(select(Rental).where(Rental.user_id == user_id)).all()
         
+        if not rentals:
+            return {"most_active_day": "N/A", "avg_rental_duration_hours": 0}
+
         day_freq = {}
+        total_duration_hours = 0
         for r in rentals:
             day = r.start_time.strftime("%A")
             day_freq[day] = day_freq.get(day, 0) + 1
+            if r.actual_end_time:
+                total_duration_hours += (r.actual_end_time - r.start_time).total_seconds() / 3600
             
         most_active_day = max(day_freq, key=day_freq.get) if day_freq else "N/A"
         
         return {
             "most_active_day": most_active_day,
             "rental_frequency": day_freq,
-            "avg_rental_duration_hours": round(float(len(rentals)) * 24 / max(len(rentals), 1), 1) # Mock logic
+            "avg_rental_duration_hours": round(total_duration_hours / len(rentals), 1) if rentals else 0
         }

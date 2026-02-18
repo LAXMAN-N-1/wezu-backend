@@ -101,28 +101,8 @@ def check_permission(menu_name: str, permission_type: str = "view"):
                 detail="User has no role assigned"
             )
 
-        # Check role rights by joining with Menu to filter by name
-        from app.models.menu import Menu
-        role_right = db.query(RoleRight).join(Menu).filter(
-            RoleRight.role_id == current_user.role_id,
-            Menu.name == menu_name
-        ).first()
-        
-        if not role_right:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"No access to resource: {menu_name}"
-            )
-        
-        # Check specific permission
-        permission_map = {
-            "view": role_right.can_view,
-            "create": role_right.can_create,
-            "edit": role_right.can_edit,
-            "delete": role_right.can_delete
-        }
-        
-        if not permission_map.get(permission_type, False):
+        from app.services.rbac_service import rbac_service
+        if not rbac_service.check_menu_access(db, current_user.role_id, menu_name, permission_type):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Insufficient permissions: {permission_type} on {menu_name}"

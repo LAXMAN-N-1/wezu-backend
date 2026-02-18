@@ -27,10 +27,10 @@ class TimescaleDBService:
                 # Enable TimescaleDB extension
                 conn.execute(text("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"))
                 
-                # Convert battery_health_log to hypertable
+                # Convert telemetry to hypertable in inventory schema
                 conn.execute(text("""
                     SELECT create_hypertable(
-                        'battery_health_log',
+                        'inventory.telemetry',
                         'timestamp',
                         if_not_exists => TRUE,
                         chunk_time_interval => INTERVAL '1 day'
@@ -67,9 +67,9 @@ class TimescaleDBService:
         """Setup automatic compression for old data"""
         try:
             with self.engine.connect() as conn:
-                # Compress battery health logs older than 7 days
+                # Compress telemetry logs older than 7 days
                 conn.execute(text("""
-                    ALTER TABLE battery_health_log SET (
+                    ALTER TABLE inventory.telemetry SET (
                         timescaledb.compress,
                         timescaledb.compress_segmentby = 'battery_id'
                     );
@@ -77,7 +77,7 @@ class TimescaleDBService:
                 
                 conn.execute(text("""
                     SELECT add_compression_policy(
-                        'battery_health_log',
+                        'inventory.telemetry',
                         INTERVAL '7 days',
                         if_not_exists => TRUE
                     );
@@ -109,10 +109,10 @@ class TimescaleDBService:
         """Setup data retention policies"""
         try:
             with self.engine.connect() as conn:
-                # Retain battery health logs for 90 days
+                # Retain telemetry logs for 90 days
                 conn.execute(text("""
                     SELECT add_retention_policy(
-                        'battery_health_log',
+                        'inventory.telemetry',
                         INTERVAL '90 days',
                         if_not_exists => TRUE
                     );
@@ -158,8 +158,8 @@ class TimescaleDBService:
                         AVG(current) as avg_current,
                         AVG(temperature) as avg_temperature,
                         AVG(soc) as avg_soc,
-                        AVG(health_percentage) as avg_health
-                    FROM battery_health_log
+                        AVG(soh) as avg_health
+                    FROM inventory.telemetry
                     WHERE battery_id = :battery_id
                         AND timestamp >= :start_time
                         AND timestamp <= :end_time

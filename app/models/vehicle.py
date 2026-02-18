@@ -5,8 +5,9 @@ from app.models.user import User
 
 class Vehicle(SQLModel, table=True):
     __tablename__ = "vehicles"
+    __table_args__ = {"schema": "core"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id", index=True)
+    user_id: int = Field(foreign_key="core.users.id", index=True)
     
     # Vehicle Details
     make: str # e.g., Ather, Ola

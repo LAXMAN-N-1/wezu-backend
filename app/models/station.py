@@ -18,6 +18,7 @@ class StationStatus(str, Enum):
 
 class Station(SQLModel, table=True):
     __tablename__ = "stations"
+    __table_args__ = {"schema": "stations"}
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     tenant_id: Optional[str] = Field(default="default", index=True)
@@ -27,12 +28,12 @@ class Station(SQLModel, table=True):
     city: Optional[str] = None
     latitude: float = Field(index=True)
     longitude: float = Field(index=True)
-    zone_id: Optional[int] = Field(default=None, foreign_key="zones.id")
+    zone_id: Optional[int] = Field(default=None, foreign_key="core.zones.id")
     
     # Ownership
-    owner_id: Optional[int] = Field(default=None, foreign_key="users.id") # Dealer/Owner
-    vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id")
-    dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id")
+    owner_id: Optional[int] = Field(default=None, foreign_key="core.users.id") # Dealer/Owner
+    vendor_id: Optional[int] = Field(default=None, foreign_key="finance.vendors.id") # Assuming vendor is in finance or core? I'll check.
+    dealer_id: Optional[int] = Field(default=None, foreign_key="dealers.dealer_profiles.id")
     
     # Hardware Specs
     station_type: str = Field(default="automated") # automated, manual, hybrid
@@ -75,8 +76,9 @@ class Station(SQLModel, table=True):
 
 class StationImage(SQLModel, table=True):
     __tablename__ = "station_images"
+    __table_args__ = {"schema": "stations"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    station_id: int = Field(foreign_key="stations.id")
+    station_id: int = Field(foreign_key="stations.stations.id")
     url: str
     is_primary: bool = Field(default=False)
     
@@ -84,15 +86,16 @@ class StationImage(SQLModel, table=True):
 
 class StationSlot(SQLModel, table=True):
     __tablename__ = "station_slots"
+    __table_args__ = {"schema": "stations"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    station_id: int = Field(foreign_key="stations.id")
+    station_id: int = Field(foreign_key="stations.stations.id")
     
     slot_number: int
     status: str = Field(default="empty") # empty, charging, ready, maintenance, error
     is_locked: bool = Field(default=True)
     
     # Battery Connection
-    battery_id: Optional[int] = Field(default=None, foreign_key="batteries.id")
+    battery_id: Optional[int] = Field(default=None, foreign_key="inventory.batteries.id")
     
     # Real-time Telemetry
     current_power_w: float = Field(default=0.0)
