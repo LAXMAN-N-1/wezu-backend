@@ -64,8 +64,8 @@ def ingest_telemetry(
     
     # Update GPS if provided
     if data_in.gps_latitude and data_in.gps_longitude:
-        # battery.last_known_location = ... (If we added this field)
-        pass
+        battery.last_latitude = data_in.gps_latitude
+        battery.last_longitude = data_in.gps_longitude
 
     session.add(battery)
     session.commit()

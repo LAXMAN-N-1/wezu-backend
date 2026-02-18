@@ -1,63 +1,75 @@
 from datetime import datetime
 from typing import Optional, List, TYPE_CHECKING
-if TYPE_CHECKING:
-    from app.models.battery_catalog import BatterySpec, BatteryBatch
-    from app.models.rental import Rental
-    from app.models.logistics import BatteryTransfer
 from sqlmodel import SQLModel, Field, Relationship
+from enum import Enum
 
-# Import for relationships (Forward references stringified to avoid circular imports where possible)
+if TYPE_CHECKING:
+    from app.models.battery_catalog import BatteryCatalog
+    from app.models.rental import Rental
+    from app.models.station import Station, StationSlot
+    from app.models.iot import IoTDevice
+
+class BatteryStatus(str, Enum):
+    AVAILABLE = "available"
+    RENTED = "rented"
+    MAINTENANCE = "maintenance"
+    CHARGING = "charging"
+    RETIRED = "retired"
+
+class BatteryHealth(str, Enum):
+    GOOD = "good"
+    FAIR = "fair"
+    CRITICAL = "critical"
+
 class Battery(SQLModel, table=True):
     __tablename__ = "batteries"
     id: Optional[int] = Field(default=None, primary_key=True)
+    
+    # Identity
     serial_number: str = Field(index=True, unique=True)
-    tenant_id: Optional[str] = Field(default="default", index=True)
-
-    
-    # Specs & Inventory (New)
-    spec_id: Optional[int] = Field(default=None, foreign_key="battery_specs.id")
-    batch_id: Optional[int] = Field(default=None, foreign_key="battery_batches.id")
-    
     qr_code_data: Optional[str] = Field(default=None, unique=True, index=True)
-    battery_type: str = Field(default="lithium_ion") # lithium_ion, lithium_polymer, lead_acid
-    capacity_mah: int = Field(default=0)
-    voltage_v: float = Field(default=0.0)
-    manufacturer: Optional[str] = None
-    model_number: Optional[str] = None
+    iot_device_id: Optional[str] = Field(default=None, index=True)
     
-    rental_price_per_day: float = Field(default=0.0)
-    damage_deposit_amount: float = Field(default=0.0)
-    certification_details: Optional[str] = None # JSON string: {"CE": "123", "RoHS": "456"}
+    # Product Catalog Link
+    sku_id: Optional[int] = Field(default=None, foreign_key="battery_catalog.id")
     
-    # State
-    status: str = Field(default="new") # new, ready, rented, charging, maintenance, retired
+    # Location tracking
+    station_id: Optional[int] = Field(default=None, foreign_key="stations.id", index=True)
+    current_user_id: Optional[int] = Field(default=None, foreign_key="users.id", index=True)
+    
+    # Technical State
+    status: BatteryStatus = Field(default=BatteryStatus.AVAILABLE, index=True)
+    health_status: BatteryHealth = Field(default=BatteryHealth.GOOD)
+    
     current_charge: float = Field(default=100.0)
     health_percentage: float = Field(default=100.0)
     cycle_count: int = Field(default=0)
+    temperature_c: float = Field(default=25.0)
     
-    # Lifecycle Info
+    # Lifecycle
     purchase_date: Optional[datetime] = None
     warranty_expiry: Optional[datetime] = None
-    retirement_date: Optional[datetime] = None
     last_maintenance_date: Optional[datetime] = None
-    last_maintenance_cycles: int = Field(default=0)
-
     
-    # Current Location Context
-    # Polymorphic-like tracking: location_type enum ('warehouse', 'station', 'customer', 'transit')
-    location_type: Optional[str] = None 
-    location_id: Optional[int] = None 
-    
+    # Timestamps
+    last_telemetry_at: Optional[datetime] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     # Relationships
-    spec: Optional["BatterySpec"] = Relationship(back_populates="batteries")
-    batch: Optional["BatteryBatch"] = Relationship(back_populates="batteries")
-    
-    lifecycle_events: List["BatteryLifecycleEvent"] = Relationship(back_populates="battery")
+    sku: Optional["BatteryCatalog"] = Relationship(back_populates="batteries")
+    product: Optional["BatteryCatalog"] = Relationship(back_populates="batteries") # Alias for backward compat if needed
     rentals: List["Rental"] = Relationship(back_populates="battery")
-    iot_device: Optional["IoTDevice"] = Relationship(back_populates="battery")
+    lifecycle_events: List["BatteryLifecycleEvent"] = Relationship(back_populates="battery")
+    
+    iot_device: Optional["IoTDevice"] = Relationship(
+        back_populates="battery",
+        sa_relationship_kwargs={"uselist": False}
+    )
+    
+    # The station relationship is implicit via station_id, but cleaner to define if Station is imported
+    # Defining it as generic object to avoid circular dep issues in file
+    # station: Optional["Station"] = Relationship()
 
 class BatteryLifecycleEvent(SQLModel, table=True):
     __tablename__ = "battery_lifecycle_events"
@@ -66,9 +78,7 @@ class BatteryLifecycleEvent(SQLModel, table=True):
     
     event_type: str = Field(index=True) # created, assigned, maintenance_start, maintenance_end, retired
     description: Optional[str] = None
-    
-    # Actor (who performed the action)
-    actor_id: Optional[int] = None # AdminUser ID
+    actor_id: Optional[int] = None # User ID
     
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     

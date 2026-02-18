@@ -38,16 +38,28 @@ class RentalService:
 
     @staticmethod
     def initiate_rental(db: Session, user_id: int, rental_in: RentalCreate) -> Rental:
-        # 1. Verify battery availability
+        # 1. Enforce single active rental constraint
+        active_rental = db.exec(
+            select(Rental).where(
+                Rental.user_id == user_id, 
+                Rental.status.in_(["active", "pending_payment"])
+            )
+        ).first()
+        if active_rental:
+            raise HTTPException(
+                status_code=400, 
+                detail="User already has an active rental or pending payment"
+            )
+
+        # 2. Verify battery availability
         battery = db.get(Battery, rental_in.battery_id)
-        if not battery or battery.status not in ["ready", "available"]: # "ready" is the status set in StationService check
-             # If station slot says 'ready', battery status should be 'ready' or 'available'
-             pass
+        if not battery or battery.status not in ["ready", "available"]:
+             raise HTTPException(status_code=400, detail="Battery is not available for rental")
         
-        # 2. Calculate final price (ensure consistency)
+        # 3. Calculate final price
         price_details = RentalService.calculate_price(db, rental_in.battery_id, rental_in.duration_days, rental_in.promo_code)
         
-        # 3. Create Rental (PENDING_PAYMENT)
+        # 4. Create Rental (PENDING_PAYMENT)
         rental = Rental(
             user_id=user_id,
             battery_id=rental_in.battery_id,
@@ -64,7 +76,7 @@ class RentalService:
         )
         db.add(rental)
         
-        # Reserve battery?
+        # Reserve battery
         battery.status = "reserved"
         db.add(battery)
         
@@ -79,35 +91,47 @@ class RentalService:
             raise HTTPException(status_code=400, detail="Invalid rental state")
             
         rental.status = "active"
-        rental.payment_transaction_id = payment_ref # Assuming field exists or add it
+        rental.payment_transaction_id = payment_ref
         rental.terms_accepted_at = datetime.utcnow()
         
-        # Unlock battery
+        # Update Battery status
         battery = db.get(Battery, rental.battery_id)
-        battery.status = "rented"
-        
-        # Unlock slot
-        # Access slot via battery location or query
-        # This part requires integrating with StationService or Slot logic
+        if battery:
+            battery.status = "rented"
+            db.add(battery)
         
         db.add(rental)
-        db.add(battery)
         db.commit()
         db.refresh(rental)
         return rental
 
-    # Legacy wrapper if needed
-    @staticmethod
-    def create_rental(db: Session, user_id: int, rental_in: RentalCreate) -> Rental:
-        return RentalService.initiate_rental(db, user_id, rental_in)
-
     @staticmethod
     def get_active_rentals(db: Session, user_id: int) -> List[Rental]:
-        return db.exec(select(Rental).where(Rental.user_id == user_id, Rental.status == "active")).all()
+        from sqlalchemy.orm import selectinload
+        return db.exec(
+            select(Rental)
+            .where(Rental.user_id == user_id, Rental.status == "active")
+            .options(selectinload(Rental.battery))
+        ).all()
+
+    @staticmethod
+    def get_current_rental(db: Session, user_id: int) -> Optional[Rental]:
+        from sqlalchemy.orm import selectinload
+        return db.exec(
+            select(Rental)
+            .where(Rental.user_id == user_id, Rental.status.in_(["active", "pending_payment"]))
+            .options(selectinload(Rental.battery))
+        ).first()
 
     @staticmethod
     def get_history(db: Session, user_id: int) -> List[Rental]:
-        return db.exec(select(Rental).where(Rental.user_id == user_id).order_by(Rental.start_time.desc())).all()
+        from sqlalchemy.orm import selectinload
+        return db.exec(
+            select(Rental)
+            .where(Rental.user_id == user_id)
+            .options(selectinload(Rental.battery))
+            .order_by(Rental.start_time.desc())
+        ).all()
 
     @staticmethod
     def return_battery(db: Session, rental_id: int, station_id: int) -> Rental:
@@ -117,15 +141,13 @@ class RentalService:
              
         rental.status = "completed"
         rental.drop_station_id = station_id
-        # Calculate final price if needed (or late fees)
         
         battery = db.get(Battery, rental.battery_id)
-        battery.status = "available"
-        # Update battery location to this station? Station needs slots update.
-        # Assuming IoT updates station slot.
+        if battery:
+            battery.status = "available"
+            db.add(battery)
          
         db.add(rental)
-        db.add(battery)
         
         event = RentalEvent(
             rental_id=rental.id,

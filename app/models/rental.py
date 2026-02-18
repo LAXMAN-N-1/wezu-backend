@@ -1,52 +1,62 @@
-from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, List
 from datetime import datetime
+from typing import Optional, List, TYPE_CHECKING
+from sqlmodel import SQLModel, Field, Relationship
+from enum import Enum
+
+if TYPE_CHECKING:
+    from app.models.user import User
+    from app.models.battery import Battery
+    from app.models.station import Station
+    from app.models.swap import Swap
+    from app.models.finance.transaction import Transaction
+
+class RentalStatus(str, Enum):
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    OVERDUE = "overdue"
+    CANCELLED = "cancelled"
+    PENDING_PAYMENT = "pending_payment"
 
 class Rental(SQLModel, table=True):
     __tablename__ = "rentals"
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id")
-    battery_id: int = Field(foreign_key="batteries.id")
-    pickup_station_id: int = Field(foreign_key="stations.id")
-    drop_station_id: Optional[int] = Field(default=None, foreign_key="stations.id")
     
-    status: str = Field(default="active") # active, completed, cancelled
+    # Core References
+    user_id: int = Field(foreign_key="users.id", index=True)
+    battery_id: int = Field(foreign_key="batteries.id", index=True)
     
+    # Location
+    start_station_id: int = Field(foreign_key="stations.id")
+    end_station_id: Optional[int] = Field(default=None, foreign_key="stations.id")
+    
+    # Timings
     start_time: datetime = Field(default_factory=datetime.utcnow)
+    expected_end_time: datetime
     end_time: Optional[datetime] = None
     
-    # Cost Breakdown
-    rental_duration_days: int = Field(default=1)
-    daily_rate: float = Field(default=0.0)
-    damage_deposit: float = Field(default=0.0)
-    discount_amount: float = Field(default=0.0)
-    promo_code_id: Optional[int] = Field(default=None, foreign_key="promo_codes.id")
+    # Financials
+    total_amount: float = Field(default=0.0)
+    security_deposit: float = Field(default=0.0)
+    late_fee: float = Field(default=0.0)
+    currency: str = Field(default="INR")
+    is_deposit_refunded: bool = Field(default=False)
     
-    total_price: float = Field(default=0.0)
-    late_fee_amount: float = Field(default=0.0)
-    late_fee_applicable: bool = Field(default=False)
+    # State
+    status: RentalStatus = Field(default=RentalStatus.ACTIVE, index=True)
     
-    # Verification & Flow
-    terms_accepted_at: Optional[datetime] = None
-    pickup_verified: bool = Field(default=False)
-    return_verified: bool = Field(default=False)
+    # Metrics
+    start_battery_level: float = Field(default=100.0)
+    end_battery_level: float = Field(default=0.0)
+    distance_traveled_km: float = Field(default=0.0)
     
-    # Relationships
-    user: "User" = Relationship()
-    battery: "Battery" = Relationship()
-    events: List["RentalEvent"] = Relationship(back_populates="rental")
-
-class Purchase(SQLModel, table=True):
-    __tablename__ = "purchases"
-    id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id")
-    battery_id: int = Field(foreign_key="batteries.id")
-    amount: float
-    status: str = Field(default="pending") # pending, success, failed
-    transaction_id: Optional[int] = Field(default=None, foreign_key="transactions.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     # Relationships
-    user: "User" = Relationship()
-    battery: "Battery" = Relationship()
-    transaction: Optional["Transaction"] = Relationship()
+    user: "User" = Relationship(back_populates="rentals")
+    battery: "Battery" = Relationship(back_populates="rentals")
+    start_station: "Station" = Relationship(sa_relationship_kwargs={"foreign_keys": "[Rental.start_station_id]"})
+    end_station: Optional["Station"] = Relationship(sa_relationship_kwargs={"foreign_keys": "[Rental.end_station_id]"})
+    
+    swaps: List["Swap"] = Relationship(back_populates="rental")
+    transactions: List["Transaction"] = Relationship(back_populates="rental")

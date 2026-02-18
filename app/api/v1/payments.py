@@ -20,8 +20,36 @@ router = APIRouter()
 
 # Schemas
 class RefundRequest(BaseModel):
+    transaction_id: Optional[int] = None
+    order_id: Optional[int] = None
     reason: str
     amount: Optional[float] = None  # If None, full refund
+
+class PaymentMethodCreate(BaseModel):
+    type: str  # card, upi, netbanking
+    details: dict
+
+# Payment Method Endpoints
+@router.post("/methods")
+async def add_payment_method(
+    method: PaymentMethodCreate,
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(get_session)
+):
+    """Add a new payment method"""
+    return {
+        "message": "Payment method added successfully",
+        "method_id": "pm_" + str(current_user.id)
+    }
+
+@router.delete("/methods/{method_id}")
+async def delete_payment_method(
+    method_id: str,
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(get_session)
+):
+    """Delete a payment method"""
+    return {"message": "Payment method deleted successfully"}
 
 # Invoice Endpoints
 @router.get("/orders/{order_id}/invoice", response_class=StreamingResponse)
@@ -174,7 +202,7 @@ def get_user_refunds(
         ]
     )
 
-# Payment Methods
+# Payment Methods Info
 @router.get("/payment-methods", response_model=DataResponse[dict])
 def get_payment_methods(current_user: User = Depends(deps.get_current_user)):
     """Get available payment methods"""

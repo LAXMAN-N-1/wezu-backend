@@ -224,3 +224,28 @@ class CatalogService:
         except Exception as e:
             session.rollback()
             logger.error(f"Failed to release stock: {str(e)}")
+    @staticmethod
+    def get_catalog_metadata(session: Session) -> Dict[str, Any]:
+        """Get available categories, brands, and price ranges for filtering"""
+        from sqlmodel import func
+        
+        categories = session.exec(select(CatalogProduct.category).distinct()).all()
+        brands = session.exec(select(CatalogProduct.brand).distinct()).all()
+        
+        # Price range
+        min_price = session.exec(select(func.min(CatalogProduct.price))).one() or 0
+        max_price = session.exec(select(func.max(CatalogProduct.price))).one() or 0
+        
+        # Capacities (for battery filtering)
+        capacities = session.exec(
+            select(CatalogProduct.capacity_mah)
+            .where(CatalogProduct.category == "BATTERY")
+            .distinct()
+        ).all()
+        
+        return {
+            "categories": [c for c in categories if c],
+            "brands": [b for b in brands if b],
+            "price_range": {"min": min_price, "max": max_price},
+            "capacities": [cap for cap in capacities if cap]
+        }

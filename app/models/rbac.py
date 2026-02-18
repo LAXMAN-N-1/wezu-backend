@@ -54,7 +54,7 @@ class Role(SQLModel, table=True):
     description: Optional[str] = None
     category: str = Field(default="system") # powerfill_staff, vendor_staff, customer, system
     level: int = Field(default=0) # Hierarchy level (e.g. 100=Admin, 10=User)
-    parent_role_id: Optional[int] = Field(default=None, foreign_key="roles.id")
+    parent_id: Optional[int] = Field(default=None, foreign_key="roles.id")
     is_system_role: bool = Field(default=False)  # If True, cannot be deleted (e.g., Super Admin)
     is_active: bool = Field(default=True)
     
@@ -62,14 +62,14 @@ class Role(SQLModel, table=True):
     parent: Optional["Role"] = Relationship(
         sa_relationship_kwargs={
             "remote_side": "Role.id",
-            "primaryjoin": "Role.parent_role_id==Role.id",
+            "primaryjoin": "Role.parent_id==Role.id",
             "back_populates": "children"
         }
     )
     children: List["Role"] = Relationship(
         back_populates="parent",
         sa_relationship_kwargs={
-            "primaryjoin": "Role.parent_role_id==Role.id"
+            "primaryjoin": "Role.parent_id==Role.id"
         }
     )
 
@@ -84,7 +84,8 @@ class Role(SQLModel, table=True):
         }
     )
 
-    users: List["User"] = Relationship(back_populates="roles", link_model=UserRole)
+    # Change to One-to-Many to match User model
+    users: List["User"] = Relationship(back_populates="role")
     
     # Merged from app/models/role.py (Legacy/Chandu branch)
     role_rights: List["RoleRight"] = Relationship(back_populates="role", sa_relationship_kwargs={"cascade": "all, delete-orphan"})

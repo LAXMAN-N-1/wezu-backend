@@ -1,56 +1,81 @@
-from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, List
 from datetime import datetime
+from typing import Optional, List, TYPE_CHECKING
+from sqlmodel import SQLModel, Field, Relationship
+from enum import Enum
 
-class Wallet(SQLModel, table=True):
-    __tablename__ = "wallets"
-    id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(unique=True, foreign_key="users.id")
-    balance: float = Field(default=0.0)
-    deposit_amount: float = Field(default=0.0) # Security deposit held
-    currency: str = Field(default="INR")
-    
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+if TYPE_CHECKING:
+    from app.models.user import User
+    from app.models.rental import Rental
+    from app.models.invoice import Invoice
 
-    # Relationship
-    user: "User" = Relationship(back_populates="wallet")
-    transactions: List["Transaction"] = Relationship(back_populates="wallet")
+class TransactionType(str, Enum):
+    RENTAL_PAYMENT = "rental_payment"
+    SECURITY_DEPOSIT = "security_deposit"
+    WALLET_TOPUP = "wallet_topup"
+    REFUND = "refund"
+    FINE = "fine"
+    SUBSCRIPTION = "subscription"
+    WITHDRAWAL = "withdrawal"
+
+class TransactionStatus(str, Enum):
+    PENDING = "pending"
+    SUCCESS = "success"
+    FAILED = "failed"
+    REFUNDED = "refunded"
 
 class Transaction(SQLModel, table=True):
     __tablename__ = "transactions"
     id: Optional[int] = Field(default=None, primary_key=True)
-    wallet_id: int = Field(foreign_key="wallets.id")
     
-    amount: float # Positive for credit, negative for debit
-    balance_after: float # Wallet balance after transaction
+    user_id: int = Field(foreign_key="users.id", index=True)
+    rental_id: Optional[int] = Field(default=None, foreign_key="rentals.id")
+    wallet_id: Optional[int] = Field(default=None, foreign_key="wallets.id")
     
-    type: str = Field(index=True) # credit, debit
-    category: str = Field(index=True) # deposit, swap_fee, penalty, refund, withdrawal
+    amount: float
+    currency: str = Field(default="INR")
     
-    status: str = Field(default="success") # success, pending, failed
+    transaction_type: TransactionType = Field(index=True)
+    status: TransactionStatus = Field(default=TransactionStatus.PENDING, index=True)
     
-    # References (Generic Foreign Key Concept)
-    reference_type: Optional[str] = None # swap_session, payment_gateway, admin_adjustment
-    reference_id: Optional[str] = None # ID of the related entity
+    payment_method: str = Field(default="upi") # upi, card, netbanking, wallet
+    payment_gateway_ref: Optional[str] = Field(default=None, index=True) # Razorpay/Stripe ID
     
-    razorpay_payment_id: Optional[str] = None
     description: Optional[str] = None
-    
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
     # Relationships
-    wallet: Wallet = Relationship(back_populates="transactions")
+    user: "User" = Relationship(back_populates="transactions")
+    rental: Optional["Rental"] = Relationship(back_populates="transactions")
+    wallet: Optional["Wallet"] = Relationship(back_populates="transactions")
     invoice: Optional["Invoice"] = Relationship(back_populates="transaction")
-    refund: Optional["Refund"] = Relationship(back_populates="transaction")
+
+class Wallet(SQLModel, table=True):
+    __tablename__ = "wallets"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", unique=True, index=True)
+    
+    balance: float = Field(default=0.0)
+    currency: str = Field(default="INR")
+    
+    is_frozen: bool = Field(default=False)
+    
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationships
+    user: "User" = Relationship(back_populates="wallet")
+    transactions: List["Transaction"] = Relationship(back_populates="wallet")
+    withdrawal_requests: List["WalletWithdrawalRequest"] = Relationship(back_populates="wallet")
 
 class WalletWithdrawalRequest(SQLModel, table=True):
     __tablename__ = "wallet_withdrawal_requests"
     id: Optional[int] = Field(default=None, primary_key=True)
     wallet_id: int = Field(foreign_key="wallets.id")
     amount: float
-    status: str = Field(default="requested") # requested, approved, processed, rejected
-    bank_details: str # JSON of bank info
+    status: str = Field(default="requested") # requested, approved, rejected, processed
+    bank_details: str 
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
     processed_at: Optional[datetime] = None
+    
+    wallet: "Wallet" = Relationship(back_populates="withdrawal_requests")

@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
-from typing import Optional, List, Dict
-from datetime import datetime
+from typing import Optional, List, Dict, Any
+from datetime import datetime, date
 from app.models.user import User
 
 class AddressBase(BaseModel):
@@ -53,7 +53,19 @@ class UserUpdate(BaseModel):
     profile_picture: Optional[str] = None
     is_active: Optional[bool] = None
     role_id: Optional[int] = None
-    address: Optional[str] = None
+    
+    # Extended Profile Fields
+    address_line_1: Optional[str] = None
+    address_line_2: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    pin_code: Optional[str] = None
+    country: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = None
+    preferred_language: Optional[str] = None
+    
+    # Legacy / Other
     emergency_contact: Optional[str] = None
     notification_preferences: Optional[str] = None  # JSON: {"push": true, "email": true, "sms": false}
     security_question: Optional[str] = None
@@ -73,7 +85,8 @@ class UserResponse(UserBase):
     kyc_status: str
     wallet_balance: float = 0.0 # Virtual field
     addresses: List[AddressResponse] = []
-    roles: List[RoleResponse] = []
+    # roles: List[RoleResponse] = [] # Deprecated
+    role: Optional[RoleResponse] = None # New single role
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -131,6 +144,17 @@ class UserProfileResponse(BaseModel):
     phone_number: Optional[str] = None
     profile_picture: Optional[str] = None
     
+    # Extended Profile Info from UserProfile
+    address_line_1: Optional[str] = None
+    address_line_2: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    pin_code: Optional[str] = None
+    country: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = None
+    preferred_language: Optional[str] = None
+    
     # Status
     is_active: bool
     is_superuser: bool
@@ -138,7 +162,7 @@ class UserProfileResponse(BaseModel):
     
     # Roles & Permissions
     current_role: Optional[str] = None
-    available_roles: List[str] = []
+    available_roles: List[str] = [] # Legacy compatibility
     permissions: List[str] = []
     menu: List[MenuItem] = []
     
@@ -186,8 +210,6 @@ class UserSessionResponse(BaseModel):
     is_current: bool = False # Helper field
 
     model_config = ConfigDict(from_attributes=True)
-
-from typing import Any
 
 class KYCDocumentResponse(BaseModel):
     id: int

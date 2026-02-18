@@ -37,6 +37,40 @@ async def get_transactions(
     return db.exec(select(Transaction).where(Transaction.wallet_id == wallet.id).order_by(Transaction.created_at.desc())).all()
 
 from pydantic import BaseModel
+class TransferRequest(BaseModel):
+    recipient_phone: str
+    amount: float
+    note: Optional[str] = None
+
+@router.post("/transfer", response_model=TransactionResponse)
+async def transfer_to_user(
+    request: TransferRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
+):
+    """Transfer money to another user by phone number"""
+    return WalletService.transfer_balance(
+        db, 
+        sender_id=current_user.id, 
+        recipient_phone=request.recipient_phone, 
+        amount=request.amount, 
+        note=request.note
+    )
+
+@router.get("/cashback")
+async def get_cashback_history(
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
+):
+    """Get cashback history and total"""
+    transactions = WalletService.get_cashback_history(db, current_user.id)
+    total_cashback = sum(t.amount for t in transactions)
+    
+    return {
+        "total_cashback": total_cashback,
+        "transactions": transactions
+    }
+
 class WithdrawRequest(BaseModel):
     amount: float
     bank_details: dict

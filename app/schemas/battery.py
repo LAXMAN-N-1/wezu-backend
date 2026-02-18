@@ -2,6 +2,7 @@ from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 from app.schemas.battery_catalog import BatterySpecResponse, BatteryBatchResponse
+from app.schemas.iot import IoTDeviceResponse
 
 # --- Lifecycle Event Schemas ---
 class BatteryLifecycleEventBase(BaseModel):
@@ -44,10 +45,10 @@ class BatteryUpdate(BaseModel):
 
 class BatteryResponse(BatteryBase):
     id: int
-    status: str
-    current_charge: float
-    health_percentage: float
-    cycle_count: int
+    status: Optional[str] = "new"
+    current_charge: Optional[float] = 0.0
+    health_percentage: Optional[float] = 100.0
+    cycle_count: Optional[int] = 0
     created_at: datetime
     location_type: Optional[str] = None
     location_id: Optional[int] = None
@@ -55,6 +56,7 @@ class BatteryResponse(BatteryBase):
     # Nested Info
     spec: Optional["BatterySpecResponse"] = None
     batch: Optional["BatteryBatchResponse"] = None
+    iot_device: Optional["IoTDeviceResponse"] = None
     
     model_config = ConfigDict(from_attributes=True)
 

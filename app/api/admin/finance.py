@@ -22,9 +22,7 @@ def list_transactions(
     """List all financial transactions."""
     statement = select(Transaction)
     if type:
-        statement = statement.where(Transaction.type == type)
-    if category:
-        statement = statement.where(Transaction.category == category)
+        statement = statement.where(Transaction.transaction_type == type)
     
     statement = statement.offset(skip).limit(limit).order_by(Transaction.created_at.desc())
     transactions = db.exec(statement).all()

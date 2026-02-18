@@ -25,7 +25,9 @@ class StationService:
         status: Optional[str] = None,
         is_24x7: Optional[bool] = None,
         sort_by: str = "distance"
-    ) -> List[Station]:
+    ) -> List['NearbyStationResponse']:
+        from app.schemas.station import NearbyStationResponse, StationImageResponse
+        
         # 1. Base Query
         query = select(Station)
         if status:
@@ -44,12 +46,22 @@ class StationService:
         
         nearby = []
         for station in stations:
-            dist = StationService.haversine(lat, lon, station.latitude, station.longitude)
+            dist = StationService.haversine(lon, lat, station.longitude, station.latitude)
             if dist <= radius_km:
-                # Monkey patch for Pydantic response
-                station.distance = dist 
-                station.available_batteries = availability_map.get(station.id, 0)
-                nearby.append(station)
+                # Create the response object
+                station_data = station.model_dump()
+                # Images need to be converted to schemas too if the relation is loaded
+                # For simplicity, we can load images or just pass empty for now if not needed
+                # However, StationResponse expects List[StationImageResponse]
+                images = [StationImageResponse(url=img.url, is_primary=img.is_primary) for img in station.images]
+                
+                nearby_station = NearbyStationResponse(
+                    **station_data,
+                    images=images,
+                    distance=dist,
+                    available_batteries=availability_map.get(station.id, 0)
+                )
+                nearby.append(nearby_station)
         
         # 3. Sort
         if sort_by == "rating":

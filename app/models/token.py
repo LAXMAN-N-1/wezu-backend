@@ -28,4 +28,4 @@ class SessionToken(SQLModel, table=True):
     last_activity_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Relationship
-    user: "User" = Relationship(back_populates="sessions")
+    user: "User" = Relationship(back_populates="session_tokens")

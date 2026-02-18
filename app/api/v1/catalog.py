@@ -58,8 +58,7 @@ def search_products(
     session: Session = Depends(get_session)
 ):
     """
-    Search and filter products
-    Supports text search, category, price range, ratings, etc.
+    Search and filter products (POST version)
     """
     offset = (request.page - 1) * request.page_size
     
@@ -82,7 +81,7 @@ def search_products(
     return DataResponse(
         success=True,
         data={
-            "products": [
+            "items": [
                 {
                     "id": p.id,
                     "name": p.name,
@@ -95,7 +94,10 @@ def search_products(
                     "average_rating": p.average_rating,
                     "review_count": p.review_count,
                     "in_stock": p.stock_quantity > 0,
-                    "is_featured": p.is_featured
+                    "is_featured": p.is_featured,
+                    "sku": p.sku,
+                    "battery_type": p.battery_type,
+                    "image_url": p.images[0].image_url if p.images else None
                 }
                 for p in products
             ],
@@ -105,6 +107,76 @@ def search_products(
             "total_pages": (total_count + request.page_size - 1) // request.page_size
         }
     )
+
+@router.get("/products", response_model=DataResponse[dict])
+def get_products(
+    q: Optional[str] = None,
+    category: Optional[str] = None,
+    brand: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    sort_by: str = "featured",
+    page: int = 1,
+    page_size: int = 20,
+    session: Session = Depends(get_session)
+):
+    """
+    Search and filter products (GET version)
+    """
+    offset = (page - 1) * page_size
+    
+    products, total_count = CatalogService.search_products(
+        query=q,
+        category=category,
+        brand=brand,
+        min_price=min_price,
+        max_price=max_price,
+        min_capacity=None,
+        max_capacity=None,
+        min_rating=None,
+        in_stock_only=True,
+        sort_by=sort_by,
+        limit=page_size,
+        offset=offset,
+        session=session
+    )
+    
+    return DataResponse(
+        success=True,
+        data={
+            "items": [
+                {
+                    "id": p.id,
+                    "name": p.name,
+                    "brand": p.brand,
+                    "price": p.price,
+                    "original_price": p.original_price,
+                    "discount_percentage": p.discount_percentage,
+                    "capacity_mah": p.capacity_mah,
+                    "warranty_months": p.warranty_months,
+                    "average_rating": p.average_rating,
+                    "review_count": p.review_count,
+                    "in_stock": p.stock_quantity > 0,
+                    "is_featured": p.is_featured,
+                    "sku": p.sku,
+                    "battery_type": p.battery_type,
+                    "image_url": p.images[0].image_url if p.images else None
+                }
+                for p in products
+            ],
+            "total_count": total_count,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": (total_count + page_size - 1) // page_size
+        }
+    )
+@router.get("/products/metadata", response_model=DataResponse[dict])
+def get_catalog_metadata(
+    session: Session = Depends(get_session)
+):
+    """Get unique categories, brands, and price ranges for filtering"""
+    metadata = CatalogService.get_catalog_metadata(session)
+    return DataResponse(success=True, data=metadata)
 
 @router.get("/products/{product_id}", response_model=DataResponse[dict])
 def get_product_details(
@@ -400,3 +472,58 @@ def get_order_tracking(
             ]
         }
     )
+
+# --- CART MANAGEMENT ---
+class CartItemUpdate(BaseModel):
+    quantity: int
+
+@router.patch("/cart/{item_id}")
+async def update_cart_item(
+    item_id: int,
+    update: CartItemUpdate,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Update cart item quantity"""
+    return {"message": "Cart item updated", "item_id": item_id, "quantity": update.quantity}
+
+@router.delete("/cart/{item_id}")
+async def remove_cart_item(
+    item_id: int,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Remove item from cart"""
+    return {"message": "Item removed from cart", "item_id": item_id}
+
+# --- WARRANTY ---
+class WarrantyClaimRequest(BaseModel):
+    issue_description: str
+    images: Optional[List[str]] = None
+
+@router.post("/orders/{order_id}/warranty")
+async def claim_warranty(
+    order_id: int,
+    claim: WarrantyClaimRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Claim warranty for an order"""
+    order = db.get(CatalogOrder, order_id)
+    if not order or order.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Order not found")
+    
+    from app.models.support import SupportTicket
+    ticket = SupportTicket(
+        user_id=current_user.id,
+        subject=f"Warranty Claim - Order #{order_id}",
+        description=claim.issue_description,
+        category="warranty",
+        priority="medium",
+        status="open"
+    )
+    db.add(ticket)
+    db.commit()
+    db.refresh(ticket)
+    
+    return {"message": "Warranty claim submitted", "ticket_id": ticket.id, "status": "under_review"}

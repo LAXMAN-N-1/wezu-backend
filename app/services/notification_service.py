@@ -83,3 +83,22 @@ class NotificationService:
             notif.is_read = True
             db.add(notif)
             db.commit()
+
+    @staticmethod
+    def mark_all_read(db: Session, user_id: int) -> int:
+        statement = select(Notification).where(Notification.user_id == user_id, Notification.is_read == False)
+        unread = db.exec(statement).all()
+        for notif in unread:
+            notif.is_read = True
+            db.add(notif)
+        db.commit()
+        return len(unread)
+
+    @staticmethod
+    def clear_all_notifications(db: Session, user_id: int) -> int:
+        statement = select(Notification).where(Notification.user_id == user_id)
+        notifications = db.exec(statement).all()
+        for notif in notifications:
+            db.delete(notif)
+        db.commit()
+        return len(notifications)

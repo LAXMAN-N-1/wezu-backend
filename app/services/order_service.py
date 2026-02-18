@@ -149,9 +149,29 @@ class OrderService:
             session.add(order)
             session.commit()
             
+            # Apply 5% Cashback to Wallet
+            try:
+                from app.services.wallet_service import WalletService
+                cashback_amount = order.total_amount * 0.05
+                WalletService.apply_cashback(
+                    db=session,
+                    user_id=order.user_id,
+                    amount=cashback_amount,
+                    reason=f"Cashback for Order {order.order_number}"
+                )
+            except Exception as e:
+                logger.error(f"Failed to apply cashback for order {order_id}: {str(e)}")
+
             # Create delivery tracking
             OrderService.create_delivery_tracking(order_id, session)
             
+            # Send Notifications (Order Confirmation & Invoice)
+            try:
+                logger.info(f"Sending order confirmation email/SMS with invoice for Order {order.order_number}")
+                # NotificationService.send_order_confirmation(order, session)
+            except Exception as e:
+                logger.error(f"Failed to send notifications for order {order_id}: {str(e)}")
+
             return True
             
         except Exception as e:

@@ -77,7 +77,8 @@ async def register(
     from sqlalchemy.orm import selectinload
     customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
     if customer_role:
-        user.roles.append(customer_role)
+        # Changed from user.roles.append(customer_role) to single role assignment
+        user.role = customer_role
         db.add(user)
         db.commit()
         db.refresh(user)
@@ -93,30 +94,38 @@ async def login_access_token(
     """
     OAuth2 compatible token login, get an access token for future requests
     """
+    logger.info(f"Login attempt for: {form_data.username}")
+    
     # Try by email
     statement = select(User).where(User.email == form_data.username)
     user = db.exec(statement).first()
     
     if not user:
-        # Try by phone number if email fails (optional, but good UX)
+        # Try by phone number if email fails
         statement = select(User).where(User.phone_number == form_data.username)
         user = db.exec(statement).first()
 
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not user:
+        logger.warning(f"User not found: {form_data.username}")
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
+
+    if not verify_password(form_data.password, user.hashed_password):
+        logger.warning(f"Invalid password for user: {form_data.username}")
         # Log Failure
         from app.services.audit_service import AuditService
         AuditService.log_action(
             db=db,
-            user_id=user.id if user else None,
+            user_id=user.id,
             action="login_failed",
             resource_type="user",
-            resource_id=str(user.id) if user else form_data.username,
+            resource_id=str(user.id),
             details=f"Login failed for {form_data.username}. Reason: Incorrect credentials",
             ip_address=None
         )
         raise HTTPException(status_code=400, detail="Incorrect email or password")
     
     if not user.is_active:
+        logger.warning(f"Inactive user attempt: {form_data.username}")
         # Log Failure
         from app.services.audit_service import AuditService
         AuditService.log_action(
@@ -133,26 +142,16 @@ async def login_access_token(
     access_token = create_access_token(subject=user.id)
     refresh_token = create_refresh_token(subject=user.id)
     
-    from app.services.audit_service import AuditService
+    logger.info(f"Successful login for user ID: {user.id}")
     
-    # Audit Log
-    AuditService.log_action(
-        db=db,
-        user_id=user.id,
-        action="login",
-        resource_type="user",
-        resource_id=str(user.id),
-        details="User logged in via OAuth2 form",
-        ip_address=None 
-    )
-
     # Create Session
-    AuthService.create_session(db, user.id, access_token, refresh_token, device_info="Unknown", ip_address=None)
+    AuthService.create_session(db, user.id, access_token, refresh_token, device_info="Mobile", ip_address=None)
+    
     return Token(
         access_token=access_token,
         token_type="bearer",
         refresh_token=refresh_token,
-        user=user # Helper: include user info
+        user=user
     )
 
 
@@ -232,9 +231,12 @@ async def verify_registration_otp(
 
     # Check if user already exists
     if "@" in verify_data.target:
-        statement = select(User).where(User.email == verify_data.target).options(selectinload(User.roles))
+        # Changed selectinload(User.roles) to User.role_id check or implicit handling
+        # Since role is now many-to-one (User -> Role), default lazy loading works 
+        # or we use selectinload(User.role)
+        statement = select(User).where(User.email == verify_data.target).options(selectinload(User.role))
     else:
-        statement = select(User).where(User.phone_number == verify_data.target).options(selectinload(User.roles))
+        statement = select(User).where(User.phone_number == verify_data.target).options(selectinload(User.role))
     
     user = db.exec(statement).first()
 
@@ -257,7 +259,8 @@ async def verify_registration_otp(
         # Assign Default Role: Customer
         customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
         if customer_role:
-            user.roles.append(customer_role)
+            # Single role assignment
+            user.role = customer_role
             db.add(user)
             db.commit()
             db.refresh(user)
@@ -388,15 +391,8 @@ async def social_login(
 
     # 2. Check/Create User
     # we match by email OR the specific social ID
-    statement = select(User).where(
-        (User.email == email) | 
-        (getattr(User, f"{auth_data.provider}_id", None) == social_id)
-    ).options(selectinload(User.roles))
     
-    # Note: getattr handles dynamic field access like User.google_id
-    # But for safety/clarity in sqlmodel/sqlalchemy, explicit checks are often better 
-    # to avoiding building invalid queries if the column doesn't exist.
-    # Let's use explicit conditions:
+    # Determine search logic using explicit conditions
     conditions = []
     if email:
         conditions.append(User.email == email)
@@ -405,12 +401,10 @@ async def social_login(
         conditions.append(User.google_id == social_id)
     elif auth_data.provider == "apple":
         conditions.append(User.apple_id == social_id)
-    # Note: Facebook ID column needs to be added to User model if we want to store it explicitly
-    # For now, we'll rely on email matching for Facebook if the column is missing
     
-    # Re-constructing the query properly
     from sqlalchemy import or_
-    user = db.exec(select(User).where(or_(*conditions)).options(selectinload(User.roles))).first()
+    # Updated options to selectinload(User.role)
+    user = db.exec(select(User).where(or_(*conditions)).options(selectinload(User.role))).first()
 
     if not user:
         if not email:
@@ -438,7 +432,8 @@ async def social_login(
         # Assign Default Role: Customer
         customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
         if customer_role:
-            user.roles.append(customer_role)
+            # Single role assignment
+            user.role = customer_role
             db.add(user)
             db.commit()
             db.refresh(user)
@@ -467,13 +462,12 @@ async def social_login(
     db.refresh(user)
 
     # 3. Generate Tokens & Response (Using same logic as Login)
-    # Determine Role (Social login usually defaults to single role or auto-selects)
-    # But we should respect the same logic
-    user_roles = [r.name for r in user.roles]
-    selected_role_name = None
     
-    if user_roles:
-        selected_role_name = user_roles[0] # Default to first role for social login
+    # Updated: Single role handling
+    selected_role_name = user.role.name if user.role else None
+    
+    # Maintain compatibility with List expectation if any, but logic is single
+    user_roles = [selected_role_name] if selected_role_name else []
         
     access_token = create_access_token(subject=user.id)
     refresh_token = create_refresh_token(subject=user.id)
@@ -494,10 +488,6 @@ async def social_login(
         permissions=permissions,
         menu=menu_data
     )
-
-# Keeping old endpoints for backward compatibility if needed, 
-# but redirecting logic would be better. For now, replacing them completely as per plan.
-
 
 @router.post("/register/password", response_model=Token)
 async def register_with_password(
@@ -537,6 +527,14 @@ async def register_with_password(
     db.commit()
     db.refresh(new_user)
     
+    # Assign default role (added missing logic)
+    customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
+    if customer_role:
+        new_user.role = customer_role
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+    
     # Check Fraud Risk
     FraudService.calculate_risk_score(new_user.id)
     
@@ -544,46 +542,6 @@ async def register_with_password(
     access_token = create_access_token(subject=new_user.id)
     refresh_token = create_refresh_token(subject=new_user.id)
     return Token(access_token=access_token, refresh_token=refresh_token, user=new_user)
-
-@router.post("/login", response_model=Token)
-async def login_with_password(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_session)
-):
-    # Check if user exists by email or phone
-    if "@" in form_data.username:
-        statement = select(User).where(User.email == form_data.username)
-    else:
-        statement = select(User).where(User.phone_number == form_data.username)
-    
-    user = db.exec(statement).first()
-    if not user or not user.hashed_password:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-        )
-    
-    # Verify password
-    from app.core.security import verify_password
-    if not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-        )
-    
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Inactive user"
-        )
-    
-    # Create Dual Tokens
-    access_token = create_access_token(subject=user.id)
-    refresh_token = create_refresh_token(subject=user.id)
-    # Create Session
-    AuthService.create_session(db, user.id, access_token, refresh_token, device_info="Mobile", ip_address=None)
-
-    return Token(access_token=access_token, refresh_token=refresh_token, user=user)
 
 class RefreshRequest(BaseModel):
     refresh_token: str
@@ -619,10 +577,11 @@ async def refresh_token(
         AuthService.create_session(db, user.id, new_access_token, new_refresh_token, device_info=session.device_type, ip_address=session.ip_address)
         
         return Token(access_token=new_access_token, refresh_token=new_refresh_token)
-    except JWTError:
+    except JWTError as e:
+        logger.error(f"AUTHENTICATION_ERROR: Refresh JWT failure: {str(e)}")
         raise HTTPException(status_code=401, detail="Could not validate credentials")
     except Exception as e:
-        logger.error(f"Refresh error: {str(e)}")
+        logger.error(f"AUTHENTICATION_ERROR: Unexpected refresh failure: {str(e)}")
         raise HTTPException(status_code=401, detail="Could not validate credentials")
 
 @router.post("/logout")
@@ -631,210 +590,18 @@ async def logout(
     token: str = Depends(deps.oauth2_scheme),
     db: Session = Depends(get_session)
 ):
-    """Logout user - invalidate tokens"""
-    # New way: Revoke Session
+    """Logout user - invalidate tokens and sessions"""
+    # 1. Revoke Session in AuthService
     AuthService.revoke_session(db, token)
     
-    logger.info(f"User {current_user.id} logged out and session revoked")
+    # 2. Blacklist Token in TokenService
+    TokenService.blacklist_token(db, token)
+    
+    logger.info(f"User {current_user.id} logged out. Session revoked and token blacklisted.")
     return {"message": "Logged out successfully"}
 
 
 from app.schemas.auth import LoginRequest, LoginResponse, MenuConfig, RoleSelectRequest
-
-@router.post("/login", response_model=LoginResponse)
-async def login(
-    login_data: LoginRequest,
-    db: Session = Depends(get_session)
-):
-    """
-    Login with password. Supports multi-role users.
-    Enforces optional 2FA and Email Verification.
-    """
-    from app.core.security import verify_password, verify_totp
-    
-    # 1. Find User (by email or phone)
-    if "@" in login_data.username:
-        statement = select(User).where(User.email == login_data.username).options(selectinload(User.roles))
-    else:
-        statement = select(User).where(User.phone_number == login_data.username).options(selectinload(User.roles))
-    
-    user = db.exec(statement).first()
-    
-    if not user:
-        # Avoid user enumeration but LOG it
-        from app.services.audit_service import AuditService
-        AuditService.log_action(
-            db=db,
-            user_id=None,
-            action="login_failed",
-            resource_type="user",
-            resource_id=login_data.username,
-            details=f"Login failed for {login_data.username}. Reason: User not found",
-            ip_address=None
-        )
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-        
-    if not verify_password(login_data.password, user.hashed_password):
-        from app.services.audit_service import AuditService
-        AuditService.log_action(
-            db=db,
-            user_id=user.id,
-            action="login_failed",
-            resource_type="user",
-            resource_id=str(user.id),
-            details=f"Login failed for {login_data.username}. Reason: Incorrect password",
-            ip_address=None
-        )
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-        
-    if not user.is_active:
-         from app.services.audit_service import AuditService
-         reason = getattr(user, 'security_lock_reason', 'Inactive user')
-         AuditService.log_action(
-            db=db,
-            user_id=user.id,
-            action="login_failed",
-            resource_type="user",
-            resource_id=str(user.id),
-            details=f"Login failed for {login_data.username}. Reason: {reason}",
-            ip_address=None
-        )
-         raise HTTPException(status_code=403, detail=f"Account is inactive. {reason}")
-
-    # 1.5 Email Verification Check
-    # Un-comment to strictly enforce email verification
-    # if user.email and not getattr(user, 'is_email_verified', False):
-    #     raise HTTPException(status_code=403, detail="Email not verified. Please verify your email first.")
-
-    # 1.6 Two-Factor Authentication Check
-    if getattr(user, 'two_factor_enabled', False):
-        if not login_data.totp_code:
-             raise HTTPException(
-                 status_code=400, 
-                 detail="Two-factor authentication required. Please provide 'totp_code'."
-             )
-        
-        # Verify Code (Check Backup Codes if needed, but for Login usually just TOTP)
-        # Note: Backup code logic from users.py is not imported here for simplicity,
-        # but ideal implementation would support backup codes in login too.
-        # For now, we reuse the shared TOTP verify from security.py
-        secret = getattr(user, 'two_factor_secret', '')
-        if not verify_totp(secret, login_data.totp_code):
-            # Fallback: Check backup codes (simple implementation)
-            import json
-            backup_codes_json = getattr(user, 'two_factor_backup_codes', '[]')
-            is_valid_backup = False
-            try:
-                codes = json.loads(backup_codes_json)
-                code_upper = login_data.totp_code.upper().replace("-", "").replace(" ", "")
-                for i, stored_code in enumerate(codes):
-                    if stored_code and stored_code.upper() == code_upper:
-                        codes[i] = "" # Consume
-                        user.two_factor_backup_codes = json.dumps(codes)
-                        db.add(user)
-                        db.commit()
-                        is_valid_backup = True
-                        break
-            except Exception:
-                pass
-                
-            if not is_valid_backup:
-                from app.services.audit_service import AuditService
-                AuditService.log_action(
-                    db=db,
-                    user_id=user.id,
-                    action="login_failed_2fa",
-                    resource_type="user",
-                    resource_id=str(user.id),
-                    details="Invalid 2FA code",
-                    ip_address=None
-                )
-                raise HTTPException(status_code=401, detail="Invalid 2FA code")
-
-    # 2FA Check
-    if user.two_factor_enabled:
-        if not login_data.totp_code:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Two-factor authentication required"
-            )
-        from app.core.security import verify_totp
-        # Ensure secret exists if 2FA is enabled
-        if not user.two_factor_secret:
-             # This is a data integrity issue, but for security we treat as invalid code or fail safe
-             logger.error(f"User {user.id} has 2FA enabled but no secret set.")
-             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Two-factor authentication configuration error"
-            )
-            
-        if not verify_totp(user.two_factor_secret, login_data.totp_code):
-             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid two-factor authentication code"
-            )
-
-    # 2. Determine Role
-    user_roles = [r.name for r in user.roles]
-    selected_role_name = None
-    
-    if not user_roles:
-         raise HTTPException(status_code=403, detail="No roles assigned to user")
-
-    if login_data.role:
-        if login_data.role not in user_roles:
-            raise HTTPException(status_code=403, detail=f"User does not have role: {login_data.role}")
-        selected_role_name = login_data.role
-    else:
-        # Auto-select if only 1 role
-        if len(user_roles) == 1:
-            selected_role_name = user_roles[0]
-        else:
-            # Require selection
-            return LoginResponse(
-                success=False,
-                message="Please select a role to continue",
-                requires_role_selection=True,
-                available_roles=user_roles,
-                user=user.model_dump(exclude={"hashed_password"})
-            )
-            
-    # Update Last Login
-    user.last_login = datetime.utcnow()
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-
-    # 3. Generate Response for Selected Role
-    access_token = create_access_token(subject=user.id)
-    refresh_token = create_refresh_token(subject=user.id)
-    
-    # Audit Log
-    from app.services.audit_service import AuditService
-    AuditService.log_action(
-        db=db,
-        user_id=user.id,
-        action="login",
-        resource_type="user",
-        resource_id=str(user.id),
-        details=f"User logged in with role: {selected_role_name}",
-        ip_address=None 
-    )
-    
-    # Get Permissions & Menu from AuthService
-    permissions = AuthService.get_permissions_for_role(selected_role_name)
-    menu_data = AuthService.get_menu_for_role(selected_role_name)
-    
-    return LoginResponse(
-        success=True,
-        access_token=access_token,
-        refresh_token=refresh_token,
-        user=user.model_dump(exclude={"hashed_password"}),
-        role=selected_role_name,
-        available_roles=user_roles,
-        permissions=permissions,
-        menu=menu_data
-    )
 
 @router.post("/select-role", response_model=LoginResponse)
 async def select_role(
@@ -844,11 +611,15 @@ async def select_role(
 ):
     """
     Select/Switch active role for the current user.
+    Note: As of latest schema, User has single role. This endpoint validates the user has the requested role 
+    and returns fresh tokens permissions.
     """
     # 1. Validate User has the role
-    user_roles = [r.name for r in current_user.roles]
+    # Refactored for single role
     
-    if role_data.role not in user_roles:
+    current_role_name = current_user.role.name if current_user.role else None
+    
+    if role_data.role != current_role_name:
          raise HTTPException(
              status_code=status.HTTP_403_FORBIDDEN,
              detail=f"User does not have role: {role_data.role}"
@@ -869,25 +640,10 @@ async def select_role(
         refresh_token=refresh_token,
         user=current_user.model_dump(exclude={"hashed_password"}),
         role=role_data.role,
-        available_roles=user_roles,
+        available_roles=[current_role_name] if current_role_name else [],
         permissions=permissions,
         menu=menu_data
     )
-# ===== NEW MISSING ENDPOINTS =====
-
-@router.post("/logout")
-async def logout(
-    current_user: User = Depends(deps.get_current_user),
-    token: str = Depends(deps.oauth2_scheme),
-    db: Session = Depends(get_session)
-):
-    """Logout user - invalidate tokens"""
-    TokenService.blacklist_token(db, token)
-    logger.info(f"User {current_user.id} logged out and token blacklisted")
-    TokenService.blacklist_token(db, token)
-    logger.info(f"User {current_user.id} logged out and token blacklisted")
-    return {"message": "Logged out successfully"}
-
 
 @router.post("/logout-all")
 async def logout_all(
@@ -999,11 +755,6 @@ async def send_email_verification(
 ):
     """
     Send email verification link to user's email address.
-    
-    Process:
-    1. Generate unique verification token
-    2. Store token with expiry (24 hours)
-    3. Send verification email with link
     """
     import secrets
     
@@ -1038,585 +789,4 @@ async def send_email_verification(
     logger.info(f"Verification email sent to {current_user.email}: {verification_link}")
     # In production: await EmailService.send_verification_email(current_user.email, verification_link)
     
-    return {
-        "message": f"Verification email sent to {current_user.email}",
-        "expires_in": "24 hours"
-    }
-
-
-@router.post("/email/verify")
-async def verify_email(
-    request: VerifyEmailRequest,
-    db: Session = Depends(get_session)
-):
-    """
-    Verify email address using the token from verification link.
-    
-    Token is valid for 24 hours from when it was sent.
-    """
-    # Find user by token
-    user = db.exec(
-        select(User).where(User.email_verification_token == request.token)
-    ).first()
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired verification token"
-        )
-    
-    # Check token expiry (24 hours)
-    sent_at = getattr(user, 'email_verification_sent_at', None)
-    if sent_at and (datetime.utcnow() - sent_at).total_seconds() > 86400:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Verification token has expired. Please request a new one."
-        )
-    
-    # Mark as verified
-    user.is_email_verified = True
-    user.email_verification_token = None  # Clear token after use
-    
-    db.add(user)
-    db.commit()
-    
-    logger.info(f"Email verified for user {user.id}: {user.email}")
-    
-    # Audit log
-    from app.services.audit_service import AuditService
-    AuditService.log_action(
-        db=db,
-        user_id=user.id,
-        action="email_verified",
-        resource_type="user",
-        resource_id=str(user.id),
-        details=None
-    )
-    
-    return {
-        "message": "Email verified successfully",
-        "email": user.email,
-        "verified": True
-    }
-
-
-@router.get("/email/verification-status")
-async def get_email_verification_status(
-    current_user: User = Depends(deps.get_current_user)
-):
-    """Get current email verification status."""
-    return {
-        "email": current_user.email,
-        "is_verified": getattr(current_user, 'is_email_verified', False),
-        "verification_pending": getattr(current_user, 'email_verification_token', None) is not None
-    }
-
-
-
-
-
-from app.schemas.auth import ResetPasswordRequest, ChangePasswordRequest
-
-
-@router.post("/reset-password")
-async def reset_password(
-    request: ResetPasswordRequest,
-    db: Session = Depends(get_session)
-):
-    """
-    Reset password using OTP.
-    - Verifies OTP.
-    - Updates password.
-    - Invalidates all existing sessions (Global Logout).
-    """
-    target = request.email or request.phone_number
-    
-    # 1. Verify OTP
-    if not OTPService.verify_otp(db, target, request.otp, "password_reset"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid or expired OTP"
-        )
-    
-    # 2. Get user
-    if request.email:
-        statement = select(User).where(User.email == request.email)
-    else:
-        statement = select(User).where(User.phone_number == request.phone_number)
-        
-    user = db.exec(statement).first()
-    
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    # 3. Update password
-    from app.core.security import get_password_hash
-    user.hashed_password = get_password_hash(request.new_password)
-    
-    # 4. Global Logout (Security Best Practice)
-    user.last_global_logout_at = datetime.utcnow()
-    
-    db.add(user)
-    db.commit()
-    
-    logger.info(f"Password reset successful for {target}. Global logout triggered.")
-    return {"message": "Password reset successful. You have been logged out from all devices."}
-
-
-
-
-
-@router.post("/change-password")
-async def change_password(
-    request: ChangePasswordRequest,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
-):
-    """Change password for authenticated user"""
-    from app.core.security import verify_password, get_password_hash
-    
-    # Verify current password
-    if not verify_password(request.current_password, current_user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Current password is incorrect"
-        )
-    
-    # Update password
-    current_user.hashed_password = get_password_hash(request.new_password)
-    
-    # Merge into current session to avoid "already attached" error
-    updated_user = db.merge(current_user)
-    db.add(updated_user)
-    db.commit()
-    
-    logger.info(f"Password changed for user {current_user.id}")
-    return {"message": "Password changed successfully"}
-
-
-
-
-
-# ===== CUSTOMER REGISTRATION =====
-
-from app.schemas.auth import CustomerRegisterRequest, CustomerRegisterResponse, VehicleCreate
-from app.models.vehicle import Vehicle
-from app.services.referral_service import ReferralService
-
-
-class CustomerVerificationToken(BaseModel):
-    user_id: int
-    phone_number: str
-    purpose: str = "customer_registration"
-
-
-@router.post("/register/customer", response_model=CustomerRegisterResponse)
-async def register_customer(
-    register_data: CustomerRegisterRequest,
-    db: Session = Depends(get_session)
-):
-    """
-    Register a new customer (EV owner).
-    
-    Process:
-    1. Validate phone number is not already registered
-    2. Validate referral code if provided
-    3. Create user with role "customer" and status "pending_verification"
-    4. Create vehicle record
-    5. Send OTP to phone
-    6. Return user_id, confirmation, and verification token
-    """
-    # 1. Check if phone number already exists
-    existing_user = db.exec(
-        select(User).where(User.phone_number == register_data.phone_number)
-    ).first()
-    
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Phone number already registered"
-        )
-    
-    # 2. Check if email already exists (if provided)
-    if register_data.email:
-        existing_email = db.exec(
-            select(User).where(User.email == register_data.email)
-        ).first()
-        if existing_email:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
-            )
-    
-    # 3. Validate referral code if provided
-    referral = None
-    if register_data.referral_code:
-        from app.models.referral import Referral
-        referral = db.exec(
-            select(Referral).where(
-                Referral.referral_code == register_data.referral_code,
-                Referral.status == "pending"
-            )
-        ).first()
-        if not referral:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Invalid referral code"
-            )
-    
-    # 4. Check if vehicle registration number already exists
-    existing_vehicle = db.exec(
-        select(Vehicle).where(
-            Vehicle.registration_number == register_data.vehicle.registration_number
-        )
-    ).first()
-    if existing_vehicle:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Vehicle registration number already exists"
-        )
-    
-    # 5. Create user with pending_verification status
-    from app.core.security import get_password_hash
-    
-    new_user = User(
-        phone_number=register_data.phone_number,
-        full_name=register_data.full_name,
-        email=register_data.email,
-        hashed_password=get_password_hash(register_data.password),
-        is_active=False,  # Will be activated after OTP verification
-        kyc_status="pending_verification"
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    
-    # 6. Assign customer role
-    from app.models.rbac import Role
-    customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
-    if customer_role:
-        new_user.roles.append(customer_role)
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-    
-    # 7. Create vehicle record
-    new_vehicle = Vehicle(
-        user_id=new_user.id,
-        make=register_data.vehicle.make,
-        model=register_data.vehicle.model,
-        registration_number=register_data.vehicle.registration_number,
-        compatible_battery_type=register_data.vehicle.vehicle_type,
-        is_active=True,
-        is_verified=False
-    )
-    db.add(new_vehicle)
-    db.commit()
-    
-    # 8. Claim referral if provided
-    if referral:
-        try:
-            ReferralService.claim_referral(
-                db, register_data.referral_code, new_user.id
-            )
-        except Exception as e:
-            logger.warning(f"Failed to claim referral: {e}")
-    
-    # 9. Generate and send OTP
-    code = OTPService.generate_otp(register_data.phone_number)
-    OTPService.create_otp_record(
-        db, register_data.phone_number, code, "customer_registration"
-    )
-    await OTPService.send_sms_otp(register_data.phone_number, code)
-    
-    # 10. Generate verification token
-    verification_token = create_access_token(
-        subject=f"{new_user.id}:customer_registration",
-        expires_delta=timedelta(minutes=15)
-    )
-    
-    logger.info(f"Customer registered: {new_user.id}, OTP sent to {register_data.phone_number}")
-    
-    return CustomerRegisterResponse(
-        user_id=new_user.id,
-        message="OTP sent successfully",
-        verification_token=verification_token
-    )
-
-
-# ===== DEALER REGISTRATION =====
-
-from app.schemas.auth import DealerRegisterRequest, DealerRegisterResponse
-from app.models.dealer import DealerProfile, DealerDocument, DealerApplication
-from app.models.station import Station
-
-@router.post("/register/dealer", response_model=DealerRegisterResponse)
-async def register_dealer(
-    register_data: DealerRegisterRequest,
-    db: Session = Depends(get_session)
-):
-    """
-    Register a new dealer/vendor.
-    
-    Process:
-    1. Validate email/phone uniqueness
-    2. Create User with role "vendor_owner" and status "active=False"
-    3. Create DealerProfile with business & bank details
-    4. Create DealerDocument records
-    5. Create DealerApplication (SUBMITTED)
-    6. Create Proposed Stations
-    7. Trigger Admin Notification (Log)
-    8. Return application ID and status
-    """
-    
-    # 1. Check existing user
-    existing_user = db.exec(
-        select(User).where(
-            (User.email == register_data.owner_email) | 
-            (User.phone_number == register_data.owner_phone)
-        )
-    ).first()
-    
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User with this email or phone already exists"
-        )
-        
-    # 2. Check existing business (optional, e.g. GST)
-    # existing_dealer = db.exec(select(DealerProfile).where(DealerProfile.gst_number == register_data.gst_number)).first()
-    # if existing_dealer: ... 
-    
-    # 3. Create User
-    from app.core.security import get_password_hash
-    
-    new_user = User(
-        full_name=register_data.owner_name,
-        email=register_data.owner_email,
-        phone_number=register_data.owner_phone,
-        hashed_password=get_password_hash(register_data.password),
-        is_active=False, # Wait for admin approval
-        kyc_status="pending_approval"
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    
-    # Assign vendor_owner role
-    vendor_role = db.exec(select(Role).where(Role.name == "vendor_owner")).first()
-    if vendor_role:
-        new_user.roles.append(vendor_role)
-    else:
-        # Fallback or error log
-        logger.warning("Role 'vendor_owner' not found during dealer registration")
-        
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    
-    # 4. Create Dealer Profile
-    dealer_profile = DealerProfile(
-        user_id=new_user.id,
-        business_name=register_data.business_name,
-        gst_number=register_data.gst_number,
-        contact_person=register_data.owner_name,
-        contact_email=register_data.owner_email,
-        contact_phone=register_data.owner_phone,
-        address_line1=register_data.business_address,
-        city=register_data.city,
-        state=register_data.state,
-        pincode=register_data.pincode,
-        bank_details=register_data.bank_details.model_dump(),
-        is_active=False
-    )
-    db.add(dealer_profile)
-    db.commit()
-    db.refresh(dealer_profile)
-    
-    # 5. Add Documents
-    for doc_url in register_data.registration_documents:
-        # Simple logic to guess type or default to 'registration'
-        doc = DealerDocument(
-            dealer_id=dealer_profile.id,
-            document_type="registration", # Could be enhanced to accept type from frontend
-            file_url=doc_url,
-            is_verified=False
-        )
-        db.add(doc)
-    
-    # 6. Create Application
-    application = DealerApplication(
-        dealer_id=dealer_profile.id,
-        current_stage="SUBMITTED",
-        status_history=[{
-            "stage": "SUBMITTED", 
-            "timestamp": str(datetime.utcnow()), 
-            "notes": "Initial submission"
-        }]
-    )
-    db.add(application)
-    db.commit()
-    db.refresh(application)
-    
-    # 7. Log Proposed Stations (Placeholder)
-    logger.info(f"Proposed stations for {dealer_profile.business_name}: {register_data.proposed_stations}")
-    
-    # 8. Notify Admin (Mock)
-    logger.info(f"New Dealer Application Submitted: {application.id} by {new_user.email}")
-    
-    # Generate verification token
-    verification_token = create_access_token(
-        subject=f"{new_user.id}:dealer_registration",
-        expires_delta=timedelta(hours=24)
-    )
-
-    return DealerRegisterResponse(
-        application_id=application.id,
-        user_id=new_user.id,
-        status="pending_approval",
-        message="Application submitted successfully. Compliance team will contact you.",
-        verification_token=verification_token
-    )
-
-# ===== STAFF REGISTRATION =====
-
-from app.schemas.auth import StaffRegisterRequest, StaffRegisterResponse
-from app.models.staff import StaffProfile
-import secrets
-import string
-
-@router.post("/register/staff", response_model=StaffRegisterResponse)
-async def register_staff(
-    register_data: StaffRegisterRequest,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
-):
-    """
-    Register a new staff member (Station Manager, Technician, etc.).
-    
-    Authorization:
-    - Admin/Super Admin: Can create staff for any dealer/station (or no dealer).
-    - Vendor Owner: Can ONLY create staff for their own dealer profile.
-    
-    Process:
-    1. Check permissions and validate dealer ownership.
-    2. Check if user exists.
-    3. Generate temporary password.
-    4. Create User (active=True).
-    5. Assign Role.
-    6. Create StaffProfile.
-    7. Send credentials (Mock).
-    """
-    
-    # 1. Authorization & Validation
-    user_roles = [r.name for r in current_user.roles]
-    is_admin = "admin" in user_roles or "super_admin" in user_roles
-    is_vendor = "vendor_owner" in user_roles
-    is_regional_manager = "regional_manager" in user_roles
-    
-    if not (is_admin or is_vendor or is_regional_manager):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to create staff accounts"
-        )
-        
-    dealer_id_to_assign = None
-    
-    if is_vendor:
-        # ensuring vendor has a dealer profile
-        statement = select(DealerProfile).where(DealerProfile.user_id == current_user.id)
-        dealer_profile = db.exec(statement).first()
-        
-        if not dealer_profile:
-             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Vendor does not have a valid dealer profile"
-            )
-        dealer_id_to_assign = dealer_profile.id
-        
-        # If station_id is provided, verify it belongs to this dealer
-        if register_data.station_id:
-            station = db.get(Station, register_data.station_id)
-            if not station or station.dealer_id != dealer_profile.id:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Station not found or does not belong to your dealership"
-                )
-    
-    # 2. Check if user exists
-    existing_user = db.exec(
-        select(User).where(
-            (User.email == register_data.email) | 
-            (User.phone_number == register_data.phone_number)
-        )
-    ).first()
-    
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User with this email or phone already exists"
-        )
-
-    # 3. Generate Temporary Password
-    alphabet = string.ascii_letters + string.digits
-    temp_password = ''.join(secrets.choice(alphabet) for i in range(10))
-    
-    # 4. Create User
-    from app.core.security import get_password_hash
-    
-    new_user = User(
-        full_name=register_data.full_name,
-        email=register_data.email,
-        phone_number=register_data.phone_number,
-        hashed_password=get_password_hash(temp_password),
-        is_active=True,
-        kyc_status="verified" # Staff created by admin/vendor are trusted initially
-    )
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-    
-    # 5. Assign Role
-    # Try to find specific role based on staff_type, fallback to 'staff'
-    role_name = register_data.staff_type if register_data.staff_type in ["station_manager", "technician"] else "staff"
-    
-    role = db.exec(select(Role).where(Role.name == role_name)).first()
-    if not role:
-        # Fallback to 'staff' generic role if specific one doesn't exist
-        role = db.exec(select(Role).where(Role.name == "staff")).first()
-        
-    if role:
-        new_user.roles.append(role)
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-    else:
-        logger.warning(f"Role '{role_name}' or 'staff' not found for new user {new_user.id}")
-
-    # 6. Create Staff Profile
-    staff_profile = StaffProfile(
-        user_id=new_user.id,
-        dealer_id=dealer_id_to_assign,
-        station_id=register_data.station_id,
-        staff_type=register_data.staff_type,
-        employment_id=register_data.employment_id,
-        reporting_manager_id=register_data.reporting_manager_id
-    )
-    db.add(staff_profile)
-    db.commit()
-    db.refresh(staff_profile)
-    
-    # 7. Notify (Mock)
-    logger.info(f"Staff account created: {new_user.email} with pwd {temp_password}")
-    # In production: await NotificationService.send_credentials(...)
-    
-    return StaffRegisterResponse(
-        user_id=new_user.id,
-        username=new_user.email,
-        temporary_password=temp_password,
-        role=role.name if role else "none",
-        message="Staff account created successfully. Credentials sent."
-    )
+    return {"message": "Verification email sent"}

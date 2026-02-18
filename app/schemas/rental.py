@@ -31,6 +31,13 @@ class RentalResponse(BaseModel):
     damage_deposit: float = 0.0
     discount_amount: float = 0.0
     total_price: float
+    
+    late_fee_amount: float = 0.0
+    is_overdue: bool = False
+    
+    swap_station_id: Optional[int] = None
+    swap_requested_at: Optional[datetime] = None
+    
     events: List[RentalEventResponse] = []
     
     model_config = ConfigDict(from_attributes=True)

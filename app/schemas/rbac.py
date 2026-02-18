@@ -70,7 +70,7 @@ class RoleBase(BaseModel):
 
 class RoleCreate(RoleBase):
     permissions: List[str] # List of Permission Slugs
-    parent_role_id: Optional[int] = None
+    parent_id: Optional[int] = None
 
 
 class RoleRead(RoleBase):
@@ -81,7 +81,7 @@ class RoleRead(RoleBase):
     permission_count: int = 0
     category: str
     level: int
-    parent_role_id: Optional[int] = None
+    parent_id: Optional[int] = None
 
 
     
@@ -102,7 +102,7 @@ class RoleUpdate(BaseModel):
     description: Optional[str] = None
     category: Optional[str] = None
     level: Optional[int] = None
-    parent_role_id: Optional[int] = None
+    parent_id: Optional[int] = None
     permissions: Optional[List[str]] = None # List of Permission Slugs
 
 class RoleDuplicate(BaseModel):

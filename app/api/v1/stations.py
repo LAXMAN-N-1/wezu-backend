@@ -106,5 +106,11 @@ async def read_station_batteries(
     station_id: int,
     db: Session = Depends(deps.get_db),
 ):
-    query = select(Battery).where(Battery.location_type == "station", Battery.location_id == station_id)
-    return db.exec(query).all()
+    try:
+        query = select(Battery).where(Battery.location_type == "station", Battery.location_id == station_id)
+        results = db.exec(query).all()
+        return results
+    except Exception as e:
+        import logging
+        logging.error(f"DATABASE_ERROR: Failed to fetch batteries for station {station_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")

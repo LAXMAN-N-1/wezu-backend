@@ -1,14 +1,18 @@
-from typing import Any, List
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Any, List, Optional
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlmodel import Session, select
 from app.api.deps import get_current_user
+from app.api import deps
 from app.db.session import get_session
 from app.models.user import User
 from app.models.support import SupportTicket, TicketMessage
+from app.models.faq import FAQ
 from app.schemas.support import (
     TicketCreate, TicketMessageCreate, 
     SupportTicketResponse, SupportTicketDetailResponse
 )
+import os
+import shutil
 
 router = APIRouter()
 
@@ -33,14 +37,14 @@ def create_ticket(
     session.commit()
     session.refresh(ticket)
     
-    # 2. Add Initial Message
-    message = TicketMessage(
+    # 2. Add Initial Message & Check for Auto-Response
+    from app.services.support_service import SupportService
+    SupportService.handle_new_ticket_message(
+        db=session,
         ticket_id=ticket.id,
         sender_id=current_user.id,
-        message=ticket_in.description
+        message_text=ticket_in.description
     )
-    session.add(message)
-    session.commit()
     
     return ticket
 
@@ -90,13 +94,14 @@ def reply_ticket(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
     
-    msg = TicketMessage(
+    # Add Message & Check for Auto-Response
+    from app.services.support_service import SupportService
+    SupportService.handle_new_ticket_message(
+        db=session,
         ticket_id=ticket.id,
         sender_id=current_user.id,
-        message=reply_in.message,
-        is_internal_note=reply_in.is_internal_note
+        message_text=reply_in.message
     )
-    session.add(msg)
     
     # Auto-reopen if closed
     if ticket.status == "closed":
@@ -106,3 +111,48 @@ def reply_ticket(
     session.commit()
     session.refresh(ticket)
     return ticket
+
+@router.post("/{ticket_id}/attachment")
+async def upload_ticket_attachment(
+    ticket_id: int,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Upload attachment to support ticket"""
+    # Get ticket
+    ticket = db.get(SupportTicket, ticket_id)
+    if not ticket or ticket.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    
+    # Save file
+    os.makedirs("uploads/support", exist_ok=True)
+    file_name = f"ticket_{ticket_id}_{file.filename}"
+    file_path = f"uploads/support/{file_name}"
+    
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    return {
+        "message": "Attachment uploaded successfully",
+        "file_path": f"/static/{file_path}",
+        "file_name": file.filename
+    }
+
+@router.get("/faq/search")
+async def search_faq(
+    q: str,
+    db: Session = Depends(get_session)
+):
+    """Search FAQ by keyword"""
+    statement = select(FAQ).where(
+        (FAQ.question.contains(q)) |
+        (FAQ.answer.contains(q))
+    )
+    results = db.exec(statement).all()
+    
+    return {
+        "query": q,
+        "results": results,
+        "count": len(results)
+    }
