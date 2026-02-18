@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.api.v1 import (
     auth, users, kyc, stations, batteries, rentals, wallet, payments, 
     notifications, support, favorites, analytics, transactions, promo, 
-    faqs, iot, swaps, i18n, fraud, branches, organizations, warehouses, screens
+    faqs, iot, swaps, i18n, fraud, branches, organizations, warehouses, screens, stock, dealers
 )
 # Enhanced customer endpoints
 from app.api.v1 import (
@@ -83,6 +83,8 @@ app.include_router(organizations.router, prefix=f"{settings.API_V1_STR}/organiza
 app.include_router(warehouses.router, prefix=f"{settings.API_V1_STR}/warehouses", tags=["Warehouses"])
 app.include_router(screens.router, prefix=f"{settings.API_V1_STR}/screens", tags=["UI Configuration"])
 app.include_router(system.router, prefix=f"{settings.API_V1_STR}/system", tags=["System"])
+app.include_router(stock.router, prefix=f"{settings.API_V1_STR}/stock", tags=["Stock"])
+app.include_router(dealers.router, prefix=f"{settings.API_V1_STR}/dealers", tags=["Dealers"])
 
 # Admin & Role Based Routes
 app.include_router(roles.router, prefix=f"{settings.API_V1_STR}/roles", tags=["Roles"])

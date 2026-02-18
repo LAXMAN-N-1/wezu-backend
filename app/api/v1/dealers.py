@@ -1,58 +1,54 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlmodel import Session, select
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import datetime
 from app.db.session import get_session
-from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
+from app.models.dealer import DealerProfile, DealerApplication
 from app.models.user import User
 from app.services.dealer_service import DealerService
 from app.api.deps import get_current_user
 from app.schemas.common import DataResponse
+from app.schemas.dealer import DealerProfileCreate, DealerProfileUpdate, DealerProfileResponse
 from pydantic import BaseModel
 
 router = APIRouter()
 
-class DealerProfileCreate(BaseModel):
-    business_name: str
-    contact_person: str
-    contact_email: str
-    contact_phone: str
-    address_line1: str
-    city: str
-    state: str
-    pincode: str
-    gst_number: Optional[str] = None
-    pan_number: Optional[str] = None
 
-class StageUpdate(BaseModel):
-    stage: str
-    note: Optional[str] = ""
+# --- Dealer Profile CRUD ---
 
-class VisitSchedule(BaseModel):
-    application_id: int
-    officer_id: int
-    date: datetime
-
-@router.post("/onboard", response_model=DataResponse[DealerProfile])
-def submit_application(
+@router.post("/", response_model=DataResponse[DealerProfileResponse])
+def create_dealer_profile(
     profile_in: DealerProfileCreate,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
-    """Submits a new dealer application."""
-    existing = DealerService.get_dealer_by_user(current_user.id)
+    """Create a new dealer profile (Onboarding)."""
+    existing = DealerService.get_dealer_by_user(session, current_user.id)
     if existing:
         raise HTTPException(status_code=400, detail="Dealer profile already exists")
     
-    profile = DealerService.create_dealer_profile(current_user.id, profile_in.dict())
-    return DataResponse(data=profile, message="Application submitted")
+    profile = DealerService.create_dealer_profile(session, current_user.id, profile_in.dict())
+    return DataResponse(data=profile, message="Dealer profile created")
+
+@router.get("/", response_model=DataResponse[List[DealerProfileResponse]])
+def read_dealers(
+    skip: int = 0,
+    limit: int = 100,
+    current_user: User = Depends(get_current_user), # Should be Admin only
+    session: Session = Depends(get_session)
+):
+    """Retrieve all dealers."""
+    # Add RBAC check here
+    dealers = DealerService.get_dealers(session, skip=skip, limit=limit)
+    return DataResponse(data=dealers)
 
 @router.get("/me", response_model=DataResponse[dict])
 def get_my_status(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
-    profile = DealerService.get_dealer_by_user(current_user.id)
+    """Get current user's dealer profile and application status."""
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
     if not profile:
         raise HTTPException(status_code=404, detail="Not a dealer")
         
@@ -63,66 +59,41 @@ def get_my_status(
         "application": app
     })
 
-@router.get("/dashboard", response_model=DataResponse[dict])
-def get_dashboard(
+@router.get("/{id}", response_model=DataResponse[DealerProfileResponse])
+def read_dealer(
+    id: int,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
-    profile = DealerService.get_dealer_by_user(current_user.id)
-    if not profile:
-        raise HTTPException(status_code=403, detail="Access denied")
-        
-    stats = DealerService.get_dashboard_stats(profile.id)
-    return DataResponse(data=stats)
+    """Get dealer by ID."""
+    dealer = DealerService.get_dealer_by_id(session, id)
+    if not dealer:
+        raise HTTPException(status_code=404, detail="Dealer not found")
+    return DataResponse(data=dealer)
 
-# Admin Endpoints (Should be protected by superuser dependency in real app)
-@router.post("/application/{app_id}/stage", response_model=DataResponse[DealerApplication])
-def update_stage(
-    app_id: int, 
-    update_in: StageUpdate,
-    current_user: User = Depends(get_current_user), # Check Is Admin
-    session: Session = Depends(get_session)
-):
-    try:
-        app = DealerService.update_application_stage(app_id, update_in.stage, update_in.note)
-        return DataResponse(data=app)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-@router.post("/visits/schedule", response_model=DataResponse[FieldVisit])
-def schedule_visit(
-    visit_in: VisitSchedule,
-    current_user: User = Depends(get_current_user), # Check Is Admin
-    session: Session = Depends(get_session)
-):
-    visit = DealerService.schedule_field_visit(visit_in.application_id, visit_in.officer_id, visit_in.date)
-    return DataResponse(data=visit)
-
-from app.services.financial_service import FinancialService
-from app.models.commission import Settlement
-
-class SettlementRequest(BaseModel):
-    dealer_id: int
-    start_date: datetime
-    end_date: datetime
-
-@router.post("/settlements/generate", response_model=DataResponse[Settlement])
-def generate_settlement(
-    req: SettlementRequest,
-    current_user: User = Depends(get_current_user), # Admin check
-):
-    # In real app verify admin
-    settlement = FinancialService.generate_settlement(req.dealer_id, req.start_date, req.end_date)
-    return DataResponse(data=settlement)
-
-@router.get("/settlements", response_model=DataResponse[List[Settlement]])
-def get_my_settlements(
+@router.put("/me", response_model=DataResponse[DealerProfileResponse])
+def update_my_profile(
+    profile_in: DealerProfileUpdate,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
-    profile = DealerService.get_dealer_by_user(current_user.id)
+    """Update current user's dealer profile."""
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
     if not profile:
         raise HTTPException(status_code=404, detail="Not a dealer")
-        
-    settlements = session.exec(select(Settlement).where(Settlement.dealer_id == profile.id).order_by(Settlement.generated_at.desc())).all()
-    return DataResponse(data=settlements)
+    
+    dealer = DealerService.update_dealer_profile(session, profile.id, profile_in)
+    return DataResponse(data=dealer, message="Profile updated")
+
+@router.put("/{id}", response_model=DataResponse[DealerProfileResponse])
+def update_dealer(
+    id: int,
+    profile_in: DealerProfileUpdate,
+    current_user: User = Depends(get_current_user), # Should be Admin
+    session: Session = Depends(get_session)
+):
+    """Update a specific dealer profile (Admin)."""
+    dealer = DealerService.update_dealer_profile(session, id, profile_in)
+    if not dealer:
+        raise HTTPException(status_code=404, detail="Dealer not found")
+    return DataResponse(data=dealer, message="Profile updated")

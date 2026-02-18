@@ -20,6 +20,7 @@ class Warehouse(SQLModel, table=True):
     pincode: str
     
     branch_id: Optional[int] = Field(default=None, foreign_key="branches.id")
+    manager_id: Optional[int] = Field(default=None, foreign_key="users.id")
     
     is_active: bool = Field(default=True)
     
@@ -34,3 +35,4 @@ class Warehouse(SQLModel, table=True):
     # Relationships
     branch: Optional["Branch"] = Relationship(back_populates="warehouses")
     manager: Optional["User"] = Relationship()
+    stocks: List["Stock"] = Relationship(back_populates="warehouse")

@@ -56,6 +56,9 @@ class Battery(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
+    # Location tracking
+    warehouse_id: Optional[int] = Field(default=None, foreign_key="warehouses.id")
+
     # Relationships
     sku: Optional["BatteryCatalog"] = Relationship(back_populates="batteries")
     product: Optional["BatteryCatalog"] = Relationship(back_populates="batteries") # Alias for backward compat if needed
