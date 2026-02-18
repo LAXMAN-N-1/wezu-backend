@@ -1,6 +1,10 @@
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 from datetime import datetime
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 class UserSession(SQLModel, table=True):
     __tablename__ = "user_sessions"
@@ -10,11 +14,12 @@ class UserSession(SQLModel, table=True):
     user_id: int = Field(foreign_key="users.id", index=True)
     
     # Token Tracking
-    token_id: Optional[str] = Field(default=None, index=True) # JTI of the refresh token
-    access_token: Optional[str] = Field(default=None, index=True)
-    refresh_token: Optional[str] = Field(default=None, index=True)
+    token_id: str = Field(index=True) # JTI of the refresh token
+    refresh_token_hash: Optional[str] = Field(default=None, index=True)
     
     # Device Info
+    device_id: Optional[str] = Field(default=None, index=True)
+    device_name: Optional[str] = None
     ip_address: Optional[str] = None
     user_agent: Optional[str] = None
     location: Optional[str] = None # City, Country derived from IP

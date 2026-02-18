@@ -1,8 +1,10 @@
 from typing import Any, List
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from datetime import datetime
 from sqlmodel import Session, select
 from app.api.deps import get_current_user
+from app.core.audit import audit_log
+from app.db.session import get_session
 from app.models.user import User
 from app.models.swap import SwapSession
 from app.models.station import Station
@@ -14,9 +16,11 @@ from app.api import deps
 router = APIRouter()
 
 @router.post("/initiate", response_model=SwapResponse)
+@audit_log("INITIATE_SWAP", "SWAP")
 def initiate_swap(
     *,
-    session: Session = Depends(deps.get_db),
+    request: Request,
+    session: Session = Depends(get_session),
     swap_in: SwapInitRequest,
     current_user: User = Depends(get_current_user),
 ) -> Any:
@@ -53,9 +57,11 @@ def initiate_swap(
     }
 
 @router.post("/{swap_id}/complete", response_model=SwapResponse)
+@audit_log("COMPLETE_SWAP", "SWAP", resource_id_param="swap_id")
 def complete_swap(
     *,
-    session: Session = Depends(deps.get_db),
+    request: Request,
+    session: Session = Depends(get_session),
     swap_id: int,
     complete_in: SwapCompleteRequest,
     # In production, this endpoint might be protected for IoT Station Callbacks only

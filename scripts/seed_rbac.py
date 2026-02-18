@@ -7,8 +7,10 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from sqlmodel import Session, select, SQLModel
 from app.core.database import engine
 
+# Import all models to ensure SQLModel registry is complete
+from app import models 
+
 # Imports for Menu-Based RBAC (HEAD)
-# from app.models.role import Role as RoleLegacy # DEPRECATED
 from app.models.menu import Menu
 from app.models.role_right import RoleRight
 
@@ -200,30 +202,41 @@ def seed_permissions_rbac():
             
         # 2. Define Roles
         roles_def = {
-            "Super Admin": {
+            "super_admin": {
                 "desc": "Full access to everything",
                 "is_system": True,
                 "perms": "ALL" 
             },
-            "Platform Admin": {
+            "platform_admin": {
                 "desc": "Senior leadership with broad access",
                 "is_system": False,
                 "perms": ["vendor:read", "vendor:approve", "vendor:suspend", "station:create", "station:read", "station:update", "battery:read", "customer:read", "finance:read_dashboard", "analytics:read"]
             },
-            "Finance Manager": {
+            # "finance_manager": { ... } - Keeping keys lowercase to match potential existing roles
+            "finance_manager": {
                 "desc": "Manages financial operations",
                 "is_system": False,
                 "perms": ["finance:read_dashboard", "finance:read_transactions", "finance:process_refund", "finance:approve_settlement", "finance:export_reports", "vendor:read"]
             },
-            "Operations Manager": {
+            "operations_manager": {
                 "desc": "Manages vendors, stations, batteries",
                 "is_system": False,
                 "perms": ["vendor:create", "vendor:read", "vendor:update", "station:create", "station:read", "station:update", "station:delete", "station:manage_slots", "battery:create", "battery:read", "battery:update"]
             },
-            "Support Agent": {
+            "support_agent": {
                 "desc": "Basic customer support",
                 "is_system": False,
                 "perms": ["customer:read", "support:read_tickets", "support:update_tickets"]
+            },
+            "driver": {
+                "desc": "Delivery driver with limited access",
+                "is_system": False,
+                "perms": ["battery:read", "station:read", "station:read"] 
+            },
+            "dealer": {
+                "desc": "Station dealer with access to own resources",
+                "is_system": False,
+                "perms": ["station:read", "station:create", "station:update", "battery:read", "battery:create", "battery:update", "customer:read"]
             }
         }
         

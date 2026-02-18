@@ -2,7 +2,7 @@
 Enhanced Payment and Invoice API
 Invoice generation, refunds, and payment methods
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request as FastAPIRequest
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from pydantic import BaseModel
@@ -10,6 +10,8 @@ from typing import Optional, List
 from datetime import datetime, timedelta
 
 from app.api import deps
+from app.core.audit import audit_log
+from app.db.session import get_session
 from app.models.user import User
 from app.models.catalog import CatalogOrder
 from app.models.rental import Rental
@@ -256,9 +258,11 @@ def get_profit_margins(
 
 # Refund Endpoints
 @router.post("/orders/{order_id}/refund", response_model=DataResponse[dict])
+@audit_log("REQUEST_REFUND", "PAYMENT", resource_id_param="order_id")
 def request_refund(
     order_id: int,
     request: RefundRequest,
+    http_request: FastAPIRequest = None,
     current_user: User = Depends(deps.get_current_user),
     session: Session = Depends(deps.get_db)
 ):

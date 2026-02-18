@@ -64,8 +64,59 @@ def get_dealer_dashboard(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
-    """Dealer: own dashboard (sales, inventory, commissions, KPIs)"""
-    profile = DealerService.get_dealer_by_user(session, current_user.id)
+    profile = DealerService.get_dealer_by_user(current_user.id)
+    if not profile:
+        raise HTTPException(status_code=403, detail="Access denied")
+        
+    stats = DealerService.get_dashboard_stats(profile.id)
+    return DataResponse(data=stats)
+
+# Admin Endpoints (Should be protected by superuser dependency in real app)
+@router.post("/application/{app_id}/stage", response_model=DataResponse[DealerApplication])
+def update_stage(
+    app_id: int, 
+    update_in: StageUpdate,
+    current_user: User = Depends(get_current_user), # Check Is Admin
+    session: Session = Depends(get_session)
+):
+    try:
+        app = DealerService.update_application_stage(app_id, update_in.stage, update_in.note)
+        return DataResponse(data=app)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/visits/schedule", response_model=DataResponse[FieldVisit])
+def schedule_visit(
+    visit_in: VisitSchedule,
+    current_user: User = Depends(get_current_user), # Check Is Admin
+    session: Session = Depends(get_session)
+):
+    visit = DealerService.schedule_field_visit(visit_in.application_id, visit_in.officer_id, visit_in.date)
+    return DataResponse(data=visit)
+
+from app.services.financial_service import FinancialService
+from app.models.settlement import Settlement
+
+class SettlementRequest(BaseModel):
+    dealer_id: int
+    start_date: datetime
+    end_date: datetime
+
+@router.post("/settlements/generate", response_model=DataResponse[Settlement])
+def generate_settlement(
+    req: SettlementRequest,
+    current_user: User = Depends(get_current_user), # Admin check
+):
+    # In real app verify admin
+    settlement = FinancialService.generate_settlement(req.dealer_id, req.start_date, req.end_date)
+    return DataResponse(data=settlement)
+
+@router.get("/settlements", response_model=DataResponse[List[Settlement]])
+def get_my_settlements(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    profile = DealerService.get_dealer_by_user(current_user.id)
     if not profile:
         raise HTTPException(status_code=404, detail="Not a dealer")
         

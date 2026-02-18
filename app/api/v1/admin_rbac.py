@@ -6,6 +6,7 @@ from app.api import deps
 from app.models.admin_user import AdminUser
 from app.models.rbac import Role, Permission, RolePermission, AdminUserRole, UserRole
 from app.models.session import UserSession
+from app.services.auth_service import AuthService
 from app.schemas import rbac as rbac_schema
 
 router = APIRouter()
@@ -357,10 +358,12 @@ def assign_permissions_to_role(
         user_ids = [u.id for u in role.users]
         if user_ids:
             # Bulk update session status
-            statement = update(UserSession).where(col(UserSession.user_id).in_(user_ids)).values(is_active=False)
-            result = db.exec(statement)
+            # Bulk revoke sessions for users with this role
+            # Note: revoke_all_user_sessions is per user. We need bulk!
+            # Or loop.
+            for uid in user_ids:
+                 AuthService.revoke_all_user_sessions(db, uid)
             users_affected = len(user_ids)
-            db.commit()
     
     return rbac_schema.RolePermissionUpdateResponse(
         role_id=role.id,
@@ -486,10 +489,7 @@ def bulk_assign_roles(
                 )
                 db.add(new_link)
                 # Invalidate Session
-                user_sessions = db.exec(select(UserSession).where(UserSession.user_id == uid).where(UserSession.is_active == True)).all()
-                for sess in user_sessions:
-                     sess.is_active = False
-                     db.add(sess)
+                AuthService.revoke_all_user_sessions(db, uid)
                      
                 results.append(rbac_schema.BulkAssignmentResult(user_id=uid, success=True, message="Assigned successfully"))
                 success_count += 1
@@ -703,11 +703,9 @@ def transfer_role_assignment(
         ))
         
         # D. Invalidate Sessions
-        for uid in [source_user_id, target_user.id]:
-            sessions = db.exec(select(UserSession).where(UserSession.user_id == uid).where(UserSession.is_active == True)).all()
-            for s in sessions:
-                s.is_active = False
-                db.add(s)
+        # D. Invalidate Sessions
+        AuthService.revoke_all_user_sessions(db, source_user_id)
+        AuthService.revoke_all_user_sessions(db, target_user.id)
                 
         db.commit()
         # No ID to refresh for new_link
@@ -782,13 +780,7 @@ def assign_roles_to_user(
     db.commit()
     
     # 3. Side Effects: Invalidate User Session
-    # Find active sessions for this user and revoke
-    user_sessions = db.exec(select(UserSession).where(UserSession.user_id == user_id).where(UserSession.is_active == True)).all()
-    if user_sessions:
-        for sess in user_sessions:
-            sess.is_active = False
-            db.add(sess)
-        db.commit()
+    AuthService.revoke_all_user_sessions(db, user_id)
     
     # 4. Prepare Response (Refresh perms)
     db.refresh(user)

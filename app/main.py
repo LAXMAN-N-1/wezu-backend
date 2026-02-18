@@ -117,22 +117,33 @@ app.add_middleware(
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Auth"])
 
 # Customer API Routes
-# 1. Customer Application Endpoints
-customer_api = f"{settings.API_V1_STR}/customer"
-app.include_router(auth.router, prefix=f"{customer_api}/auth", tags=["Customer: Auth"])
-app.include_router(users.router, prefix=f"{customer_api}/users", tags=["Customer: Users"])
-app.include_router(kyc.router, prefix=f"{customer_api}/kyc", tags=["Customer: KYC"])
-app.include_router(stations.router, prefix=f"{customer_api}/stations", tags=["Customer: Stations"])
-app.include_router(batteries.router, prefix=f"{customer_api}/batteries", tags=["Customer: Batteries"])
-app.include_router(rentals.router, prefix=f"{customer_api}/rentals", tags=["Customer: Rentals"])
-app.include_router(wallet.router, prefix=f"{customer_api}/wallet", tags=["Customer: Wallet"])
-app.include_router(payments.router, prefix=f"{customer_api}/payments", tags=["Customer: Payments"])
-app.include_router(notifications.router, prefix=f"{customer_api}/notifications", tags=["Customer: Notifications"])
-app.include_router(support.router, prefix=f"{customer_api}/support", tags=["Customer: Support"])
-app.include_router(favorites.router, prefix=f"{settings.API_V1_STR}/users/me/favorites", tags=["Customer: Favorites"])
-app.include_router(promo.router, prefix=f"{settings.API_V1_STR}/coupons", tags=["Customer: Coupons"])
-app.include_router(swaps.router, prefix=f"{customer_api}/swaps", tags=["Customer: Swaps"])
-app.include_router(vehicles.router, prefix=f"{customer_api}/vehicles", tags=["Customer: Vehicles"])
+app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentication"])
+from app.api.v1 import sessions
+app.include_router(sessions.router, prefix=f"{settings.API_V1_STR}/sessions", tags=["Session Management"])
+app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["Users"])
+from app.api.v1 import admin_users
+app.include_router(admin_users.router, prefix=f"{settings.API_V1_STR}/admin/users", tags=["Admin User Management"])
+app.include_router(kyc.router, prefix=f"{settings.API_V1_STR}", tags=["KYC"])
+app.include_router(stations.router, prefix=f"{settings.API_V1_STR}/stations", tags=["Stations"])
+app.include_router(batteries.router, prefix=f"{settings.API_V1_STR}/batteries", tags=["Batteries"])
+app.include_router(rentals.router, prefix=f"{settings.API_V1_STR}/rentals", tags=["Rentals"])
+app.include_router(wallet.router, prefix=f"{settings.API_V1_STR}/wallet", tags=["Wallet"])
+app.include_router(payments.router, prefix=f"{settings.API_V1_STR}/payments", tags=["Payments"])
+app.include_router(notifications.router, prefix=f"{settings.API_V1_STR}/notifications", tags=["Notifications"])
+app.include_router(support.router, prefix=f"{settings.API_V1_STR}/support", tags=["Support"])
+app.include_router(favorites.router, prefix=f"{settings.API_V1_STR}/favorites", tags=["Favorites"])
+app.include_router(analytics.router, prefix=f"{settings.API_V1_STR}/analytics", tags=["Analytics"])
+app.include_router(transactions.router, prefix=f"{settings.API_V1_STR}/transactions", tags=["Transactions"])
+app.include_router(promo.router, prefix=f"{settings.API_V1_STR}/promo", tags=["Promo"])
+app.include_router(faqs.router, prefix=f"{settings.API_V1_STR}/faqs", tags=["FAQs"])
+app.include_router(iot.router, prefix=f"{settings.API_V1_STR}/iot", tags=["IoT"])
+app.include_router(swaps.router, prefix=f"{settings.API_V1_STR}/swaps", tags=["Swaps"])
+app.include_router(i18n.router, prefix=f"{settings.API_V1_STR}/i18n", tags=["i18n"])
+app.include_router(fraud.router, prefix=f"{settings.API_V1_STR}/fraud", tags=["Fraud Detection"])
+app.include_router(branches.router, prefix=f"{settings.API_V1_STR}/branches", tags=["Branches"])
+app.include_router(organizations.router, prefix=f"{settings.API_V1_STR}/organizations", tags=["Organizations"])
+app.include_router(warehouses.router, prefix=f"{settings.API_V1_STR}/warehouses", tags=["Warehouses"])
+app.include_router(screens.router, prefix=f"{settings.API_V1_STR}/screens", tags=["UI Configuration"])
 
 # 2. Admin Application Endpoints
 admin_api = f"{settings.API_V1_STR}/admin"
@@ -173,23 +184,66 @@ logistics_deps = [Depends(deps.get_current_user)]
 app.include_router(logistics.router, prefix=f"{logistics_api}", tags=["Logistics: Main"], dependencies=logistics_deps)
 app.include_router(warehouses.router, prefix=f"{logistics_api}/warehouses", tags=["Logistics: Warehouses"], dependencies=logistics_deps)
 
-# 5. Shared / Infrastructure Endpoints
-infra_api = f"{settings.API_V1_STR}/infra"
-app.include_router(system.router, prefix=f"{infra_api}/system", tags=["Infra: System"])
-app.include_router(iot.router, prefix=f"{infra_api}/iot", tags=["Infra: IoT"])
-app.include_router(telemetry.router, prefix=f"{infra_api}/telemetry", tags=["Infra: Telemetry"])
-app.include_router(i18n.router, prefix=f"{infra_api}/i18n", tags=["Infra: i18n"])
-app.include_router(locations.router, prefix=f"{infra_api}/locations", tags=["Infra: Locations"])
-app.include_router(inventory.router, prefix=f"{settings.API_V1_STR}/inventory", tags=["Logistics: Inventory"])
+# Customer Vehicles
+from app.api.v1 import vehicles
+app.include_router(vehicles.router, prefix=f"{settings.API_V1_STR}/vehicles", tags=["Customer Vehicles"])
 
+# Swap Operations
+from app.api.v1 import swaps
+app.include_router(swaps.router, prefix=f"{settings.API_V1_STR}/swaps", tags=["Swap Operations"])
 
-# Analytics Module (V2 Architecture)
-from app.api.v1.analytics import analytics_router
-app.include_router(analytics_router, prefix=f"{settings.API_V1_STR}/analytics")
+# Financial Settlements
+from app.api.v1 import settlements
+app.include_router(settlements.router, prefix=f"{settings.API_V1_STR}/settlements", tags=["Financial Settlements"])
+
+# Telematics Ingestion
+from app.api.v1 import telematics
+app.include_router(telematics.router, prefix=f"{settings.API_V1_STR}/telematics", tags=["Telematics & IoT"])
+
+# Support Tickets
+from app.api.v1 import support
+app.include_router(support.router, prefix=f"{settings.API_V1_STR}/support", tags=["Support & Ticketing"])
+
+# Admin / RBAC
+from app.api.v1 import admin_rbac, security, admin_audit
+app.include_router(admin_rbac.router, prefix=f"{settings.API_V1_STR}/admin/rbac", tags=["Admin RBAC"])
+app.include_router(security.router, prefix=f"{settings.API_V1_STR}/admin/security", tags=["Admin Security"])
+app.include_router(admin_audit.router, prefix=f"{settings.API_V1_STR}/admin/audit-logs", tags=["Admin Audit Logs"])
+app.include_router(support_enhanced.router, prefix=f"{settings.API_V1_STR}/support", tags=["Support Enhanced"])
+app.include_router(rentals_enhanced.router, prefix=f"{settings.API_V1_STR}/rentals", tags=["Rentals Enhanced"])
+app.include_router(purchases_enhanced.router, prefix=f"{settings.API_V1_STR}/purchases", tags=["Purchases Enhanced"])
+app.include_router(analytics_enhanced.router, prefix=f"{settings.API_V1_STR}/analytics", tags=["Analytics Enhanced"])
+
+# RBAC API Routes
+app.include_router(roles.router, prefix=f"{settings.API_V1_STR}/roles", tags=["Roles"])
+app.include_router(menus.router, prefix=f"{settings.API_V1_STR}/menus", tags=["Menus"])
+app.include_router(role_rights.router, prefix=f"{settings.API_V1_STR}/role-rights", tags=["Role Rights"])
+
+# ML & Dynamics (Phase 5)
+from app.api.v1 import ml, admin_roles, admin_kyc
+app.include_router(ml.router, prefix=f"{settings.API_V1_STR}/ml", tags=["Machine Learning"])
+app.include_router(admin_roles.router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin Role Management"])
+app.include_router(admin_kyc.router, prefix=f"{settings.API_V1_STR}/admin/kyc", tags=["Admin KYC Management"])
 
 
 # Webhooks
 app.include_router(razorpay_webhook.router, prefix="/api/webhooks", tags=["Webhooks"])
+
+# Battery Catalog (Specs)
+from app.api.v1 import battery_catalog
+app.include_router(battery_catalog.router, prefix=f"{settings.API_V1_STR}/batteries", tags=["Battery Catalog"])
+
+# Logistics (Warehouses & Transfers)
+from app.api.v1 import logistics
+app.include_router(logistics.router, prefix=f"{settings.API_V1_STR}/logistics", tags=["Logistics & Supply Chain"])
+
+# Dealer Onboarding
+from app.api.v1 import dealers
+app.include_router(dealers.router, prefix=f"{settings.API_V1_STR}/dealers", tags=["Dealers"])
+
+# Driver Onboarding
+from app.api.v1 import drivers
+app.include_router(drivers.router, prefix=f"{settings.API_V1_STR}/drivers", tags=["Driver Onboarding"])
 
 
 @app.get("/")

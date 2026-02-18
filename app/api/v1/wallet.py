@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlmodel import Session, select
-from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlmodel import Session
+from typing import List
 from app.api import deps
+from app.core.audit import audit_log
 from app.models.user import User
 from app.models.financial import Transaction
 from app.schemas.wallet import TransactionResponse, RechargeRequest
@@ -55,11 +56,12 @@ async def get_wallet_balance(
     }
 
 @router.post("/recharge", response_model=dict)
-@router.post("/add-funds", response_model=dict)
+@audit_log("WALLET_RECHARGE", "WALLET")
 async def recharge_wallet(
+    request: Request,
     recharge_in: RechargeRequest,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db)
+    db: Session = Depends(deps.get_db),
 ):
     """Create order for wallet topup"""
     order = PaymentService.create_order(recharge_in.amount)
@@ -128,8 +130,10 @@ class WithdrawRequest(BaseModel):
     ifsc_code: Optional[str] = None
     upi_id: Optional[str] = None
 
-@router.post("/withdraw", response_model=dict)
+@router.post("/withdraw", response_model=dict) # Return basic dict or WithdrawalRequest model if schema defined
+@audit_log("WALLET_WITHDRAWAL", "WALLET")
 async def request_withdrawal(
+    request: Request,
     req: WithdrawRequest,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),

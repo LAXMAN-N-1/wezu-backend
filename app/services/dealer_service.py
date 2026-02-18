@@ -5,8 +5,8 @@ from app.models.dealer_inventory import DealerInventory
 from app.models.dealer_promotion import DealerPromotion
 from app.models.user import User
 from app.models.station import Station
-from app.models.commission import Commission
-from typing import List, Optional, Any
+from app.models.commission import CommissionLog
+from typing import List, Optional
 from datetime import datetime
 from app.repositories.dealer import (
     dealer_profile_repository,
@@ -88,7 +88,37 @@ class DealerService:
             dealer.is_active = True
             db.add(dealer) # Or dealer_repo.update if needed, but simple attribute change here
             
-        return dealer_application_repository.update(db, db_obj=app, obj_in=app) # Using update to commit
+            # Append history
+            history = list(app.status_history) if app.status_history else []
+            history.append({"stage": new_stage, "timestamp": str(datetime.utcnow()), "note": note})
+            app.status_history = history
+            
+            # If Active, activate profile and assign role
+            if new_stage == "ACTIVE":
+                dealer = session.get(DealerProfile, app.dealer_id)
+                dealer.is_active = True
+                session.add(dealer)
+                
+                # Assign 'dealer' role
+                from app.models.rbac import Role, UserRole
+                dealer_role = session.exec(select(Role).where(Role.name == "dealer")).first()
+                if dealer_role:
+                    # Check existence in link table directly
+                    existing_link = session.exec(
+                        select(UserRole).where(
+                            UserRole.user_id == dealer.user_id,
+                            UserRole.role_id == dealer_role.id
+                        )
+                    ).first()
+                    
+                    if not existing_link:
+                        new_link = UserRole(user_id=dealer.user_id, role_id=dealer_role.id)
+                        session.add(new_link)
+                
+            session.add(app)
+            session.commit()
+            session.refresh(app)
+            return app
 
     @staticmethod
     def schedule_field_visit(db: Session, application_id: int, officer_id: int, date: datetime) -> FieldVisit:
@@ -120,34 +150,19 @@ class DealerService:
         DealerService.update_application_stage(db, visit.application_id, "FIELD_VISIT_COMPLETED", "Field visit done")
 
     @staticmethod
-    def get_dashboard_stats(db: Session, dealer_id: int) -> dict:
-        """Dashboard KPIs for dealers"""
-        stations = db.exec(select(Station).where(Station.dealer_id == dealer_id)).all()
-        station_ids = [s.id for s in stations]
-        
-        from app.models.rental import Rental
-        rentals = db.exec(select(Rental).where(Rental.start_station_id.in_(station_ids))).all()
-        
-        from app.models.commission import CommissionLog
-        commissions = db.exec(select(CommissionLog).where(CommissionLog.dealer_id == dealer_id)).all()
-        
-        # Aggregations
-        total_earnings = sum(c.amount for c in commissions)
-        pending_commissions = sum(c.amount for c in commissions if c.status == "pending")
-        
-        return {
-            "total_sales": 0.0, # Placeholder for e-commerce sales if handled separately
-            "total_rentals": len(rentals),
-            "active_rentals": len([r for r in rentals if r.status == "active"]),
-            "total_earnings": round(total_earnings, 2),
-            "pending_commissions": round(pending_commissions, 2),
-            "inventory_summary": {
-                "active_stations": len([s for s in stations if s.status == "operational"]),
-                "total_stations": len(stations)
-            },
-            "recent_orders": [], # Placeholder
-            "performance_metrics": {
-                "rental_growth": 0.0 # Placeholder
+    def get_dashboard_stats(dealer_id: int) -> dict:
+        with Session(engine) as session:
+            stations = session.exec(select(Station).where(Station.dealer_id == dealer_id)).all()
+            total_stations = len(stations)
+            # total_rentals = sum([s.total_rentals for s in stations]) # Assuming station has this or we query Rental JOIN Station
+            
+            commissions = session.exec(select(CommissionLog).where(CommissionLog.dealer_id == dealer_id)).all()
+            total_earnings = sum([c.amount for c in commissions])
+            
+            return {
+                "total_stations": total_stations,
+                "total_earnings": total_earnings,
+                "active_stations": len([s for s in stations if s.status == 'active'])
             }
         }
 

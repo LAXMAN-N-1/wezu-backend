@@ -93,11 +93,8 @@ class User(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    # Relationships
-    user_profile: Optional["UserProfile"] = Relationship(back_populates="user")
-    role: Optional["Role"] = Relationship(back_populates="users")
-    
-    # Legacy Relationships (To be refactored or kept for backward compat initially)
+    # Relationship
+    role: Optional["Role"] = Relationship(sa_relationship_kwargs={"viewonly": True}) # Legacy/Primary role. Viewonly to prevent conflict with roles list
     wallet: Optional["Wallet"] = Relationship(back_populates="user")
     addresses: List["Address"] = Relationship(back_populates="user")
     
@@ -127,9 +124,23 @@ class User(SQLModel, table=True):
     session_tokens: List["SessionToken"] = Relationship(back_populates="user")
     two_factor_auth: Optional["TwoFactorAuth"] = Relationship(back_populates="user")
 
+    # --- Granular RBAC Helpers ---
     @property
-    def is_active(self) -> bool:
-        return self.status == UserStatus.ACTIVE
+    def all_permissions(self) -> set:
+        """Aggregate all permission slugs from all assigned roles."""
+        perms = set()
+        for role in self.roles:
+            for perm in role.permissions:
+                perms.add(perm.slug)
+        return perms
+
+    def has_permission(self, slug: str) -> bool:
+        """Check if user has a specific permission (superusers always pass)."""
+        if self.is_superuser:
+            return True
+        return slug in self.all_permissions
+
+# OTP class removed (moved to app/models/otp.py)
 
     @is_active.setter
     def is_active(self, value: bool):
