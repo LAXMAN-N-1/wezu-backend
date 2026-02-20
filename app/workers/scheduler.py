@@ -100,6 +100,14 @@ def register_jobs():
         replace_existing=True
     )
     
+    scheduler.add_job(
+        hourly_jobs.smart_battery_swap_notifications,
+        IntervalTrigger(minutes=30), # Every 30 minutes to ensure timely swapping
+        id='smart_battery_swap_notifications',
+        name='Smart Battery Swap Notifications',
+        replace_existing=True
+    )
+    
     # Monthly Jobs (1st of month, 02:00 IST)
     scheduler.add_job(
         monthly_jobs.commission_settlement,

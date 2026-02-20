@@ -122,16 +122,11 @@ app.include_router(iot.router, prefix=f"{infra_api}/iot", tags=["Infra: IoT"])
 app.include_router(telemetry.router, prefix=f"{infra_api}/telemetry", tags=["Infra: Telemetry"])
 app.include_router(i18n.router, prefix=f"{infra_api}/i18n", tags=["Infra: i18n"])
 app.include_router(locations.router, prefix=f"{infra_api}/locations", tags=["Infra: Locations"])
-app.include_router(battery_catalog.router, prefix=f"{infra_api}/catalog", tags=["Infra: Catalog"])
 
 
 # Webhooks
 # Webhooks
 app.include_router(razorpay_webhook.router, prefix="/api/webhooks", tags=["Webhooks"])
-
-# Battery Catalog (Specs)
-from app.api.v1 import battery_catalog
-app.include_router(battery_catalog.router, prefix=f"{settings.API_V1_STR}/batteries", tags=["Battery Catalog"])
 
 # Logistics (Warehouses & Transfers)
 from app.api.v1 import logistics

@@ -291,9 +291,54 @@ async def request_late_fee_waiver(
     db.refresh(waiver)
     return waiver
 
+from app.services.station_service import StationService
+from app.models.battery import Battery
+from app.models.battery_catalog import BatteryCatalog
+from app.schemas.station import NearbyStationResponse
+
 class SwapRequest(BaseModel):
     station_id: int
     reason: str = "health_check"
+
+@router.get("/{rental_id}/swap-suggestions", response_model=List[NearbyStationResponse])
+async def get_swap_suggestions(
+    rental_id: int,
+    lat: float,
+    lon: float,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    """
+    FR-MOB-ACTIVE-006: Intelligent Swap Suggestions.
+    Suggests the top 3 nearest stations that have a compatible, fully charged battery.
+    """
+    rental = db.get(Rental, rental_id)
+    if not rental or rental.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Rental not found")
+        
+    if rental.status != "active":
+        raise HTTPException(status_code=400, detail="Rental is not active")
+        
+    battery = db.get(Battery, rental.battery_id)
+    if not battery:
+        raise HTTPException(status_code=404, detail="Original battery not found")
+        
+    # Get the spec of the current battery to find compatible ones
+    catalog = db.get(BatteryCatalog, battery.sku_id)
+    if not catalog:
+        raise HTTPException(status_code=404, detail="Battery specs not found")
+        
+    # Query nearby stations filtering by the same battery type and minimum capacity
+    stations = StationService.get_nearby(
+        db, lat, lon, radius_km=15.0,
+        status="active",
+        battery_type=catalog.battery_type,
+        min_capacity=catalog.capacity_mah,
+        sort_by="distance"
+    )
+    
+    # Return top 3
+    return stations[:3]
 
 @router.post("/{rental_id}/swap-request", response_model=RentalResponse)
 async def request_battery_swap(

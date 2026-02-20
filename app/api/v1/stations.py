@@ -31,11 +31,21 @@ async def search_nearby_stations(
     status: Optional[str] = Query(None, description="Station status (active, maintenance)"),
     is_24x7: Optional[bool] = Query(None, description="Filter only 24x7 stations"),
     sort_by: str = Query("distance", description="Sort by: distance, rating, availability"),
+    
+    # Advanced Battery Filters (FR-MOB-DISC-002)
+    battery_type: Optional[str] = Query(None, description="Filter by battery type (e.g., lithium_ion, lfp)"),
+    min_capacity: Optional[int] = Query(None, description="Minimum battery capacity (mAh)"),
+    max_price: Optional[float] = Query(None, description="Maximum daily rental price"),
+    
     db: Session = Depends(deps.get_db),
 ):
+    """
+    Find nearby stations, optionally filtered by available battery specs.
+    """
     stations = StationService.get_nearby(
         db, lat, lon, radius,
-        min_rating=min_rating, status=status, is_24x7=is_24x7, sort_by=sort_by
+        min_rating=min_rating, status=status, is_24x7=is_24x7, sort_by=sort_by,
+        battery_type=battery_type, min_capacity=min_capacity, max_price=max_price
     )
     return stations
 
@@ -107,7 +117,8 @@ async def read_station_batteries(
     db: Session = Depends(deps.get_db),
 ):
     try:
-        query = select(Battery).where(Battery.location_type == "station", Battery.location_id == station_id)
+        # Assuming we just need to query by station_id since location_id doesn't exist anymore
+        query = select(Battery).where(Battery.station_id == station_id)
         results = db.exec(query).all()
         return results
     except Exception as e:

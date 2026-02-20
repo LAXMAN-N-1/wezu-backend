@@ -24,9 +24,13 @@ class StationService:
         min_rating: Optional[float] = None,
         status: Optional[str] = None,
         is_24x7: Optional[bool] = None,
-        sort_by: str = "distance"
+        sort_by: str = "distance",
+        battery_type: Optional[str] = None,
+        min_capacity: Optional[int] = None,
+        max_price: Optional[float] = None
     ) -> List['NearbyStationResponse']:
         from app.schemas.station import NearbyStationResponse, StationImageResponse
+        from app.models.battery_catalog import BatteryCatalog
         
         # 1. Base Query
         query = select(Station)
@@ -39,8 +43,25 @@ class StationService:
              
         stations = db.execute(query).scalars().all()
         
-        # 2. Get Availability Map (Optimized)
-        availability_query = select(StationSlot.station_id, func.count(StationSlot.id)).where(StationSlot.status == "ready").group_by(StationSlot.station_id)
+        # 2. Get Availability Map (Filtered by battery specs)
+        # We join StationSlot -> Battery -> BatteryCatalog to evaluate specs
+        availability_query = (
+            select(StationSlot.station_id, func.count(StationSlot.id))
+            .join(Battery, StationSlot.battery_id == Battery.id)
+            .join(BatteryCatalog, Battery.sku_id == BatteryCatalog.id)
+            .where(StationSlot.status == "ready")
+        )
+        
+        # Apply filters to availability count
+        if battery_type:
+            availability_query = availability_query.where(BatteryCatalog.battery_type == battery_type)
+        if min_capacity:
+            availability_query = availability_query.where(BatteryCatalog.capacity_mah >= min_capacity)
+        if max_price:
+            availability_query = availability_query.where(BatteryCatalog.price_per_day <= max_price)
+            
+        availability_query = availability_query.group_by(StationSlot.station_id)
+        
         availability_results = db.execute(availability_query).all()
         availability_map = {r[0]: r[1] for r in availability_results}
         

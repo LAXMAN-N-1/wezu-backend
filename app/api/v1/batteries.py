@@ -1,9 +1,12 @@
-from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status
+from typing import Any, List, Optional, Dict
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status, UploadFile, File
+from fastapi.responses import Response
 from sqlmodel import Session, select
 from pydantic import BaseModel
 from sqlalchemy.orm import selectinload
 from datetime import datetime
+import csv
+import io
 
 from app.db.session import get_session
 from app.models.battery import Battery, BatteryLifecycleEvent
@@ -16,6 +19,7 @@ from app.schemas.battery import (
 from app.services.qr_service import QRCodeService
 from app.services.mqtt_service import mqtt_service
 from app.services.websocket_service import manager
+from app.services.battery_batch_service import battery_batch_service
 from app.schemas.common import DataResponse
 
 router = APIRouter()
@@ -59,8 +63,7 @@ def scan_battery_qr(
         select(Battery)
         .where(Battery.qr_code_data == qr_in.qr_code_data)
         .options(
-            selectinload(Battery.spec), 
-            selectinload(Battery.batch),
+            selectinload(Battery.sku), 
             selectinload(Battery.iot_device),
             selectinload(Battery.lifecycle_events)
         )
@@ -113,13 +116,58 @@ def read_batteries(
     batteries = session.exec(
         select(Battery)
         .options(
-             selectinload(Battery.spec), 
-             selectinload(Battery.batch),
+             selectinload(Battery.sku), 
              selectinload(Battery.iot_device)
         )
         .offset(skip).limit(limit)
     ).all()
     return batteries
+
+@router.post("/batch/import", response_model=DataResponse[dict])
+def import_batteries_csv(
+    file: UploadFile = File(...),
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(get_session)
+):
+    """Import batteries via CSV"""
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="Only CSV files are allowed")
+    
+    content = file.file.read().decode("utf-8")
+    parsed_data = battery_batch_service.parse_import_csv(content)
+    result = battery_batch_service.process_import(session, parsed_data)
+    
+    return DataResponse(success=True, data=result, message=f"Processed {len(parsed_data)} items")
+
+@router.get("/batch/export")
+def export_batteries_csv(
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(get_session)
+):
+    """Export battery inventory to CSV"""
+    csv_str = battery_batch_service.generate_export_csv(session)
+    
+    return Response(
+        content=csv_str,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=batteries_export_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"}
+    )
+
+@router.put("/batch/update", response_model=DataResponse[dict])
+def update_batteries_batch(
+    updates: List[Dict[str, Any]],
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(get_session)
+):
+    """
+    Batch update batteries. 
+    Payload: [{"serial_number": "SN123", "status": "rented", ...}]
+    """
+    if not updates or len(updates) > 1000:
+        raise HTTPException(status_code=400, detail="Invalid payload. Max 1000 updates allowed per request.")
+    
+    result = battery_batch_service.process_bulk_update(session, updates)
+    return DataResponse(success=True, data=result, message="Batch update complete")
 
 @router.get("/{battery_id}/telemetry", response_model=DataResponse[BatteryTelemetryResponse])
 def get_battery_telemetry(
@@ -200,8 +248,7 @@ def read_battery(
         select(Battery)
         .where(Battery.id == battery_id)
         .options(
-            selectinload(Battery.spec), 
-            selectinload(Battery.batch),
+            selectinload(Battery.sku), 
             selectinload(Battery.iot_device),
             selectinload(Battery.lifecycle_events)
         )
