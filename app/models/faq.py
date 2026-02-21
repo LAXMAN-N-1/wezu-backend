@@ -8,6 +8,11 @@ class FAQ(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     question: str
     answer: str
-    category: str = "general" # general, rental, payment
+    category: str = Field(default="general") # general, rental, payment
     is_active: bool = Field(default=True)
+    
+    helpful_count: int = Field(default=0)
+    not_helpful_count: int = Field(default=0)
+    
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)

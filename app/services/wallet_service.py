@@ -160,7 +160,7 @@ class WalletService:
     @staticmethod
     def apply_cashback(db: Session, user_id: int, amount: float, reason: str = "Cashback") -> Transaction:
         wallet = WalletService.get_wallet(db, user_id)
-        wallet.balance += amount
+        wallet.cashback_balance += amount
         db.add(wallet)
         
         txn = Transaction(

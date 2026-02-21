@@ -297,3 +297,39 @@ class OrderService:
             session.rollback()
             logger.error(f"Failed to update delivery status: {str(e)}")
             return False
+
+    @staticmethod
+    def get_admin_orders(
+        session: Session,
+        status: Optional[str] = None,
+        user_id: Optional[int] = None,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[CatalogOrder]:
+        """Admin: Retrieve all orders with filters"""
+        statement = select(CatalogOrder)
+        if status:
+            statement = statement.where(CatalogOrder.status == status)
+        if user_id:
+            statement = statement.where(CatalogOrder.user_id == user_id)
+            
+        return session.exec(statement.offset(skip).limit(limit)).all()
+
+    @staticmethod
+    def initiate_return(order_id: int, reason: str, session: Session) -> bool:
+        """Initiate return request for a delivered order"""
+        try:
+            order = session.get(CatalogOrder, order_id)
+            if not order or order.status != "DELIVERED":
+                return False
+                
+            # Change status to RETURN_REQUESTED (or similar)
+            order.status = "RETURN_REQUESTED"
+            order.admin_notes = f"Return initiated: {reason}"
+            session.add(order)
+            session.commit()
+            return True
+        except Exception as e:
+            session.rollback()
+            logger.error(f"Failed to initiate return: {str(e)}")
+            return False

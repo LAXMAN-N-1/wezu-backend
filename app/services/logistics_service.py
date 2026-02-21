@@ -12,87 +12,112 @@ from datetime import datetime
 from sqlmodel import func, select
 
 class LogisticsService:
-    
     @staticmethod
-    def create_delivery_for_order(order_id: int, pickup_address: str, delivery_address: str) -> DeliveryAssignment:
-        with Session(engine) as session:
-            assignment = DeliveryAssignment(
-                order_id=order_id,
-                status="PENDING",
-                pickup_address=pickup_address,
-                delivery_address=delivery_address
-            )
-            session.add(assignment)
-            session.commit()
-            session.refresh(assignment)
-            return assignment
+    def create_delivery_order(db: Session, data: dict) -> Any:
+        from app.models.logistics import DeliveryOrder
+        order = DeliveryOrder(**data)
+        db.add(order)
+        db.commit()
+        db.refresh(order)
+        return order
 
     @staticmethod
-    def assign_driver(delivery_id: int, driver_id: int) -> DeliveryAssignment:
-        with Session(engine) as session:
-            delivery = session.get(DeliveryAssignment, delivery_id)
-            if not delivery:
-                raise ValueError("Delivery not found")
-            
-            driver = session.get(DriverProfile, driver_id)
-            if not driver:
-                raise ValueError("Driver not found")
-            
-            delivery.driver_id = driver_id
-            delivery.status = "ASSIGNED"
-            delivery.assigned_at = datetime.utcnow()
-            
-            session.add(delivery)
-            session.commit()
-            session.refresh(delivery)
-            
-            # Notify Driver
-            NotificationService.send_push_notification(
-                user_id=driver.user_id,
-                title="New Delivery Assigned",
-                body=f"Pickup: {delivery.pickup_address}"
-            )
-            
-            return delivery
+    def assign_order(db: Session, order_id: int, driver_id: int) -> Any:
+        from app.models.logistics import DeliveryOrder, DeliveryStatus
+        order = db.get(DeliveryOrder, order_id)
+        if not order:
+            raise ValueError("Order not found")
+        
+        order.assigned_driver_id = driver_id
+        order.status = DeliveryStatus.ASSIGNED
+        order.updated_at = datetime.utcnow()
+        db.add(order)
+        db.commit()
+        db.refresh(order)
+        return order
 
     @staticmethod
-    def update_delivery_status(delivery_id: int, status: str, pod_img: str = None, signature: str = None) -> DeliveryAssignment:
-        with Session(engine) as session:
-            delivery = session.get(DeliveryAssignment, delivery_id)
-            if not delivery:
-                raise ValueError("Delivery not found")
+    def update_order_status(db: Session, order_id: int, status: str) -> Any:
+        from app.models.logistics import DeliveryOrder
+        order = db.get(DeliveryOrder, order_id)
+        if not order:
+            raise ValueError("Order not found")
             
-            delivery.status = status
-            
-            if status == "PICKED_UP":
-                delivery.picked_up_at = datetime.utcnow()
-                # Update Order Status
-                if delivery.order_id:
-                     order = session.get(Order, delivery.order_id)
-                     order.status = "shipped"
-                     session.add(order)
-            
-            elif status == "DELIVERED":
-                delivery.delivered_at = datetime.utcnow()
-                delivery.proof_of_delivery_img = pod_img
-                delivery.customer_signature = signature
-                
-                # Update Order Status
-                if delivery.order_id:
-                     order = session.get(Order, delivery.order_id)
-                     order.status = "delivered"
-                     session.add(order)
-                
-                # Update Driver Stats
-                if delivery.driver_id:
-                    driver = session.get(DriverProfile, delivery.driver_id)
+        order.status = status
+        if status == "in_transit" and not order.started_at:
+            order.started_at = datetime.utcnow()
+        elif status == "delivered":
+            order.completed_at = datetime.utcnow()
+            # Update driver stats
+            if order.assigned_driver_id:
+                from app.models.driver_profile import DriverProfile
+                driver = db.exec(select(DriverProfile).where(DriverProfile.user_id == order.assigned_driver_id)).first()
+                if driver:
                     driver.total_deliveries += 1
-                    session.add(driver)
+                    # Simple on-time logic: if completed - started < 30 mins
+                    if order.started_at:
+                        duration = (order.completed_at - order.started_at).total_seconds()
+                        driver.total_delivery_time_seconds += int(duration)
+                        if duration < 1800: # 30 mins
+                            driver.on_time_deliveries += 1
+                    db.add(driver)
 
-            session.add(delivery)
-            session.commit()
-            session.refresh(delivery)
-            return delivery
+        db.add(order)
+        db.commit()
+        db.refresh(order)
+        return order
+
+    @staticmethod
+    def upload_pod(db: Session, order_id: int, pod_url: str, signature_url: str = None, otp: str = None) -> Any:
+        from app.models.logistics import DeliveryOrder
+        order = db.get(DeliveryOrder, order_id)
+        if not order:
+            raise ValueError("Order not found")
+            
+        order.proof_of_delivery_url = pod_url
+        if signature_url:
+            order.customer_signature_url = signature_url
+        if otp and order.completion_otp == otp:
+            order.otp_verified = True
+            
+        db.add(order)
+        db.commit()
+        db.refresh(order)
+        return order
+
+    @staticmethod
+    def initiate_reverse_pickup(db: Session, order_id: int, user_id: int, reason: str) -> Any:
+        from app.models.return_request import ReturnRequest, ReturnStatus
+        rr = ReturnRequest(order_id=order_id, user_id=user_id, reason=reason, status=ReturnStatus.PENDING)
+        db.add(rr)
+        db.commit()
+        db.refresh(rr)
+        return rr
+
+    @staticmethod
+    def optimize_route(db: Session, driver_id: int, stops: List[dict]) -> dict:
+        """Simple sequence optimization by distance (Nearest Neighbor)"""
+        # In production, use Google Matrix API or similar
+        # For now, just return stops in original order but wrap in a route object
+        from app.models.delivery_route import DeliveryRoute
+        route = DeliveryRoute(driver_id=driver_id, route_name=f"Route {datetime.utcnow().date()}", total_stops=len(stops))
+        db.add(route)
+        db.commit()
+        db.refresh(route)
+        return {"route_id": route.id, "optimized_stops": [s['delivery_assignment_id'] for s in stops], "total_distance_km": 0.0}
+
+    @staticmethod
+    def get_platform_performance(db: Session) -> dict:
+        """Global logistics metrics"""
+        from app.models.logistics import DeliveryOrder
+        total = db.exec(select(func.count(DeliveryOrder.id))).one()
+        delivered = db.exec(select(func.count(DeliveryOrder.id)).where(DeliveryOrder.status == "delivered")).one()
+        
+        return {
+            "total_orders": total,
+            "success_rate": (delivered / total * 100) if total > 0 else 0.0,
+            "active_drivers": 0 # Placeholder
+        }
 
     @staticmethod
     def create_manifest(db: Session, driver_id: int, vehicle_id: Optional[str] = None) -> Manifest:

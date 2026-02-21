@@ -62,3 +62,23 @@ class BatteryResponse(BatteryBase):
 
 class BatteryDetailResponse(BatteryResponse):
     lifecycle_events: List[BatteryLifecycleEventResponse] = []
+
+class BatteryHealthReading(BaseModel):
+    timestamp: datetime
+    soh: float
+    soc: float
+    temperature: Optional[float] = None
+
+class BatteryUtilizationResponse(BaseModel):
+    total_batteries: int
+    available_count: int
+    rented_count: int
+    maintenance_count: int
+    retired_count: int
+    utilization_percentage: float
+
+class BatteryMaintenanceCreate(BaseModel):
+    maintenance_type: str # preventive, corrective
+    description: str
+    cost: float = 0.0
+    parts_replaced: Optional[str] = None

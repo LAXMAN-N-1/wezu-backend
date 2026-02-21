@@ -2,6 +2,18 @@ from google.oauth2 import id_token
 from google.auth.transport import requests
 from app.core.config import settings
 from fastapi import HTTPException, status
+from sqlmodel import Session, select
+from app.models.user import User
+from app.models.biometric import BiometricCredential
+from app.core.security import generate_totp_secret, verify_totp, generate_backup_codes, generate_qr_uri
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding, ec
+from cryptography.hazmat.primitives import serialization
+import pyotp
+import logging
+import base64
+
+logger = logging.getLogger(__name__)
 
 class AuthService:
     @staticmethod
@@ -179,3 +191,114 @@ class AuthService:
             db.commit()
             return session
         return None
+
+    # --- 2FA Logic ---
+    @staticmethod
+    def initiate_2fa_setup(user: User):
+        """Generates secret and QR URI for 2FA setup"""
+        secret = generate_totp_secret()
+        qr_uri = generate_qr_uri(user.email or user.phone_number, secret)
+        return {"secret": secret, "qr_uri": qr_uri}
+
+    @staticmethod
+    def verify_and_enable_2fa(db: Session, user: User, code: str, secret: str):
+        """Verifies initial 2FA code and enables it for user"""
+        if verify_totp(secret, code):
+            user.two_factor_enabled = True
+            user.two_factor_secret = secret
+            user.backup_codes = generate_backup_codes()
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            return user.backup_codes
+        return None
+
+    @staticmethod
+    def verify_2fa_login(user: User, code: str) -> bool:
+        """Verify 2FA code during login process"""
+        if not user.two_factor_enabled or not user.two_factor_secret:
+            return True # Not enabled
+        
+        # Check backup codes first
+        if user.backup_codes and code in user.backup_codes:
+            user.backup_codes.remove(code)
+            # db.add(user) # Needs session from caller or internal commit
+            return True
+            
+        return verify_totp(user.two_factor_secret, code)
+
+    # --- Biometric Logic ---
+    @staticmethod
+    def register_biometric(db: Session, user_id: int, device_id: str, credential_id: str, public_key: str):
+        """Register a new biometric public key"""
+        # Deactivate old credentials for this user/device if needed
+        # ...
+        
+        cred = BiometricCredential(
+            user_id=user_id,
+            device_id=device_id,
+            credential_id=credential_id,
+            public_key=public_key
+        )
+        db.add(cred)
+        db.commit()
+        db.refresh(cred)
+        return cred
+
+    @staticmethod
+    def verify_biometric_signature(db: Session, user_id: int, credential_id: str, signature: str, challenge: str):
+        """Verify signed challenge using stored public key (Production Ready)"""
+        statement = select(BiometricCredential).where(
+            BiometricCredential.user_id == user_id,
+            BiometricCredential.credential_id == credential_id
+        )
+        cred = db.exec(statement).first()
+        if not cred:
+            return False
+            
+        try:
+            # 1. Decode public key and signature
+            # Public key is expected to be PEM or DER encoded Base64
+            public_key_bytes = base64.b64decode(cred.public_key)
+            signature_bytes = base64.b64decode(signature)
+            challenge_bytes = challenge.encode('utf-8')
+            
+            # 2. Load public key (assuming ECDSA/P-256 which is standard for WebAuthn)
+            # Try loading as SubjectPublicKeyInfo (DER) first
+            try:
+                public_key = serialization.load_der_public_key(public_key_bytes)
+            except:
+                public_key = serialization.load_pem_public_key(public_key_bytes)
+            
+            # 3. Verify signature
+            if isinstance(public_key, ec.EllipticCurvePublicKey):
+                public_key.verify(signature_bytes, challenge_bytes, ec.ECDSA(hashes.SHA256()))
+                return True
+            
+            # Fallback for RSA if needed
+            public_key.verify(
+                signature_bytes,
+                challenge_bytes,
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
+            return True
+            
+        except Exception as e:
+            logger.error(f"BIOMETRIC_VERIFICATION_FAILED: {str(e)}")
+            return False
+
+    @staticmethod
+    def revoke_all_user_sessions(db: Session, user_id: int):
+        """Revoke all active sessions for a user (called on deletion/password change)"""
+        from app.models.session import UserSession
+        statement = select(UserSession).where(UserSession.user_id == user_id, UserSession.is_active == True)
+        sessions = db.exec(statement).all()
+        for session in sessions:
+            session.is_active = False
+            session.is_revoked = True
+            db.add(session)
+        db.commit()

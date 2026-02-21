@@ -2,6 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
 from enum import Enum
+import sqlalchemy as sa
 
 if TYPE_CHECKING:
     from app.models.financial import Wallet
@@ -15,6 +16,7 @@ if TYPE_CHECKING:
     from app.models.rbac import Role, UserAccessPath
     from app.models.session import UserSession
     from app.models.user_profile import UserProfile
+    from app.models.membership import UserMembership
     from app.models.finance.transaction import Transaction
     from app.models.rental import Rental
     from app.models.support import SupportTicket
@@ -71,12 +73,23 @@ class User(SQLModel, table=True):
     # Security
     two_factor_enabled: bool = Field(default=False)
     two_factor_secret: Optional[str] = None
+    backup_codes: Optional[List[str]] = Field(default=None, sa_column=sa.Column(sa.JSON))
+    
+    # Email Verification
+    is_email_verified: bool = Field(default=False)
+    email_verification_token: Optional[str] = None
+    email_verification_sent_at: Optional[datetime] = None
+    
     last_login_at: Optional[datetime] = None
+    
+    # Soft Delete
+    is_deleted: bool = Field(default=False)
+    deletion_reason: Optional[str] = None
+    deleted_at: Optional[datetime] = None
     
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    deleted_at: Optional[datetime] = None
 
     # Relationships
     user_profile: Optional["UserProfile"] = Relationship(back_populates="user")
@@ -101,6 +114,7 @@ class User(SQLModel, table=True):
         back_populates="user",
         sa_relationship_kwargs={"foreign_keys": "[StaffProfile.user_id]"}
     )
+    membership: Optional["UserMembership"] = Relationship(back_populates="user")
     
     transactions: List["Transaction"] = Relationship(back_populates="user")
     rentals: List["Rental"] = Relationship(back_populates="user")

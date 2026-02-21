@@ -41,9 +41,19 @@ class DriverService:
                 session.commit()
 
     @staticmethod
-    def find_nearby_drivers(lat: float, lng: float, radius_km: float = 10.0) -> List[DriverProfile]:
-        # Simple bounding box or just return all online drivers for now
-        with Session(engine) as session:
-            # In production, use PostGIS or Haversine filter
-            drivers = session.exec(select(DriverProfile).where(DriverProfile.is_online == True)).all()
-            return drivers
+    def get_driver_performance(db: Session, driver_id: int) -> dict:
+        """Calculate real-time KPIs for a driver"""
+        driver = db.get(DriverProfile, driver_id)
+        if not driver:
+            return {}
+            
+        on_time_rate = (driver.on_time_deliveries / driver.total_deliveries * 100) if driver.total_deliveries > 0 else 100.0
+        avg_time = (driver.total_delivery_time_seconds / driver.total_deliveries / 60) if driver.total_deliveries > 0 else 0.0
+        satisfaction = (driver.satisfaction_sum / driver.total_deliveries) if driver.total_deliveries > 0 else 5.0
+        
+        return {
+            "driver_id": driver_id,
+            "on_time_rate": round(on_time_rate, 2),
+            "avg_delivery_time_minutes": round(avg_time, 2),
+            "satisfaction_score": round(satisfaction, 2)
+        }

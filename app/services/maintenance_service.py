@@ -102,3 +102,21 @@ class MaintenanceService:
         db.add(dt)
         db.commit()
         return dt
+
+    @staticmethod
+    def get_maintenance_history(db: Session, entity_id: int, entity_type: str = "battery") -> List[MaintenanceRecord]:
+        return db.exec(
+            select(MaintenanceRecord)
+            .where(MaintenanceRecord.entity_id == entity_id, MaintenanceRecord.entity_type == entity_type)
+            .order_by(MaintenanceRecord.performed_at.desc())
+        ).all()
+
+    @staticmethod
+    def get_maintenance_schedule(db: Session, entity_id: int, entity_type: str = "station") -> List[MaintenanceSchedule]:
+        # In this model, schedules are templates, but we can return records marked as pending if they existed.
+        # However, the SRS implies a task list. Let's use records with status='pending' or just history.
+        return db.exec(
+            select(MaintenanceRecord)
+            .where(MaintenanceRecord.entity_id == entity_id, MaintenanceRecord.entity_type == entity_type)
+            .order_by(MaintenanceRecord.performed_at.asc())
+        ).all()

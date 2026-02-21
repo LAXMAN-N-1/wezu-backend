@@ -7,7 +7,8 @@ from app.api import deps
 import shutil
 import os
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
+from app.schemas.kyc import RejectionReasonResponse
 
 router = APIRouter()
 
@@ -71,8 +72,9 @@ async def submit_kyc_document(
     if current_user.kyc_status == "verified":
          pass # Don't downgrade if verified?
     else:
-         current_user.kyc_status = "submitted"
-         record.status = "submitted"
+         from app.models.user import KYCStatus
+         current_user.kyc_status = KYCStatus.PENDING
+         record.status = KYCStatus.PENDING
          
     db.add(record)
     db.add(current_user)
@@ -183,25 +185,49 @@ def request_video_kyc(
     session = VideoKYCService.schedule_session(current_user.id, datetime.utcnow(), db=db)
     return session
 
-@router.post("/me/kyc/resubmit")
+@router.post("/resubmit")
 async def resubmit_kyc(
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db),
+    db: Session = Depends(get_session),
 ):
     """
-    Resubmit KYC after rejection. Resets status to pending.
+    Resubmit KYC after rejection. Resets status and documents logic.
     """
-    if current_user.kyc_status != "rejected":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Can only resubmit if current status is rejected"
-        )
+    from app.services.kyc_service import kyc_service
+    success = kyc_service.resubmit_kyc(db, current_user.id)
+    if not success:
+         raise HTTPException(status_code=404, detail="User not found")
     
-    current_user.kyc_status = "pending_verification"
-    current_user.kyc_rejection_reason = None
+    return {"message": "KYC status reset. You can now re-upload documents."}
+
+@router.get("/rejection-reasons", response_model=List[RejectionReasonResponse])
+async def get_kyc_rejection_reasons():
+    """Fetch available standardized rejection reason codes"""
+    from app.services.kyc_service import kyc_service
+    return kyc_service.get_rejection_reasons()
+
+@router.post("/utility-bill-verify")
+async def verify_utility_bill(
+    file: UploadFile = File(...),
+    bill_type: str = Form("electricity"),
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Upload and verify utility bill for address proof"""
+    # 1. Save File
+    upload_dir = f"uploads/kyc/{current_user.id}"
+    os.makedirs(upload_dir, exist_ok=True)
+    file_path = f"{upload_dir}/utility_bill_{file.filename}"
     
-    db.add(current_user)
-    db.commit()
-    db.refresh(current_user)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+        
+    # 2. Verify via service
+    from app.services.kyc_service import kyc_service
+    result = await kyc_service.verify_utility_bill(db, current_user.id, file_path)
     
-    return current_user
+    return {
+        "message": "Utility bill uploaded and processed",
+        "extracted_address": result.get("extracted_address"),
+        "status": "pending"
+    }

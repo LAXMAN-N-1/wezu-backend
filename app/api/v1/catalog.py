@@ -14,7 +14,13 @@ from app.models.user import User
 from app.models.catalog import CatalogOrder, CatalogOrderItem
 from app.services.catalog_service import CatalogService
 from app.services.order_service import OrderService
+from app.services.invoice_service import InvoiceService
 from app.schemas.common import DataResponse
+from app.schemas.catalog import (
+    ProductCreate, ProductUpdate, ProductResponse, 
+    CategoryListResponse, OrderReturnRequest
+)
+from fastapi.responses import StreamingResponse
 
 router = APIRouter()
 
@@ -52,6 +58,52 @@ class OrderCreateRequest(BaseModel):
     customer_notes: Optional[str] = None
 
 # Catalog Endpoints
+
+@router.get("/products/categories", response_model=DataResponse[CategoryListResponse])
+def get_product_categories(
+    session: Session = Depends(get_session)
+):
+    """List of product categories"""
+    metadata = CatalogService.get_catalog_metadata(session)
+    return DataResponse(success=True, data={"categories": metadata["categories"]})
+
+# Admin Product Management
+@router.post("/admin/products", response_model=DataResponse[dict])
+def admin_create_product(
+    request: ProductCreate,
+    current_user: User = Depends(deps.get_current_active_superuser),
+    session: Session = Depends(get_session)
+):
+    """Admin: create a new product listing"""
+    product = CatalogService.create_product(request, session)
+    return DataResponse(success=True, data={"id": product.id, "message": "Product created"})
+
+@router.put("/admin/products/{id}", response_model=DataResponse[dict])
+def admin_update_product(
+    id: int,
+    request: ProductUpdate,
+    current_user: User = Depends(deps.get_current_active_superuser),
+    session: Session = Depends(get_session)
+):
+    """Admin: update product details or pricing"""
+    product = CatalogService.update_product(id, request, session)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return DataResponse(success=True, data={"id": product.id, "message": "Product updated"})
+
+@router.delete("/admin/products/{id}", response_model=DataResponse[dict])
+def admin_delete_product(
+    id: int,
+    current_user: User = Depends(deps.get_current_active_superuser),
+    session: Session = Depends(get_session)
+):
+    """Admin: deactivate/remove a product"""
+    success = CatalogService.delete_product(id, session)
+    if not success:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return DataResponse(success=True, data={"message": "Product deactivated"})
+
+# Catalog Endpoints (continued)
 @router.post("/products/search", response_model=DataResponse[dict])
 def search_products(
     request: ProductSearchRequest,
@@ -263,6 +315,20 @@ def get_featured_products(
     )
 
 # Order Endpoints
+
+@router.get("/admin/catalog/orders", response_model=DataResponse[list])
+def admin_get_orders(
+    status: Optional[str] = None,
+    user_id: Optional[int] = None,
+    skip: int = 0,
+    limit: int = 100,
+    current_user: User = Depends(deps.get_current_active_superuser),
+    session: Session = Depends(get_session)
+):
+    """Admin: all orders paginated with filters"""
+    orders = OrderService.get_admin_orders(session, status, user_id, skip, limit)
+    return DataResponse(success=True, data=orders)
+
 @router.post("/orders", response_model=DataResponse[dict])
 def create_order(
     request: OrderCreateRequest,
@@ -418,6 +484,50 @@ def cancel_order(
         success=True,
         data={"message": "Order cancelled successfully"}
     )
+
+    return DataResponse(
+        success=True,
+        data={"message": "Order cancelled successfully"}
+    )
+
+@router.get("/orders/{order_id}/invoice")
+def get_order_invoice(
+    order_id: int,
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(get_session)
+):
+    """Download GST invoice PDF for the order"""
+    order = session.get(CatalogOrder, order_id)
+    if not order or (order.user_id != current_user.id and not current_user.is_superuser):
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    buffer = InvoiceService.generate_order_invoice(order_id, session)
+    if not buffer:
+        raise HTTPException(status_code=500, detail="Failed to generate invoice")
+        
+    return StreamingResponse(
+        buffer, 
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=invoice_{order.order_number}.pdf"}
+    )
+
+@router.post("/orders/{order_id}/return", response_model=DataResponse[dict])
+def initiate_order_return(
+    order_id: int,
+    request: OrderReturnRequest,
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(get_session)
+):
+    """Initiate return request for a purchased battery"""
+    order = session.get(CatalogOrder, order_id)
+    if not order or order.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Order not found")
+        
+    success = OrderService.initiate_return(order_id, request.reason, session)
+    if not success:
+        raise HTTPException(status_code=400, detail="Order is not eligible for return")
+        
+    return DataResponse(success=True, data={"message": "Return request submitted"})
 
 @router.get("/orders/{order_id}/tracking", response_model=DataResponse[dict])
 def get_order_tracking(

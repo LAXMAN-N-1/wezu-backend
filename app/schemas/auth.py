@@ -8,7 +8,6 @@ class LoginRequest(BaseModel):
     role: Optional[str] = None
     device_fingerprint: Optional[str] = None
     remember_me: bool = False
-    totp_code: Optional[str] = None
 
 class RoleSelectRequest(BaseModel):
     role: str
@@ -205,3 +204,45 @@ class StaffRegisterResponse(BaseModel):
     temporary_password: str
     role: str
     message: str
+
+# 2FA Schemas
+class TwoFASetupResponse(BaseModel):
+    secret: str
+    qr_uri: str
+
+class TwoFAVerifyRequest(BaseModel):
+    code: str
+    secret: str
+
+class TwoFADisableRequest(BaseModel):
+    password: str
+
+# Email Verification
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+# Biometric Schemas
+class BiometricRegisterRequest(BaseModel):
+    credential_id: str
+    public_key: str
+    device_id: str
+    friendly_name: Optional[str] = "My Device"
+
+class BiometricLoginRequest(BaseModel):
+    credential_id: str
+    signature: str
+    challenge: str
+
+# Security Question Schemas
+class SecurityQuestionResponse(BaseModel):
+    id: int
+    question_text: str
+    
+    model_config = ConfigDict(from_attributes=True)
+
+class SetSecurityQuestionRequest(BaseModel):
+    question_id: int
+    answer: str
+
+class VerifySecurityQuestionRequest(BaseModel):
+    answer: str

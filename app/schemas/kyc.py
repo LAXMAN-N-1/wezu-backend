@@ -49,3 +49,17 @@ class KYCVerifyRequest(BaseModel):
     notes: Optional[str] = None
     rejection_reasons: Optional[Dict[int, str]] = None # map of doc_id -> reason
 
+class RejectionReasonResponse(BaseModel):
+    code: str
+    description: str
+
+class KYCDashboardResponse(BaseModel):
+    total_pending: int
+    total_approved_today: int
+    total_rejected_today: int
+    submission_trend: Dict[str, int] # date -> count
+
+class UtilityBillVerifyRequest(BaseModel):
+    bill_type: str # electricity, water, postpaid_mobile
+    provider_name: str
+

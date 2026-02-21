@@ -4,18 +4,26 @@ from typing import List
 from app.api import deps
 from app.models.user import User
 from app.models.financial import Transaction
-from app.schemas.wallet import WalletResponse, TransactionResponse, RechargeRequest
+from app.schemas.wallet import TransactionResponse, RechargeRequest
+from app.schemas.payment import WalletBalanceResponse, TransactionFilterRequest
 from app.services.wallet_service import WalletService
 from app.services.payment_service import PaymentService
 
 router = APIRouter()
 
-@router.get("/", response_model=WalletResponse)
-async def get_wallet(
+@router.get("/balance", response_model=WalletBalanceResponse)
+async def get_wallet_balance(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ):
-    return WalletService.get_wallet(db, current_user.id)
+    """Current wallet balance and cashback balance"""
+    wallet = WalletService.get_wallet(db, current_user.id)
+    return {
+        "user_id": current_user.id,
+        "balance": wallet.balance,
+        "cashback_balance": wallet.cashback_balance,
+        "currency": wallet.currency
+    }
 
 @router.post("/recharge", response_model=dict)
 async def recharge_wallet(
@@ -27,14 +35,24 @@ async def recharge_wallet(
     return order # Returns Razorpay order details for frontend
 
 @router.get("/transactions", response_model=List[TransactionResponse])
-async def get_transactions(
+async def get_wallet_transactions(
+    transaction_type: Optional[str] = None,
+    status: Optional[str] = None,
+    skip: int = 0,
+    limit: int = 20,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ):
+    """Paginated wallet transaction history with filters"""
     wallet = WalletService.get_wallet(db, current_user.id)
-    # Simple query
     from sqlmodel import select
-    return db.exec(select(Transaction).where(Transaction.wallet_id == wallet.id).order_by(Transaction.created_at.desc())).all()
+    statement = select(Transaction).where(Transaction.wallet_id == wallet.id)
+    if transaction_type:
+        statement = statement.where(Transaction.transaction_type == transaction_type)
+    if status:
+        statement = statement.where(Transaction.status == status)
+        
+    return db.exec(statement.order_by(Transaction.created_at.desc()).offset(skip).limit(limit)).all()
 
 from pydantic import BaseModel
 class TransferRequest(BaseModel):

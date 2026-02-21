@@ -10,6 +10,50 @@ class RBACService:
         return db.exec(select(Role).where(Role.name == name)).first()
 
     @staticmethod
+    def list_roles(db: Session) -> List[Role]:
+        from sqlalchemy.orm import selectinload
+        return db.exec(select(Role).options(selectinload(Role.permissions))).all()
+
+    @staticmethod
+    def create_role(db: Session, role_in: Role, permission_ids: List[int] = []) -> Role:
+        db.add(role_in)
+        db.commit()
+        db.refresh(role_in)
+        
+        if permission_ids:
+            for pid in permission_ids:
+                rp = RolePermission(role_id=role_in.id, permission_id=pid)
+                db.add(rp)
+            db.commit()
+            db.refresh(role_in)
+        return role_in
+
+    @staticmethod
+    def update_role(db: Session, role_id: int, update_data: dict, permission_ids: Optional[List[int]] = None) -> Role:
+        role = db.get(Role, role_id)
+        if not role:
+            return None
+            
+        for key, value in update_data.items():
+            setattr(role, key, value)
+            
+        if permission_ids is not None:
+            # Simple replace: delete old associations, add new ones
+            db.exec(sa.delete(RolePermission).where(RolePermission.role_id == role_id))
+            for pid in permission_ids:
+                rp = RolePermission(role_id=role_id, permission_id=pid)
+                db.add(rp)
+                
+        db.add(role)
+        db.commit()
+        db.refresh(role)
+        return role
+
+    @staticmethod
+    def list_permissions(db: Session) -> List[Permission]:
+        return db.exec(select(Permission)).all()
+
+    @staticmethod
     def get_user_permissions(db: Session, role_id: int) -> List[str]:
         """
         Get all permission slugs for a given role.

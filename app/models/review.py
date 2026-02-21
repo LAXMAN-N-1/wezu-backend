@@ -16,6 +16,7 @@ class Review(SQLModel, table=True):
     response_from_station: Optional[str] = None
     
     is_verified_rental: bool = Field(default=False)
+    is_hidden: bool = Field(default=False)
     helpful_count: int = Field(default=0)
     
     created_at: datetime = Field(default_factory=datetime.utcnow)

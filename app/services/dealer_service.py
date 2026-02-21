@@ -121,16 +121,82 @@ class DealerService:
 
     @staticmethod
     def get_dashboard_stats(db: Session, dealer_id: int) -> dict:
-        # This part still uses manual queries as it aggregates data across modules not fully repository-ized or needed custom queries
+        """Dashboard KPIs for dealers"""
         stations = db.exec(select(Station).where(Station.dealer_id == dealer_id)).all()
-        total_stations = len(stations)
-        # total_rentals = sum([s.total_rentals for s in stations]) # Assuming station has this or we query Rental JOIN Station
+        station_ids = [s.id for s in stations]
         
-        commissions = db.exec(select(Commission).where(Commission.dealer_id == dealer_id)).all()
-        total_earnings = sum([c.amount for c in commissions])
+        from app.models.rental import Rental
+        rentals = db.exec(select(Rental).where(Rental.start_station_id.in_(station_ids))).all()
+        
+        from app.models.commission import CommissionLog
+        commissions = db.exec(select(CommissionLog).where(CommissionLog.dealer_id == dealer_id)).all()
+        
+        # Aggregations
+        total_earnings = sum(c.amount for c in commissions)
+        pending_commissions = sum(c.amount for c in commissions if c.status == "pending")
         
         return {
-            "total_stations": total_stations,
-            "total_earnings": total_earnings,
-            "active_stations": len([s for s in stations if s.status == 'active'])
+            "total_sales": 0.0, # Placeholder for e-commerce sales if handled separately
+            "total_rentals": len(rentals),
+            "active_rentals": len([r for r in rentals if r.status == "active"]),
+            "total_earnings": round(total_earnings, 2),
+            "pending_commissions": round(pending_commissions, 2),
+            "inventory_summary": {
+                "active_stations": len([s for s in stations if s.status == "operational"]),
+                "total_stations": len(stations)
+            },
+            "recent_orders": [], # Placeholder
+            "performance_metrics": {
+                "rental_growth": 0.0 # Placeholder
+            }
         }
+
+    @staticmethod
+    def get_sales_summary(db: Session, dealer_id: int) -> dict:
+        """Daily/Weekly/Monthly sales summary for dealer"""
+        stations = db.exec(select(Station).where(Station.dealer_id == dealer_id)).all()
+        station_ids = [s.id for s in stations]
+        
+        from app.models.rental import Rental
+        from datetime import datetime, timedelta
+        
+        now = datetime.utcnow()
+        day_ago = now - timedelta(days=1)
+        week_ago = now - timedelta(days=7)
+        month_ago = now - timedelta(days=30)
+        
+        daily = db.exec(select(func.count(Rental.id)).where(Rental.start_station_id.in_(station_ids)).where(Rental.created_at >= day_ago)).one()
+        weekly = db.exec(select(func.count(Rental.id)).where(Rental.start_station_id.in_(station_ids)).where(Rental.created_at >= week_ago)).one()
+        monthly = db.exec(select(func.count(Rental.id)).where(Rental.start_station_id.in_(station_ids)).where(Rental.created_at >= month_ago)).one()
+        
+        return {
+            "daily_rentals": daily,
+            "weekly_rentals": weekly,
+            "monthly_rentals": monthly,
+            "revenue": 0.0 # Placeholder
+        }
+
+    @staticmethod
+    def update_promotion(db: Session, promo_id: int, dealer_id: int, promo_in: dict) -> Any:
+        from app.models.dealer_promotion import DealerPromotion
+        promo = db.exec(select(DealerPromotion).where(DealerPromotion.id == promo_id).where(DealerPromotion.dealer_id == dealer_id)).first()
+        if not promo:
+            raise ValueError("Promotion not found")
+            
+        for key, value in promo_in.items():
+            setattr(promo, key, value)
+            
+        db.add(promo)
+        db.commit()
+        db.refresh(promo)
+        return promo
+
+    @staticmethod
+    def get_commission_history(db: Session, dealer_id: int, skip: int = 0, limit: int = 50) -> List[Any]:
+        from app.models.commission import CommissionLog
+        return db.exec(
+            select(CommissionLog)
+            .where(CommissionLog.dealer_id == dealer_id)
+            .order_by(CommissionLog.created_at.desc())
+            .offset(skip).limit(limit)
+        ).all()

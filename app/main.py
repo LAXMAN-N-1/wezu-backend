@@ -9,6 +9,14 @@ from app.api.v1 import (
     notifications, support, favorites, analytics, transactions, promo, 
     faqs, iot, swaps, i18n, fraud, branches, organizations, warehouses, screens, stock, dealers
 )
+from app.api.v1.admin import support as admin_support
+from app.api.v1.admin import faqs as admin_faqs
+from app.api.v1.admin import analytics as admin_analytics
+from app.api.v1 import inventory
+from app.api.v1.admin import promo as admin_coupons
+from app.api.v1.admin import reviews as admin_reviews
+from app.api.v1.admin import roles as admin_roles
+from app.api.v1.admin import users as admin_user_mgmt
 # Enhanced customer endpoints
 from app.api.v1 import (
     system, payments_enhanced, wallet_enhanced, notifications_enhanced,
@@ -84,9 +92,9 @@ app.include_router(wallet.router, prefix=f"{customer_api}/wallet", tags=["Custom
 app.include_router(payments.router, prefix=f"{customer_api}/payments", tags=["Customer: Payments"])
 app.include_router(notifications.router, prefix=f"{customer_api}/notifications", tags=["Customer: Notifications"])
 app.include_router(support.router, prefix=f"{customer_api}/support", tags=["Customer: Support"])
-app.include_router(favorites.router, prefix=f"{customer_api}/favorites", tags=["Customer: Favorites"])
+app.include_router(favorites.router, prefix=f"{settings.API_V1_STR}/users/me/favorites", tags=["Customer: Favorites"])
 app.include_router(analytics.router, prefix=f"{customer_api}/analytics", tags=["Customer: Analytics"])
-app.include_router(promo.router, prefix=f"{customer_api}/promo", tags=["Customer: Promo"])
+app.include_router(promo.router, prefix=f"{settings.API_V1_STR}/coupons", tags=["Customer: Coupons"])
 app.include_router(swaps.router, prefix=f"{customer_api}/swaps", tags=["Customer: Swaps"])
 app.include_router(vehicles.router, prefix=f"{customer_api}/vehicles", tags=["Customer: Vehicles"])
 
@@ -101,6 +109,13 @@ app.include_router(admin_kyc.router, prefix=f"{admin_api}/kyc", tags=["Admin: KY
 app.include_router(audit.router, prefix=f"{admin_api}/audit", tags=["Admin: Audit"], dependencies=admin_deps)
 app.include_router(fraud.router, prefix=f"{admin_api}/fraud", tags=["Admin: Fraud"], dependencies=admin_deps)
 app.include_router(ml.router, prefix=f"{admin_api}/ml", tags=["Admin: ML & Analytics"], dependencies=admin_deps)
+app.include_router(admin_support.router, prefix=f"{admin_api}/support", tags=["Admin: Support"], dependencies=admin_deps)
+app.include_router(admin_faqs.router, prefix=f"{admin_api}/faq", tags=["Admin: FAQ"], dependencies=admin_deps)
+app.include_router(admin_analytics.router, prefix=f"{admin_api}/analytics", tags=["Admin: Analytics"], dependencies=admin_deps)
+app.include_router(admin_coupons.router, prefix=f"{admin_api}/coupons", tags=["Admin: Coupons"], dependencies=admin_deps)
+app.include_router(admin_reviews.router, prefix=f"{admin_api}/reviews", tags=["Admin: Review Moderation"], dependencies=admin_deps)
+app.include_router(admin_roles.router, prefix=f"{admin_api}/roles", tags=["Admin: RBAC"], dependencies=admin_deps)
+app.include_router(admin_user_mgmt.router, prefix=f"{admin_api}/users", tags=["Admin: User Management"], dependencies=admin_deps)
 
 # 3. Dealer Application Endpoints
 dealer_api = f"{settings.API_V1_STR}/dealer"
@@ -122,6 +137,7 @@ app.include_router(iot.router, prefix=f"{infra_api}/iot", tags=["Infra: IoT"])
 app.include_router(telemetry.router, prefix=f"{infra_api}/telemetry", tags=["Infra: Telemetry"])
 app.include_router(i18n.router, prefix=f"{infra_api}/i18n", tags=["Infra: i18n"])
 app.include_router(locations.router, prefix=f"{infra_api}/locations", tags=["Infra: Locations"])
+app.include_router(inventory.router, prefix=f"{settings.API_V1_STR}/inventory", tags=["Logistics: Inventory"])
 
 
 # Webhooks

@@ -102,3 +102,34 @@ class NotificationService:
             db.delete(notif)
         db.commit()
         return len(notifications)
+
+    @staticmethod
+    def get_unread_count(db: Session, user_id: int) -> int:
+        from sqlmodel import func
+        statement = select(func.count(Notification.id)).where(Notification.user_id == user_id, Notification.is_read == False)
+        return db.exec(statement).one()
+
+    @staticmethod
+    def send_bulk_notification(
+        db: Session,
+        segment: str,
+        title: str,
+        message: str,
+        type: str = "info",
+        channel: str = "push"
+    ) -> int:
+        from app.models.user import User
+        statement = select(User).where(User.is_active == True)
+        
+        if segment == "dealers":
+             from app.models.dealer import DealerProfile
+             statement = statement.join(DealerProfile, User.id == DealerProfile.user_id)
+        elif segment == "drivers":
+             from app.models.driver_profile import DriverProfile
+             statement = statement.join(DriverProfile, User.id == DriverProfile.user_id)
+        
+        users = db.exec(statement).all()
+        for user in users:
+            NotificationService.send_notification(db, user, title, message, type, channel)
+            
+        return len(users)

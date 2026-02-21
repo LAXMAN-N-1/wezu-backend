@@ -175,3 +175,27 @@ class LateFeeService:
                 })
         
         return overdue
+
+    @staticmethod
+    def pay_late_fee(db: Session, rental_id: int) -> bool:
+        from app.models.late_fee import LateFee
+        from app.services.wallet_service import WalletService
+        
+        fee = db.exec(select(LateFee).where(LateFee.rental_id == rental_id)).first()
+        if not fee or fee.amount_outstanding <= 0:
+            return False
+            
+        # Deduct from wallet
+        WalletService.deduct_balance(
+            db, fee.user_id, fee.amount_outstanding, 
+            f"Late Fee Payment for Rental {rental_id}"
+        )
+        
+        fee.amount_paid += fee.amount_outstanding
+        fee.amount_outstanding = 0
+        fee.payment_status = "PAID"
+        fee.updated_at = datetime.utcnow()
+        
+        db.add(fee)
+        db.commit()
+        return True

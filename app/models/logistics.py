@@ -6,6 +6,7 @@ import uuid
 
 if TYPE_CHECKING:
     from app.models.user import User
+    from app.models.return_request import ReturnRequest
 
 class DeliveryType(str, Enum):
     DEALER_RESTOCK = "dealer_restock"
@@ -33,7 +34,7 @@ class BatteryTransfer(SQLModel, table=True):
     to_location_type: str
     to_location_id: int
     
-    status: str = Field(default="pending") # pending, pick_up, in_transit, delivered, completed
+    status: str = Field(default="pending") # pending, assigned, in_transit, received, cancelled
     manifest_id: Optional[int] = Field(default=None, foreign_key="logistics.manifests.id")
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -96,10 +97,17 @@ class DeliveryOrder(SQLModel, table=True):
     # Tracking
     tracking_url: Optional[str] = None
     proof_of_delivery_url: Optional[str] = None
+    customer_signature_url: Optional[str] = None
+    otp_verified: bool = Field(default=False)
+    completion_otp: Optional[str] = None
+    
+    # Reverse Logistics Link
+    return_request_id: Optional[int] = Field(default=None, foreign_key="logistics.return_requests.id")
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     # Relationships
     driver: Optional["User"] = Relationship(back_populates="delivery_orders")
+    return_request: Optional["ReturnRequest"] = Relationship(back_populates="delivery_order")
 

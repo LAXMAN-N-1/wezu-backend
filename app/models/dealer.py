@@ -43,6 +43,7 @@ class DealerProfile(SQLModel, table=True):
     # commissions: List["Commission"] = Relationship(back_populates="dealer")
     documents: List["DealerDocument"] = Relationship(back_populates="dealer")
     staff_members: List["StaffProfile"] = Relationship(back_populates="dealer")
+    settlements: List["Settlement"] = Relationship(back_populates="dealer")
 
 class DealerDocument(SQLModel, table=True):
     __tablename__ = "dealer_documents"
@@ -62,8 +63,8 @@ class DealerApplication(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     dealer_id: int = Field(foreign_key="dealers.dealer_profiles.id", unique=True)
     
-    # Stages: SUBMITTED, AUTO_VERIFIED, KYC_SUBMITTED, REVIEW_PENDING, 
-    # FIELD_VISIT_SCHEDULED, FIELD_VISIT_COMPLETED, REJECTED, APPROVED
+    # Stages: SUBMITTED, KYC_PENDING, KYC_SUBMITTED, REVIEW_PENDING, 
+    # FIELD_VISIT_SCHEDULED, FIELD_VISIT_COMPLETED, REJECTED, APPROVED, ACTIVE
     current_stage: str = Field(default="SUBMITTED")
     
     risk_score: float = Field(default=0.0)

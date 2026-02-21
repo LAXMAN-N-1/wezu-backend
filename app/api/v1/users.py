@@ -18,9 +18,13 @@ from app.schemas.user import (
     UserResponse, UserUpdate, AddressCreate, AddressResponse, AddressUpdate, 
     DeviceCreate, DeviceResponse, UserProfileResponse, StaffAssignmentInfo, 
     UserStatusUpdate, ActivityLogEntry, ActivityLogResponse, MenuItem, MenuConfigResponse,
-    FeatureFlagsResponse, KYCDocumentResponse, KYCStatusDetailsResponse, UserSearchResponse, UserSearchItem
+    FeatureFlagsResponse, KYCDocumentResponse, KYCStatusDetailsResponse, UserSearchResponse, UserSearchItem,
+    AccountDeletionRequest, MembershipResponse, DashboardSummaryResponse, LoginHistoryResponse
 )
 from app.schemas.dashboard import DashboardConfigResponse
+from app.services.audit_service import audit_service
+from app.services.analytics_service import AnalyticsService
+from app.services.membership_service import MembershipService
 import os
 import shutil
 import json
@@ -428,7 +432,7 @@ async def delete_avatar(
     return current_user
 
 
-@router.patch("/me/addresses/{address_id}/default", response_model=AddressResponse)
+@router.put("/me/addresses/{address_id}/default", response_model=AddressResponse)
 async def set_default_address(
     address_id: int,
     current_user: User = Depends(deps.get_current_user),
@@ -456,6 +460,43 @@ async def set_default_address(
     return address
 
 
+@router.put("/me/addresses/{address_id}", response_model=AddressResponse)
+async def update_address(
+    address_id: int,
+    address_in: AddressUpdate,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """Update a specific saved address"""
+    statement = select(Address).where(
+        (Address.id == address_id) & (Address.user_id == current_user.id)
+    )
+    address = db.exec(statement).first()
+    if not address:
+        raise HTTPException(status_code=404, detail="Address not found")
+    
+    update_data = address_in.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        # Handle street_address mapping if necessary (Schema uses street_address, Model uses address_line1)
+        if key == "street_address":
+            address.address_line1 = value
+        else:
+             setattr(address, key, value)
+    
+    if address_in.is_default:
+        # Unset others
+        all_addresses = db.exec(select(Address).where(Address.user_id == current_user.id)).all()
+        for addr in all_addresses:
+            addr.is_default = False
+            db.add(addr)
+        address.is_default = True
+
+    db.add(address)
+    db.commit()
+    db.refresh(address)
+    return address
+
+
 @router.delete("/me/addresses/{address_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_address(
     address_id: int,
@@ -474,6 +515,80 @@ async def delete_address(
     db.delete(address)
     db.commit()
     return None
+
+
+@router.delete("/me", status_code=status.HTTP_200_OK)
+async def delete_my_account(
+    data: AccountDeletionRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """Soft delete current user's account with reason"""
+    UserService.delete_account(db, current_user, data.reason)
+    return {"message": "Account deletion request processed successfully"}
+
+
+@router.get("/me/login-history", response_model=LoginHistoryResponse)
+async def get_my_login_history(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """Get paginated login history for current user"""
+    sessions, total = UserService.get_login_history(db, current_user.id, page, limit)
+    return LoginHistoryResponse(
+        sessions=sessions,
+        total_count=total,
+        page=page,
+        limit=limit
+    )
+
+
+@router.get("/me/activity-log", response_model=ActivityLogResponse)
+async def get_my_activity_log(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(deps.get_current_user),
+):
+    """Get activity logs from MongoDB audit service"""
+    result = await audit_service.get_logs(user_id=current_user.id, page=page, limit=limit)
+    return ActivityLogResponse(
+        logs=result["logs"],
+        total_count=result["total_count"],
+        page=page,
+        limit=limit
+    )
+
+
+@router.get("/me/membership", response_model=MembershipResponse)
+async def get_my_membership(
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """Get current user's membership details"""
+    membership = MembershipService.get_user_membership(db, current_user.id)
+    benefits = MembershipService.get_tier_benefits(membership.tier)
+    upgrade = MembershipService.check_upgrade_eligibility(membership)
+    
+    return MembershipResponse(
+        tier=membership.tier,
+        points_balance=membership.points_balance,
+        status=membership.status,
+        tier_expiry=membership.tier_expiry,
+        benefits=benefits,
+        upgrade_eligibility=upgrade
+    )
+
+
+@router.get("/me/dashboard-summary", response_model=DashboardSummaryResponse)
+async def get_my_dashboard_summary(
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session),
+):
+    """Get aggregated dashboard stats for home screen"""
+    summary = AnalyticsService.get_customer_dashboard(current_user.id, db)
+    return summary
 
 
 # ===== FEATURE FLAGS & DASHBOARD =====

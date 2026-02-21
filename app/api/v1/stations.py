@@ -1,16 +1,22 @@
-from app.models.station import Station
+from app.models.station import Station, StationStatus
 from app.models.favorite import Favorite
 from app.models.battery import Battery
 from app.schemas.battery import BatteryResponse
 from sqlmodel import Session, select
-from typing import List, Optional
+from typing import List, Optional, Any
 from app.api import deps
 from app.models.user import User
-from app.schemas.station import StationResponse, StationCreate, NearbyStationResponse
+from app.schemas.station import (
+    StationResponse, StationCreate, NearbyStationResponse,
+    StationUpdate, StationPerformanceResponse, StationMapResponse,
+    HeatmapPoint
+)
 from app.schemas.review import ReviewResponse, ReviewCreate
 from app.services.station_service import StationService
-from fastapi import APIRouter, Depends, HTTPException, Query
+from app.services.maintenance_service import MaintenanceService
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from app.services.review_service import ReviewService
+from datetime import datetime
 
 router = APIRouter()
 
@@ -18,9 +24,21 @@ router = APIRouter()
 async def read_stations(
     skip: int = 0,
     limit: int = 100,
+    city: Optional[str] = None,
+    status: Optional[str] = None,
+    dealer_id: Optional[int] = None,
     db: Session = Depends(deps.get_db),
 ):
-    return StationService.get_stations(db, skip=skip, limit=limit)
+    """Retrieve stations with filters."""
+    statement = select(Station)
+    if city:
+        statement = statement.where(Station.city == city)
+    if status:
+        statement = statement.where(Station.status == status)
+    if dealer_id:
+        statement = statement.where(Station.dealer_id == dealer_id)
+        
+    return db.exec(statement.offset(skip).limit(limit)).all()
 
 @router.get("/nearby", response_model=List[NearbyStationResponse])
 async def search_nearby_stations(
@@ -52,9 +70,10 @@ async def search_nearby_stations(
 @router.post("/", response_model=StationResponse)
 async def create_station(
     station_in: StationCreate,
-    current_user: User = Depends(deps.check_permission("stations", "create")),
+    current_user: User = Depends(deps.get_current_active_superuser),
     db: Session = Depends(deps.get_db),
 ):
+    """Admin: create a new station record."""
     return StationService.create_station(db, station_in)
 
 @router.get("/{station_id}", response_model=StationResponse)
@@ -67,12 +86,162 @@ async def read_station(
         raise HTTPException(status_code=404, detail="Station not found")
     return station
 
-@router.get("/{station_id}/reviews", response_model=List[ReviewResponse])
-async def read_station_reviews(
+@router.put("/{station_id}", response_model=StationResponse)
+async def update_station(
+    station_id: int,
+    station_in: StationUpdate,
+    current_user: User = Depends(deps.get_current_active_superuser),
+    db: Session = Depends(deps.get_db),
+):
+    """Update station details."""
+    station = StationService.update_station(db, station_id, station_in)
+    if not station:
+        raise HTTPException(status_code=404, detail="Station not found")
+    return station
+
+@router.delete("/{station_id}")
+async def delete_station(
+    station_id: int,
+    current_user: User = Depends(deps.get_current_active_superuser),
+    db: Session = Depends(deps.get_db),
+):
+    """Deactivate or archive a station."""
+    success = StationService.deactivate_station(db, station_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Station not found")
+    return {"status": "success", "message": "Station deactivated"}
+
+@router.put("/{station_id}/status", response_model=StationResponse)
+async def update_station_status(
+    station_id: int,
+    status: StationStatus,
+    current_user: User = Depends(deps.get_current_active_superuser),
+    db: Session = Depends(deps.get_db),
+):
+    """Change station operational status."""
+    station = db.get(Station, station_id)
+    if not station:
+        raise HTTPException(status_code=404, detail="Station not found")
+    station.status = status
+    station.updated_at = datetime.utcnow()
+    db.add(station)
+    db.commit()
+    db.refresh(station)
+    return station
+
+@router.get("/{station_id}/performance", response_model=StationPerformanceResponse)
+async def read_station_performance(
+    station_id: int,
+    current_user: User = Depends(deps.get_current_active_superuser),
+    db: Session = Depends(deps.get_db),
+):
+    """Station metrics: daily rentals, revenue, avg duration, etc."""
+    return StationService.get_performance_metrics(db, station_id)
+
+@router.get("/{station_id}/rental-history")
+async def read_station_rental_history(
+    station_id: int,
+    current_user: User = Depends(deps.get_current_active_superuser),
+    db: Session = Depends(deps.get_db),
+    limit: int = Query(50, le=100)
+):
+    """All rentals that originated from this station."""
+    return StationService.get_rental_history(db, station_id, limit)
+
+@router.post("/{station_id}/photos")
+async def upload_station_photo(
+    station_id: int,
+    file: UploadFile = File(...),
+    current_user: User = Depends(deps.get_current_active_superuser),
+    db: Session = Depends(deps.get_db),
+):
+    """Upload station photos."""
+    # Assuming storage service logic or just direct DB update for mock
+    from app.models.station import StationImage
+    image = StationImage(station_id=station_id, url=f"/media/stations/{file.filename}")
+    db.add(image)
+    db.commit()
+    db.refresh(image)
+    return image
+
+@router.delete("/{station_id}/photos/{photo_id}")
+async def delete_station_photo(
+    station_id: int,
+    photo_id: int,
+    current_user: User = Depends(deps.get_current_active_superuser),
+    db: Session = Depends(deps.get_db),
+):
+    """Remove a station photo."""
+    from app.models.station import StationImage
+    image = db.get(StationImage, photo_id)
+    if not image or image.station_id != station_id:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    db.delete(image)
+    db.commit()
+    return {"status": "success"}
+
+@router.get("/{station_id}/maintenance-schedule")
+async def read_station_maintenance_schedule(
     station_id: int,
     db: Session = Depends(deps.get_db),
 ):
-    return ReviewService.get_by_station(db, station_id)
+    """View upcoming and past maintenance for station."""
+    return MaintenanceService.get_maintenance_schedule(db, station_id)
+
+@router.post("/{station_id}/maintenance-schedule")
+async def create_station_maintenance_task(
+    station_id: int,
+    data: dict, # Simplified for now, should use schema
+    current_user: User = Depends(deps.get_current_active_superuser),
+    db: Session = Depends(deps.get_db),
+):
+    data.update({"entity_type": "station", "entity_id": station_id})
+    return MaintenanceService.record_maintenance(db, current_user.id, data)
+
+@router.put("/{station_id}/maintenance-schedule/{task_id}")
+async def update_station_maintenance_task(
+    station_id: int,
+    task_id: int,
+    status: str,
+    current_user: User = Depends(deps.get_current_active_superuser),
+    db: Session = Depends(deps.get_db),
+):
+    """Mark maintenance task complete or update it."""
+    from app.models.maintenance import MaintenanceRecord
+    task = db.get(MaintenanceRecord, task_id)
+    if not task or task.entity_id != station_id or task.entity_type != "station":
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    task.status = status
+    task.performed_at = datetime.utcnow()
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+    return task
+
+@router.get("/map", response_model=List[StationMapResponse])
+async def get_stations_map(
+    db: Session = Depends(deps.get_db),
+):
+    """Return all station coordinates and status for map rendering."""
+    stations = db.exec(select(Station)).all()
+    return stations
+
+@router.get("/heatmap", response_model=List[HeatmapPoint])
+async def get_stations_heatmap(
+    db: Session = Depends(deps.get_db),
+):
+    """Demand heatmap data aggregated by geography."""
+    return StationService.get_heatmap_data(db)
+
+@router.get("/{station_id}/reviews", response_model=List[ReviewResponse])
+async def read_station_reviews(
+    station_id: int,
+    skip: int = Query(0),
+    limit: int = Query(50),
+    db: Session = Depends(deps.get_db),
+):
+    return ReviewService.get_by_station(db, station_id, skip, limit)
 
 @router.post("/{station_id}/reviews", response_model=ReviewResponse)
 async def create_review(
@@ -83,6 +252,28 @@ async def create_review(
 ):
     review_in.station_id = station_id
     return ReviewService.create_review(db, current_user.id, review_in)
+
+@router.put("/{station_id}/reviews/{review_id}", response_model=ReviewResponse)
+async def update_review(
+    station_id: int,
+    review_id: int,
+    review_in: ReviewUpdate,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    """Edit own review"""
+    return ReviewService.update_review(db, review_id, current_user.id, review_in.model_dump(exclude_unset=True))
+
+@router.delete("/{station_id}/reviews/{review_id}")
+async def delete_review(
+    station_id: int,
+    review_id: int,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    """Delete own review"""
+    ReviewService.delete_review(db, review_id, current_user.id)
+    return {"status": "success", "message": "Review deleted"}
 
 @router.post("/{station_id}/favorite", response_model=dict)
 async def favorite_station(

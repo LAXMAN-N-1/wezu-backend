@@ -36,6 +36,33 @@ class SupportTicketResponse(BaseModel):
 class SupportTicketDetailResponse(SupportTicketResponse):
     messages: List[TicketMessageResponse]
 
+# --- Admin & Analytics Schemas ---
+class AgentPerformanceResponse(BaseModel):
+    agent_id: int
+    agent_name: str
+    resolved_tickets: int
+    avg_resolution_time_hours: float
+    csat_score: float
+
+class QueueStatsResponse(BaseModel):
+    open_tickets: int
+    in_progress: int
+    overdue_tickets: int
+    priority_breakdown: dict # {"high": 5, "medium": 10, ...}
+
+# --- Live Chat Schemas ---
+class ChatSessionResponse(BaseModel):
+    id: int
+    status: str
+    created_at: datetime
+    assigned_agent_id: Optional[int] = None
+
+class ChatMessageResponse(BaseModel):
+    id: int
+    sender_id: int
+    message: str
+    created_at: datetime
+
 class NotificationResponse(BaseModel):
     id: int
     title: str

@@ -15,7 +15,13 @@ from app.schemas.user import TokenPayload
 from app.core.config import settings
 from app.api import deps
 from pydantic import BaseModel, EmailStr, Field
-from fastapi.security import OAuth2PasswordRequestForm
+from app.schemas.auth import (
+    LoginRequest, LoginResponse, SocialLoginRequest, RoleSelectRequest, ForgotPasswordRequest,
+    ChangePasswordRequest, TwoFASetupResponse, TwoFAVerifyRequest, TwoFADisableRequest,
+    VerifyEmailRequest, BiometricRegisterRequest, BiometricLoginRequest,
+    SecurityQuestionResponse, SetSecurityQuestionRequest, VerifySecurityQuestionRequest
+)
+from app.services.security_service import SecurityService
 import logging
 from typing import Any, List, Optional
 from datetime import datetime, timedelta
@@ -795,3 +801,142 @@ async def send_email_verification(
     # In production: await EmailService.send_verification_email(current_user.email, verification_link)
     
     return {"message": "Verification email sent"}
+
+
+# --- NEW AUTH GAPS ENDPOINTS ---
+
+@router.post("/verify-email")
+async def verify_email(
+    data: VerifyEmailRequest,
+    db: Session = Depends(get_session)
+):
+    """Verify email verification token"""
+    statement = select(User).where(User.email_verification_token == data.token)
+    user = db.exec(statement).first()
+    
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid verification token")
+    
+    user.is_email_verified = True
+    user.email_verification_token = None
+    db.add(user)
+    db.commit()
+    return {"message": "Email verified successfully", "email": user.email}
+
+@router.post("/change-password")
+async def change_password(
+    data: ChangePasswordRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Authenticated user changing their current password"""
+    SecurityService.change_password(db, current_user, data.current_password, data.new_password)
+    return {"message": "Password updated successfully"}
+
+@router.post("/enable-2fa", response_model=TwoFASetupResponse)
+async def enable_2fa_request(
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Initiate 2FA setup by generating secret and QR code"""
+    if current_user.two_factor_enabled:
+        raise HTTPException(status_code=400, detail="2FA is already enabled")
+    
+    setup_data = AuthService.initiate_2fa_setup(current_user)
+    return setup_data
+
+@router.post("/verify-2fa")
+async def verify_2fa_and_enable(
+    data: TwoFAVerifyRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Verify first TOTP and permanently enable 2FA for user"""
+    backup_codes = AuthService.verify_and_enable_2fa(db, current_user, data.code, data.secret)
+    if backup_codes:
+        return {
+            "message": "2FA enabled successfully",
+            "backup_codes": backup_codes
+        }
+    raise HTTPException(status_code=400, detail="Invalid TOTP code")
+
+@router.post("/2fa/disable")
+async def disable_2fa(
+    data: TwoFADisableRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Disable 2FA with password confirmation"""
+    if not verify_password(data.password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Invalid password")
+    
+    current_user.two_factor_enabled = False
+    current_user.two_factor_secret = None
+    current_user.backup_codes = None
+    db.add(current_user)
+    db.commit()
+    return {"message": "2FA disabled successfully"}
+
+@router.post("/biometric/register")
+async def biometric_register(
+    data: BiometricRegisterRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Register biometric public key for device"""
+    AuthService.register_biometric(
+        db, current_user.id, data.device_id, data.credential_id, data.public_key
+    )
+    return {"message": "Biometric credential registered successfully"}
+
+@router.post("/biometric-login", response_model=Token)
+async def biometric_login(
+    data: BiometricLoginRequest,
+    request: Request,
+    db: Session = Depends(get_session)
+):
+    """Login using biometric challenge/response"""
+    # This usually requires user_id to find the public key if not in the credential_id
+    # We'll assume the client sends the user context or we lookup by credential_id
+    from app.models.biometric import BiometricCredential
+    cred = db.exec(select(BiometricCredential).where(BiometricCredential.credential_id == data.credential_id)).first()
+    if not cred:
+        raise HTTPException(status_code=401, detail="Biometric credential not found")
+    
+    if AuthService.verify_biometric_signature(db, cred.user_id, data.credential_id, data.signature, data.challenge):
+        user = db.get(User, cred.user_id)
+        # Proceed to login
+        access_token = create_access_token(subject=user.id)
+        refresh_token = create_refresh_token(subject=user.id)
+        AuthService.create_session(db, user.id, access_token, refresh_token, device_info="Biometric", ip_address=request.client.host)
+        return Token(access_token=access_token, refresh_token=refresh_token, user=user)
+    
+    raise HTTPException(status_code=401, detail="Biometric verification failed")
+
+@router.get("/security-questions", response_model=List[SecurityQuestionResponse])
+async def list_security_questions(
+    db: Session = Depends(get_session)
+):
+    """Fetch list of available security questions"""
+    return SecurityService.get_available_questions(db)
+
+@router.post("/security-questions/set")
+async def set_security_question(
+    data: SetSecurityQuestionRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Set user's security question and answer"""
+    SecurityService.set_user_security_question(db, current_user.id, data.question_id, data.answer)
+    return {"message": "Security question set successfully"}
+
+@router.post("/security-questions/verify")
+async def verify_security_question_route(
+    data: VerifySecurityQuestionRequest,
+    user_id: int, # Sent in body or query during recovery flow
+    db: Session = Depends(get_session)
+):
+    """Verify security question during recovery"""
+    if SecurityService.verify_security_answer(db, user_id, data.answer):
+        return {"message": "Verification successful", "success": True}
+    raise HTTPException(status_code=400, detail="Incorrect answer")

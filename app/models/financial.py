@@ -16,6 +16,7 @@ class TransactionType(str, Enum):
     FINE = "fine"
     SUBSCRIPTION = "subscription"
     WITHDRAWAL = "withdrawal"
+    PURCHASE = "purchase"
 
 class TransactionStatus(str, Enum):
     PENDING = "pending"
@@ -58,6 +59,7 @@ class Wallet(SQLModel, table=True):
     user_id: int = Field(foreign_key="core.users.id", unique=True, index=True)
     
     balance: float = Field(default=0.0)
+    cashback_balance: float = Field(default=0.0)
     currency: str = Field(default="INR")
     
     is_frozen: bool = Field(default=False)

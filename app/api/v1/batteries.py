@@ -14,12 +14,16 @@ from app.models.user import User
 from app.api import deps
 from app.schemas.battery import (
     BatteryCreate, BatteryBulkCreate, BatteryResponse, 
-    BatteryDetailResponse, BatteryUpdate
+    BatteryDetailResponse, BatteryUpdate, BatteryHealthReading,
+    BatteryUtilizationResponse, BatteryMaintenanceCreate
 )
 from app.services.qr_service import QRCodeService
 from app.services.mqtt_service import mqtt_service
 from app.services.websocket_service import manager
 from app.services.battery_batch_service import battery_batch_service
+from app.services.battery_service import BatteryService
+from app.services.maintenance_service import MaintenanceService
+from app.models.battery import BatteryStatus
 from app.schemas.common import DataResponse
 
 router = APIRouter()
@@ -73,6 +77,116 @@ def scan_battery_qr(
         raise HTTPException(status_code=404, detail="Battery not found")
     return battery
 
+@router.get("/{battery_id}/health-history", response_model=List[BatteryHealthReading])
+def get_battery_health_history(
+    battery_id: int,
+    session: Session = Depends(get_session),
+    limit: int = Query(50, le=200)
+):
+    """Historical health percentage (SOH) readings over time."""
+    return BatteryService.get_health_history(session, battery_id, limit)
+
+@router.get("/{battery_id}/rental-history")
+def get_battery_rental_history(
+    battery_id: int,
+    session: Session = Depends(get_session),
+    limit: int = Query(20, le=100)
+):
+    """All past rentals associated with this battery."""
+    return BatteryService.get_rental_history(session, battery_id, limit)
+
+@router.post("/{battery_id}/maintenance")
+def log_battery_maintenance(
+    battery_id: int,
+    maintenance_in: BatteryMaintenanceCreate,
+    current_user: User = Depends(deps.get_current_active_superuser),
+    session: Session = Depends(get_session)
+):
+    """Log a maintenance event on a battery."""
+    data = maintenance_in.model_dump()
+    data.update({"entity_type": "battery", "entity_id": battery_id})
+    return MaintenanceService.record_maintenance(session, current_user.id, data)
+
+@router.get("/{battery_id}/maintenance-history")
+def get_battery_maintenance_history(
+    battery_id: int,
+    session: Session = Depends(get_session)
+):
+    """All maintenance records for a battery."""
+    return MaintenanceService.get_maintenance_history(session, battery_id)
+
+@router.put("/{battery_id}/status")
+def update_battery_status(
+    battery_id: int,
+    status: str,
+    description: str = "Manual status update",
+    current_user: User = Depends(deps.get_current_active_superuser),
+    session: Session = Depends(get_session)
+):
+    """Manually change battery status (available/maintenance/retired)."""
+    battery = BatteryService.update_status(session, battery_id, status, description)
+    if not battery:
+        raise HTTPException(status_code=404, detail="Battery not found")
+    return battery
+
+@router.post("/{battery_id}/assign-station")
+def assign_battery_station(
+    battery_id: int,
+    station_id: int,
+    current_user: User = Depends(deps.get_current_active_superuser),
+    session: Session = Depends(get_session)
+):
+    """Assign a battery to a specific station."""
+    battery = BatteryService.assign_station(session, battery_id, station_id)
+    if not battery:
+        raise HTTPException(status_code=404, detail="Battery not found")
+    return battery
+
+@router.post("/{battery_id}/transfer")
+def transfer_battery(
+    battery_id: int,
+    to_station_id: int,
+    notes: Optional[str] = None,
+    current_user: User = Depends(deps.get_current_active_superuser),
+    session: Session = Depends(get_session)
+):
+    """Transfer battery from one station to another (logs movement)."""
+    # Simply re-use assign_station but with better logging description
+    battery = session.get(Battery, battery_id)
+    if not battery:
+         raise HTTPException(status_code=404, detail="Battery not found")
+    
+    from_station_id = battery.station_id
+    battery.station_id = to_station_id
+    battery.updated_at = datetime.utcnow()
+    
+    BatteryService.log_lifecycle_event(
+        session, battery_id, "transfer", 
+        f"Transferred from Station {from_station_id} to {to_station_id}. Notes: {notes}"
+    )
+    session.add(battery)
+    session.commit()
+    return battery
+
+@router.get("/low-health", response_model=List[BatteryResponse])
+def get_low_health_batteries(
+    threshold: float = Query(80.0, description="Health percentage threshold"),
+    session: Session = Depends(get_session)
+):
+    """List all batteries below a configurable health threshold."""
+    batteries = session.exec(
+        select(Battery).where(Battery.health_percentage < threshold)
+    ).all()
+    return batteries
+
+@router.get("/utilization-report", response_model=BatteryUtilizationResponse)
+def get_battery_utilization_report(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(deps.get_current_active_superuser)
+):
+    """Utilization percentage across fleet."""
+    return BatteryService.get_utilization_report(session)
+
 @router.post("/qr/generate", response_model=DataResponse[dict])
 def generate_qr_code(
     request: QRGenerateRequest,
@@ -110,18 +224,75 @@ def verify_qr_code(
 def read_batteries(
     skip: int = 0,
     limit: int = 100,
+    status: Optional[str] = None,
+    health: Optional[str] = None,
+    sku_id: Optional[int] = None,
+    station_id: Optional[int] = None,
     session: Session = Depends(get_session),
 ) -> Any:
-    """Retrieve batteries."""
-    batteries = session.exec(
-        select(Battery)
-        .options(
-             selectinload(Battery.sku), 
-             selectinload(Battery.iot_device)
-        )
-        .offset(skip).limit(limit)
-    ).all()
+    """Retrieve batteries with filters."""
+    statement = select(Battery).options(
+        selectinload(Battery.sku), 
+        selectinload(Battery.iot_device)
+    )
+    
+    if status:
+        statement = statement.where(Battery.status == status)
+    if health:
+        statement = statement.where(Battery.health_status == health)
+    if sku_id:
+        statement = statement.where(Battery.sku_id == sku_id)
+    if station_id:
+        statement = statement.where(Battery.station_id == station_id)
+        
+    batteries = session.exec(statement.offset(skip).limit(limit)).all()
     return batteries
+
+@router.post("/", response_model=BatteryResponse)
+def create_battery(
+    *,
+    session: Session = Depends(get_session),
+    battery_in: BatteryCreate,
+    current_user: User = Depends(deps.get_current_active_superuser)
+) -> Any:
+    """Create a new battery record manually."""
+    return BatteryService.create_battery(session, battery_in)
+
+@router.put("/{battery_id}", response_model=BatteryResponse)
+def update_battery(
+    *,
+    session: Session = Depends(get_session),
+    battery_id: int,
+    battery_in: BatteryUpdate,
+    current_user: User = Depends(deps.get_current_active_superuser)
+) -> Any:
+    """Update battery specs/metadata."""
+    battery = session.get(Battery, battery_id)
+    if not battery:
+        raise HTTPException(status_code=404, detail="Battery not found")
+        
+    update_data = battery_in.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(battery, key, value)
+    
+    battery.updated_at = datetime.utcnow()
+    session.add(battery)
+    session.commit()
+    session.refresh(battery)
+    return battery
+
+@router.delete("/{battery_id}")
+def decommission_battery(
+    *,
+    session: Session = Depends(get_session),
+    battery_id: int,
+    current_user: User = Depends(deps.get_current_active_superuser)
+) -> Any:
+    """Retire/decommission a battery from circulation."""
+    battery = BatteryService.update_status(session, battery_id, "retired", "Manual decommission")
+    if not battery:
+        raise HTTPException(status_code=404, detail="Battery not found")
+    return {"status": "success", "message": "Battery retired"}
 
 @router.post("/batch/import", response_model=DataResponse[dict])
 def import_batteries_csv(

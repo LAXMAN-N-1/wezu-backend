@@ -1,5 +1,5 @@
 from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Body
 from sqlmodel import Session, select
 from app.api.deps import get_current_user
 from app.api import deps
@@ -16,17 +16,29 @@ import shutil
 
 router = APIRouter()
 
-@router.post("/", response_model=SupportTicketResponse)
+@router.get("/admin/tickets", response_model=List[SupportTicketResponse])
+def admin_read_tickets(
+    status: Optional[str] = None,
+    category: Optional[str] = None,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """Admin: list all support tickets with filters"""
+    statement = select(SupportTicket)
+    if status:
+        statement = statement.where(SupportTicket.status == status)
+    if category:
+        statement = statement.where(SupportTicket.category == category)
+    return session.exec(statement.order_by(SupportTicket.created_at.desc())).all()
+
+@router.post("/tickets", response_model=SupportTicketResponse)
 def create_ticket(
     *,
     session: Session = Depends(get_session),
     ticket_in: TicketCreate,
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    """
-    Create a new support ticket.
-    """
-    # 1. Create Ticket
+    """Customer: raise a new support ticket"""
     ticket = SupportTicket(
         user_id=current_user.id,
         subject=ticket_in.subject,
@@ -37,7 +49,6 @@ def create_ticket(
     session.commit()
     session.refresh(ticket)
     
-    # 2. Add Initial Message & Check for Auto-Response
     from app.services.support_service import SupportService
     SupportService.handle_new_ticket_message(
         db=session,
@@ -45,20 +56,17 @@ def create_ticket(
         sender_id=current_user.id,
         message_text=ticket_in.description
     )
-    
     return ticket
 
-@router.get("/", response_model=List[SupportTicketResponse])
+@router.get("/tickets/my", response_model=List[SupportTicketResponse])
 def read_my_tickets(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    """
-    List current user's tickets.
-    """
+    """Customer: list their own tickets"""
     return session.exec(select(SupportTicket).where(SupportTicket.user_id == current_user.id)).all()
 
-@router.get("/{ticket_id}", response_model=SupportTicketDetailResponse)
+@router.get("/tickets/{ticket_id}", response_model=SupportTicketDetailResponse)
 def read_ticket_detail(
     *,
     session: Session = Depends(get_session),
@@ -79,7 +87,7 @@ def read_ticket_detail(
          
     return ticket
 
-@router.post("/{ticket_id}/reply", response_model=SupportTicketDetailResponse)
+@router.post("/tickets/{ticket_id}/reply", response_model=SupportTicketDetailResponse)
 def reply_ticket(
     *,
     session: Session = Depends(get_session),
@@ -112,7 +120,70 @@ def reply_ticket(
     session.refresh(ticket)
     return ticket
 
-@router.post("/{ticket_id}/attachment")
+@router.put("/tickets/{ticket_id}/close", response_model=SupportTicketResponse)
+def close_ticket(
+    ticket_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Customer: close a resolved ticket"""
+    from app.models.support import TicketStatus
+    ticket = db.get(SupportTicket, ticket_id)
+    if not ticket or ticket.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    
+    ticket.status = TicketStatus.CLOSED
+    ticket.updated_at = datetime.utcnow()
+    db.add(ticket)
+    db.commit()
+    db.refresh(ticket)
+    return ticket
+
+# --- Live Chat ---
+from app.schemas.support import ChatSessionResponse, ChatMessageResponse
+
+@router.post("/chat/initiate", response_model=ChatSessionResponse)
+def initiate_live_chat(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Start a live chat or automated chat session"""
+    from app.services.support_service import SupportService
+    session = SupportService.initiate_chat(db, current_user.id)
+    return session
+
+@router.post("/chat/{sessionId}/message", response_model=ChatMessageResponse)
+def send_chat_message(
+    sessionId: int,
+    message: str = Body(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Send a message in chat"""
+    from app.models.support import ChatSession
+    session = db.get(ChatSession, sessionId)
+    if not session or session.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+        
+    from app.services.support_service import SupportService
+    msg = SupportService.add_chat_message(db, sessionId, current_user.id, message)
+    return msg
+
+@router.get("/chat/{sessionId}/history", response_model=List[ChatMessageResponse])
+def get_chat_history(
+    sessionId: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Fetch full chat transcript"""
+    from app.models.support import ChatSession, ChatMessage
+    session = db.get(ChatSession, sessionId)
+    if not session or session.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+        
+    return session.messages
+
+@router.post("/tickets/{ticket_id}/attachment")
 async def upload_ticket_attachment(
     ticket_id: int,
     file: UploadFile = File(...),

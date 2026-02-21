@@ -1,9 +1,10 @@
-from sqlmodel import Session, select, func
-from app.models.station import Station, StationImage, StationSlot
+from app.models.station import Station, StationImage, StationSlot, StationStatus
 from app.models.battery import Battery
-from app.schemas.station import StationCreate
-from typing import List, Optional
-from math import radians, cos, sin, asin, sqrt
+from app.models.rental import Rental
+from app.schemas.station import StationCreate, StationUpdate
+from typing import List, Optional, Dict, Any
+from datetime import datetime, timedelta
+from sqlmodel import Session, select, func
 
 class StationService:
     @staticmethod
@@ -170,4 +171,98 @@ class StationService:
         db.commit()
         db.refresh(slot)
         return slot
+
+    @staticmethod
+    def update_station(db: Session, station_id: int, station_in: StationUpdate) -> Optional[Station]:
+        station = db.get(Station, station_id)
+        if not station:
+            return None
+        
+        update_data = station_in.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(station, key, value)
+            
+        station.updated_at = datetime.utcnow()
+        db.add(station)
+        db.commit()
+        db.refresh(station)
+        return station
+
+    @staticmethod
+    def deactivate_station(db: Session, station_id: int) -> bool:
+        station = db.get(Station, station_id)
+        if not station:
+            return False
+        
+        station.status = StationStatus.CLOSED
+        station.updated_at = datetime.utcnow()
+        db.add(station)
+        db.commit()
+        return True
+
+    @staticmethod
+    def get_performance_metrics(db: Session, station_id: int) -> Dict[str, Any]:
+        # Last 24 hours stats
+        day_ago = datetime.utcnow() - timedelta(days=1)
+        rentals_stmt = select(Rental).where(Rental.start_station_id == station_id, Rental.start_time >= day_ago)
+        rentals = db.exec(rentals_stmt).all()
+        
+        total_rentals = len(rentals)
+        total_revenue = sum(r.total_amount for r in rentals if r.total_amount)
+        
+        # Calculate avg duration for completed rentals
+        completed_rentals = [r for r in rentals if r.end_time]
+        avg_duration = 0.0
+        if completed_rentals:
+            total_dur = sum((r.end_time - r.start_time).total_seconds() for r in completed_rentals)
+            avg_duration = (total_dur / len(completed_rentals)) / 60.0 # in minutes
+            
+        station = db.get(Station, station_id)
+        utilization = 0.0
+        if station and station.total_slots > 0:
+            # Let's define utilization as (available_batteries / total_slots) for capacity check
+            utilization = (station.available_batteries / station.total_slots * 100)
+            
+        return {
+            "daily_rentals": total_rentals,
+            "daily_revenue": round(total_revenue, 2),
+            "avg_duration_minutes": round(avg_duration, 2),
+            "satisfaction_score": station.rating if station else 0.0,
+            "utilization_percentage": round(utilization, 2)
+        }
+
+    @staticmethod
+    def get_rental_history(db: Session, station_id: int, limit: int = 50) -> List[Rental]:
+        return db.exec(
+            select(Rental)
+            .where(Rental.start_station_id == station_id)
+            .order_by(Rental.start_time.desc())
+            .limit(limit)
+        ).all()
+
+    @staticmethod
+    def get_heatmap_data(db: Session) -> List[Dict[str, Any]]:
+        # Aggregate demand by recent rentals per station
+        week_ago = datetime.utcnow() - timedelta(days=7)
+        demand_stmt = (
+            select(Station.latitude, Station.longitude, func.count(Rental.id))
+            .join(Rental, Rental.start_station_id == Station.id)
+            .where(Rental.start_time >= week_ago)
+            .group_by(Station.id)
+        )
+        results = db.exec(demand_stmt).all()
+        
+        if not results:
+            return []
+            
+        max_demand = max(r[2] for r in results) if results else 1
+        
+        return [
+            {
+                "latitude": r[0],
+                "longitude": r[1],
+                "intensity": round(r[2] / max_demand, 2)
+            }
+            for r in results
+        ]
 

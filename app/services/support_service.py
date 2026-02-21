@@ -79,32 +79,94 @@ class SupportService:
         return None
 
     @staticmethod
-    def handle_new_ticket_message(db: Session, ticket_id: int, sender_id: int, message_text: str):
-        # ... logic ...
-        """
-        Add a message to a ticket and check for automated response.
-        """
+    def handle_new_ticket_message(db: Session, ticket_id: int, sender_id: int, message_text: str, is_internal: bool = False):
+        """Add a message to a ticket and check for automated response."""
         # 1. Add User Message
         user_msg = TicketMessage(
             ticket_id=ticket_id,
             sender_id=sender_id,
-            message=message_text
+            message=message_text,
+            is_internal_note=is_internal
         )
         db.add(user_msg)
+        
+        # 2. Reopen if closed and not an internal note
+        ticket = db.get(SupportTicket, ticket_id)
+        if ticket and not is_internal and ticket.status == "closed":
+             ticket.status = "open"
+             db.add(ticket)
+        
         db.commit()
         
-        # 2. Check for Automated Response
-        auto_reply = SupportService.get_automated_response(message_text)
-        if auto_reply:
-            # Find a system user or represent as 'Bot'
-            # For now, we'll assume a system user or use a magic ID
-            system_msg = TicketMessage(
-                ticket_id=ticket_id,
-                sender_id=0, # Representing System/Bot
-                message=f"[Auto-Response] {auto_reply}"
-            )
-            db.add(system_msg)
-            db.commit()
-            return auto_reply
+        # 3. Check for Automated Response (only for customer messages)
+        if not is_internal:
+            auto_reply = SupportService.get_automated_response(message_text)
+            if auto_reply:
+                system_msg = TicketMessage(
+                    ticket_id=ticket_id,
+                    sender_id=0, # Representing System/Bot
+                    message=f"[Auto-Response] {auto_reply}"
+                )
+                db.add(system_msg)
+                db.commit()
+                return auto_reply
             
         return None
+
+    @staticmethod
+    def get_queue_stats(db: Session) -> dict:
+        """Overview of the support queue"""
+        from datetime import datetime, timedelta
+        now = datetime.utcnow()
+        overdue_threshold = now - timedelta(hours=24)
+        
+        open_count = db.exec(select(func.count(SupportTicket.id)).where(SupportTicket.status == "open")).one()
+        in_progress = db.exec(select(func.count(SupportTicket.id)).where(SupportTicket.status == "in_progress")).one()
+        overdue = db.exec(select(func.count(SupportTicket.id)).where(SupportTicket.status == "open", SupportTicket.created_at < overdue_threshold)).one()
+        
+        # Priority breakdown
+        statement = select(SupportTicket.priority, func.count(SupportTicket.id)).group_by(SupportTicket.priority)
+        results = db.exec(statement).all()
+        priority_map = {r[0]: r[1] for r in results}
+        
+        return {
+            "open_tickets": open_count,
+            "in_progress": in_progress,
+            "overdue_tickets": overdue,
+            "priority_breakdown": priority_map
+        }
+
+    @staticmethod
+    def get_agent_performance(db: Session) -> List[dict]:
+        """Aggregate KPIs for all support agents"""
+        # Mocking this since we'd need a specialized 'Support' user filter
+        # In production, join with UserRole
+        return [
+            {
+                "agent_id": 1,
+                "agent_name": "Support Agent Alpha",
+                "resolved_tickets": 42,
+                "avg_resolution_time_hours": 1.5,
+                "csat_score": 4.8
+            }
+        ]
+
+    @staticmethod
+    def initiate_chat(db: Session, user_id: int) -> ChatSession:
+        """Start a new live chat session"""
+        from app.models.support import ChatSession, ChatStatus
+        session = ChatSession(user_id=user_id, status=ChatStatus.WAITING)
+        db.add(session)
+        db.commit()
+        db.refresh(session)
+        return session
+
+    @staticmethod
+    def add_chat_message(db: Session, session_id: int, sender_id: int, message: str) -> ChatMessage:
+        """Add message to chat session"""
+        from app.models.support import ChatMessage
+        msg = ChatMessage(session_id=session_id, sender_id=sender_id, message=message)
+        db.add(msg)
+        db.commit()
+        db.refresh(msg)
+        return msg

@@ -13,8 +13,11 @@ class AuditMiddleware(BaseHTTPMiddleware):
         
         # 2. Extract basic info
         user_id = None
-        if hasattr(request.state, "user"):
-            user_id = request.state.user.id
+        if hasattr(request.state, "user_id"):
+             user_id = request.state.user_id
+        elif hasattr(request.state, "user"):
+             # For cases where getting user object is preferred over just id
+             user_id = getattr(request.state.user, "id", None)
         
         # 3. Process request
         response = await call_next(request)

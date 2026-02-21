@@ -29,6 +29,9 @@ class Commission(SQLModel, table=True):
     # Reference to causing event
     transaction_id: int = Field(foreign_key="finance.transactions.id")
     
+    # Relationships
+    # transaction: "Transaction" = Relationship()
+    
 class CommissionLog(SQLModel, table=True):
     __tablename__ = "commission_logs"
     __table_args__ = {"schema": "finance"}
@@ -49,4 +52,7 @@ class CommissionLog(SQLModel, table=True):
     settlement_id: Optional[int] = Field(default=None, foreign_key="finance.settlements.id")
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    # Relationships
+    settlement: Optional["Settlement"] = Relationship(back_populates="commission_logs")
 

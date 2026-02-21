@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime, date
 from app.models.user import User
 
@@ -236,3 +236,30 @@ class Token(BaseModel):
 
 class TokenPayload(BaseModel):
     sub: Optional[str] = None
+
+# Profile Gaps Schemas
+class AccountDeletionRequest(BaseModel):
+    reason: str
+
+class MembershipResponse(BaseModel):
+    tier: str
+    points_balance: float
+    status: str
+    tier_expiry: Optional[datetime] = None
+    benefits: List[str] = []
+    upgrade_eligibility: Dict[str, Any] = {}
+
+class DashboardSummaryResponse(BaseModel):
+    total_spent_this_month: float
+    active_rentals_count: int
+    lifetime_rentals_count: int
+    membership_tier: str
+    wallet_balance: float
+    carbon_saved_kg: float
+    quick_stats: Dict[str, Any] = {}
+
+class LoginHistoryResponse(BaseModel):
+    sessions: List[UserSessionResponse]
+    total_count: int
+    page: int
+    limit: int

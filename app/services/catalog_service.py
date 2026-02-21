@@ -5,6 +5,7 @@ CatalogProduct catalog management with search and filtering
 from sqlmodel import Session, select, or_, and_
 from typing import List, Optional, Dict
 from app.models.catalog import CatalogProduct, CatalogProductImage, CatalogProductVariant
+from app.schemas.catalog import ProductCreate, ProductUpdate
 from datetime import datetime
 import logging
 
@@ -249,3 +250,55 @@ class CatalogService:
             "price_range": {"min": min_price, "max": max_price},
             "capacities": [cap for cap in capacities if cap]
         }
+
+    @staticmethod
+    def create_product(product_in: ProductCreate, session: Session) -> CatalogProduct:
+        """Admin: Create new product and associated images/variants"""
+        data = product_in.model_dump(exclude={"images", "variants"})
+        product = CatalogProduct(**data)
+        session.add(product)
+        session.flush()
+        
+        # Add images
+        for img_in in product_in.images:
+            image = CatalogProductImage(product_id=product.id, **img_in.model_dump())
+            session.add(image)
+            
+        # Add variants
+        for var_in in product_in.variants:
+            variant = CatalogProductVariant(product_id=product.id, **var_in.model_dump())
+            session.add(variant)
+            
+        session.commit()
+        session.refresh(product)
+        return product
+
+    @staticmethod
+    def update_product(product_id: int, product_in: ProductUpdate, session: Session) -> Optional[CatalogProduct]:
+        """Admin: Update product details"""
+        product = session.get(CatalogProduct, product_id)
+        if not product:
+            return None
+            
+        update_data = product_in.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(product, key, value)
+            
+        product.updated_at = datetime.utcnow()
+        session.add(product)
+        session.commit()
+        session.refresh(product)
+        return product
+
+    @staticmethod
+    def delete_product(product_id: int, session: Session) -> bool:
+        """Admin: Deactivate product"""
+        product = session.get(CatalogProduct, product_id)
+        if not product:
+            return False
+            
+        product.status = "INACTIVE"
+        product.updated_at = datetime.utcnow()
+        session.add(product)
+        session.commit()
+        return True

@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlmodel import Session, select
 from typing import List, Optional, Any
 from datetime import datetime
+from app.api import deps
 from app.db.session import get_session
 from app.models.dealer import DealerProfile, DealerApplication
 from app.models.user import User
 from app.services.dealer_service import DealerService
-from app.api.deps import get_current_user
 from app.schemas.common import DataResponse
 from app.schemas.dealer import DealerProfileCreate, DealerProfileUpdate, DealerProfileResponse
 from pydantic import BaseModel
@@ -42,22 +42,78 @@ def read_dealers(
     dealers = DealerService.get_dealers(session, skip=skip, limit=limit)
     return DataResponse(data=dealers)
 
-@router.get("/me", response_model=DataResponse[dict])
-def get_my_status(
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session)
+@router.get("/registration-status", response_model=DataResponse[dict])
+def get_registration_status(
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
 ):
-    """Get current user's dealer profile and application status."""
+    """Dealer: check their own onboarding stage and status"""
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    
+    app = session.exec(select(DealerApplication).where(DealerApplication.dealer_id == profile.id)).first()
+    return DataResponse(success=True, data={
+        "business_name": profile.business_name,
+        "current_stage": app.current_stage if app else "NOT_STARTED",
+        "created_at": profile.created_at
+    })
+
+@router.get("/me/dashboard", response_model=DataResponse[dict])
+def get_dealer_dashboard(
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
+):
+    """Dealer: own dashboard (sales, inventory, commissions, KPIs)"""
     profile = DealerService.get_dealer_by_user(session, current_user.id)
     if not profile:
         raise HTTPException(status_code=404, detail="Not a dealer")
         
-    app = session.exec(select(DealerApplication).where(DealerApplication.dealer_id == profile.id)).first()
+    stats = DealerService.get_dashboard_stats(session, profile.id)
+    return DataResponse(success=True, data=stats)
+
+@router.get("/me/stations", response_model=DataResponse[list])
+def get_dealer_stations(
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
+):
+    """Dealer: list of their own stations"""
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Not a dealer")
     
-    return DataResponse(data={
-        "profile": profile,
-        "application": app
-    })
+    from app.models.station import Station
+    stations = session.exec(select(Station).where(Station.dealer_id == profile.id)).all()
+    return DataResponse(success=True, data=stations)
+
+@router.get("/me/inventory", response_model=DataResponse[list])
+def get_dealer_inventory(
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
+):
+    """Dealer: inventory across all their stations"""
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Not a dealer")
+    
+    from app.models.dealer_inventory import DealerInventory
+    inventory = session.exec(select(DealerInventory).where(DealerInventory.dealer_id == profile.id)).all()
+    return DataResponse(success=True, data=inventory)
+
+@router.get("/me/commissions", response_model=DataResponse[list])
+def get_dealer_commissions(
+    skip: int = 0,
+    limit: int = 50,
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
+):
+    """Dealer: commission history and pending amounts"""
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Not a dealer")
+        
+    history = DealerService.get_commission_history(session, profile.id, skip, limit)
+    return DataResponse(success=True, data=history)
 
 @router.get("/{id}", response_model=DataResponse[DealerProfileResponse])
 def read_dealer(
@@ -97,3 +153,140 @@ def update_dealer(
     if not dealer:
         raise HTTPException(status_code=404, detail="Dealer not found")
     return DataResponse(data=dealer, message="Profile updated")
+
+@router.post("/me/documents", response_model=DataResponse[dict])
+def upload_dealer_document(
+    doc_type: str = Body(...),
+    file_url: str = Body(...),
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
+):
+    """Dealer: upload business license, GST cert, insurance docs"""
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Not a dealer")
+    
+    from app.models.dealer import DealerDocument
+    doc = DealerDocument(dealer_id=profile.id, document_type=doc_type, file_url=file_url)
+    session.add(doc)
+    session.commit()
+    return DataResponse(success=True, data={"id": doc.id, "message": "Document uploaded"})
+
+@router.get("/me/documents", response_model=DataResponse[list])
+def list_dealer_documents(
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
+):
+    """Dealer: list uploaded documents with versions"""
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Not a dealer")
+    
+    from app.models.dealer import DealerDocument
+    docs = session.exec(select(DealerDocument).where(DealerDocument.dealer_id == profile.id)).all()
+    return DataResponse(success=True, data=docs)
+
+@router.delete("/me/documents/{id}", response_model=DataResponse[dict])
+def delete_dealer_document(
+    id: int,
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
+):
+    """Remove or replace a document"""
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Not a dealer")
+    
+    from app.models.dealer import DealerDocument
+    doc = session.get(DealerDocument, id)
+    if not doc or doc.dealer_id != profile.id:
+        raise HTTPException(status_code=404, detail="Document not found")
+        
+    session.delete(doc)
+    session.commit()
+    return DataResponse(success=True, data={"message": "Document deleted"})
+
+@router.post("/me/promotions", response_model=DataResponse[dict])
+def create_dealer_promotion(
+    request: dict = Body(...),
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
+):
+    """Dealer: create a discount/promotion campaign"""
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Not a dealer")
+    
+    from app.models.dealer_promotion import DealerPromotion
+    promo = DealerPromotion(dealer_id=profile.id, **request)
+    session.add(promo)
+    session.commit()
+    return DataResponse(success=True, data={"id": promo.id, "promo_code": promo.promo_code})
+
+@router.get("/me/promotions", response_model=DataResponse[list])
+def list_dealer_promotions(
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
+):
+    """Dealer: list all campaigns and their performance"""
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Not a dealer")
+    
+    from app.models.dealer_promotion import DealerPromotion
+    promos = session.exec(select(DealerPromotion).where(DealerPromotion.dealer_id == profile.id)).all()
+    return DataResponse(success=True, data=promos)
+
+@router.get("/me/commission-statement/{month}")
+def get_commission_statement(
+    month: str,
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
+):
+    """Monthly commission statement PDF"""
+    # Placeholder for actual PDF generation
+    return {"message": f"Statement for {month} is being generated"}
+
+@router.get("/me/support-tickets", response_model=DataResponse[list])
+def get_dealer_support_tickets(
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
+):
+    """Dealer: view support tickets raised for their stations"""
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Not a dealer")
+    
+    # Placeholder
+    return DataResponse(success=True, data=[])
+
+@router.get("/me/sales", response_model=DataResponse[dict])
+def get_dealer_sales(
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
+):
+    """Dealer: daily/weekly/monthly sales summary"""
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Not a dealer")
+        
+    summary = DealerService.get_sales_summary(session, profile.id)
+    return DataResponse(success=True, data=summary)
+
+@router.put("/me/promotions/{id}", response_model=DataResponse[dict])
+def update_dealer_promotion(
+    id: int,
+    request: dict = Body(...),
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
+):
+    """Update or deactivate a campaign"""
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Not a dealer")
+        
+    try:
+        promo = DealerService.update_promotion(session, id, profile.id, request)
+        return DataResponse(success=True, data={"id": promo.id, "is_active": promo.is_active})
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
