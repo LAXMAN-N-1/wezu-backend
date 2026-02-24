@@ -1,7 +1,18 @@
-from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, TYPE_CHECKING
 from datetime import datetime
 from enum import Enum
+from sqlmodel import SQLModel, Field, Relationship
+from typing import Optional, List, TYPE_CHECKING
+
+class ReturnInspection(SQLModel, table=True):
+    __tablename__ = "return_inspections"
+    __table_args__ = {"schema": "logistics"}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    return_request_id: int = Field(foreign_key="logistics.return_requests.id", index=True)
+    inspection_date: datetime = Field(default_factory=datetime.utcnow)
+    inspector_id: int = Field(foreign_key="core.users.id")
+    condition: str
+    notes: Optional[str] = None
+
 
 if TYPE_CHECKING:
     from app.models.logistics import DeliveryOrder

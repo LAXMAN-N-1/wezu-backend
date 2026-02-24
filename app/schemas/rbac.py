@@ -31,3 +31,6 @@ class RoleResponse(RoleBase):
     permissions: List[PermissionResponse] = []
     
     model_config = ConfigDict(from_attributes=True)
+
+RoleRead = RoleResponse
+

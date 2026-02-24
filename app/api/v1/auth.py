@@ -91,7 +91,6 @@ async def register(
         
     return user
 
-@router.post("/login", response_model=Token)
 @router.post("/token", response_model=Token)
 async def login_access_token(
     db: Session = Depends(get_session),
@@ -128,7 +127,7 @@ async def login_access_token(
             details=f"Login failed for {form_data.username}. Reason: Incorrect credentials",
             ip_address=None
         )
-        raise HTTPException(status_code=400, detail="Incorrect email or password")
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
     
     if not user.is_active:
         logger.warning(f"Inactive user attempt: {form_data.username}")
@@ -548,6 +547,8 @@ async def register_with_password(
     access_token = create_access_token(subject=new_user.id)
     refresh_token = create_refresh_token(subject=new_user.id)
     return Token(access_token=access_token, refresh_token=refresh_token, user=new_user)
+
+# Removed redundant login_with_password
 
 class RefreshRequest(BaseModel):
     refresh_token: str

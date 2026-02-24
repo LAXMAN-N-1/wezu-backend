@@ -4,8 +4,12 @@ from app.models.rental import Rental
 from app.schemas.battery import BatteryCreate, BatteryUpdate
 from app.services.qr_service import QRCodeService
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlmodel import Session, select, func
+from sqlalchemy import desc
+from app.models.battery_health_log import BatteryHealthLog as BatteryHealthLogModel
+from app.models.battery_catalog import BatterySpec
+from app.schemas.station_monitoring import BatteryHealthStatus, BatteryHealthReport, BatteryHealthLog
 
 class BatteryService:
     @staticmethod
@@ -17,9 +21,147 @@ class BatteryService:
         return db.exec(select(Battery).where(Battery.serial_number == serial)).first()
 
     @staticmethod
-    def create_battery(db: Session, battery_in: BatteryCreate) -> Battery:
-        battery = Battery(**battery_in.dict())
+    def list_batteries(db: Session, skip: int = 0, limit: int = 100) -> List[BatteryHealthStatus]:
+        batteries = db.exec(select(Battery).offset(skip).limit(limit)).all()
+        result = []
+        for b in batteries:
+            # Map percentage to status string
+            status = "EXCELLENT"
+            if b.health_percentage < 60: status = "DAMAGED"
+            elif b.health_percentage < 75: status = "POOR"
+            elif b.health_percentage < 85: status = "FAIR"
+            elif b.health_percentage < 95: status = "GOOD"
+            
+            result.append(BatteryHealthStatus(
+                battery_id=str(b.id),
+                charge_cycles=b.cycle_count,
+                state_of_health=b.health_percentage,
+                health_status=status,
+                last_maintenance_date=b.last_maintenance_date
+            ))
+        return result
+
+
+    @staticmethod
+    def get_health_report(db: Session, battery_id: int) -> BatteryHealthReport:
+        battery = db.get(Battery, battery_id)
+        if not battery:
+            raise ValueError(f"Battery {battery_id} not found")
+        
+        # Get history from actual health logs
+        logs_db = db.exec(
+            select(BatteryHealthLogModel)
+            .where(BatteryHealthLogModel.battery_id == battery_id)
+            .order_by(BatteryHealthLogModel.timestamp.asc())
+        ).all()
+        
+        logs_schema = [
+            BatteryHealthLog(
+                timestamp=l.timestamp,
+                soh=l.health_percentage,
+                status=battery.health_status # Current status
+            ) for l in logs_db
+        ]
+        
+        # Recommendations
+        recommendation = "Maintain every 500 cycles."
+        if battery.charge_cycles > 1000:
+            recommendation = "Nearing end of life. Schedule deep inspection."
+        if battery.state_of_health < 80:
+            recommendation = "Performance degraded. Consider cell balancing."
+
+        return BatteryHealthReport(
+            battery_id=str(battery.id),
+            state_of_health=battery.state_of_health,
+            charge_cycles=battery.charge_cycles,
+            temperature_history=battery.temperature_history,
+            health_logs=logs_schema,
+            maintenance_recommendation=recommendation
+        )
+
+    @staticmethod
+    def calculate_soh(db: Session, battery: Battery) -> float:
+        """
+        IEEE Battery Health Standard inspired calculation:
+        SOH = (Current Capacity / Rated Capacity) * 100
+        Factors in cycle count and temperature exposure.
+        """
+        if not battery.spec:
+            # Try to fetch spec if not loaded
+            if battery.spec_id:
+                battery.spec = db.get(BatterySpec, battery.spec_id)
+            else:
+                return battery.state_of_health # Can't calculate without spec
+
+        rated_capacity = battery.spec.capacity_ah * 1000 # convert to mAh
+        
+        # Get latest health log with capacity reading
+        latest_log = db.exec(
+            select(BatteryHealthLogModel)
+            .where(BatteryHealthLogModel.battery_id == battery.id)
+            .where(BatteryHealthLogModel.current_capacity_mah != None)
+            .order_by(desc(BatteryHealthLogModel.timestamp))
+        ).first()
+
+        current_capacity = latest_log.current_capacity_mah if latest_log else rated_capacity
+        
+        # Base SOH
+        soh = (current_capacity / rated_capacity) * 100
+        
+        # Degradation factor for cycles (example: 0.01% per cycle beyond rated life)
+        if battery.charge_cycles > battery.spec.cycle_life_expectancy:
+            excess_cycles = battery.charge_cycles - battery.spec.cycle_life_expectancy
+            soh -= (excess_cycles * 0.01)
+
+        # Degradation factor for temperature (example: penalty for high temp readings)
+        high_temp_count = sum(1 for t in battery.temperature_history if t > 45)
+        soh -= (high_temp_count * 0.05)
+        
+        return max(0.0, min(100.0, soh))
+
+    @staticmethod
+    def update_health_status(db: Session, battery: Battery) -> str:
+        """Update health_status based on SOH"""
+        soh = battery.state_of_health
+        
+        status = "EXCELLENT"
+        if soh < 70: status = "DAMAGED"
+        elif soh < 80: status = "POOR"
+        elif soh < 85: status = "FAIR"
+        elif soh < 95: status = "GOOD"
+        
+        battery.health_status = status
+        
+        if status in ["POOR", "DAMAGED"]:
+            # Generate Alert (simulated here with lifecycle event for now)
+            event = BatteryLifecycleEvent(
+                battery_id=battery.id,
+                event_type="health_alert",
+                description=f"Battery health dropped to {status} (SOH: {soh:.1f}%)"
+            )
+            db.add(event)
+            
+        return status
+
+    @staticmethod
+    def record_maintenance(db: Session, battery_id: int, notes: str, actor_id: Optional[int] = None) -> bool:
+        battery = db.get(Battery, battery_id)
+        if not battery:
+            return False
+        
+        battery.last_maintenance_date = datetime.utcnow()
+        battery.updated_at = datetime.utcnow()
         db.add(battery)
+        
+        # Log event
+        event = BatteryLifecycleEvent(
+            battery_id=battery_id,
+            event_type="maintenance_complete",
+            description=notes,
+            actor_id=actor_id
+        )
+        db.add(event)
+        
         db.commit()
         db.refresh(battery)
         
@@ -36,92 +178,3 @@ class BatteryService:
         db.refresh(battery)
         return battery
 
-    @staticmethod
-    def log_lifecycle_event(
-        db: Session, 
-        battery_id: int, 
-        event_type: str, 
-        description: str,
-        metadata: Optional[dict] = None
-    ):
-        event = BatteryLifecycleEvent(
-            battery_id=battery_id,
-            event_type=event_type,
-            description=description,
-            timestamp=datetime.utcnow()
-        )
-        db.add(event)
-        db.commit()
-
-        return battery
-
-    @staticmethod
-    def update_status(db: Session, battery_id: int, status: BatteryStatus, description: str) -> Optional[Battery]:
-        battery = db.get(Battery, battery_id)
-        if not battery:
-            return None
-        
-        old_status = battery.status
-        battery.status = status
-        battery.updated_at = datetime.utcnow()
-        db.add(battery)
-        
-        BatteryService.log_lifecycle_event(
-            db, battery_id, "status_change", 
-            f"Status changed from {old_status} to {status}. Reason: {description}"
-        )
-        db.commit()
-        return battery
-
-    @staticmethod
-    def assign_station(db: Session, battery_id: int, station_id: int) -> Optional[Battery]:
-        battery = db.get(Battery, battery_id)
-        if not battery:
-            return None
-            
-        battery.station_id = station_id
-        battery.updated_at = datetime.utcnow()
-        db.add(battery)
-        
-        BatteryService.log_lifecycle_event(
-            db, battery_id, "station_assigned", f"Assigned to station ID: {station_id}"
-        )
-        db.commit()
-        return battery
-
-    @staticmethod
-    def get_health_history(db: Session, battery_id: int, limit: int = 50) -> List[Telemetry]:
-        return db.exec(
-            select(Telemetry)
-            .where(Telemetry.battery_id == battery_id)
-            .order_by(Telemetry.timestamp.desc())
-            .limit(limit)
-        ).all()
-
-    @staticmethod
-    def get_rental_history(db: Session, battery_id: int, limit: int = 20) -> List[Rental]:
-        return db.exec(
-            select(Rental)
-            .where(Rental.battery_id == battery_id)
-            .order_by(Rental.start_time.desc())
-            .limit(limit)
-        ).all()
-
-    @staticmethod
-    def get_utilization_report(db: Session) -> Dict[str, Any]:
-        total = db.exec(select(func.count(Battery.id))).one() or 0
-        rented = db.exec(select(func.count(Battery.id)).where(Battery.status == BatteryStatus.RENTED)).one() or 0
-        available = db.exec(select(func.count(Battery.id)).where(Battery.status == BatteryStatus.AVAILABLE)).one() or 0
-        maintenance = db.exec(select(func.count(Battery.id)).where(Battery.status == BatteryStatus.MAINTENANCE)).one() or 0
-        retired = db.exec(select(func.count(Battery.id)).where(Battery.status == BatteryStatus.RETIRED)).one() or 0
-        
-        utilization = (rented / total * 100) if total > 0 else 0.0
-        
-        return {
-            "total_batteries": total,
-            "available_count": available,
-            "rented_count": rented,
-            "maintenance_count": maintenance,
-            "retired_count": retired,
-            "utilization_percentage": round(utilization, 2)
-        }

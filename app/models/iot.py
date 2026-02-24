@@ -59,28 +59,6 @@ class FirmwareUpdate(SQLModel, table=True):
     
     is_critical: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
-class Telemetry(SQLModel, table=True):
-    __tablename__ = "telemetry"
-    __table_args__ = {"schema": "inventory"}
-    
-    battery_id: int = Field(primary_key=True)
-    timestamp: datetime = Field(primary_key=True, default_factory=datetime.utcnow)
-    
-    # State of Charge & Health
-    soc: float
-    soh: float
-    
-    # Electrical
-    voltage: float
-    current: float
-    
-    # Environment
-    temperature: float
-    
-    # Tracking
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    speed: Optional[float] = None
-    
-    # Status
-    status_flags: Optional[str] = None # JSON string
+    is_critical: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+

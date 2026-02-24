@@ -12,7 +12,7 @@ from app.models.role_right import RoleRight
 from app.schemas.user import TokenPayload
 from app.models.oauth import BlacklistedToken
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/token")
 
 def get_current_user(
     db: Session = Depends(get_db),

@@ -1,6 +1,6 @@
-from typing import Any, List, Optional, Dict
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status, UploadFile, File
-from fastapi.responses import Response
+from typing import Any, List
+from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 from pydantic import BaseModel
 from sqlalchemy.orm import selectinload
@@ -28,8 +28,8 @@ from app.schemas.common import DataResponse
 
 router = APIRouter()
 
-class QRCodeRequest(BaseModel):
-    qr_code_data: str
+from app.schemas.station_monitoring import BatteryListResponse, BatteryHealthReport
+from app.services.battery_service import BatteryService
 
 class QRGenerateRequest(BaseModel):
     battery_id: int

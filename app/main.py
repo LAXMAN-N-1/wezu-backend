@@ -1,5 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from contextlib import asynccontextmanager
+
 from app.core.config import settings
 
 
@@ -37,11 +40,11 @@ from app.services.mqtt_service import start_mqtt_service, stop_mqtt_service
 import asyncio
 from contextlib import asynccontextmanager
 
+# ----------------------------
+# Lifespan (No init_db here)
+# ----------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start background scheduler on app startup and init DB"""
-    from app.db.session import init_db
-    init_db()
     start_scheduler()
     
     # Start MQTT and WebSocket background tasks
@@ -49,25 +52,27 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(heartbeat_task())
     
     yield
-    """Stop background scheduler on app shutdown"""
     stop_scheduler()
     stop_mqtt_service()
 
+
 app = FastAPI(
-    title=settings.PROJECT_NAME, 
+    title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
-# Rate Limit
+# ----------------------------
+# Rate Limiting
+# ----------------------------
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# GZip Compression
-from fastapi.middleware.gzip import GZipMiddleware
+# ----------------------------
+# Middleware
+# ----------------------------
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# Configure CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -154,9 +159,11 @@ async def root():
     return {
         "message": "Welcome to WEZU Energy API",
         "status": "Running",
-        "version": "1.0.0"
+        "version": "1.0.0",
     }
+
 
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+

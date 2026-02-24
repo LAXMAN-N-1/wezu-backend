@@ -38,3 +38,14 @@ class BatteryCatalog(SQLModel, table=True):
 
     # Relationships
     batteries: List["Battery"] = Relationship(back_populates="sku")
+
+BatterySpec = BatteryCatalog
+
+class BatteryBatch(SQLModel, table=True):
+    __tablename__ = "battery_batches"
+    __table_args__ = {"schema": "inventory"}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    batch_number: str = Field(unique=True, index=True)
+    manufacturer: str
+    production_date: datetime = Field(default_factory=datetime.utcnow)
+
