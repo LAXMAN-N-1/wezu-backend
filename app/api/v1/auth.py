@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
 from app.db.session import get_session
-from app.models.user import User
+from app.models.user import User, UserStatus
 from app.schemas.user import Token
 from app.models.session import UserSession
 from app.models.otp import OTP
@@ -72,22 +72,19 @@ async def register(
         hashed_password=get_password_hash(user_in.password),
         full_name=user_in.full_name,
         phone_number=user_in.phone_number,
-        is_active=True
+        status=UserStatus.ACTIVE
     )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
     
     # Assign default role
     from app.models.rbac import Role
     from sqlalchemy.orm import selectinload
     customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
     if customer_role:
-        # Changed from user.roles.append(customer_role) to single role assignment
         user.role = customer_role
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+        
+    db.add(user)
+    db.commit()
+    db.refresh(user)
         
     return user
 
@@ -118,30 +115,28 @@ async def login_access_token(
     if not verify_password(form_data.password, user.hashed_password):
         logger.warning(f"Invalid password for user: {form_data.username}")
         # Log Failure
-        from app.services.audit_service import AuditService
-        AuditService.log_action(
-            db=db,
+        from app.services.audit_service import audit_service
+        await audit_service.log_event(
+            event_type="security",
             user_id=user.id,
             action="login_failed",
-            resource_type="user",
-            resource_id=str(user.id),
-            details=f"Login failed for {form_data.username}. Reason: Incorrect credentials",
-            ip_address=None
+            resource="user",
+            status="failed",
+            metadata={"details": f"Login failed for {form_data.username}. Reason: Incorrect credentials"}
         )
         raise HTTPException(status_code=400, detail="Incorrect email or password")
     
-    if not user.is_active:
+    if user.status != UserStatus.ACTIVE:
         logger.warning(f"Inactive user attempt: {form_data.username}")
         # Log Failure
-        from app.services.audit_service import AuditService
-        AuditService.log_action(
-            db=db,
+        from app.services.audit_service import audit_service
+        await audit_service.log_event(
+            event_type="security",
             user_id=user.id,
             action="login_failed",
-            resource_type="user",
-            resource_id=str(user.id),
-            details=f"Login failed for {form_data.username}. Reason: Inactive user",
-            ip_address=None
+            resource="user",
+            status="failed",
+            metadata={"details": f"Login failed for {form_data.username}. Reason: Inactive user"}
         )
         raise HTTPException(status_code=400, detail="Inactive user")
         
@@ -250,7 +245,7 @@ async def verify_registration_otp(
         # Create new user
         new_user_data = {
             "full_name": verify_data.full_name,
-            "is_active": True
+            "status": UserStatus.ACTIVE
         }
         if "@" in verify_data.target:
             new_user_data["email"] = verify_data.target
@@ -277,8 +272,8 @@ async def verify_registration_otp(
         logger.info(f"Existing user linked via OTP: {verify_data.target}")
         
         # ACTIVATE ACCOUNT if pending
-        if not user.is_active or user.kyc_status == "pending_verification":
-            user.is_active = True
+        if user.status != UserStatus.ACTIVE or user.kyc_status == "pending_verification":
+            user.status = UserStatus.ACTIVE
             if user.kyc_status == "pending_verification":
                 user.kyc_status = "verified" # Auto-verify phone for customers
             db.add(user)
@@ -287,7 +282,7 @@ async def verify_registration_otp(
             logger.info(f"User {user.id} activated after OTP verification")
 
     # Update Last Login
-    user.last_login = datetime.utcnow()
+    user.last_login_at = datetime.utcnow()
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -421,7 +416,7 @@ async def social_login(
             email=email,
             full_name=name,
             profile_picture=picture,
-            is_active=True,
+            status=UserStatus.ACTIVE,
             kyc_status="verified", # Social login usually implies verified email
         )
         
@@ -462,7 +457,7 @@ async def social_login(
         db.refresh(user)
 
     # Update Last Login
-    user.last_login = datetime.utcnow()
+    user.last_login_at = datetime.utcnow()
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -527,7 +522,7 @@ async def register_with_password(
         phone_number=register_data.phone_number,
         full_name=register_data.full_name,
         hashed_password=get_password_hash(register_data.password),
-        is_active=True
+        status=UserStatus.ACTIVE
     )
     db.add(new_user)
     db.commit()
@@ -707,7 +702,7 @@ async def forgot_password(
         # We will return 200 OK regardless to prevent user enumeration.
         return {"message": "If an account with these details exists, an OTP has been sent."}
 
-    if not user.is_active:
+    if user.status != UserStatus.ACTIVE:
          raise HTTPException(status_code=400, detail="User account is inactive.")
 
     # 2. Generate OTP

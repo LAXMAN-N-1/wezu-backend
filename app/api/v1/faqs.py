@@ -1,6 +1,11 @@
+from fastapi import APIRouter, Depends
+from sqlmodel import Session, select
+from typing import List
 from app.api import deps
 from app.models.faq import FAQ
 from app.schemas.faq import FAQResponse, FAQCategoryResponse
+
+router = APIRouter()
 
 @router.get("/", response_model=List[FAQResponse])
 async def get_faqs(

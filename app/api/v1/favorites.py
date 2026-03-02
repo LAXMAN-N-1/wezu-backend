@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
-from typing import List
+from typing import List, Optional
 from app.api import deps
 from app.models.user import User
 from app.models.favorite import Favorite

@@ -1,4 +1,4 @@
-from sqlmodel import Session
+from sqlmodel import Session, select
 from app.ml.feature_store import FeatureStore
 from app.ml.models.battery_health import BatteryHealthModel, DemandForecastModel
 from typing import Dict, Any
@@ -39,18 +39,18 @@ class MLService:
         """
         Generate demand forecast based on last 30 days of swap history.
         """
-        from app.models.swap import Swap
+        from app.models.swap import SwapSession
         from sqlalchemy import func
         
         # 1. Fetch swap counts per day for the last 30 days
         since = datetime.utcnow() - timedelta(days=30)
         history_stmt = select(
-            func.date(Swap.created_at).label("date"),
-            func.count(Swap.id).label("count")
+            func.date(SwapSession.created_at).label("date"),
+            func.count(SwapSession.id).label("count")
         ).where(
-            Swap.station_id == station_id,
-            Swap.created_at >= since
-        ).group_by(func.date(Swap.created_at)).order_by(func.date(Swap.created_at).asc())
+            SwapSession.station_id == station_id,
+            SwapSession.created_at >= since
+        ).group_by(func.date(SwapSession.created_at)).order_by(func.date(SwapSession.created_at).asc())
         
         results = db.exec(history_stmt).all()
         # Convert to list of counts, filling missing days with 0

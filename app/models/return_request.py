@@ -5,6 +5,7 @@ from enum import Enum
 
 if TYPE_CHECKING:
     from app.models.logistics import DeliveryOrder
+    from app.models.delivery_assignment import DeliveryAssignment
 
 class ReturnStatus(str, Enum):
     PENDING = "pending"
@@ -27,7 +28,7 @@ class ReturnRequest(SQLModel, table=True):
     status: ReturnStatus = Field(default=ReturnStatus.PENDING)
     
     # Logistics Link
-    delivery_order_id: Optional[int] = Field(default=None, foreign_key="logistics.delivery_orders.id")
+    delivery_order_id: Optional[int] = Field(default=None, index=True)
     
     refund_amount: Optional[float] = None
     inspection_notes: Optional[str] = None
@@ -37,3 +38,4 @@ class ReturnRequest(SQLModel, table=True):
     
     # Relationships
     delivery_order: Optional["DeliveryOrder"] = Relationship(back_populates="return_request")
+    delivery: Optional["DeliveryAssignment"] = Relationship(back_populates="return_request")

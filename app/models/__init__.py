@@ -12,7 +12,7 @@ from app.models.iot import IoTDevice
 # Operations
 from app.models.rental import Rental, RentalStatus
 # from app.models.swap import SwapRequest, SwapHistory
-from app.models.swap import Swap
+from app.models.swap import SwapSession
 from app.models.telemetry import Telemetry
 from app.models.logistics import DeliveryOrder, DeliveryType, DeliveryStatus
 
@@ -47,7 +47,7 @@ from app.models.menu import Menu
 # Teammate Operations & IoT
 from app.models.commission import Commission
 from app.models.settlement import Settlement
-from app.models.iot import DeviceCommand, FirmwareUpdate, Telemetry as IOTTelemetry
+from app.models.iot import DeviceCommand, FirmwareUpdate
 from app.models.fraud import RiskScore, FraudCheckLog, Blacklist
 from app.models.maintenance import MaintenanceSchedule, MaintenanceRecord, StationDowntime
 from app.models.i18n import Translation
@@ -58,10 +58,14 @@ from app.models.stock import Stock
 from app.models.stock_movement import StockMovement
 
 # New critical models
+from app.models.membership import UserMembership
+from app.models.session import UserSession
+from app.models.rental_event import RentalEvent
+from app.models.refund import Refund
 from app.models.dealer_inventory import DealerInventory, InventoryTransaction
 from app.models.dealer_promotion import DealerPromotion, PromotionUsage
 from app.models.delivery_route import DeliveryRoute, RouteStop
-from app.models.return_request import ReturnRequest, ReturnInspection
+from app.models.return_request import ReturnRequest
 from app.models.rental_modification import RentalExtension, RentalPause
 from app.models.late_fee import LateFee, LateFeeWaiver
 from app.models.device_fingerprint import DeviceFingerprint, DuplicateAccount

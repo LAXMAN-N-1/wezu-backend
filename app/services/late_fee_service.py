@@ -80,7 +80,7 @@ class LateFeeService:
         }
     
     @staticmethod
-    def apply_late_fee(rental_id: int, db: Session) -> Optional[LateFee]:
+    def apply_late_fee(rental_id: int, db: Session) -> Optional["LateFee"]:
         """
         Apply late fee to rental and create/update LateFee record.
         """

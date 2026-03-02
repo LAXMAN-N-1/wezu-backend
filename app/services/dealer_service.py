@@ -6,7 +6,7 @@ from app.models.dealer_promotion import DealerPromotion
 from app.models.user import User
 from app.models.station import Station
 from app.models.commission import Commission
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import datetime
 from app.repositories.dealer import (
     dealer_profile_repository,

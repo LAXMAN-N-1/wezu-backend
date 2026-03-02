@@ -75,7 +75,7 @@ class UserStatusUpdate(BaseModel):
     status: str # active, suspended, banned
     reason: str
 
-from app.schemas.rbac import RoleRead as RoleResponse
+from app.schemas.rbac import RoleResponse
 
 class UserResponse(UserBase):
     id: int
@@ -263,3 +263,23 @@ class LoginHistoryResponse(BaseModel):
     total_count: int
     page: int
     limit: int
+
+class UserSearchItem(BaseModel):
+    id: int
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
+    profile_picture: Optional[str] = None
+    is_active: bool
+    kyc_status: str
+    roles: List[str]
+    created_at: datetime
+    last_login: Optional[datetime] = None
+
+class UserSearchResponse(BaseModel):
+    users: List[UserSearchItem]
+    total_count: int
+    page: int
+    limit: int
+    filters_applied: Dict[str, Any] = {}
+

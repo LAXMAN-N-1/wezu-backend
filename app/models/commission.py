@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import Optional
-from sqlmodel import SQLModel, Field
+from typing import Optional, List
+from sqlmodel import SQLModel, Field, Relationship
 
 class CommissionConfig(SQLModel, table=True):
     __tablename__ = "commission_configs"

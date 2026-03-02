@@ -59,6 +59,12 @@ class AuditService:
             metadata=metadata
         )
 
+    @staticmethod
+    def log_action(db, user_id, action, resource_type, resource_id, details, ip_address=None, **kwargs):
+        """Backward compatibility static method for older synchronous endpoints"""
+        import logging
+        logging.info(f"Audit Action (Sync): User {user_id} performed {action} on {resource_type} {resource_id}. Details: {details}")
+
     async def get_logs(
         self,
         user_id: Optional[int] = None,

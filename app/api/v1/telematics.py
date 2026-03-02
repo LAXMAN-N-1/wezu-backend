@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlmodel import Session, select
 from datetime import datetime
 from app.db.session import get_session
-from app.models.telematics import TelemeticsData
+from app.models.telemetry import Telemetry
 from app.models.battery import Battery, BatteryLifecycleEvent
 from app.schemas.telematics import TelemeticsDataIngest, TelemeticsDataResponse
 
@@ -50,10 +50,17 @@ def ingest_telemetry(
         raise HTTPException(status_code=404, detail="Battery not found")
         
     # 2. Save Time-Series Data
-    if not data_in.timestamp:
-        data_in.timestamp = datetime.utcnow()
-        
-    telemetry_entry = TelemeticsData.from_orm(data_in)
+    telemetry_entry = Telemetry(
+        battery_id=data_in.battery_id,
+        timestamp=data_in.timestamp,
+        voltage=data_in.voltage,
+        current=data_in.current,
+        temperature=data_in.temperature,
+        soc=data_in.soc,
+        soh=data_in.soh,
+        latitude=data_in.gps_latitude,
+        longitude=data_in.gps_longitude
+    )
     session.add(telemetry_entry)
     
     # 3. Update Battery "Current State" (Snapshot)
@@ -85,7 +92,7 @@ def get_latest_telemetry(
     """
     Get the most recent telemetry packet for a battery.
     """
-    statement = select(TelemeticsData).where(TelemeticsData.battery_id == battery_id).order_by(TelemeticsData.timestamp.desc()).limit(1)
+    statement = select(Telemetry).where(Telemetry.battery_id == battery_id).order_by(Telemetry.timestamp.desc()).limit(1)
     result = session.exec(statement).first()
     if not result:
         raise HTTPException(status_code=404, detail="No data found")

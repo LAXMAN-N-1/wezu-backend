@@ -109,5 +109,8 @@ class DeliveryOrder(SQLModel, table=True):
 
     # Relationships
     driver: Optional["User"] = Relationship(back_populates="delivery_orders")
-    return_request: Optional["ReturnRequest"] = Relationship(back_populates="delivery_order")
+    return_request: Optional["ReturnRequest"] = Relationship(
+        back_populates="delivery_order",
+        sa_relationship_kwargs={"foreign_keys": "[DeliveryOrder.return_request_id]"}
+    )
 

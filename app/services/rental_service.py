@@ -4,7 +4,7 @@ from app.models.rental_event import RentalEvent
 from app.models.battery import Battery
 from app.models.user import User
 from app.schemas.rental import RentalCreate
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from fastapi import HTTPException
 from app.services.security_service import SecurityService

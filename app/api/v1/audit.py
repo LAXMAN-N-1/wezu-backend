@@ -1,17 +1,35 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select, func
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from app.api import deps
 from app.db.session import get_session
 from app.models.user import User
 from app.models.audit_log import AuditLog
 from app.models.address import Address
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 
 router = APIRouter()
 
 from app.services.audit_service import audit_service
+
+class AuditLogEntry(BaseModel):
+    id: int
+    user_id: Optional[int]
+    action: str
+    resource_type: str
+    resource_id: Optional[str]
+    timestamp: datetime
+    details: Optional[str]
+    ip_address: Optional[str]
+
+    model_config = ConfigDict(from_attributes=True)
+
+class AuditLogResponse(BaseModel):
+    logs: List[AuditLogEntry]
+    total_count: int
+    page: int
+    limit: int
 
 class MongoAuditEntry(BaseModel):
     id: str = Field(alias="_id")

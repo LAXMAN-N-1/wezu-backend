@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 
@@ -7,7 +7,8 @@ from app.core.config import settings
 from app.api.v1 import (
     auth, users, kyc, stations, batteries, rentals, wallet, payments, 
     notifications, support, favorites, analytics, transactions, promo, 
-    faqs, iot, swaps, i18n, fraud, branches, organizations, warehouses, screens, stock, dealers
+    faqs, iot, swaps, i18n, fraud, branches, organizations, warehouses, screens, stock, dealers, logistics,
+    vehicles, settlements, telemetry, locations, audit, ml
 )
 from app.api.v1.admin import support as admin_support
 from app.api.v1.admin import faqs as admin_faqs
@@ -17,10 +18,10 @@ from app.api.v1.admin import promo as admin_coupons
 from app.api.v1.admin import reviews as admin_reviews
 from app.api.v1.admin import roles as admin_roles
 from app.api.v1.admin import users as admin_user_mgmt
+from app.api.v1 import admin_kyc
 # Enhanced customer endpoints
 from app.api.v1 import (
-    system, payments_enhanced, wallet_enhanced, notifications_enhanced,
-    support_enhanced, rentals_enhanced, purchases_enhanced, analytics_enhanced,
+    system,
     roles, menus, role_rights
 )
 from app.api.admin import router as admin_router
@@ -44,8 +45,12 @@ async def lifespan(app: FastAPI):
     init_db()
     start_scheduler()
     
-    # Start MQTT and WebSocket background tasks
-    start_mqtt_service()
+    # Start MQTT and WebSocket background tasks - making MQTT non-fatal for dev
+    try:
+        start_mqtt_service()
+    except Exception as e:
+        print(f"MQTT Service Startup Error: {e}")
+        
     asyncio.create_task(heartbeat_task())
     
     yield
@@ -103,7 +108,7 @@ admin_api = f"{settings.API_V1_STR}/admin"
 from app.api import deps
 admin_deps = [Depends(deps.get_current_active_superuser)]
 app.include_router(admin_router, prefix=f"{admin_api}", tags=["Admin: Main"], dependencies=admin_deps)
-app.include_router(admin_users.router, prefix=f"{admin_api}/users", tags=["Admin: Users"], dependencies=admin_deps)
+app.include_router(admin_user_mgmt.router, prefix=f"{admin_api}/users", tags=["Admin: Users"], dependencies=admin_deps)
 app.include_router(admin_roles.router, prefix=f"{admin_api}/roles", tags=["Admin: Roles"], dependencies=admin_deps)
 app.include_router(admin_kyc.router, prefix=f"{admin_api}/kyc", tags=["Admin: KYC"], dependencies=admin_deps)
 app.include_router(audit.router, prefix=f"{admin_api}/audit", tags=["Admin: Audit"], dependencies=admin_deps)
@@ -141,12 +146,7 @@ app.include_router(inventory.router, prefix=f"{settings.API_V1_STR}/inventory", 
 
 
 # Webhooks
-# Webhooks
 app.include_router(razorpay_webhook.router, prefix="/api/webhooks", tags=["Webhooks"])
-
-# Logistics (Warehouses & Transfers)
-from app.api.v1 import logistics
-app.include_router(logistics.router, prefix=f"{settings.API_V1_STR}/logistics", tags=["Logistics & Supply Chain"])
 
 
 @app.get("/")

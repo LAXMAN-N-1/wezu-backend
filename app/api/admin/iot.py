@@ -6,7 +6,7 @@ from app.api import deps
 from app.models.user import User
 from app.models.battery import Battery
 from app.models.station import Station
-from app.models.telematics import TelemeticsData
+from app.models.telemetry import Telemetry
 from app.db.session import get_session
 
 router = APIRouter()
@@ -46,10 +46,10 @@ def get_battery_telematics(
 ):
     """Get historical telematics for a specific battery."""
     since = datetime.utcnow() - timedelta(hours=hours)
-    statement = select(TelemeticsData).where(
-        TelemeticsData.battery_id == battery_id,
-        TelemeticsData.timestamp >= since
-    ).order_by(TelemeticsData.timestamp.desc())
+    statement = select(Telemetry).where(
+        Telemetry.battery_id == battery_id,
+        Telemetry.timestamp >= since
+    ).order_by(Telemetry.timestamp.desc())
     
     logs = db.exec(statement).all()
     return logs

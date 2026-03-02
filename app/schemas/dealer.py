@@ -3,7 +3,7 @@ Dealer-related Pydantic schemas
 Request and response models for dealer operations
 """
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
 

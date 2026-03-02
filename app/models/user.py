@@ -122,3 +122,11 @@ class User(SQLModel, table=True):
     
     access_paths: List["UserAccessPath"] = Relationship(back_populates="user")
     sessions: List["UserSession"] = Relationship(back_populates="user")
+
+    @property
+    def is_active(self) -> bool:
+        return self.status == UserStatus.ACTIVE
+
+    @is_active.setter
+    def is_active(self, value: bool):
+        self.status = UserStatus.ACTIVE if value else UserStatus.SUSPENDED

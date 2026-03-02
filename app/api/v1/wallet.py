@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
-from typing import List
+from typing import List, Optional
 from app.api import deps
 from app.models.user import User
 from app.models.financial import Transaction
@@ -91,18 +91,58 @@ async def get_cashback_history(
 
 class WithdrawRequest(BaseModel):
     amount: float
-    bank_details: dict
+    payment_mode: str
+    account_number: Optional[str] = None
+    account_holder_name: Optional[str] = None
+    bank_name: Optional[str] = None
+    ifsc_code: Optional[str] = None
+    upi_id: Optional[str] = None
 
-@router.post("/withdraw", response_model=dict) # Return basic dict or WithdrawalRequest model if schema defined
+@router.post("/withdraw", response_model=dict)
 async def request_withdrawal(
     req: WithdrawRequest,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ):
     try:
-        wr = WalletService.request_withdrawal(db, current_user.id, req.amount, req.bank_details)
+        bank_details = {
+            "payment_mode": req.payment_mode,
+            "account_number": req.account_number,
+            "account_holder_name": req.account_holder_name,
+            "bank_name": req.bank_name,
+            "ifsc_code": req.ifsc_code,
+            "upi_id": req.upi_id
+        }
+        bank_details = {k: v for k, v in bank_details.items() if v is not None}
+        
+        wr = WalletService.request_withdrawal(db, current_user.id, req.amount, bank_details)
         return {"status": "success", "request_id": wr.id, "message": "Withdrawal request submitted"}
     except HTTPException as e:
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/lookup")
+async def lookup_user_by_phone(
+    phone: str,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
+):
+    """Lookup user by phone number to mask name before transfer"""
+    from sqlmodel import select
+    user = db.exec(select(User).where(User.phone_number == phone)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    first_name = user.first_name or ""
+    last_name = user.last_name or ""
+    
+    if len(first_name) >= 3:
+        masked_first = first_name[:3] + "***"
+    elif len(first_name) > 0:
+        masked_first = first_name[0] + "***"
+    else:
+        masked_first = "***"
+        
+    masked_name = f"{masked_first} {last_name[:1] + '.' if last_name else ''}".strip()
+    return {"masked_name": masked_name}

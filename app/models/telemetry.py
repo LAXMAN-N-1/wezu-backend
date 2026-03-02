@@ -4,7 +4,7 @@ from datetime import datetime
 
 class Telemetry(SQLModel, table=True):
     __tablename__ = "telemetry"
-    __table_args__ = {"schema": "inventory"}
+    __table_args__ = {"schema": "inventory", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     
