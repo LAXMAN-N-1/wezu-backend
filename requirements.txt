@@ -39,6 +39,7 @@ fpdf
 reportlab
 slowapi
 pytest
+pytest-asyncio
 paho-mqtt
 psutil
 apscheduler
