@@ -47,3 +47,4 @@ twilio
 pyotp==2.9.0
 motor
 pymongo
+qrcode[pil]
