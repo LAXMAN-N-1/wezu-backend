@@ -28,6 +28,22 @@ engine = create_engine(
     poolclass=StaticPool,
 )
 
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+import sqlite3
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    if type(dbapi_connection) is sqlite3.Connection:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("ATTACH DATABASE ':memory:' AS core")
+        cursor.execute("ATTACH DATABASE ':memory:' AS finance")
+        cursor.execute("ATTACH DATABASE ':memory:' AS rentals")
+        cursor.execute("ATTACH DATABASE ':memory:' AS inventory")
+        cursor.execute("ATTACH DATABASE ':memory:' AS stations")
+        cursor.execute("ATTACH DATABASE ':memory:' AS logistics")
+        cursor.close()
+
 # Initialize all tables before any test session
 SQLModel.metadata.create_all(engine)
 
