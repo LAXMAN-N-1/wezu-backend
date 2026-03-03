@@ -1,3 +1,4 @@
+import os
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine
@@ -18,13 +19,20 @@ SQLiteTypeCompiler.visit_JSONB = visit_JSONB
 # --------------------------------------------
 
 # Use in-memory SQLite for tests
-DATABASE_URL = "sqlite://"
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite://")
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
+# For in-memory SQLite, use StaticPool; for file-based, use default
+if DATABASE_URL == "sqlite://":
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+else:
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},
+    )
 
 @pytest.fixture(name="session")
 def session_fixture():
