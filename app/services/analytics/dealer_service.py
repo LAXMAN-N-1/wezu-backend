@@ -33,7 +33,17 @@ class AnalyticsDealerService(BaseAnalyticsService):
                 "conversion": BaseAnalyticsService.format_kpi_card(round(conversion_rate, 1), conversion_rate, conversion_rate - 2.0)
             },
             inventory={"days_of_charge": available_stock}, # mapped for demo
-            sales={"period_revenue": [{"x": target_date_ago.strftime("%Y-%m-%d"), "y": period_rev}]}
+            sales={"period_revenue": [{"x": target_date_ago.strftime("%Y-%m-%d"), "y": period_rev}]},
+            operations={
+                "peak_hours": [
+                     # Raw Postgres Epoch Extract for Hour distribution
+                    {"hour": int(row[0]), "swaps": row[1]}
+                    for row in db.query(func.extract('hour', Rental.created_at), func.count(Rental.id))
+                    .join(Station, Rental.start_station_id == Station.id)
+                    .filter(Station.dealer_id == dealer_profile_id, Rental.created_at >= target_date_ago)
+                    .group_by(func.extract('hour', Rental.created_at)).all()
+                ] if dealer_profile_id else []
+            }
         )
 
 analytics_dealer_service = AnalyticsDealerService()

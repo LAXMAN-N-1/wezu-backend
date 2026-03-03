@@ -31,6 +31,16 @@ class AnalyticsLogisticsService(BaseAnalyticsService):
                 "surplus": total_batteries - depleted_batteries,
                 "depleted": depleted_batteries,
                 "depleted_percentage": round(depleted_pct, 1)
+            },
+            maintenance={
+                "most_broken_models": [
+                    {"model": str(row[0]), "issues": row[1]}
+                    for row in db.query(Battery.model, func.count(MaintenanceRecord.id))
+                    .join(Battery, MaintenanceRecord.battery_id == Battery.id)
+                    .group_by(Battery.model)
+                    .order_by(func.count(MaintenanceRecord.id).desc())
+                    .limit(5).all()
+                ]
             }
         )
 

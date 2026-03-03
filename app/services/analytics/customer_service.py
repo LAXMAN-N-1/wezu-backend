@@ -34,7 +34,10 @@ class AnalyticsCustomerService(BaseAnalyticsService):
         return CustomerOverviewResponse(
             ride_status={"current_range": round(current_range, 1), "battery_health": battery_health},
             gamification={"eco_score": 100}, # Setup for ML scoring later
-            savings={"money_saved": BaseAnalyticsService.format_kpi_card(round(petrol_savings, 0), petrol_savings, petrol_savings * 0.9)}
+            savings={
+                "money_saved": BaseAnalyticsService.format_kpi_card(round(petrol_savings, 0), petrol_savings, petrol_savings * 0.9),
+                "co2_saved_kg": BaseAnalyticsService.format_kpi_card(round(total_distance * 0.12, 1), total_distance * 0.12, (total_distance * 0.9) * 0.12)
+            }
         )
 
 analytics_customer_service = AnalyticsCustomerService()

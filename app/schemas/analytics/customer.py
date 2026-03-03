@@ -5,4 +5,4 @@ from .base import KpiCard, TrendPoint
 class CustomerOverviewResponse(BaseModel):
     ride_status: Dict[str, Any]
     gamification: Dict[str, Any]
-    savings: Dict[str, KpiCard]
+    savings: Dict[str, Any]

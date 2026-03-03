@@ -6,3 +6,4 @@ class LogisticsOverviewResponse(BaseModel):
     overview: Dict[str, KpiCard]
     slas: Dict[str, List[TrendPoint]]
     network_map: Dict[str, Any]
+    maintenance: Dict[str, Any] = {}

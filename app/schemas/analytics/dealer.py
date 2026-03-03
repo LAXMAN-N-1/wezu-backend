@@ -6,3 +6,4 @@ class DealerOverviewResponse(BaseModel):
     overview: Dict[str, KpiCard]
     inventory: Dict[str, Any]
     sales: Dict[str, List[TrendPoint]]
+    operations: Dict[str, Any] = {}

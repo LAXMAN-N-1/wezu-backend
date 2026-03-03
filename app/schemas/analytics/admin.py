@@ -6,3 +6,4 @@ class AdminOverviewResponse(BaseModel):
     overview: Dict[str, KpiCard]
     financials: Dict[str, List[TrendPoint]]
     risk: Dict[str, Any]
+    performance: Dict[str, Any] = {}

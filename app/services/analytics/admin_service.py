@@ -35,6 +35,20 @@ class AnalyticsAdminService(BaseAnalyticsService):
             risk={
                 "critical_alerts": critical_batteries,
                 "geo_breaches": []
+            },
+            performance={
+                "top_stations": [
+                    # Real query: Group by Station ID to find highest volume
+                    {"station_id": row[0], "swaps": row[1]} 
+                    for row in db.query(Rental.start_station_id, func.count(Rental.id))
+                    .filter(Rental.created_at >= target_date_ago)
+                    .group_by(Rental.start_station_id)
+                    .order_by(func.count(Rental.id).desc())
+                    .limit(5).all()
+                ],
+                "avg_rental_duration_minutes": db.query(
+                    func.avg(func.extract('epoch', Rental.completed_at - Rental.created_at) / 60)
+                ).filter(Rental.created_at >= target_date_ago, Rental.completed_at.isnot(None)).scalar() or 0.0
             }
         )
 
