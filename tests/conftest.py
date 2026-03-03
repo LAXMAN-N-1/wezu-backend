@@ -37,6 +37,7 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     if type(dbapi_connection) is sqlite3.Connection:
         cursor = dbapi_connection.cursor()
         cursor.execute("ATTACH DATABASE ':memory:' AS core")
+        cursor.execute("ATTACH DATABASE ':memory:' AS dealers")
         cursor.execute("ATTACH DATABASE ':memory:' AS finance")
         cursor.execute("ATTACH DATABASE ':memory:' AS rentals")
         cursor.execute("ATTACH DATABASE ':memory:' AS inventory")
