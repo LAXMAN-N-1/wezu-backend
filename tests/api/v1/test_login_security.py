@@ -1,7 +1,7 @@
 
 import pytest
 from unittest.mock import patch, MagicMock
-from app.api.v1.auth import login
+from app.api.v1.auth import login_access_token as login
 from app.schemas.auth import LoginRequest
 from app.models.user import User
 from app.core.security import get_password_hash, generate_totp_secret
