@@ -18,34 +18,23 @@ def visit_JSONB(self, type_, **kw):
 SQLiteTypeCompiler.visit_JSONB = visit_JSONB
 # --------------------------------------------
 
-# Use in-memory SQLite for tests
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite://")
+# Use in-memory SQLite for tests - ensure no database URL is passed
+DATABASE_URL = "sqlite://"  # Force in-memory database for tests
 
-# For in-memory SQLite, use StaticPool; for file-based, use default
-if DATABASE_URL == "sqlite://":
-    engine = create_engine(
-        DATABASE_URL,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-else:
-    # Ensure database file directory exists
-    db_path = DATABASE_URL.replace("sqlite:///", "")
-    db_dir = os.path.dirname(db_path)
-    if db_dir and not os.path.exists(db_dir):
-        os.makedirs(db_dir, exist_ok=True)
-    
-    engine = create_engine(
-        DATABASE_URL,
-        connect_args={"check_same_thread": False},
-    )
+# Create engine with proper configuration
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+
+# Initialize all tables before any test session
+SQLModel.metadata.create_all(engine)
 
 @pytest.fixture(name="session")
 def session_fixture():
-    SQLModel.metadata.create_all(engine)
     with Session(engine) as session:
         yield session
-    SQLModel.metadata.drop_all(engine)
 
 from app.db.session import get_session as db_get_session
 
