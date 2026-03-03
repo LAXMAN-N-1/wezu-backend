@@ -1,3 +1,4 @@
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
@@ -10,7 +11,7 @@ def create_superuser(session):
     user = session.exec(select(AdminUser).where(AdminUser.email == "admin@roles.com")).first()
     if user:
         return user
-    user = AdminUser(
+    user = AdminUser(phone_number='9528790507', 
         email="admin@roles.com",
         hashed_password="hashed",
         is_active=True,
@@ -58,7 +59,7 @@ def test_delete_role_prevention_active_users(client: TestClient, session: Sessio
     session.add(role)
     session.commit()
     
-    user = User(email="test@u.com", hashed_password="pw")
+    user = User(phone_number='8207630572', email="test@u.com", hashed_password="pw")
     session.add(user)
     session.commit()
     

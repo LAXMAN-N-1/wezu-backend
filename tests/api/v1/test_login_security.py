@@ -1,3 +1,4 @@
+import uuid
 
 import pytest
 from unittest.mock import patch, MagicMock
@@ -14,7 +15,7 @@ async def test_login_success_no_2fa(session):
     # Setup user
     password = "password123"
     hashed = get_password_hash(password)
-    user = User(
+    user = User(phone_number='3661418373', 
         email="test_no_2fa@example.com", 
         hashed_password=hashed,
         is_active=True,
@@ -49,7 +50,7 @@ async def test_login_requires_2fa_fail(session):
     # Setup user with 2FA
     password = "password123"
     hashed = get_password_hash(password)
-    user = User(
+    user = User(phone_number='1288749902', 
         email="test_2fa_fail@example.com", 
         hashed_password=hashed,
         is_active=True,
@@ -84,7 +85,7 @@ async def test_login_2fa_success(session):
     password = "password123"
     hashed = get_password_hash(password)
     secret = generate_totp_secret()
-    user = User(
+    user = User(phone_number='4787258940', 
         email="test_2fa_success@example.com", 
         hashed_password=hashed,
         is_active=True,
@@ -123,7 +124,7 @@ async def test_login_inactive_user(session):
     # Setup inactive user
     password = "password123"
     hashed = get_password_hash(password)
-    user = User(
+    user = User(phone_number='9724772773', 
         email="test_inactive@example.com", 
         hashed_password=hashed,
         is_active=False

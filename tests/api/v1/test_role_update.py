@@ -1,3 +1,4 @@
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
@@ -12,7 +13,7 @@ def create_superuser(session):
     user = session.exec(select(AdminUser).where(AdminUser.email == "admin@roles.com")).first()
     if user:
         return user
-    user = AdminUser(
+    user = AdminUser(phone_number='3223004283', 
         email="admin@roles.com",
         hashed_password="hashed",
         is_active=True,
@@ -38,7 +39,7 @@ def setup_role_and_user(session):
     session.add(RolePermission(role_id=role.id, permission_id=p1.id))
     
     # User & Session
-    user = User(email="u@test.com", hashed_password="pw")
+    user = User(phone_number='2763621620', email="u@test.com", hashed_password="pw")
     session.add(user)
     session.commit()
     session.add(UserRole(user_id=user.id, role_id=role.id))

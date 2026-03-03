@@ -1,0 +1,52 @@
+
+=================================== ERRORS ====================================
+______________________ ERROR collecting test_output.txt _______________________
+E   UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 0: invalid start byte
+============================== warnings summary ===============================
+app\schemas\notification.py:5
+  d:\wezu\wezu-backend\app\schemas\notification.py:5: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class NotificationResponse(BaseModel):
+
+app\schemas\branch.py:32
+  d:\wezu\wezu-backend\app\schemas\branch.py:32: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class BranchRead(BranchBase):
+
+app\schemas\organization.py:24
+  d:\wezu\wezu-backend\app\schemas\organization.py:24: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class OrganizationSocialLinkRead(OrganizationSocialLinkBase):
+
+app\schemas\organization.py:46
+  d:\wezu\wezu-backend\app\schemas\organization.py:46: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class OrganizationRead(OrganizationBase):
+
+C:\Python312\Lib\site-packages\dateutil\tz\tz.py:37
+  C:\Python312\Lib\site-packages\dateutil\tz\tz.py:37: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+    EPOCH = datetime.datetime.utcfromtimestamp(0)
+
+app\schemas\warehouse.py:30
+  d:\wezu\wezu-backend\app\schemas\warehouse.py:30: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class WarehouseRead(WarehouseBase):
+
+app\schemas\stock.py:23
+  d:\wezu\wezu-backend\app\schemas\stock.py:23: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class StockResponse(StockBase):
+
+app\schemas\stock.py:42
+  d:\wezu\wezu-backend\app\schemas\stock.py:42: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class StockMovementResponse(StockMovementBase):
+
+C:\Python312\Lib\site-packages\sqlmodel\main.py:583
+C:\Python312\Lib\site-packages\sqlmodel\main.py:583
+C:\Python312\Lib\site-packages\sqlmodel\main.py:583
+  C:\Python312\Lib\site-packages\sqlmodel\main.py:583: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    "SQLModel", super().__new__(cls, name, bases, dict_used, **config_kwargs)
+
+app\api\admin\users.py:63
+  d:\wezu\wezu-backend\app\api\admin\users.py:63: DeprecationWarning: `regex` has been deprecated, please use `pattern` instead
+    status: str = Query(..., regex="^(pending|verified|rejected)$"),
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+ERROR test_output.txt - UnicodeDecodeError: 'utf-8' codec can't decode byte 0...
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+12 warnings, 1 error in 0.94s

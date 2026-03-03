@@ -1,3 +1,4 @@
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
@@ -18,7 +19,7 @@ def create_user(session, email, name, last_login_offset=0):
             phone_number=f"999{hash(email) % 10000000}",
             hashed_password="hashed_password",
             is_active=True,
-            kyc_status="verified",
+            kyc_status="approved",
             last_login=datetime.utcnow() - timedelta(minutes=last_login_offset) if last_login_offset >= 0 else None
         )
         session.add(user)

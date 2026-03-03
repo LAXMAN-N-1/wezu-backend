@@ -1,0 +1,85 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.2, pytest-9.0.2, pluggy-1.5.0
+rootdir: D:\wezu\wezu-backend
+configfile: pytest.ini
+plugins: asyncio-1.3.0, anyio-3.7.1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 2 items
+
+tests\api\v1\test_auth.py ..                                             [100%]
+
+============================== warnings summary ===============================
+app\schemas\notification.py:5
+  D:\wezu\wezu-backend\app\schemas\notification.py:5: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class NotificationResponse(BaseModel):
+
+app\schemas\branch.py:32
+  D:\wezu\wezu-backend\app\schemas\branch.py:32: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class BranchRead(BranchBase):
+
+app\schemas\organization.py:24
+  D:\wezu\wezu-backend\app\schemas\organization.py:24: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class OrganizationSocialLinkRead(OrganizationSocialLinkBase):
+
+app\schemas\organization.py:46
+  D:\wezu\wezu-backend\app\schemas\organization.py:46: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class OrganizationRead(OrganizationBase):
+
+C:\Python312\Lib\site-packages\dateutil\tz\tz.py:37
+  C:\Python312\Lib\site-packages\dateutil\tz\tz.py:37: DeprecationWarning: datetime.datetime.utcfromtimestamp() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.fromtimestamp(timestamp, datetime.UTC).
+    EPOCH = datetime.datetime.utcfromtimestamp(0)
+
+app\schemas\warehouse.py:30
+  D:\wezu\wezu-backend\app\schemas\warehouse.py:30: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class WarehouseRead(WarehouseBase):
+
+app\schemas\stock.py:23
+  D:\wezu\wezu-backend\app\schemas\stock.py:23: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class StockResponse(StockBase):
+
+app\schemas\stock.py:42
+  D:\wezu\wezu-backend\app\schemas\stock.py:42: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class StockMovementResponse(StockMovementBase):
+
+C:\Python312\Lib\site-packages\sqlmodel\main.py:583
+C:\Python312\Lib\site-packages\sqlmodel\main.py:583
+C:\Python312\Lib\site-packages\sqlmodel\main.py:583
+  C:\Python312\Lib\site-packages\sqlmodel\main.py:583: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    "SQLModel", super().__new__(cls, name, bases, dict_used, **config_kwargs)
+
+app\api\admin\users.py:63
+  D:\wezu\wezu-backend\app\api\admin\users.py:63: DeprecationWarning: `regex` has been deprecated, please use `pattern` instead
+    status: str = Query(..., regex="^(pending|verified|rejected)$"),
+
+tests/api/v1/test_auth.py::test_register_user
+  C:\Python312\Lib\site-packages\sqlmodel\orm\session.py:75: SAWarning: relationship 'Battery.product' will copy column battery_catalog.id to column batteries.sku_id, which conflicts with relationship(s): 'Battery.sku' (copies battery_catalog.id to batteries.sku_id). If this is not the intention, consider if these relationships should be linked with back_populates, or if viewonly=True should be applied to one or more if they are read-only. For the less common case that foreign key constraints are partially overlapping, the orm.foreign() annotation can be used to isolate the columns that should be written towards.   To silence this warning, add the parameter 'overlaps="sku"' to the 'Battery.product' relationship. (Background on this warning at: https://sqlalche.me/e/20/qzyx) (This warning originated from the `configure_mappers()` process, which was invoked automatically in response to a user-initiated operation.)
+    results = super().execute(
+
+tests/api/v1/test_auth.py::test_register_user
+tests/api/v1/test_auth.py::test_login_user
+tests/api/v1/test_auth.py::test_login_user
+  D:\wezu\wezu-backend\app\services\audit_service.py:35: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "timestamp": datetime.utcnow(),
+
+tests/api/v1/test_auth.py::test_login_user
+  D:\wezu\wezu-backend\app\core\security.py:15: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    expire = datetime.utcnow() + timedelta(hours=24)
+
+tests/api/v1/test_auth.py::test_login_user
+  D:\wezu\wezu-backend\app\core\security.py:18: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    iat = int(datetime.utcnow().timestamp())
+
+tests/api/v1/test_auth.py::test_login_user
+  D:\wezu\wezu-backend\app\core\security.py:28: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    expire = datetime.utcnow() + timedelta(days=7) # Refresh token valid for 7 days
+
+tests/api/v1/test_auth.py::test_login_user
+  D:\wezu\wezu-backend\app\core\security.py:34: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "iat": int(datetime.utcnow().timestamp())
+
+tests/api/v1/test_auth.py::test_login_user
+  D:\wezu\wezu-backend\app\services\auth_service.py:139: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    expires_at = datetime.utcnow() + timedelta(days=7)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 2 passed, 21 warnings in 0.49s ========================

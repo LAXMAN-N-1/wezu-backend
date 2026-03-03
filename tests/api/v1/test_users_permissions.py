@@ -1,3 +1,4 @@
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -25,7 +26,7 @@ def create_role(session, name):
 
 def create_user_with_role(session, email, role_name, address_state=None):
     # ... (same)
-    user = User(email=email, full_name=f"User {email}", is_active=True)
+    user = User(phone_number='2604131216', email=email, full_name=f"User {email}", is_active=True)
     session.add(user)
     session.commit()
     session.refresh(user)
@@ -60,7 +61,7 @@ def create_role(session, name):
     return role
 
 def create_user_with_role(session, email, role_name, address_state=None):
-    user = User(email=email, full_name=f"User {email}", is_active=True)
+    user = User(phone_number='3135293261', email=email, full_name=f"User {email}", is_active=True)
     session.add(user)
     session.commit()
     session.refresh(user)
@@ -100,7 +101,7 @@ def test_regional_manager_access(session, client):
     resp = client.get(f"/api/v1/users/{user_delhi.id}")
     assert resp.status_code == 200, f"Super Admin failed: {resp.text}"
     
-    # 2. Regional Manager (Delhi) -> User (Delhi) : Should Pass
+    # 2. Regional Manager (Delhi) -> User (phone_number='1847645133', Delhi) : Should Pass
     # Verify setup
     manager_addr_count = session.exec(select(Address).where(Address.user_id == manager_delhi.id)).all()
     with open("debug.log", "w") as f:
@@ -116,14 +117,14 @@ def test_regional_manager_access(session, client):
     
     assert resp.status_code == 200, "Manager should access user in same region"
     
-    # 3. Regional Manager (Delhi) -> User (Mumbai) : Should Fail
+    # 3. Regional Manager (Delhi) -> User (phone_number='1978862939', Mumbai) : Should Fail
     resp = client.get(f"/api/v1/users/{user_mumbai.id}")
-    print(f"Manager (Delhi) -> User (Mumbai): {resp.status_code}")
+    print(f"Manager (Delhi) -> User (phone_number='1822682845', Mumbai): {resp.status_code}")
     assert resp.status_code == 403, "Manager should NOT access user in different region"
     
-    # 4. Regional Manager (Delhi) -> User (No Addr) : Should Fail
+    # 4. Regional Manager (Delhi) -> User (phone_number='3167556157', No Addr) : Should Fail
     resp = client.get(f"/api/v1/users/{user_no_addr.id}")
-    print(f"Manager (Delhi) -> User (No Addr): {resp.status_code}")
+    print(f"Manager (Delhi) -> User (phone_number='8595951077', No Addr): {resp.status_code}")
     assert resp.status_code == 403, "Manager should NOT access user with no address"
 
 if __name__ == "__main__":

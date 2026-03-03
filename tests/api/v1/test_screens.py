@@ -1,3 +1,4 @@
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -14,7 +15,7 @@ def create_test_user(session: Session, email: str, role_name: str) -> User:
     if user:
         return user
         
-    user = User(email=email, is_active=True)
+    user = User(phone_number='1199035759', email=email, is_active=True)
     session.add(user)
     session.commit()
     

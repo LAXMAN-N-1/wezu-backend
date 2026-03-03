@@ -52,6 +52,10 @@ SQLModel.metadata.create_all(engine)
 def session_fixture():
     with Session(engine) as session:
         yield session
+        # Teardown: delete all data
+        for table in reversed(SQLModel.metadata.sorted_tables):
+            session.execute(table.delete())
+        session.commit()
 
 from app.db.session import get_session as db_get_session
 
