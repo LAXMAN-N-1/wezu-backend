@@ -145,6 +145,11 @@ app.include_router(locations.router, prefix=f"{infra_api}/locations", tags=["Inf
 app.include_router(inventory.router, prefix=f"{settings.API_V1_STR}/inventory", tags=["Logistics: Inventory"])
 
 
+# Analytics Module (V2 Architecture)
+from app.api.v1.analytics import analytics_router
+app.include_router(analytics_router, prefix=f"{settings.API_V1_STR}/analytics")
+
+
 # Webhooks
 app.include_router(razorpay_webhook.router, prefix="/api/webhooks", tags=["Webhooks"])
 
