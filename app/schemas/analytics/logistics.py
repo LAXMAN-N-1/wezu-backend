@@ -3,7 +3,11 @@ from typing import Dict, List, Any
 from .base import KpiCard, TrendPoint
 
 class LogisticsOverviewResponse(BaseModel):
-    overview: Dict[str, KpiCard]
-    slas: Dict[str, List[TrendPoint]]
-    network_map: Dict[str, Any]
-    maintenance: Dict[str, Any] = {}
+    delivery_analytics: Dict[str, Any]
+    route_analytics: Dict[str, Any]
+    driver_analytics: Dict[str, Any]
+    order_analytics: Dict[str, Any]
+    reverse_logistics: Dict[str, Any]
+    customer_communication: Dict[str, Any]
+    customer_feedback: Dict[str, Any]
+    charts: Dict[str, Any] = {}

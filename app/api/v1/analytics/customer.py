@@ -13,4 +13,4 @@ async def get_customer_overview(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_user)
 ):
-    return await analytics_customer_service.get_overview(db, period)
+    return await analytics_customer_service.get_overview(db, period, customer_id=current_user.id)
