@@ -26,7 +26,7 @@ class BatteryTransfer(SQLModel, table=True):
     __table_args__ = {"schema": "logistics"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    battery_id: int = Field(foreign_key="inventory.batteries.id")
+    battery_id: uuid.UUID = Field(foreign_key="inventory.batteries.id")
     
     from_location_type: str # warehouse, station, dealer
     from_location_id: int

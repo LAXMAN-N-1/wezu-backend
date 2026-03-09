@@ -88,6 +88,16 @@ def get_current_active_superuser(
         )
     return current_user
 
+def get_current_active_admin(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    from app.models.user import UserType
+    if not (current_user.is_superuser or current_user.user_type == UserType.ADMIN):
+        raise HTTPException(
+            status_code=403, detail="The user doesn't have enough privileges (Admin required)"
+        )
+    return current_user
+
 def check_permission(menu_name: str, permission_type: str = "view"):
     """
     Dependency to check if user has specific permission for a menu by name

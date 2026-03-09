@@ -19,11 +19,23 @@ class FirebaseIntegration:
         try:
             # Initialize Firebase Admin SDK
             if not firebase_admin._apps:
-                cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
-                firebase_admin.initialize_app(cred)
-            logger.info("Firebase initialized successfully")
+                if not settings.FIREBASE_CREDENTIALS_PATH:
+                    logger.warning("FIREBASE_CREDENTIALS_PATH not set. Push notifications will be disabled.")
+                    return
+                
+                import os
+                if not os.path.exists(settings.FIREBASE_CREDENTIALS_PATH):
+                    logger.warning(f"Firebase credentials file not found at {settings.FIREBASE_CREDENTIALS_PATH}. Push notifications will be disabled.")
+                    return
+
+                try:
+                    cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
+                    firebase_admin.initialize_app(cred)
+                    logger.info("Firebase initialized successfully")
+                except Exception as e:
+                    logger.warning(f"Firebase initialization failed (likely invalid service account JSON): {str(e)}")
         except Exception as e:
-            logger.error(f"Firebase initialization failed: {str(e)}")
+            logger.error(f"Unexpected error during Firebase setup: {str(e)}")
     
     def send_notification(
         self,

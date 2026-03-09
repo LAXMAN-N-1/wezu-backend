@@ -1,6 +1,7 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
 from datetime import datetime
+import uuid
 
 class IoTDevice(SQLModel, table=True):
     __tablename__ = "iot_devices"
@@ -13,7 +14,7 @@ class IoTDevice(SQLModel, table=True):
     status: str = Field(default="offline") # online, offline, error
     communication_protocol: str = Field(default="mqtt")
     
-    battery_id: Optional[int] = Field(default=None, foreign_key="inventory.batteries.id")
+    battery_id: Optional[uuid.UUID] = Field(default=None, foreign_key="inventory.batteries.id")
     
     auth_token: Optional[str] = None # For device authentication
     

@@ -5,8 +5,10 @@ from app.models.rbac import Role, Permission, RolePermission, UserRole, UserAcce
 
 # Fleet & Inventory
 from app.models.station import Station, StationImage, StationSlot, StationStatus
-from app.models.battery import Battery, BatteryLifecycleEvent, BatteryStatus, BatteryHealth
+from app.models.battery import Battery, BatteryLifecycleEvent, BatteryStatus, BatteryHealth, LocationType, BatteryAuditLog, BatteryHealthHistory
 from app.models.battery_catalog import BatteryCatalog
+from app.models.battery_health import BatteryHealthSnapshot, BatteryMaintenanceSchedule, BatteryHealthAlert
+from app.models.station_stock import StationStockConfig, ReorderRequest, StockAlertDismissal
 from app.models.iot import IoTDevice
 
 # Operations

@@ -935,3 +935,78 @@ async def verify_security_question_route(
     if SecurityService.verify_security_answer(db, user_id, data.answer):
         return {"message": "Verification successful", "success": True}
     raise HTTPException(status_code=400, detail="Incorrect answer")
+
+
+# ===== ADMIN LOGIN (JSON-based, for Admin Flutter App) =====
+
+class AdminLoginRequest(BaseModel):
+    username: str  # email
+    password: str
+
+@router.post("/admin/login")
+async def admin_login(
+    login_data: AdminLoginRequest,
+    db: Session = Depends(get_session)
+):
+    """
+    Admin login endpoint (JSON body).
+    Validates credentials and ensures the user has an admin-level role.
+    """
+    logger.info(f"Admin login attempt for: {login_data.username}")
+
+    # Look up user by email
+    user = db.exec(select(User).where(User.email == login_data.username)).first()
+
+    if not user:
+        logger.warning(f"Admin login - user not found: {login_data.username}")
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
+
+    if not verify_password(login_data.password, user.hashed_password):
+        logger.warning(f"Admin login - invalid password for: {login_data.username}")
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
+
+    if user.status != UserStatus.ACTIVE:
+        raise HTTPException(status_code=400, detail="Inactive user")
+
+    # Verify user has admin-level role
+    from app.models.user import UserType
+    admin_types = [UserType.ADMIN] if hasattr(UserType, 'ADMIN') else []
+    is_admin = False
+
+    # Check user_type field
+    if hasattr(user, 'user_type') and user.user_type in admin_types:
+        is_admin = True
+
+    # Check role name
+    if hasattr(user, 'role') and user.role and user.role.name in ("admin", "super_admin", "superadmin"):
+        is_admin = True
+
+    # Fallback: also allow if role_id exists (seeded admin may have role set)
+    if hasattr(user, 'role_id') and user.role_id is not None:
+        from app.models.rbac import Role
+        role = db.get(Role, user.role_id)
+        if role and role.name in ("admin", "super_admin", "superadmin"):
+            is_admin = True
+
+    if not is_admin:
+        logger.warning(f"Admin login - non-admin user attempted: {login_data.username}")
+        raise HTTPException(status_code=403, detail="User does not have admin privileges")
+
+    # Generate tokens
+    access_token = create_access_token(subject=user.id)
+    refresh_tok = create_refresh_token(subject=user.id)
+
+    # Create session
+    AuthService.create_session(db, user.id, access_token, refresh_tok, device_info="Admin Web", ip_address=None)
+
+    logger.info(f"Admin login successful for user ID: {user.id}")
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "refresh_token": refresh_tok,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "full_name": user.full_name,
+        }
+    }

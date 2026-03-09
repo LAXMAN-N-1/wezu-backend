@@ -62,8 +62,8 @@ class MQTTService:
             logger.info(f"Connected to MQTT broker at {host}:{port}")
             
         except Exception as e:
-            logger.error(f"Failed to connect to MQTT broker: {str(e)}")
-            raise
+            logger.warning(f"MQTT Service: Failed to connect to broker at {broker_url}. Real-time updates disabled. Error: {str(e)}")
+            self.client = None
     
     def disconnect(self):
         """Disconnect from MQTT broker"""
