@@ -7,8 +7,9 @@ if TYPE_CHECKING:
     from app.models.user import User
     from app.models.battery import Battery
     from app.models.station import Station
-    from app.models.swap import Swap
-    from app.models.finance.transaction import Transaction
+    from app.models.swap import SwapSession
+    from app.models.financial import Transaction
+    from app.models.rental_event import RentalEvent
 
 class RentalStatus(str, Enum):
     ACTIVE = "active"
@@ -59,8 +60,9 @@ class Rental(SQLModel, table=True):
     start_station: "Station" = Relationship(sa_relationship_kwargs={"foreign_keys": "[Rental.start_station_id]"})
     end_station: Optional["Station"] = Relationship(sa_relationship_kwargs={"foreign_keys": "[Rental.end_station_id]"})
     
-    swaps: List["Swap"] = Relationship(back_populates="rental")
+    swaps: List["SwapSession"] = Relationship(back_populates="rental")
     transactions: List["Transaction"] = Relationship(back_populates="rental")
+    events: List["RentalEvent"] = Relationship(back_populates="rental")
 
 class Purchase(SQLModel, table=True):
     __tablename__ = "purchases"

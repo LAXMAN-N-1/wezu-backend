@@ -83,9 +83,19 @@ class Battery(SQLModel, table=True):
     warehouse_id: Optional[int] = Field(default=None, foreign_key="logistics.warehouses.id")
 
     # Relationships
-    sku: Optional["BatteryCatalog"] = Relationship(back_populates="batteries")
-    product: Optional["BatteryCatalog"] = Relationship(back_populates="batteries") # Alias for backward compat if needed
-    spec: Optional["BatteryCatalog"] = Relationship(back_populates="batteries")
+    sku: Optional["BatteryCatalog"] = Relationship(
+        back_populates="batteries",
+        sa_relationship_kwargs={"foreign_keys": "[Battery.sku_id]"}
+    )
+    product: Optional["BatteryCatalog"] = Relationship(
+        sa_relationship_kwargs={
+            "foreign_keys": "[Battery.sku_id]",
+            "overlaps": "sku"
+        }
+    )
+    spec: Optional["BatteryCatalog"] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "[Battery.spec_id]"}
+    )
     rentals: List["Rental"] = Relationship(back_populates="battery")
     lifecycle_events: List["BatteryLifecycleEvent"] = Relationship(back_populates="battery")
     

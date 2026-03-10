@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 from sqlmodel import Session, select
 from pydantic import BaseModel, Field
 from app.api import deps
-from app.db.session import get_session
 from app.models.rental import Rental
 from app.models.battery import Battery
 from app.models.user import User
@@ -41,7 +40,7 @@ def update_location(
     rental_id: int,
     request: LocationUpdateRequest,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Update GPS location for active rental"""
     rental = session.get(Rental, rental_id)
@@ -64,7 +63,7 @@ def update_location(
 @router.get("/rentals/{rental_id}/telemetry", response_model=TelemetryResponse)
 def get_rental_telemetry(
     rental_id: int,
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Mock/Real-time data for dashboard"""
     rental = session.get(Rental, rental_id)
@@ -94,7 +93,7 @@ def get_rental_telemetry(
 @router.get("/rentals/{rental_id}/location-history", response_model=List[LocationPoint])
 def get_location_history_points(
     rental_id: int,
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Get points for path visualization"""
     history = GPSTrackingService.get_location_history(rental_id=rental_id, limit=100, session=session)
@@ -106,7 +105,7 @@ def get_location_history_points(
 @router.get("/rentals/{rental_id}/travel-path", response_model=DataResponse[dict])
 def get_travel_path(
     rental_id: int,
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Get travel statistics and path"""
     path_data = GPSTrackingService.get_travel_path(rental_id, session)
@@ -115,7 +114,7 @@ def get_travel_path(
 @router.get("/rentals/{rental_id}/geofence-status", response_model=DataResponse[dict])
 def get_geofence_status(
     rental_id: int,
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Check if rental is within allowed boundaries"""
     from app.models.geofence import Geofence

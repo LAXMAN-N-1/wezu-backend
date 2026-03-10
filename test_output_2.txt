@@ -1,9 +1,0 @@
-ImportError while loading conftest 'C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\tests\conftest.py'.
-tests\conftest.py:6: in <module>
-    from app.main import app
-app\main.py:52: in <module>
-    from app.api.v1 import (
-app\api\v1\iot.py:81: in <module>
-    heartbeat_in: HeartbeatRequestV2,
-                  ^^^^^^^^^^^^^^^^^^
-E   NameError: name 'HeartbeatRequestV2' is not defined

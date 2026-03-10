@@ -1,6 +1,6 @@
 from sqlmodel import Session, select
 from app.core.database import get_db
-from app.models.station import Station
+from app.models.station import Station, StationStatus
 from app.services.alert_service import AlertService
 from datetime import datetime, timedelta
 import logging
@@ -22,7 +22,7 @@ def monitor_stations():
         threshold = datetime.utcnow() - timedelta(minutes=5)
         
         offline_query = select(Station).where(
-            Station.status == "active",
+            Station.status == StationStatus.OPERATIONAL,
             Station.updated_at < threshold
         )
         offline_stations = db.exec(offline_query).all()
@@ -31,7 +31,7 @@ def monitor_stations():
             logger.warning(f"Station {station.name} (ID: {station.id}) is OFFLINE.")
             
             # Update Status
-            station.status = "offline"
+            station.status = StationStatus.OFFLINE
             db.add(station)
             
             # Create Alert
@@ -46,7 +46,7 @@ def monitor_stations():
         # 2. Daily Escalation logic (offline for > 10m)
         escalation_threshold = datetime.utcnow() - timedelta(minutes=10)
         escalation_query = select(Station).where(
-            Station.status == "offline",
+            Station.status == StationStatus.OFFLINE,
             Station.updated_at < escalation_threshold
         )
         needs_escalation = db.exec(escalation_query).all()

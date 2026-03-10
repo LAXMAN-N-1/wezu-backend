@@ -1,5 +1,5 @@
 from sqlmodel import Session, select, func
-from app.models.support import SupportTicket, TicketMessage
+from app.models.support import SupportTicket, TicketMessage, ChatSession, ChatMessage, ChatStatus
 from app.models.user import User
 from typing import List, Optional
 import logging
@@ -154,7 +154,6 @@ class SupportService:
     @staticmethod
     def initiate_chat(db: Session, user_id: int) -> ChatSession:
         """Start a new live chat session"""
-        from app.models.support import ChatSession, ChatStatus
         session = ChatSession(user_id=user_id, status=ChatStatus.WAITING)
         db.add(session)
         db.commit()
@@ -164,7 +163,6 @@ class SupportService:
     @staticmethod
     def add_chat_message(db: Session, session_id: int, sender_id: int, message: str) -> ChatMessage:
         """Add message to chat session"""
-        from app.models.support import ChatMessage
         msg = ChatMessage(session_id=session_id, sender_id=sender_id, message=message)
         db.add(msg)
         db.commit()

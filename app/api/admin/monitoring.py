@@ -4,7 +4,6 @@ from typing import Dict
 from datetime import datetime, timedelta
 from app.api import deps
 from app.models.user import User
-from app.db.session import get_session
 
 router = APIRouter()
 
@@ -13,33 +12,44 @@ router = APIRouter()
 @router.get("/health")
 def system_health(
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Comprehensive system health check"""
-    health_status = {
-        "status": "healthy",
-        "timestamp": datetime.utcnow(),
-        "checks": {}
-    }
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("SYSTEM_HEALTH_CHECK_TRIGGERED")
     
-    # Database check
     try:
-        session.exec(select(User).limit(1)).first()
-        health_status["checks"]["database"] = {"status": "up", "latency_ms": 5}
+        health_status = {
+            "status": "healthy",
+            "timestamp": datetime.utcnow(),
+            "checks": {}
+        }
+        
+        # Database check
+        try:
+            logger.info("CHECKING_DATABASE...")
+            count = session.exec(select(func.count(User.id))).one()
+            health_status["checks"]["database"] = {"status": "up", "latency_ms": 5, "user_count": count}
+            logger.info(f"DATABASE_OK: {count} users found")
+        except Exception as e:
+            logger.error(f"DATABASE_CHECK_FAILED: {str(e)}")
+            health_status["checks"]["database"] = {"status": "down", "error": str(e)}
+            health_status["status"] = "degraded"
+        
+        # Check critical services
+        health_status["checks"]["api"] = {"status": "up"}
+        health_status["checks"]["scheduler"] = {"status": "up"}
+        
+        return health_status
     except Exception as e:
-        health_status["checks"]["database"] = {"status": "down", "error": str(e)}
-        health_status["status"] = "degraded"
-    
-    # Check critical services
-    health_status["checks"]["api"] = {"status": "up"}
-    health_status["checks"]["scheduler"] = {"status": "up"}  # Would check actual scheduler
-    
-    return health_status
+        logger.exception("CRITICAL_ERROR_IN_HEALTH_CHECK")
+        raise HTTPException(status_code=500, detail=f"Internal health check error: {str(e)}")
 
 @router.get("/metrics")
 def performance_metrics(
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Get performance KPIs"""
     from app.models.rental import Rental
@@ -64,8 +74,8 @@ def performance_metrics(
     # Active users (logged in last 7 days)
     active_users = session.exec(
         select(func.count(User.id))
-        .where(User.last_login >= week_start)
-    ).one() if hasattr(User, 'last_login') else 0
+        .where(User.last_login_at >= week_start)
+    ).one() if hasattr(User, 'last_login_at') else 0
     
     # Revenue metrics
     daily_revenue = session.exec(
@@ -117,7 +127,7 @@ def performance_metrics(
 @router.get("/uptime")
 def uptime_tracking(
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Get uptime and SLA metrics"""
     # In production, this would query from monitoring service
@@ -149,7 +159,7 @@ def error_logs(
     limit: int = 100,
     severity: str = None,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Get recent error logs"""
     from app.models.audit_log import SecurityEvent
@@ -201,7 +211,7 @@ def api_performance(
 @router.get("/database/stats")
 def database_stats(
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Get database statistics"""
     # Table sizes and counts

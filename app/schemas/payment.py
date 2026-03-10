@@ -47,3 +47,13 @@ class ProfitMarginResponse(BaseModel):
     revenue: float
     estimated_cost: float
     margin_percentage: float
+
+class PaymentMethodResponse(BaseModel):
+    id: str
+    type: str # card, upi, wallet
+    provider: str
+    is_default: bool
+    last4: Optional[str] = None
+    expiry: Optional[str] = None
+    
+    model_config = ConfigDict(from_attributes=True)

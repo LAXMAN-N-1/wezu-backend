@@ -4,7 +4,7 @@ from sqlmodel import Session, select, func
 from app.models.battery import Battery
 from app.models.telemetry import Telemetry
 from app.models.rental import Rental
-from app.models.swap import Swap
+from app.models.swap import SwapSession
 from app.models.financial import Transaction
 
 class FeatureStore:
@@ -53,7 +53,7 @@ class FeatureStore:
         )).one() or 0
 
         # 3. Swap frequency (average days between swaps)
-        swaps = db.exec(select(Swap).where(Swap.user_id == user_id).order_by(Swap.created_at.desc())).all()
+        swaps = db.exec(select(SwapSession).where(SwapSession.user_id == user_id).order_by(SwapSession.created_at.desc())).all()
         avg_swap_interval = 0
         if len(swaps) > 1:
             intervals = [(swaps[i].created_at - swaps[i+1].created_at).days for i in range(len(swaps)-1)]

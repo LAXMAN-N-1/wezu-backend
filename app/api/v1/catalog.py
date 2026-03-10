@@ -9,7 +9,6 @@ from typing import Optional, List
 from datetime import datetime
 
 from app.api import deps
-from app.db.session import get_session
 from app.models.user import User
 from app.models.catalog import CatalogOrder, CatalogOrderItem
 from app.services.catalog_service import CatalogService
@@ -61,7 +60,7 @@ class OrderCreateRequest(BaseModel):
 
 @router.get("/products/categories", response_model=DataResponse[CategoryListResponse])
 def get_product_categories(
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """List of product categories"""
     metadata = CatalogService.get_catalog_metadata(session)
@@ -72,7 +71,7 @@ def get_product_categories(
 def admin_create_product(
     request: ProductCreate,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Admin: create a new product listing"""
     product = CatalogService.create_product(request, session)
@@ -83,7 +82,7 @@ def admin_update_product(
     id: int,
     request: ProductUpdate,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Admin: update product details or pricing"""
     product = CatalogService.update_product(id, request, session)
@@ -95,7 +94,7 @@ def admin_update_product(
 def admin_delete_product(
     id: int,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Admin: deactivate/remove a product"""
     success = CatalogService.delete_product(id, session)
@@ -107,7 +106,7 @@ def admin_delete_product(
 @router.post("/products/search", response_model=DataResponse[dict])
 def search_products(
     request: ProductSearchRequest,
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """
     Search and filter products (POST version)
@@ -170,7 +169,7 @@ def get_products(
     sort_by: str = "featured",
     page: int = 1,
     page_size: int = 20,
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """
     Search and filter products (GET version)
@@ -224,7 +223,7 @@ def get_products(
     )
 @router.get("/products/metadata", response_model=DataResponse[dict])
 def get_catalog_metadata(
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Get unique categories, brands, and price ranges for filtering"""
     metadata = CatalogService.get_catalog_metadata(session)
@@ -233,7 +232,7 @@ def get_catalog_metadata(
 @router.get("/products/{product_id}", response_model=DataResponse[dict])
 def get_product_details(
     product_id: int,
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Get complete product details with images and variants"""
     details = CatalogService.get_product_details(product_id, session)
@@ -294,7 +293,7 @@ def get_product_details(
 @router.get("/products/featured", response_model=DataResponse[list])
 def get_featured_products(
     limit: int = Query(10, ge=1, le=50),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Get featured products"""
     products = CatalogService.get_featured_products(limit, session)
@@ -323,7 +322,7 @@ def admin_get_orders(
     skip: int = 0,
     limit: int = 100,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Admin: all orders paginated with filters"""
     orders = OrderService.get_admin_orders(session, status, user_id, skip, limit)
@@ -333,7 +332,7 @@ def admin_get_orders(
 def create_order(
     request: OrderCreateRequest,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """
     Create new order
@@ -387,7 +386,7 @@ def create_order(
 def get_order_details(
     order_id: int,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Get order details"""
     order = session.get(CatalogOrder, order_id)
@@ -431,7 +430,7 @@ def get_order_details(
 @router.get("/orders", response_model=DataResponse[list])
 def get_user_orders(
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Get all orders for current user"""
     from sqlmodel import select
@@ -461,7 +460,7 @@ def get_user_orders(
 def cancel_order(
     order_id: int,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Cancel order"""
     order = session.get(CatalogOrder, order_id)
@@ -494,7 +493,7 @@ def cancel_order(
 def get_order_invoice(
     order_id: int,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Download GST invoice PDF for the order"""
     order = session.get(CatalogOrder, order_id)
@@ -516,7 +515,7 @@ def initiate_order_return(
     order_id: int,
     request: OrderReturnRequest,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Initiate return request for a purchased battery"""
     order = session.get(CatalogOrder, order_id)
@@ -533,7 +532,7 @@ def initiate_order_return(
 def get_order_tracking(
     order_id: int,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Get delivery tracking for order"""
     from app.models.catalog import DeliveryTracking, DeliveryEvent
@@ -592,7 +591,7 @@ async def update_cart_item(
     item_id: int,
     update: CartItemUpdate,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """Update cart item quantity"""
     return {"message": "Cart item updated", "item_id": item_id, "quantity": update.quantity}
@@ -601,7 +600,7 @@ async def update_cart_item(
 async def remove_cart_item(
     item_id: int,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """Remove item from cart"""
     return {"message": "Item removed from cart", "item_id": item_id}
@@ -616,7 +615,7 @@ async def claim_warranty(
     order_id: int,
     claim: WarrantyClaimRequest,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """Claim warranty for an order"""
     order = db.get(CatalogOrder, order_id)

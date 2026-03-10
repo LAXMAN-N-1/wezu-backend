@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session
-from typing import List, Optional
+from typing import List, Optional, Any
+from datetime import datetime, timedelta
 from pydantic import BaseModel
 from app.api import deps
 from app.models.user import User
@@ -227,8 +228,7 @@ async def return_rental_battery(
     return rental
 
 # Rental Modifications
-from pydantic import BaseModel
-from datetime import datetime
+from app.models.rental_modification import RentalExtension, RentalPause
 from app.models.rental_modification import RentalExtension, RentalPause
 from app.models.late_fee import LateFee, LateFeeWaiver
 

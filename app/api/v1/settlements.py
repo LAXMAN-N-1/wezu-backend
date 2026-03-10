@@ -2,7 +2,7 @@ from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, col
 from datetime import datetime
-from app.db.session import get_session
+from app.api.deps import get_db
 from app.models.settlement import Settlement
 from app.models.vendor import Vendor
 from app.models.swap import SwapSession
@@ -14,7 +14,7 @@ router = APIRouter()
 @router.post("/generate", response_model=SettlementResponse)
 def generate_settlement(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
     request: SettlementGenerateRequest,
 ) -> Any:
     """
@@ -79,14 +79,14 @@ def generate_settlement(
 def read_settlements(
     skip: int = 0,
     limit: int = 100,
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
 ) -> Any:
     return session.exec(select(Settlement).offset(skip).limit(limit)).all()
 
 @router.put("/{settlement_id}", response_model=SettlementResponse)
 def update_settlement_status(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
     settlement_id: int,
     request: SettlementUpdateRequest,
 ) -> Any:

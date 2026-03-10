@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 from typing import List, Optional
 from app.api import deps
-from app.db.session import get_session
+
 from app.models.user import User
 from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
 from app.models.commission import CommissionLog
@@ -22,7 +22,7 @@ def list_dealers(
     skip: int = 0,
     limit: int = 100,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Admin: list all dealers with status filters"""
     # Logic to filter by stage if stage is provided 
@@ -33,7 +33,7 @@ def list_dealers(
 def get_dealer_full_profile(
     id: int,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Admin: full dealer profile and onboarding details"""
     dealer = DealerService.get_dealer_by_id(session, id)
@@ -48,7 +48,7 @@ def approve_dealer_stage(
     id: int,
     request: DealerApplicationUpdate,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Admin: approve dealer at a specific onboarding stage"""
     app = session.exec(select(DealerApplication).where(DealerApplication.dealer_id == id)).first()
@@ -73,7 +73,7 @@ def log_field_visit(
     id: int,
     request: FieldVisitSchedule,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Admin: log field verification visit result or schedule"""
     # Find application
@@ -89,7 +89,7 @@ def set_dealer_commission_rate(
     dealer_id: int,
     rate: float,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Admin: set or change commission rate for a dealer"""
     # Implement logic to update CommissionConfig
@@ -99,7 +99,7 @@ def set_dealer_commission_rate(
 def trigger_settlement(
     dealer_id: int,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Admin: trigger settlement payout to a dealer"""
     settlement = SettlementService.trigger_settlement(session, dealer_id)
@@ -111,7 +111,7 @@ def admin_get_all_commissions(
     dealer_id: Optional[int] = None,
     status: Optional[str] = None,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Admin: all commission records across dealers"""
     statement = select(CommissionLog)

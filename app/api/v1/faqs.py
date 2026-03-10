@@ -1,6 +1,11 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlmodel import Session, select
+from typing import List
 from app.api import deps
 from app.models.faq import FAQ
 from app.schemas.faq import FAQResponse, FAQCategoryResponse
+
+router = APIRouter()
 
 @router.get("/", response_model=List[FAQResponse])
 async def get_faqs(
@@ -36,7 +41,6 @@ async def get_faq_detail(
     """Single FAQ article detail"""
     faq = db.get(FAQ, id)
     if not faq or not faq.is_active:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="FAQ not found")
     return faq
 
@@ -49,7 +53,6 @@ async def mark_faq_helpful(
     """User: mark article as helpful or not (for analytics)"""
     faq = db.get(FAQ, id)
     if not faq:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="FAQ not found")
     
     if is_helpful:

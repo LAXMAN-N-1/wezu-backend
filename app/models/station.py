@@ -11,10 +11,11 @@ if TYPE_CHECKING:
     from app.models.review import Review
 
 class StationStatus(str, Enum):
-    OPERATIONAL = "operational"
-    MAINTENANCE = "maintenance"
-    CLOSED = "closed"
-    ERROR = "error"
+    OPERATIONAL = "OPERATIONAL"
+    MAINTENANCE = "MAINTENANCE"
+    CLOSED = "CLOSED"
+    ERROR = "ERROR"
+    OFFLINE = "OFFLINE"
 
 class Station(SQLModel, table=True):
     __tablename__ = "stations"

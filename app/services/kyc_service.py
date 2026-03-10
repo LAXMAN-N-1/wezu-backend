@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional, Protocol
+from typing import Dict, Any, Optional, Protocol, List
 from app.models.kyc import KYCDocumentType, KYCDocumentStatus
 from app.models.user import User, KYCStatus
 from app.core.config import settings

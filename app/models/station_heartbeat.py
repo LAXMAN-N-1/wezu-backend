@@ -7,9 +7,10 @@ if TYPE_CHECKING:
 
 class StationHeartbeat(SQLModel, table=True):
     __tablename__ = "station_heartbeats"
+    __table_args__ = {"schema": "stations"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    station_id: int = Field(foreign_key="stations.id", index=True)
+    station_id: int = Field(foreign_key="stations.stations.id", index=True)
     
     timestamp: datetime = Field(default_factory=datetime.utcnow, index=True)
     status: str = Field(default="online") # online, maintenance, error

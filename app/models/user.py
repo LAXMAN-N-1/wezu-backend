@@ -59,6 +59,7 @@ class User(SQLModel, table=True):
     user_type: UserType = Field(default=UserType.CUSTOMER, index=True)
     status: UserStatus = Field(default=UserStatus.ACTIVE, index=True)
     is_superuser: bool = Field(default=False)
+    is_active: bool = Field(default=True, index=True)
     role_id: Optional[int] = Field(default=None, foreign_key="core.roles.id")
     
     # Profile & Media
@@ -82,6 +83,7 @@ class User(SQLModel, table=True):
     email_verification_token: Optional[str] = None
     email_verification_sent_at: Optional[datetime] = None
     
+    last_global_logout_at: Optional[datetime] = None
     last_login_at: Optional[datetime] = None
     
     # Soft Delete

@@ -4,7 +4,6 @@ from typing import List, Optional
 from app.api import deps
 from app.models.user import User
 from app.schemas.user import UserResponse
-from app.db.session import get_session
 
 router = APIRouter()
 
@@ -14,7 +13,7 @@ def list_users(
     limit: int = 100,
     search: Optional[str] = None,
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """List all users with pagination and search."""
     statement = select(User)
@@ -32,7 +31,7 @@ def list_users(
 def get_user_detail(
     user_id: int,
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """Get detailed view of a specific user."""
     user = db.get(User, user_id)
@@ -44,7 +43,7 @@ def get_user_detail(
 def toggle_user_active(
     user_id: int,
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """Block or unblock a user."""
     user = db.get(User, user_id)
@@ -62,7 +61,7 @@ def update_user_kyc_status(
     user_id: int,
     status: str = Query(..., regex="^(pending|verified|rejected)$"),
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """Update user KYC status."""
     user = db.get(User, user_id)

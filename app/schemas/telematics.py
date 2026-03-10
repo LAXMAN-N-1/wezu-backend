@@ -2,7 +2,7 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
-class TelemeticsDataBase(BaseModel):
+class TelematicsDataBase(BaseModel):
     battery_id: int
     timestamp: Optional[datetime] = None # Defaults to now if not provided
     
@@ -23,14 +23,14 @@ class TelemeticsDataBase(BaseModel):
     error_codes: Optional[Dict[str, Any]] = None
     raw_payload: Optional[Dict[str, Any]] = None
 
-class TelemeticsDataIngest(TelemeticsDataBase):
+class TelematicsDataIngest(TelematicsDataBase):
     pass
 
-class TelemeticsDataResponse(TelemeticsDataBase):
+class TelematicsDataResponse(TelematicsDataBase):
     timestamp: datetime
     received_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
 
-class TelemeticsHistoryResponse(BaseModel):
-    items: List[TelemeticsDataResponse]
+class TelematicsHistoryResponse(BaseModel):
+    items: List[TelematicsDataResponse]

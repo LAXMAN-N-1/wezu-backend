@@ -1,8 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
-from app.db.session import get_session
-from app.models.user import User
+from app.models.user import User, UserStatus, KYCStatus
 from app.schemas.user import Token
 from app.models.session import UserSession
 from app.models.otp import OTP
@@ -14,7 +13,7 @@ from app.core.security import create_access_token, create_refresh_token, get_pas
 from app.schemas.user import TokenPayload
 from app.core.config import settings
 from app.api import deps
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from app.schemas.auth import (
     LoginRequest, LoginResponse, SocialLoginRequest, RoleSelectRequest, ForgotPasswordRequest,
     ChangePasswordRequest, TwoFASetupResponse, TwoFAVerifyRequest, TwoFADisableRequest,
@@ -22,7 +21,9 @@ from app.schemas.auth import (
     SecurityQuestionResponse, SetSecurityQuestionRequest, VerifySecurityQuestionRequest
 )
 from app.services.security_service import SecurityService
+from app.middleware.rate_limit import limiter
 import logging
+import re
 from typing import Any, List, Optional
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
@@ -37,10 +38,23 @@ class UserCreate(BaseModel):
     full_name: str
     phone_number: Optional[str] = None
 
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one number")
+        if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", v):
+            raise ValueError("Password must contain at least one special character")
+        return v
+
 @router.post("/register", response_model=User)
 async def register(
     user_in: UserCreate,
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """
     Register a new user with email or phone and password.
@@ -91,66 +105,139 @@ async def register(
         
     return user
 
-@router.post("/token", response_model=Token)
-async def login_access_token(
-    db: Session = Depends(get_session),
-    form_data: OAuth2PasswordRequestForm = Depends()
+@router.post("/login", response_model=Token)
+@limiter.limit("5/minute")
+async def login_json(
+    request: Request,
+    login_data: LoginRequest,
+    db: Session = Depends(deps.get_db)
 ) -> Any:
     """
-    OAuth2 compatible token login, get an access token for future requests
+    JSON based login for cleaner UI (uses 'email' field)
     """
-    logger.info(f"Login attempt for: {form_data.username}")
+    return await _process_login(
+        username=login_data.email,
+        password=login_data.password,
+        db=db,
+        request=request
+    )
+
+class EmailPasswordRequestForm:
+    """
+    Custom OAuth2 compatible form to show 'Email' instead of 'Username' in Swagger UI
+    """
+    def __init__(
+        self,
+        grant_type: str = Form(None, pattern="password"),
+        username: str = Form(..., description="Email or phone number", title="Email"),
+        password: str = Form(...),
+        scope: str = Form(""),
+        client_id: Optional[str] = Form(None),
+        client_secret: Optional[str] = Form(None),
+    ):
+        self.grant_type = grant_type
+        self.username = username
+        self.password = password
+        self.scopes = scope.split()
+        self.client_id = client_id
+        self.client_secret = client_secret
+
+@router.post("/token", response_model=Token)
+@limiter.limit("5/minute")
+async def login_access_token(
+    request: Request,
+    db: Session = Depends(deps.get_db),
+    form_data: EmailPasswordRequestForm = Depends()
+) -> Any:
+    """
+    OAuth2 compatible token login, get an access token for future requests (uses 'email' as username)
+    """
+    return await _process_login(
+        username=form_data.username,
+        password=form_data.password,
+        db=db,
+        request=request
+    )
+
+async def _process_login(username: str, password: str, db: Session, request: Request) -> Any:
+    logger.info(f"Authenticating: {username}")
     
     # Try by email
-    statement = select(User).where(User.email == form_data.username)
+    statement = select(User).where(User.email == username)
     user = db.exec(statement).first()
     
     if not user:
         # Try by phone number if email fails
-        statement = select(User).where(User.phone_number == form_data.username)
+        statement = select(User).where(User.phone_number == username)
         user = db.exec(statement).first()
 
     if not user:
-        logger.warning(f"User not found: {form_data.username}")
-        raise HTTPException(status_code=400, detail="Incorrect email or password")
+        logger.warning(f"USER_NOT_FOUND: {username}")
+        raise HTTPException(status_code=400, detail="Incorrect email/phone or password")
 
-    if not verify_password(form_data.password, user.hashed_password):
-        logger.warning(f"Invalid password for user: {form_data.username}")
-        # Log Failure
-        from app.services.audit_service import AuditService
-        AuditService.log_action(
-            db=db,
-            user_id=user.id,
-            action="login_failed",
-            resource_type="user",
-            resource_id=str(user.id),
-            details=f"Login failed for {form_data.username}. Reason: Incorrect credentials",
-            ip_address=None
-        )
-        raise HTTPException(status_code=401, detail="Incorrect email or password")
+    if not verify_password(password, user.hashed_password):
+        logger.warning(f"INVALID_PASSWORD: {username}")
+        # Log Failure via Audit Service
+        try:
+            from app.services.audit_service import AuditService
+            AuditService.log_action(
+                db=db,
+                user_id=user.id,
+                action="login_failed",
+                resource_type="user",
+                resource_id=str(user.id),
+                details=f"Login failed for {username}. Reason: Incorrect credentials",
+                ip_address=request.client.host
+            )
+        except Exception as e:
+            logger.error(f"AUDIT_LOG_FAILED: {str(e)}")
+            
+        raise HTTPException(status_code=401, detail="Incorrect email/phone or password")
     
     if not user.is_active:
-        logger.warning(f"Inactive user attempt: {form_data.username}")
-        # Log Failure
-        from app.services.audit_service import AuditService
-        AuditService.log_action(
-            db=db,
-            user_id=user.id,
-            action="login_failed",
-            resource_type="user",
-            resource_id=str(user.id),
-            details=f"Login failed for {form_data.username}. Reason: Inactive user",
-            ip_address=None
-        )
+        logger.warning(f"INACTIVE_USER: {username}")
         raise HTTPException(status_code=400, detail="Inactive user")
-        
+
+    # Update last login
+    try:
+        user.last_login_at = datetime.utcnow()
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    except Exception as e:
+        logger.error(f"UPDATE_LOGIN_TIME_FAILED: {str(e)}")
+        # Continue anyway
+
     access_token = create_access_token(subject=user.id)
     refresh_token = create_refresh_token(subject=user.id)
     
-    logger.info(f"Successful login for user ID: {user.id}")
+    logger.info(f"LOGIN_SUCCESS: User ID {user.id}")
     
     # Create Session
-    AuthService.create_session(db, user.id, access_token, refresh_token, device_info="Mobile", ip_address=None)
+    try:
+        AuthService.create_session(
+            db=db, 
+            user_id=user.id, 
+            access_token=access_token, 
+            refresh_token=refresh_token, 
+            device_info=request.headers.get("user-agent", "Unknown"), 
+            ip_address=request.client.host
+        )
+        
+        # Record Login History
+        from app.models.login_history import LoginHistory
+        login_record = LoginHistory(
+            user_id=user.id,
+            ip_address=request.client.host,
+            user_agent=request.headers.get("user-agent", "Unknown"),
+            device_type="web" if "Mozilla" in request.headers.get("user-agent", "") else "mobile",
+            status="success"
+        )
+        db.add(login_record)
+        db.commit()
+    except Exception as e:
+        logger.error(f"SESSION_CREATION_FAILED: {str(e)}")
+        # Some systems might still log in but token usage might fail later if session is strict
     
     return Token(
         access_token=access_token,
@@ -192,7 +279,7 @@ class PasswordLoginRequest(BaseModel):
 @router.post("/register/request-otp")
 async def request_registration_otp(
     otp_data: OTPRequest,
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     # Check if user already exists
     if "@" in otp_data.target:
@@ -224,7 +311,7 @@ from app.models.rbac import Role
 async def verify_registration_otp(
     verify_data: OTPVerifyRequest,
     request: Request,
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     # Verify OTP
     if not OTPService.verify_otp(db, verify_data.target, verify_data.code, verify_data.purpose):
@@ -276,10 +363,10 @@ async def verify_registration_otp(
         logger.info(f"Existing user linked via OTP: {verify_data.target}")
         
         # ACTIVATE ACCOUNT if pending
-        if not user.is_active or user.kyc_status == "pending_verification":
+        if not user.is_active or user.status == UserStatus.PENDING_VERIFICATION:
             user.is_active = True
-            if user.kyc_status == "pending_verification":
-                user.kyc_status = "verified" # Auto-verify phone for customers
+            if user.kyc_status == KYCStatus.PENDING:
+                user.kyc_status = KYCStatus.APPROVED # Auto-verify phone for customers
             db.add(user)
             db.commit()
             db.refresh(user)
@@ -337,7 +424,7 @@ async def verify_registration_otp(
 async def verify_otp_alias(
     verify_data: OTPVerifyRequest,
     request: Request,
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """
     Verify OTP and log in / activate account.
@@ -350,7 +437,7 @@ from app.schemas.auth import SocialLoginRequest, LoginResponse, MenuConfig, Forg
 @router.post("/social-login", response_model=LoginResponse)
 async def social_login(
     auth_data: SocialLoginRequest,
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """
     Unified Social Login (Google, Facebook, Apple).
@@ -497,7 +584,7 @@ async def social_login(
 @router.post("/register/password", response_model=Token)
 async def register_with_password(
     register_data: PasswordRegisterRequest,
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     # Determine the target (email or phone)
     if not register_data.email and not register_data.phone_number:
@@ -556,7 +643,7 @@ class RefreshRequest(BaseModel):
 @router.post("/refresh", response_model=Token)
 async def refresh_token(
     refresh_data: RefreshRequest,
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     try:
         # Validate Session first
@@ -595,7 +682,7 @@ async def refresh_token(
 async def logout(
     current_user: User = Depends(deps.get_current_user),
     token: str = Depends(deps.oauth2_scheme),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """Logout user - invalidate tokens and sessions"""
     # 1. Revoke Session in AuthService
@@ -614,7 +701,7 @@ from app.schemas.auth import LoginRequest, LoginResponse, MenuConfig, RoleSelect
 async def select_role(
     role_data: RoleSelectRequest,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """
     Select/Switch active role for the current user.
@@ -660,7 +747,7 @@ async def select_role(
 @router.post("/logout-all")
 async def logout_all(
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """
     Invalidate ALL sessions for the current user.
@@ -677,9 +764,11 @@ async def logout_all(
     return {"message": "Logged out from all devices successfully"}
 
 @router.post("/forgot-password")
+@limiter.limit("5/hour")
 async def forgot_password(
-    request: ForgotPasswordRequest,
-    db: Session = Depends(get_session)
+    request: Request,
+    forgot_in: ForgotPasswordRequest,
+    db: Session = Depends(deps.get_db)
 ):
     """
     Initiate password reset process.
@@ -691,24 +780,21 @@ async def forgot_password(
     channel = None
     
     # 1. Look up user
-    if request.email:
-        user = db.exec(select(User).where(User.email == request.email)).first()
-        target = request.email
+    if forgot_in.email:
+        user = db.exec(select(User).where(User.email == forgot_in.email)).first()
+        target = forgot_in.email
         channel = "email"
-    elif request.phone_number:
+    elif forgot_in.phone_number:
         # Normalize phone if needed, but for now strict match
-        user = db.exec(select(User).where(User.phone_number == request.phone_number)).first()
-        target = request.phone_number
+        user = db.exec(select(User).where(User.phone_number == forgot_in.phone_number)).first()
+        target = forgot_in.phone_number
         channel = "sms"
         
     if not user:
         # Security: Do not reveal if user exists, just return success
-        # But for development/UX, we might want to hint? 
-        # Standard practice: "If an account exists, an OTP has been sent."
-        # We will return 200 OK regardless to prevent user enumeration.
         return {"message": "If an account with these details exists, an OTP has been sent."}
 
-    if not user.is_active:
+    if not user.status == UserStatus.ACTIVE:
          raise HTTPException(status_code=400, detail="User account is inactive.")
 
     # 2. Generate OTP
@@ -730,9 +816,11 @@ async def forgot_password(
 
 
 @router.post("/resend-otp")
+@limiter.limit("5/hour")
 async def resend_otp(
+    request: Request,
     otp_data: OTPRequest,
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """Resend OTP for registration or verification"""
     # Generate and send new OTP
@@ -761,9 +849,10 @@ class VerifyEmailRequest(BaseModel):
 
 
 @router.post("/email/send-verification")
+@router.post("/resend-verification")
 async def send_email_verification(
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """
     Send email verification link to user's email address.
@@ -809,17 +898,24 @@ async def send_email_verification(
 @router.post("/verify-email")
 async def verify_email(
     data: VerifyEmailRequest,
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
-    """Verify email verification token"""
+    """Verify email verification token with 24h expiration"""
     statement = select(User).where(User.email_verification_token == data.token)
     user = db.exec(statement).first()
     
     if not user:
         raise HTTPException(status_code=400, detail="Invalid verification token")
     
+    # Check expiry (24 hours)
+    if user.email_verification_sent_at:
+        expiry = user.email_verification_sent_at + timedelta(hours=24)
+        if datetime.utcnow() > expiry:
+            raise HTTPException(status_code=400, detail="Verification token has expired")
+
     user.is_email_verified = True
     user.email_verification_token = None
+    user.kyc_status = KYCStatus.APPROVED # Auto-approve KYC for verified email
     db.add(user)
     db.commit()
     return {"message": "Email verified successfully", "email": user.email}
@@ -828,7 +924,7 @@ async def verify_email(
 async def change_password(
     data: ChangePasswordRequest,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """Authenticated user changing their current password"""
     SecurityService.change_password(db, current_user, data.current_password, data.new_password)
@@ -837,7 +933,7 @@ async def change_password(
 @router.post("/enable-2fa", response_model=TwoFASetupResponse)
 async def enable_2fa_request(
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """Initiate 2FA setup by generating secret and QR code"""
     if current_user.two_factor_enabled:
@@ -850,7 +946,7 @@ async def enable_2fa_request(
 async def verify_2fa_and_enable(
     data: TwoFAVerifyRequest,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """Verify first TOTP and permanently enable 2FA for user"""
     backup_codes = AuthService.verify_and_enable_2fa(db, current_user, data.code, data.secret)
@@ -865,7 +961,7 @@ async def verify_2fa_and_enable(
 async def disable_2fa(
     data: TwoFADisableRequest,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """Disable 2FA with password confirmation"""
     if not verify_password(data.password, current_user.hashed_password):
@@ -882,7 +978,7 @@ async def disable_2fa(
 async def biometric_register(
     data: BiometricRegisterRequest,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """Register biometric public key for device"""
     AuthService.register_biometric(
@@ -894,7 +990,7 @@ async def biometric_register(
 async def biometric_login(
     data: BiometricLoginRequest,
     request: Request,
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """Login using biometric challenge/response"""
     # This usually requires user_id to find the public key if not in the credential_id
@@ -916,7 +1012,7 @@ async def biometric_login(
 
 @router.get("/security-questions", response_model=List[SecurityQuestionResponse])
 async def list_security_questions(
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """Fetch list of available security questions"""
     return SecurityService.get_available_questions(db)
@@ -925,7 +1021,7 @@ async def list_security_questions(
 async def set_security_question(
     data: SetSecurityQuestionRequest,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """Set user's security question and answer"""
     SecurityService.set_user_security_question(db, current_user.id, data.question_id, data.answer)
@@ -935,7 +1031,7 @@ async def set_security_question(
 async def verify_security_question_route(
     data: VerifySecurityQuestionRequest,
     user_id: int, # Sent in body or query during recovery flow
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """Verify security question during recovery"""
     if SecurityService.verify_security_answer(db, user_id, data.answer):

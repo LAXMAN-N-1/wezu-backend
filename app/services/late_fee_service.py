@@ -3,11 +3,12 @@ Late Fee Service
 Calculate and manage late fees for overdue rentals
 """
 from sqlmodel import Session, select
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from datetime import datetime, timedelta
 from app.models.rental import Rental
 from app.models.financial import Transaction
 from app.core.config import settings
+from app.models.late_fee import LateFee
 import logging
 
 logger = logging.getLogger(__name__)
@@ -95,8 +96,6 @@ class LateFeeService:
             if fee_details['late_fee'] <= 0:
                 return None
             
-            from app.models.late_fee import LateFee
-            
             # Check if late fee record already exists for this rental
             existing_fee = db.exec(
                 select(LateFee).where(LateFee.rental_id == rental_id)
@@ -152,7 +151,7 @@ class LateFeeService:
             return None
     
     @staticmethod
-    def get_overdue_rentals(session: Session) -> list:
+    def get_overdue_rentals(session: Session) -> List[dict]:
         """Get all overdue rentals"""
         now = datetime.utcnow()
         
@@ -178,7 +177,6 @@ class LateFeeService:
 
     @staticmethod
     def pay_late_fee(db: Session, rental_id: int) -> bool:
-        from app.models.late_fee import LateFee
         from app.services.wallet_service import WalletService
         
         fee = db.exec(select(LateFee).where(LateFee.rental_id == rental_id)).first()

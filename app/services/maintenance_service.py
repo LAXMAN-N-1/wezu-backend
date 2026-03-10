@@ -1,4 +1,5 @@
 from sqlmodel import Session, select
+from typing import List
 from app.core.database import engine
 from app.models.maintenance import MaintenanceSchedule, MaintenanceRecord, StationDowntime
 from app.models.battery import Battery

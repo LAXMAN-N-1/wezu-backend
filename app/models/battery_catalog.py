@@ -37,7 +37,13 @@ class BatteryCatalog(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     # Relationships
-    batteries: List["Battery"] = Relationship(back_populates="sku")
+    batteries: List["Battery"] = Relationship(
+        back_populates="sku",
+        sa_relationship_kwargs={
+            "foreign_keys": "[Battery.sku_id]",
+            "overlaps": "product"
+        }
+    )
 
 BatterySpec = BatteryCatalog
 

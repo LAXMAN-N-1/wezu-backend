@@ -2,7 +2,7 @@ from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 from app.api import deps
-from app.db.session import get_session
+from app.api.deps import get_db
 from app.models.user import User
 from app.models.promo_code import PromoCode
 from app.schemas.promo import PromoCreate, PromoUpdate, PromoResponse
@@ -13,7 +13,7 @@ router = APIRouter()
 @router.post("/", response_model=PromoResponse)
 def create_coupon(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
     promo_in: PromoCreate,
     current_user: User = Depends(deps.get_current_active_superuser),
 ) -> Any:
@@ -24,7 +24,7 @@ def create_coupon(
 @router.get("/", response_model=List[PromoResponse])
 def list_coupons(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
     current_user: User = Depends(deps.get_current_active_superuser),
 ) -> Any:
     """Admin: list all coupons with usage stats"""
@@ -33,7 +33,7 @@ def list_coupons(
 @router.put("/{id}", response_model=PromoResponse)
 def update_coupon(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     id: int,
     promo_in: PromoUpdate,
     current_user: User = Depends(deps.get_current_active_superuser),

@@ -1,17 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
-from app.db.session import get_session
 from app.models.battery import Battery
 from app.services.mqtt_service import mqtt_service
 from app.api.deps import get_current_active_user
 from app.models.user import User
+from app.api import deps
 
 router = APIRouter()
 
 @router.post("/{battery_id}/lock")
 def lock_battery(
     battery_id: int,
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
@@ -30,7 +30,7 @@ def lock_battery(
 @router.post("/{battery_id}/unlock")
 def unlock_battery(
     battery_id: int,
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
@@ -49,7 +49,7 @@ def unlock_battery(
 @router.post("/{battery_id}/shutdown")
 def shutdown_battery(
     battery_id: int,
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
     current_user: User = Depends(get_current_active_user) # Maybe restrict to Admins later
 ):
     """

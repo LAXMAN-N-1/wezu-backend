@@ -71,7 +71,7 @@ class CatalogProduct(SQLModel, table=True):
     # Relationships
     images: List["CatalogProductImage"] = Relationship(back_populates="product")
     variants: List["CatalogProductVariant"] = Relationship(back_populates="product")
-    stocks: List["Stock"] = Relationship(back_populates="product")
+    # stocks: List["Stock"] = Relationship(back_populates="product")
 
 class CatalogProductImage(SQLModel, table=True):
     """Product images"""
@@ -123,7 +123,7 @@ class CatalogOrder(SQLModel, table=True):
     
     id: Optional[int] = Field(default=None, primary_key=True)
     order_number: str = Field(unique=True, index=True)
-    user_id: int = Field(foreign_key="users.id", index=True)
+    user_id: int = Field(foreign_key="core.users.id", index=True)
     
     # Order details
     subtotal: float

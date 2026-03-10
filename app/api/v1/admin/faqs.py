@@ -2,7 +2,7 @@ from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 from app.api import deps
-from app.db.session import get_session
+from app.api.deps import get_db
 from app.models.user import User
 from app.models.faq import FAQ
 from app.schemas.faq import FAQCreate, FAQUpdate, FAQResponse
@@ -13,7 +13,7 @@ router = APIRouter()
 @router.post("/", response_model=FAQResponse)
 def create_faq(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
     faq_in: FAQCreate,
     current_user: User = Depends(deps.get_current_active_superuser),
 ) -> Any:
@@ -27,7 +27,7 @@ def create_faq(
 @router.put("/{id}", response_model=FAQResponse)
 def update_faq(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_db),
     id: int,
     faq_in: FAQUpdate,
     current_user: User = Depends(deps.get_current_active_superuser),
@@ -50,7 +50,7 @@ def update_faq(
 @router.delete("/{id}", response_model=dict)
 def delete_faq(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     id: int,
     current_user: User = Depends(deps.get_current_active_superuser),
 ) -> Any:

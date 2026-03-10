@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session
 from typing import List
-from app.db.session import get_session
 from app.models.station_heartbeat import StationHeartbeat
 from app.schemas.station_monitoring import (
     HeartbeatRequestV2, OptimizedQueueResponse, 
@@ -10,13 +9,14 @@ from app.schemas.station_monitoring import (
 from app.schemas.common import DataResponse
 from app.services.station_service import StationService
 from app.services.charging_service import ChargingService
+from app.api import deps
 
 router = APIRouter()
 
 @router.post("/heartbeat", response_model=DataResponse[StationHeartbeat])
 def record_heartbeat(
     heartbeat_in: HeartbeatRequestV2,
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Record a heartbeat from a station with detailed metrics."""
     try:
@@ -35,7 +35,7 @@ def record_heartbeat(
 @router.post("/charging/prioritize", response_model=OptimizedQueueResponse)
 def prioritize_charging(
     request: ChargingOptimizationRequest,
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Get optimized charging priority list for a station."""
     queue = ChargingService.prioritize_charging(session, int(request.station_id), request.batteries)
@@ -45,7 +45,7 @@ def prioritize_charging(
 def reprioritize_charging(
     station_id: str,
     urgent_battery_ids: List[str],
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Dynamically re-prioritize charging queue."""
     queue = ChargingService.reprioritize_queue(session, int(station_id), urgent_battery_ids)

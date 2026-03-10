@@ -2,7 +2,6 @@ from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 from app.api import deps
-from app.db.session import get_session
 from app.services.promo_service import PromoService
 from app.models.user import User
 from pydantic import BaseModel
@@ -20,7 +19,7 @@ router = APIRouter()
 async def validate_promo(
     request: PromoValidateRequest,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """Customer: validate a coupon code and preview discount"""
     return PromoService.validate_promo(db, request.code, request.order_amount)
@@ -29,7 +28,7 @@ async def validate_promo(
 async def apply_promo(
     request: PromoApplyRequest,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """Apply validated coupon to an active order"""
     success = PromoService.apply_promo(db, request.promo_id)

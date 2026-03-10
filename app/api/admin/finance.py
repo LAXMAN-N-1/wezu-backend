@@ -6,7 +6,6 @@ from app.api import deps
 from app.models.user import User
 from app.models.financial import Transaction, WalletWithdrawalRequest
 from app.models.refund import Refund
-from app.db.session import get_session
 
 router = APIRouter()
 
@@ -17,7 +16,7 @@ def list_transactions(
     type: Optional[str] = None,
     category: Optional[str] = None,
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """List all financial transactions."""
     statement = select(Transaction)
@@ -32,7 +31,7 @@ def list_transactions(
 def list_withdrawal_requests(
     status: Optional[str] = None,
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """List wallet withdrawal requests (e.g., from vendors)."""
     statement = select(WalletWithdrawalRequest)
@@ -46,7 +45,7 @@ def list_withdrawal_requests(
 def approve_withdrawal(
     request_id: int,
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """Approve a withdrawal request."""
     req = db.get(WalletWithdrawalRequest, request_id)
@@ -68,7 +67,7 @@ def initiate_refund(
     amount: float,
     reason: str,
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """Initiate a refund for a transaction."""
     tx = db.get(Transaction, transaction_id)

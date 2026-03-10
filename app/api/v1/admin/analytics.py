@@ -2,7 +2,7 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, Query, Response
 from sqlmodel import Session
 from app.api import deps
-from app.db.session import get_session
+
 from app.models.user import User
 from app.services.analytics_service import AnalyticsService
 import csv
@@ -13,7 +13,7 @@ router = APIRouter()
 @router.get("/overview")
 def get_platform_overview(
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: Platform KPIs (active users, total rentals, revenue today)"""
     return AnalyticsService.get_platform_overview(db)
@@ -22,7 +22,7 @@ def get_platform_overview(
 def get_platform_trends(
     period: str = Query("daily", enum=["daily", "weekly", "monthly"]),
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: Daily/weekly/monthly trend data for rentals and revenue"""
     return AnalyticsService.get_trends(db, period)
@@ -30,7 +30,7 @@ def get_platform_trends(
 @router.get("/conversion-funnel")
 def get_conversion_funnel(
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: Funnel (installs -> registrations -> first rental)"""
     return AnalyticsService.get_conversion_funnel(db)
@@ -38,7 +38,7 @@ def get_conversion_funnel(
 @router.get("/user-behavior")
 def get_user_behavior(
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: Aggregated user behavior metrics"""
     return AnalyticsService.get_user_behavior(db)
@@ -46,7 +46,7 @@ def get_user_behavior(
 @router.get("/battery-health-distribution")
 def get_battery_health_distribution(
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: Distribution of all batteries by health % range"""
     return AnalyticsService.get_battery_health_distribution(db)
@@ -54,7 +54,7 @@ def get_battery_health_distribution(
 @router.get("/demand-forecast")
 def get_demand_forecast(
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: 30-day demand forecast per station"""
     return AnalyticsService.get_demand_forecast_per_station(db)
@@ -62,7 +62,7 @@ def get_demand_forecast(
 @router.get("/revenue/by-region")
 def get_revenue_by_region(
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: Revenue breakdown by city/region"""
     return AnalyticsService.get_revenue_by_region(db)
@@ -71,7 +71,7 @@ def get_revenue_by_region(
 def get_user_growth_metrics(
     period: str = Query("monthly", enum=["weekly", "monthly"]),
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: User acquisition and retention trends"""
     return AnalyticsService.get_user_growth(db, period)
@@ -79,7 +79,7 @@ def get_user_growth_metrics(
 @router.get("/inventory-status")
 def get_global_inventory_status(
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: Health of fleet and hardware utilization summary"""
     return AnalyticsService.get_fleet_inventory_status(db)
@@ -88,7 +88,7 @@ def get_global_inventory_status(
 def export_analytics_report(
     report_type: str = Query(..., enum=["overview", "trends", "forecast", "behavior"]),
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """Admin: Export any analytics report as CSV"""
     output = io.StringIO()

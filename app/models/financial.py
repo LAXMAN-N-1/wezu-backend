@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from app.models.user import User
     from app.models.rental import Rental
     from app.models.invoice import Invoice
+    from app.models.refund import Refund
 
 class TransactionType(str, Enum):
     RENTAL_PAYMENT = "rental_payment"
@@ -17,11 +18,13 @@ class TransactionType(str, Enum):
     SUBSCRIPTION = "subscription"
     WITHDRAWAL = "withdrawal"
     PURCHASE = "purchase"
+    SWAP_FEE = "swap_fee"
 
 class TransactionStatus(str, Enum):
     PENDING = "pending"
     SUCCESS = "success"
     FAILED = "failed"
+    CANCELLED = "cancelled"
     REFUNDED = "refunded"
 
 class Transaction(SQLModel, table=True):
@@ -51,6 +54,7 @@ class Transaction(SQLModel, table=True):
     rental: Optional["Rental"] = Relationship(back_populates="transactions")
     wallet: Optional["Wallet"] = Relationship(back_populates="transactions")
     invoice: Optional["Invoice"] = Relationship(back_populates="transaction")
+    refund: Optional["Refund"] = Relationship(back_populates="transaction")
 
 class Wallet(SQLModel, table=True):
     __tablename__ = "wallets"

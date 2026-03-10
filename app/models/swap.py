@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from app.models.battery import Battery
     from app.models.station import Station
 
-class Swap(SQLModel, table=True):
+class SwapSession(SQLModel, table=True):
     __tablename__ = "swaps"
     __table_args__ = {"schema": "rentals"}
     
@@ -39,5 +39,5 @@ class Swap(SQLModel, table=True):
     rental: "Rental" = Relationship(back_populates="swaps")
     user: "User" = Relationship()
     station: "Station" = Relationship()
-    old_battery: "Battery" = Relationship(sa_relationship_kwargs={"foreign_keys": "[Swap.old_battery_id]"})
-    new_battery: "Battery" = Relationship(sa_relationship_kwargs={"foreign_keys": "[Swap.new_battery_id]"})
+    old_battery: "Battery" = Relationship(sa_relationship_kwargs={"foreign_keys": "[SwapSession.old_battery_id]"})
+    new_battery: "Battery" = Relationship(sa_relationship_kwargs={"foreign_keys": "[SwapSession.new_battery_id]"})

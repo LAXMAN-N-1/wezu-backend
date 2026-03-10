@@ -11,7 +11,7 @@ from app.schemas.station import (
     StationUpdate, StationPerformanceResponse, StationMapResponse,
     HeatmapPoint
 )
-from app.schemas.review import ReviewResponse, ReviewCreate
+from app.schemas.review import ReviewResponse, ReviewCreate, ReviewUpdate
 from app.services.station_service import StationService
 from app.services.maintenance_service import MaintenanceService
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File

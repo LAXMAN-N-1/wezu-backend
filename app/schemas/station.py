@@ -76,3 +76,8 @@ class HeatmapPoint(BaseModel):
     latitude: float
     longitude: float
     intensity: float # 0.0 to 1.0 based on demand
+
+class StationAvailabilityResponse(BaseModel):
+    station_id: int
+    available_count: int
+    batteries: List[dict] # Use dict for now to avoid circular imports if any, or just Any

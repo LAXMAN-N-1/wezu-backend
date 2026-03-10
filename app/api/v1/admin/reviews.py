@@ -1,8 +1,8 @@
-from typing import Any, List
+from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session
 from app.api import deps
-from app.db.session import get_session
+
 from app.models.user import User
 from app.schemas.review import ReviewResponse
 from app.services.review_service import ReviewService
@@ -15,7 +15,7 @@ def list_reviews_for_moderation(
     skip: int = 0,
     limit: int = 100,
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ) -> Any:
     """Admin: all reviews with moderation controls"""
     return ReviewService.list_reviews_admin(db, skip, limit)
@@ -25,7 +25,7 @@ def hide_review(
     id: int,
     is_hidden: bool = True,
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ) -> Any:
     """Admin: hide an inappropriate review"""
     return ReviewService.toggle_review_visibility(db, id, is_hidden)
@@ -34,7 +34,7 @@ def hide_review(
 def admin_delete_review(
     id: int,
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ) -> Any:
     """Admin: delete any review (hard delete)"""
     ReviewService.delete_review(db, id, current_user.id, is_admin=True)

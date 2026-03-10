@@ -4,8 +4,9 @@ from datetime import datetime
 
 class Refund(SQLModel, table=True):
     __tablename__ = "refunds"
+    __table_args__ = {"schema": "finance"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    transaction_id: int = Field(foreign_key="transactions.id")
+    transaction_id: int = Field(foreign_key="finance.transactions.id")
     amount: float
     reason: Optional[str] = None
     status: str = Field(default="pending") # pending, processed, failed

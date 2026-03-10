@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
@@ -6,25 +6,24 @@ from contextlib import asynccontextmanager
 from app.core.config import settings
 
 
-# Customer-facing endpoints only
+# Customer-facing endpoints
 from app.api.v1 import (
-    auth, users, kyc, stations, batteries, rentals, wallet, payments, 
-    notifications, support, favorites, analytics, transactions, promo, 
-    faqs, iot, swaps, i18n, fraud, branches, organizations, warehouses, screens, stock, dealers
+    auth, users, profile, kyc, stations, batteries, rentals, bookings,
+    wallet, payments, notifications, support, favorites, analytics, 
+    transactions, promo, faqs, iot, swaps, i18n, fraud, branches, 
+    organizations, warehouses, screens, stock, dealers, logistics, 
+    settlements, telemetry, vehicles, locations, system, roles, 
+    menus, role_rights, admin_kyc, audit, ml, inventory,
+    admin_stations, station_monitoring
 )
-from app.api.v1.admin import support as admin_support
-from app.api.v1.admin import faqs as admin_faqs
-from app.api.v1.admin import analytics as admin_analytics
-from app.api.v1 import inventory
-from app.api.v1.admin import promo as admin_coupons
-from app.api.v1.admin import reviews as admin_reviews
-from app.api.v1.admin import roles as admin_roles
-from app.api.v1.admin import users as admin_user_mgmt
-# Enhanced customer endpoints
-from app.api.v1 import (
-    system, payments_enhanced, wallet_enhanced, notifications_enhanced,
-    support_enhanced, rentals_enhanced, purchases_enhanced, analytics_enhanced,
-    roles, menus, role_rights
+from app.api.v1.admin import (
+    support as admin_support, 
+    faqs as admin_faqs, 
+    analytics as admin_analytics, 
+    users as admin_users,
+    promo as admin_coupons,
+    reviews as admin_reviews,
+    roles as admin_roles
 )
 from app.api.admin import router as admin_router
 from app.api.webhooks import razorpay as razorpay_webhook
@@ -32,29 +31,48 @@ from app.middleware.rate_limit import limiter
 from app.middleware.audit import AuditMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-
-# Background Workers
 from app.workers import start_scheduler, stop_scheduler
 from app.services.websocket_service import heartbeat_task
 from app.services.mqtt_service import start_mqtt_service, stop_mqtt_service
 import asyncio
-from contextlib import asynccontextmanager
 
 # ----------------------------
-# Lifespan (No init_db here)
+# Lifespan
 # ----------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    start_scheduler()
-    
-    # Start MQTT and WebSocket background tasks
-    start_mqtt_service()
-    asyncio.create_task(heartbeat_task())
+    # 1. Start Scheduler
+    try:
+        start_scheduler()
+        print("INFO:     Background scheduler started.")
+    except Exception as e:
+        print(f"WARNING:  Failed to start background scheduler: {e}")
+
+    # 2. Start MQTT Service
+    try:
+        start_mqtt_service()
+        print("INFO:     MQTT service started.")
+    except Exception as e:
+        print(f"WARNING:  Failed to start MQTT service: {e}. Check if broker is running at {settings.MQTT_BROKER_URL}")
+
+    # 3. Start WebSocket Heartbeat
+    try:
+        asyncio.create_task(heartbeat_task())
+        print("INFO:     WebSocket heartbeat task started.")
+    except Exception as e:
+        print(f"WARNING:  Failed to start WebSocket heartbeat: {e}")
     
     yield
-    stop_scheduler()
-    stop_mqtt_service()
-
+    
+    # 4. Cleanup
+    try:
+        stop_scheduler()
+    except:
+        pass
+    try:
+        stop_mqtt_service()
+    except:
+        pass
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -83,25 +101,26 @@ app.add_middleware(
 
 # Audit Logging Middleware
 app.add_middleware(AuditMiddleware)
+v1_prefix = settings.API_V1_STR
 
-# Customer API Routes
-# 1. Customer Application Endpoints
-customer_api = f"{settings.API_V1_STR}/customer"
-app.include_router(auth.router, prefix=f"{customer_api}/auth", tags=["Customer: Auth"])
-app.include_router(users.router, prefix=f"{customer_api}/users", tags=["Customer: Users"])
-app.include_router(kyc.router, prefix=f"{customer_api}/kyc", tags=["Customer: KYC"])
-app.include_router(stations.router, prefix=f"{customer_api}/stations", tags=["Customer: Stations"])
-app.include_router(batteries.router, prefix=f"{customer_api}/batteries", tags=["Customer: Batteries"])
-app.include_router(rentals.router, prefix=f"{customer_api}/rentals", tags=["Customer: Rentals"])
-app.include_router(wallet.router, prefix=f"{customer_api}/wallet", tags=["Customer: Wallet"])
-app.include_router(payments.router, prefix=f"{customer_api}/payments", tags=["Customer: Payments"])
-app.include_router(notifications.router, prefix=f"{customer_api}/notifications", tags=["Customer: Notifications"])
-app.include_router(support.router, prefix=f"{customer_api}/support", tags=["Customer: Support"])
-app.include_router(favorites.router, prefix=f"{settings.API_V1_STR}/users/me/favorites", tags=["Customer: Favorites"])
-app.include_router(analytics.router, prefix=f"{customer_api}/analytics", tags=["Customer: Analytics"])
-app.include_router(promo.router, prefix=f"{settings.API_V1_STR}/coupons", tags=["Customer: Coupons"])
-app.include_router(swaps.router, prefix=f"{customer_api}/swaps", tags=["Customer: Swaps"])
-app.include_router(vehicles.router, prefix=f"{customer_api}/vehicles", tags=["Customer: Vehicles"])
+# 1. Customer Endpoints
+app.include_router(auth.router, prefix=f"{v1_prefix}/auth", tags=["Auth"])
+app.include_router(profile.router, prefix=f"{v1_prefix}/profile", tags=["Customer: Profile"])
+app.include_router(users.router, prefix=f"{v1_prefix}/users", tags=["Customer: Users"])
+app.include_router(kyc.router, prefix=f"{v1_prefix}/kyc", tags=["Customer: KYC"])
+app.include_router(stations.router, prefix=f"{v1_prefix}/stations", tags=["Customer: Stations"])
+app.include_router(bookings.router, prefix=f"{v1_prefix}/bookings", tags=["Customer: Bookings"])
+app.include_router(batteries.router, prefix=f"{v1_prefix}/batteries", tags=["Customer: Batteries"])
+app.include_router(rentals.router, prefix=f"{v1_prefix}/rentals", tags=["Customer: Rentals"])
+app.include_router(wallet.router, prefix=f"{v1_prefix}/wallet", tags=["Customer: Wallet"])
+app.include_router(payments.router, prefix=f"{v1_prefix}/payments", tags=["Customer: Payments"])
+app.include_router(notifications.router, prefix=f"{v1_prefix}/notifications", tags=["Customer: Notifications"])
+app.include_router(support.router, prefix=f"{v1_prefix}/support", tags=["Customer: Support"])
+app.include_router(favorites.router, prefix=f"{v1_prefix}/users/me/favorites", tags=["Customer: Favorites"])
+app.include_router(analytics.router, prefix=f"{v1_prefix}/analytics", tags=["Customer: Analytics"])
+app.include_router(promo.router, prefix=f"{v1_prefix}/coupons", tags=["Customer: Coupons"])
+app.include_router(swaps.router, prefix=f"{v1_prefix}/swaps", tags=["Customer: Swaps"])
+app.include_router(vehicles.router, prefix=f"{v1_prefix}/vehicles", tags=["Customer: Vehicles"])
 
 # 2. Admin Application Endpoints
 admin_api = f"{settings.API_V1_STR}/admin"
@@ -119,8 +138,11 @@ app.include_router(admin_faqs.router, prefix=f"{admin_api}/faq", tags=["Admin: F
 app.include_router(admin_analytics.router, prefix=f"{admin_api}/analytics", tags=["Admin: Analytics"], dependencies=admin_deps)
 app.include_router(admin_coupons.router, prefix=f"{admin_api}/coupons", tags=["Admin: Coupons"], dependencies=admin_deps)
 app.include_router(admin_reviews.router, prefix=f"{admin_api}/reviews", tags=["Admin: Review Moderation"], dependencies=admin_deps)
-app.include_router(admin_roles.router, prefix=f"{admin_api}/roles", tags=["Admin: RBAC"], dependencies=admin_deps)
-app.include_router(admin_user_mgmt.router, prefix=f"{admin_api}/users", tags=["Admin: User Management"], dependencies=admin_deps)
+app.include_router(admin_stations.router, prefix=f"{admin_api}/stations", tags=["Admin: Stations"], dependencies=admin_deps)
+
+# 3. Monitoring Application Endpoints
+monitoring_api = f"{v1_prefix}/monitoring"
+app.include_router(station_monitoring.router, prefix=f"{monitoring_api}/stations", tags=["Monitoring: Stations"])
 
 # 3. Dealer Application Endpoints
 dealer_api = f"{settings.API_V1_STR}/dealer"
@@ -146,12 +168,7 @@ app.include_router(inventory.router, prefix=f"{settings.API_V1_STR}/inventory", 
 
 
 # Webhooks
-# Webhooks
 app.include_router(razorpay_webhook.router, prefix="/api/webhooks", tags=["Webhooks"])
-
-# Logistics (Warehouses & Transfers)
-from app.api.v1 import logistics
-app.include_router(logistics.router, prefix=f"{settings.API_V1_STR}/logistics", tags=["Logistics & Supply Chain"])
 
 
 @app.get("/")

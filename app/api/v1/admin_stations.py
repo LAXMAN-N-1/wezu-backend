@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, func
 from sqlalchemy import cast, JSON, Float
 from app.api.deps import get_current_user
-from app.db.session import get_session
 from app.models.station import Station
 from app.models.station_heartbeat import StationHeartbeat
 from app.schemas.common import DataResponse
@@ -14,13 +13,14 @@ router = APIRouter()
 from app.schemas.station_monitoring import StationHealthListResponse, StationHealthStatus, OptimizedQueueResponse, ChargingQueueResponse
 from app.models.alert import Alert
 from app.services.charging_service import ChargingService
+from app.api import deps
 import logging
 
 logger = logging.getLogger(__name__)
 
 @router.get("/health", response_model=StationHealthListResponse)
 def get_station_health_stats(
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     current_user: Any = Depends(get_current_user)
 ):
     """
@@ -67,7 +67,7 @@ def get_station_health_stats(
 @router.get("/{station_id}/alerts")
 def get_station_alerts(
     station_id: int,
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Get alerts for a specific station."""
     alerts = session.exec(select(Alert).where(Alert.station_id == station_id).order_by(Alert.created_at.desc())).all()
@@ -85,7 +85,7 @@ def get_station_alerts(
 @router.get("/{station_id}/charging-queue", response_model=ChargingQueueResponse)
 def get_station_charging_queue(
     station_id: int,
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """View current charging queue for station."""
     station = session.get(Station, station_id)
@@ -98,9 +98,3 @@ def get_station_charging_queue(
         capacity=station.total_slots,
         current_queue=queue
     )
-
-
-
-
-
-    
