@@ -22,6 +22,7 @@ class ProductStatus(str, Enum):
 class CatalogProduct(SQLModel, table=True):
     """Product catalog"""
     __tablename__ = "products"
+    __table_args__ = {"schema": "core", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -71,14 +72,14 @@ class CatalogProduct(SQLModel, table=True):
     # Relationships
     images: List["CatalogProductImage"] = Relationship(back_populates="product")
     variants: List["CatalogProductVariant"] = Relationship(back_populates="product")
-    # stocks: List["Stock"] = Relationship(back_populates="product")
 
 class CatalogProductImage(SQLModel, table=True):
     """Product images"""
     __tablename__ = "product_images"
+    __table_args__ = {"schema": "core", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    product_id: int = Field(foreign_key="products.id", index=True)
+    product_id: int = Field(foreign_key="core.products.id", index=True)
     image_url: str
     alt_text: Optional[str] = None
     display_order: int = Field(default=0)
@@ -91,9 +92,10 @@ class CatalogProductImage(SQLModel, table=True):
 class CatalogProductVariant(SQLModel, table=True):
     """Product variants (color, size, etc.)"""
     __tablename__ = "product_variants"
+    __table_args__ = {"schema": "core", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    product_id: int = Field(foreign_key="products.id", index=True)
+    product_id: int = Field(foreign_key="core.products.id", index=True)
     
     # Variant details
     variant_name: str  # e.g., "Red - 5000mAh"
@@ -120,6 +122,7 @@ class CatalogProductVariant(SQLModel, table=True):
 class CatalogOrder(SQLModel, table=True):
     """Customer orders"""
     __tablename__ = "orders"
+    __table_args__ = {"schema": "core", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     order_number: str = Field(unique=True, index=True)
@@ -164,11 +167,12 @@ class CatalogOrder(SQLModel, table=True):
 class CatalogOrderItem(SQLModel, table=True):
     """Order line items"""
     __tablename__ = "order_items"
+    __table_args__ = {"schema": "core", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    order_id: int = Field(foreign_key="orders.id", index=True)
-    product_id: int = Field(foreign_key="products.id")
-    variant_id: Optional[int] = Field(None, foreign_key="product_variants.id")
+    order_id: int = Field(foreign_key="core.orders.id", index=True)
+    product_id: int = Field(foreign_key="core.products.id")
+    variant_id: Optional[int] = Field(None, foreign_key="core.product_variants.id")
     
     # Item details
     product_name: str  # Snapshot at time of order
@@ -187,9 +191,10 @@ class CatalogOrderItem(SQLModel, table=True):
 class DeliveryTracking(SQLModel, table=True):
     """Delivery tracking for orders"""
     __tablename__ = "delivery_tracking"
+    __table_args__ = {"schema": "core", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    order_id: int = Field(foreign_key="orders.id", index=True, unique=True)
+    order_id: int = Field(foreign_key="core.orders.id", index=True, unique=True)
     
     # Tracking details
     tracking_number: str = Field(unique=True, index=True)
@@ -216,9 +221,10 @@ class DeliveryTracking(SQLModel, table=True):
 class DeliveryEvent(SQLModel, table=True):
     """Delivery status history"""
     __tablename__ = "delivery_events"
+    __table_args__ = {"schema": "core", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    tracking_id: int = Field(foreign_key="delivery_tracking.id", index=True)
+    tracking_id: int = Field(foreign_key="core.delivery_tracking.id", index=True)
     
     # Event details
     status: str

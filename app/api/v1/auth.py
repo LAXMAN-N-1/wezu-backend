@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Form
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlmodel import Session, select
+from app.db.session import get_session
 from app.models.user import User, UserStatus, KYCStatus
 from app.schemas.user import Token
 from app.models.session import UserSession
@@ -86,22 +87,19 @@ async def register(
         hashed_password=get_password_hash(user_in.password),
         full_name=user_in.full_name,
         phone_number=user_in.phone_number,
-        is_active=True
+        status=UserStatus.ACTIVE
     )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
     
     # Assign default role
     from app.models.rbac import Role
     from sqlalchemy.orm import selectinload
     customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
     if customer_role:
-        # Changed from user.roles.append(customer_role) to single role assignment
         user.role = customer_role
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+        
+    db.add(user)
+    db.commit()
+    db.refresh(user)
         
     return user
 
@@ -179,23 +177,35 @@ async def _process_login(username: str, password: str, db: Session, request: Req
         logger.warning(f"INVALID_PASSWORD: {username}")
         # Log Failure via Audit Service
         try:
-            from app.services.audit_service import AuditService
-            AuditService.log_action(
-                db=db,
+            from app.services.audit_service import audit_service
+            await audit_service.log_event(
+                event_type="security",
                 user_id=user.id,
                 action="login_failed",
-                resource_type="user",
-                resource_id=str(user.id),
-                details=f"Login failed for {username}. Reason: Incorrect credentials",
-                ip_address=request.client.host
+                resource="user",
+                status="failed",
+                metadata={"details": f"Login failed for {username}. Reason: Incorrect credentials"}
             )
         except Exception as e:
             logger.error(f"AUDIT_LOG_FAILED: {str(e)}")
             
         raise HTTPException(status_code=401, detail="Incorrect email/phone or password")
     
-    if not user.is_active:
+    if user.status != UserStatus.ACTIVE:
         logger.warning(f"INACTIVE_USER: {username}")
+        # Log Failure
+        try:
+            from app.services.audit_service import audit_service
+            await audit_service.log_event(
+                event_type="security",
+                user_id=user.id,
+                action="login_failed",
+                resource="user",
+                status="failed",
+                metadata={"details": f"Login failed for {username}. Reason: Inactive user"}
+            )
+        except Exception as e:
+            logger.error(f"AUDIT_LOG_FAILED: {str(e)}")
         raise HTTPException(status_code=400, detail="Inactive user")
 
     # Update last login
@@ -336,7 +346,7 @@ async def verify_registration_otp(
         # Create new user
         new_user_data = {
             "full_name": verify_data.full_name,
-            "is_active": True
+            "status": UserStatus.ACTIVE
         }
         if "@" in verify_data.target:
             new_user_data["email"] = verify_data.target
@@ -363,8 +373,8 @@ async def verify_registration_otp(
         logger.info(f"Existing user linked via OTP: {verify_data.target}")
         
         # ACTIVATE ACCOUNT if pending
-        if not user.is_active or user.status == UserStatus.PENDING_VERIFICATION:
-            user.is_active = True
+        if user.status != UserStatus.ACTIVE or user.kyc_status == KYCStatus.PENDING:
+            user.status = UserStatus.ACTIVE
             if user.kyc_status == KYCStatus.PENDING:
                 user.kyc_status = KYCStatus.APPROVED # Auto-verify phone for customers
             db.add(user)
@@ -373,7 +383,7 @@ async def verify_registration_otp(
             logger.info(f"User {user.id} activated after OTP verification")
 
     # Update Last Login
-    user.last_login = datetime.utcnow()
+    user.last_login_at = datetime.utcnow()
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -507,7 +517,7 @@ async def social_login(
             email=email,
             full_name=name,
             profile_picture=picture,
-            is_active=True,
+            status=UserStatus.ACTIVE,
             kyc_status="verified", # Social login usually implies verified email
         )
         
@@ -548,7 +558,7 @@ async def social_login(
         db.refresh(user)
 
     # Update Last Login
-    user.last_login = datetime.utcnow()
+    user.last_login_at = datetime.utcnow()
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -613,7 +623,7 @@ async def register_with_password(
         phone_number=register_data.phone_number,
         full_name=register_data.full_name,
         hashed_password=get_password_hash(register_data.password),
-        is_active=True
+        status=UserStatus.ACTIVE
     )
     db.add(new_user)
     db.commit()
@@ -794,7 +804,7 @@ async def forgot_password(
         # Security: Do not reveal if user exists, just return success
         return {"message": "If an account with these details exists, an OTP has been sent."}
 
-    if not user.status == UserStatus.ACTIVE:
+    if user.status != UserStatus.ACTIVE:
          raise HTTPException(status_code=400, detail="User account is inactive.")
 
     # 2. Generate OTP
@@ -1037,3 +1047,78 @@ async def verify_security_question_route(
     if SecurityService.verify_security_answer(db, user_id, data.answer):
         return {"message": "Verification successful", "success": True}
     raise HTTPException(status_code=400, detail="Incorrect answer")
+
+
+# ===== ADMIN LOGIN (JSON-based, for Admin Flutter App) =====
+
+class AdminLoginRequest(BaseModel):
+    username: str  # email
+    password: str
+
+@router.post("/admin/login")
+async def admin_login(
+    login_data: AdminLoginRequest,
+    db: Session = Depends(get_session)
+):
+    """
+    Admin login endpoint (JSON body).
+    Validates credentials and ensures the user has an admin-level role.
+    """
+    logger.info(f"Admin login attempt for: {login_data.username}")
+
+    # Look up user by email
+    user = db.exec(select(User).where(User.email == login_data.username)).first()
+
+    if not user:
+        logger.warning(f"Admin login - user not found: {login_data.username}")
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
+
+    if not verify_password(login_data.password, user.hashed_password):
+        logger.warning(f"Admin login - invalid password for: {login_data.username}")
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
+
+    if user.status != UserStatus.ACTIVE:
+        raise HTTPException(status_code=400, detail="Inactive user")
+
+    # Verify user has admin-level role
+    from app.models.user import UserType
+    admin_types = [UserType.ADMIN] if hasattr(UserType, 'ADMIN') else []
+    is_admin = False
+
+    # Check user_type field
+    if hasattr(user, 'user_type') and user.user_type in admin_types:
+        is_admin = True
+
+    # Check role name
+    if hasattr(user, 'role') and user.role and user.role.name in ("admin", "super_admin", "superadmin"):
+        is_admin = True
+
+    # Fallback: also allow if role_id exists (seeded admin may have role set)
+    if hasattr(user, 'role_id') and user.role_id is not None:
+        from app.models.rbac import Role
+        role = db.get(Role, user.role_id)
+        if role and role.name in ("admin", "super_admin", "superadmin"):
+            is_admin = True
+
+    if not is_admin:
+        logger.warning(f"Admin login - non-admin user attempted: {login_data.username}")
+        raise HTTPException(status_code=403, detail="User does not have admin privileges")
+
+    # Generate tokens
+    access_token = create_access_token(subject=user.id)
+    refresh_tok = create_refresh_token(subject=user.id)
+
+    # Create session
+    AuthService.create_session(db, user.id, access_token, refresh_tok, device_info="Admin Web", ip_address=None)
+
+    logger.info(f"Admin login successful for user ID: {user.id}")
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "refresh_token": refresh_tok,
+        "user": {
+            "id": user.id,
+            "email": user.email,
+            "full_name": user.full_name,
+        }
+    }

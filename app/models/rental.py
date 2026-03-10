@@ -3,12 +3,14 @@ from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
 
+import uuid
+
 if TYPE_CHECKING:
     from app.models.user import User
     from app.models.battery import Battery
     from app.models.station import Station
     from app.models.swap import SwapSession
-    from app.models.financial import Transaction
+    from app.models.finance.transaction import Transaction
     from app.models.rental_event import RentalEvent
 
 class RentalStatus(str, Enum):
@@ -25,7 +27,7 @@ class Rental(SQLModel, table=True):
     
     # Core References
     user_id: int = Field(foreign_key="core.users.id", index=True)
-    battery_id: int = Field(foreign_key="inventory.batteries.id", index=True)
+    battery_id: uuid.UUID = Field(foreign_key="inventory.batteries.id", index=True)
     
     # Location
     start_station_id: int = Field(foreign_key="stations.stations.id")

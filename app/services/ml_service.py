@@ -1,4 +1,4 @@
-from sqlmodel import Session
+from sqlmodel import Session, select
 from app.ml.feature_store import FeatureStore
 from app.ml.models.battery_health import BatteryHealthModel, DemandForecastModel
 from typing import Dict, Any

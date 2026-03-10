@@ -85,6 +85,7 @@ class User(SQLModel, table=True):
     
     last_global_logout_at: Optional[datetime] = None
     last_login_at: Optional[datetime] = None
+    last_global_logout_at: Optional[datetime] = None
     
     # Soft Delete
     is_deleted: bool = Field(default=False)
@@ -126,6 +127,11 @@ class User(SQLModel, table=True):
     
     access_paths: List["UserAccessPath"] = Relationship(back_populates="user")
     sessions: List["UserSession"] = Relationship(back_populates="user")
-    two_factor_auth: Optional["TwoFactorAuth"] = Relationship(back_populates="user")
-    session_tokens: List["SessionToken"] = Relationship(back_populates="user")
 
+    @property
+    def is_active(self) -> bool:
+        return self.status == UserStatus.ACTIVE
+
+    @is_active.setter
+    def is_active(self, value: bool):
+        self.status = UserStatus.ACTIVE if value else UserStatus.SUSPENDED

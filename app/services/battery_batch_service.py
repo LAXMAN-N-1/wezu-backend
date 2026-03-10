@@ -21,17 +21,18 @@ class BatteryBatchService:
                 "sku_id": int(row.get("sku_id", 0)) if row.get("sku_id") else None,
                 "status": row.get("status", BatteryStatus.AVAILABLE).strip(),
                 "health_status": row.get("health_status", BatteryHealth.GOOD).strip(),
-                "current_charge": float(row.get("current_charge", 100.0)),
                 "health_percentage": float(row.get("health_percentage", 100.0)),
-                "temperature_c": float(row.get("temperature_c", 25.0)),
                 "station_id": int(row.get("station_id")) if row.get("station_id") else None,
-                "warehouse_id": int(row.get("warehouse_id")) if row.get("warehouse_id") else None
+                "manufacturer": row.get("manufacturer", "").strip(),
+                "location_type": row.get("location_type", "warehouse").strip(),
+                "notes": row.get("notes", "").strip(),
+                "manufacture_date": datetime.fromisoformat(row.get("manufacture_date")) if row.get("manufacture_date") else None
             })
             
         return parsed_data
 
     @staticmethod
-    def process_import(session: Session, parsed_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def process_import(session: Session, parsed_data: List[Dict[str, Any]], dry_run: bool = False) -> Dict[str, Any]:
         """Process bulk import of batteries from parsed data"""
         success_count = 0
         error_count = 0
@@ -68,7 +69,7 @@ class BatteryBatchService:
                 errors.append({"row": index + 2, "error": str(e)}) # +2 for 1-based indexing skipping header
 
         # Bulk save
-        if new_batteries:
+        if new_batteries and not dry_run:
             session.add_all(new_batteries)
             session.commit()
 
@@ -88,18 +89,18 @@ class BatteryBatchService:
         
         # Header
         writer.writerow([
-            "id", "serial_number", "sku_id", "status", "health_status", 
-            "current_charge", "health_percentage", "cycle_count", "temperature_c",
-            "station_id", "warehouse_id", "iot_device_id", "purchase_date", "created_at"
+            "id", "serial_number", "status", "health_percentage", "cycle_count",
+            "manufacturer", "location_type", "notes", "manufacture_date",
+            "station_id", "created_at"
         ])
         
         # Data
         for b in batteries:
             writer.writerow([
-                b.id, b.serial_number, b.sku_id, b.status, b.health_status,
-                b.current_charge, b.health_percentage, b.cycle_count, b.temperature_c,
-                b.station_id, b.warehouse_id, b.iot_device_id, 
-                b.purchase_date.isoformat() if b.purchase_date else "",
+                b.id, b.serial_number, b.status, b.health_percentage, b.cycle_count,
+                b.manufacturer, b.location_type, b.notes,
+                b.manufacture_date.isoformat() if b.manufacture_date else "",
+                b.station_id,
                 b.created_at.isoformat() if b.created_at else ""
             ])
             

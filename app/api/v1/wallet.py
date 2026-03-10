@@ -121,7 +121,12 @@ async def get_cashback_history(
 
 class WithdrawRequest(BaseModel):
     amount: float
-    bank_details: dict
+    payment_mode: str
+    account_number: Optional[str] = None
+    account_holder_name: Optional[str] = None
+    bank_name: Optional[str] = None
+    ifsc_code: Optional[str] = None
+    upi_id: Optional[str] = None
 
 @router.post("/withdraw", response_model=dict)
 async def request_withdrawal(
@@ -131,7 +136,17 @@ async def request_withdrawal(
 ):
     """Request withdrawal to bank account"""
     try:
-        wr = WalletService.request_withdrawal(db, current_user.id, req.amount, req.bank_details)
+        bank_details = {
+            "payment_mode": req.payment_mode,
+            "account_number": req.account_number,
+            "account_holder_name": req.account_holder_name,
+            "bank_name": req.bank_name,
+            "ifsc_code": req.ifsc_code,
+            "upi_id": req.upi_id
+        }
+        bank_details = {k: v for k, v in bank_details.items() if v is not None}
+        
+        wr = WalletService.request_withdrawal(db, current_user.id, req.amount, bank_details)
         return {"status": "success", "request_id": wr.id, "message": "Withdrawal request submitted"}
     except HTTPException as e:
         raise e
@@ -153,3 +168,30 @@ async def get_payment_receipt(
         return InvoiceService.generate_rental_invoice(txn.rental_id, db)
     
     raise HTTPException(status_code=400, detail="Receipt not available for this transaction type")
+
+@router.get("/lookup")
+async def lookup_user_by_phone(
+    phone: str,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
+):
+    """Lookup user by phone number to mask name before transfer"""
+    user = db.exec(select(User).where(User.phone_number == phone)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Use full_name if first_name/last_name are missing
+    full_name = user.full_name or ""
+    parts = full_name.split()
+    first_name = parts[0] if parts else ""
+    last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
+    
+    if len(first_name) >= 3:
+        masked_first = first_name[:3] + "***"
+    elif len(first_name) > 0:
+        masked_first = first_name[0] + "***"
+    else:
+        masked_first = "***"
+        
+    masked_name = f"{masked_first} {last_name[:1] + '.' if last_name else ''}".strip()
+    return {"masked_name": masked_name}

@@ -45,14 +45,7 @@ async def create_station_admin(
 ):
     return StationService.create_station(db, station_in)
 
-# --- Batteries ---
-@router.post("/batteries", response_model=BatteryResponse)
-async def create_battery_admin(
-    battery_in: BatteryCreate,
-    current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(deps.get_db),
-):
-     return BatteryService.create_battery(db, battery_in)
+# Redundant routes moved to specific modules
      
 # --- KYC ---
 @router.get("/kyc/pending", response_model=List[KYCDocumentResponse])

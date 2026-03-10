@@ -1,3 +1,4 @@
+from typing import List
 from sqlmodel import Session, select
 from app.models.promo_code import PromoCode
 from datetime import datetime

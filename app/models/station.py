@@ -3,6 +3,8 @@ from datetime import datetime
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
 
+import uuid
+
 if TYPE_CHECKING:
     from app.models.dealer import DealerProfile
     from app.models.vendor import Vendor
@@ -96,7 +98,7 @@ class StationSlot(SQLModel, table=True):
     is_locked: bool = Field(default=True)
     
     # Battery Connection
-    battery_id: Optional[int] = Field(default=None, foreign_key="inventory.batteries.id")
+    battery_id: Optional[uuid.UUID] = Field(default=None, foreign_key="inventory.batteries.id")
     
     # Real-time Telemetry
     current_power_w: float = Field(default=0.0)

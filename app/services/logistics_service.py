@@ -1,8 +1,9 @@
+from typing import Any, List, Optional
 from sqlmodel import Session, select, func
 from app.core.database import engine
 from app.models.logistics import BatteryTransfer, Manifest
-from app.models.delivery_assignment import DeliveryAssignment
 from app.models.warehouse import Warehouse
+from app.models.delivery_assignment import DeliveryAssignment
 from app.models.driver_profile import DriverProfile
 from app.models.ecommerce import EcommerceOrder
 from app.models.station import Station, StationSlot
@@ -209,7 +210,6 @@ class LogisticsService:
         """
         Group multiple pending transfers into a single manifest for a driver.
         """
-        from app.models.logistics import Manifest
         manifest = Manifest(
             driver_id=driver_id,
             status="assigned"

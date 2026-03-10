@@ -117,7 +117,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Wezu Battery App"
     DEBUG: bool = False
     ENVIRONMENT: str = "production"
-    CORS_ORIGINS: list[str] = []
+    CORS_ORIGINS: list[str] = ["*"]
     
     # Customer Support
     SUPPORT_EMAIL: str = "support@wezu.com"

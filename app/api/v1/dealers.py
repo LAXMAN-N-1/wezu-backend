@@ -18,8 +18,8 @@ router = APIRouter()
 @router.post("/", response_model=DataResponse[DealerProfileResponse])
 def create_dealer_profile(
     profile_in: DealerProfileCreate,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db)
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
 ):
     """Create a new dealer profile (Onboarding)."""
     existing = DealerService.get_dealer_by_user(session, current_user.id)
@@ -33,8 +33,8 @@ def create_dealer_profile(
 def read_dealers(
     skip: int = 0,
     limit: int = 100,
-    current_user: User = Depends(get_current_user), # Should be Admin only
-    session: Session = Depends(get_db)
+    current_user: User = Depends(deps.get_current_user), # Should be Admin only
+    session: Session = Depends(deps.get_db)
 ):
     """Retrieve all dealers."""
     # Add RBAC check here
@@ -117,8 +117,8 @@ def get_dealer_commissions(
 @router.get("/{id}", response_model=DataResponse[DealerProfileResponse])
 def read_dealer(
     id: int,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db)
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
 ):
     """Get dealer by ID."""
     dealer = DealerService.get_dealer_by_id(session, id)
@@ -129,8 +129,8 @@ def read_dealer(
 @router.put("/me", response_model=DataResponse[DealerProfileResponse])
 def update_my_profile(
     profile_in: DealerProfileUpdate,
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db)
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
 ):
     """Update current user's dealer profile."""
     profile = DealerService.get_dealer_by_user(session, current_user.id)
@@ -144,8 +144,8 @@ def update_my_profile(
 def update_dealer(
     id: int,
     profile_in: DealerProfileUpdate,
-    current_user: User = Depends(get_current_user), # Should be Admin
-    session: Session = Depends(get_db)
+    current_user: User = Depends(deps.get_current_user), # Should be Admin
+    session: Session = Depends(deps.get_db)
 ):
     """Update a specific dealer profile (Admin)."""
     dealer = DealerService.update_dealer_profile(session, id, profile_in)

@@ -41,26 +41,18 @@ import asyncio
 # ----------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 1. Start Scheduler
-    try:
-        start_scheduler()
-        print("INFO:     Background scheduler started.")
-    except Exception as e:
-        print(f"WARNING:  Failed to start background scheduler: {e}")
-
-    # 2. Start MQTT Service
+    """Start background scheduler on app startup and init DB"""
+    from app.db.session import init_db
+    init_db()
+    start_scheduler()
+    
+    # Start MQTT and WebSocket background tasks - making MQTT non-fatal for dev
     try:
         start_mqtt_service()
-        print("INFO:     MQTT service started.")
     except Exception as e:
-        print(f"WARNING:  Failed to start MQTT service: {e}. Check if broker is running at {settings.MQTT_BROKER_URL}")
-
-    # 3. Start WebSocket Heartbeat
-    try:
-        asyncio.create_task(heartbeat_task())
-        print("INFO:     WebSocket heartbeat task started.")
-    except Exception as e:
-        print(f"WARNING:  Failed to start WebSocket heartbeat: {e}")
+        print(f"MQTT Service Startup Error: {e}")
+        
+    asyncio.create_task(heartbeat_task())
     
     yield
     
@@ -91,17 +83,20 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # ----------------------------
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
+# Audit Logging Middleware
+app.add_middleware(AuditMiddleware)
+
+# Configure CORS - Outermost
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=["*"], # In development "*" is often safest for dynamic ports
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Audit Logging Middleware
-app.add_middleware(AuditMiddleware)
-v1_prefix = settings.API_V1_STR
+# Shared Auth Routes (needed for admin login at /api/v1/auth/admin/login)
+app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Auth"])
 
 # 1. Customer Endpoints
 app.include_router(auth.router, prefix=f"{v1_prefix}/auth", tags=["Auth"])
@@ -127,7 +122,7 @@ admin_api = f"{settings.API_V1_STR}/admin"
 from app.api import deps
 admin_deps = [Depends(deps.get_current_active_superuser)]
 app.include_router(admin_router, prefix=f"{admin_api}", tags=["Admin: Main"], dependencies=admin_deps)
-app.include_router(admin_users.router, prefix=f"{admin_api}/users", tags=["Admin: Users"], dependencies=admin_deps)
+app.include_router(admin_user_mgmt.router, prefix=f"{admin_api}/users", tags=["Admin: Users"], dependencies=admin_deps)
 app.include_router(admin_roles.router, prefix=f"{admin_api}/roles", tags=["Admin: Roles"], dependencies=admin_deps)
 app.include_router(admin_kyc.router, prefix=f"{admin_api}/kyc", tags=["Admin: KYC"], dependencies=admin_deps)
 app.include_router(audit.router, prefix=f"{admin_api}/audit", tags=["Admin: Audit"], dependencies=admin_deps)
@@ -135,8 +130,12 @@ app.include_router(fraud.router, prefix=f"{admin_api}/fraud", tags=["Admin: Frau
 app.include_router(ml.router, prefix=f"{admin_api}/ml", tags=["Admin: ML & Analytics"], dependencies=admin_deps)
 app.include_router(admin_support.router, prefix=f"{admin_api}/support", tags=["Admin: Support"], dependencies=admin_deps)
 app.include_router(admin_faqs.router, prefix=f"{admin_api}/faq", tags=["Admin: FAQ"], dependencies=admin_deps)
+app.include_router(admin_legal.router, prefix=f"{admin_api}/legal", tags=["Admin: CMS - Legal"], dependencies=admin_deps)
+app.include_router(admin_banners.router, prefix=f"{admin_api}/banners", tags=["Admin: CMS - Banners"], dependencies=admin_deps)
+app.include_router(admin_media.router, prefix=f"{admin_api}/media", tags=["Admin: CMS - Media"], dependencies=admin_deps)
 app.include_router(admin_analytics.router, prefix=f"{admin_api}/analytics", tags=["Admin: Analytics"], dependencies=admin_deps)
 app.include_router(admin_coupons.router, prefix=f"{admin_api}/coupons", tags=["Admin: Coupons"], dependencies=admin_deps)
+app.include_router(admin_blogs.router, prefix=f"{admin_api}/blogs", tags=["Admin: CMS - Blogs"], dependencies=admin_deps)
 app.include_router(admin_reviews.router, prefix=f"{admin_api}/reviews", tags=["Admin: Review Moderation"], dependencies=admin_deps)
 app.include_router(admin_stations.router, prefix=f"{admin_api}/stations", tags=["Admin: Stations"], dependencies=admin_deps)
 

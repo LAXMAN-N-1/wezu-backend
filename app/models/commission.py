@@ -1,10 +1,6 @@
 from datetime import datetime
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
-
-if TYPE_CHECKING:
-    from app.models.settlement import Settlement
-
 
 class CommissionConfig(SQLModel, table=True):
     __tablename__ = "commission_configs"

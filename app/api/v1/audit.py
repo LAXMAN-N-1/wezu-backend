@@ -13,6 +13,24 @@ router = APIRouter()
 
 from app.services.audit_service import audit_service
 
+class AuditLogEntry(BaseModel):
+    id: int
+    user_id: Optional[int]
+    action: str
+    resource_type: str
+    resource_id: Optional[str]
+    timestamp: datetime
+    details: Optional[str]
+    ip_address: Optional[str]
+
+    model_config = ConfigDict(from_attributes=True)
+
+class AuditLogResponse(BaseModel):
+    logs: List[AuditLogEntry]
+    total_count: int
+    page: int
+    limit: int
+
 class MongoAuditEntry(BaseModel):
     id: str = Field(alias="_id")
     user_id: Optional[int] = None

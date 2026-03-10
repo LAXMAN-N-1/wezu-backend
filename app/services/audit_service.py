@@ -8,13 +8,27 @@ class AuditService:
         self.client: Optional[AsyncIOMotorClient] = None
         self.db: Any = None
         self.collection: Any = None
+        self._last_connect_attempt = 0
+        self._connection_failed = False
 
     def connect(self):
-        """Initialize MongoDB connection"""
+        """Initialize MongoDB connection with cooldown on failure"""
+        if self._connection_failed and (datetime.utcnow().timestamp() - self._last_connect_attempt < 300):
+            return
+
         if not self.client:
-            self.client = AsyncIOMotorClient(settings.MONGODB_URL)
-            self.db = self.client[settings.MONGODB_DB]
-            self.collection = self.db["audit_logs"]
+            try:
+                self._last_connect_attempt = datetime.utcnow().timestamp()
+                self.client = AsyncIOMotorClient(settings.MONGODB_URL, serverSelectionTimeoutMS=2000)
+                self.db = self.client[settings.MONGODB_DB]
+                self.collection = self.db["audit_logs"]
+                # Trigger a quick check
+                import asyncio
+                self._connection_failed = False
+            except Exception as e:
+                import logging
+                logging.warning(f"AuditService failed to connect to MongoDB: {e}. Logging to fallback.")
+                self._connection_failed = True
 
     async def log_event(
         self,
@@ -58,6 +72,12 @@ class AuditService:
             action=event,
             metadata=metadata
         )
+
+    @staticmethod
+    def log_action(db, user_id, action, resource_type, resource_id, details, ip_address=None, **kwargs):
+        """Backward compatibility static method for older synchronous endpoints"""
+        import logging
+        logging.info(f"Audit Action (Sync): User {user_id} performed {action} on {resource_type} {resource_id}. Details: {details}")
 
     async def get_logs(
         self,

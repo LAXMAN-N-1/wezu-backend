@@ -39,7 +39,7 @@ class ReturnRequest(SQLModel, table=True):
     status: ReturnStatus = Field(default=ReturnStatus.PENDING)
     
     # Logistics Link
-    delivery_order_id: Optional[int] = Field(default=None)
+    delivery_order_id: Optional[int] = Field(default=None, index=True)
     
     refund_amount: Optional[float] = None
     inspection_notes: Optional[str] = None
@@ -48,9 +48,5 @@ class ReturnRequest(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Relationships
-    delivery_order: Optional["DeliveryOrder"] = Relationship(
-        back_populates="return_request"
-    )
-    delivery: Optional["DeliveryAssignment"] = Relationship(
-        back_populates="return_request"
-    )
+    delivery_order: Optional["DeliveryOrder"] = Relationship(back_populates="return_request")
+    delivery: Optional["DeliveryAssignment"] = Relationship(back_populates="return_request")

@@ -10,34 +10,37 @@ if TYPE_CHECKING:
     from app.models.station import Station
 
 class SwapSession(SQLModel, table=True):
-    __tablename__ = "swaps"
-    __table_args__ = {"schema": "rentals"}
+    __tablename__ = "swap_sessions"
+    __table_args__ = {"schema": "rentals", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    rental_id: int = Field(foreign_key="rentals.rentals.id", index=True)
+    rental_id: Optional[int] = Field(default=None, foreign_key="rentals.rentals.id", index=True)
     user_id: int = Field(foreign_key="core.users.id", index=True)
     station_id: int = Field(foreign_key="stations.stations.id", index=True)
     
     # Battery Details
-    old_battery_id: int = Field(foreign_key="inventory.batteries.id")
-    new_battery_id: int = Field(foreign_key="inventory.batteries.id")
+    old_battery_id: Optional[int] = Field(default=None, foreign_key="inventory.batteries.id")
+    new_battery_id: Optional[int] = Field(default=None, foreign_key="inventory.batteries.id")
+    
+    old_battery_soc: float = Field(default=0.0)
+    new_battery_soc: float = Field(default=0.0)
     
     # Metrics
-    old_battery_charge: float = Field(default=0.0)
-    new_battery_charge: float = Field(default=100.0)
     swap_amount: float = Field(default=0.0)
     currency: str = Field(default="INR")
     
     # Status
-    status: str = Field(default="completed") # processing, completed, failed
+    status: str = Field(default="initiated") # initiated, processing, completed, failed
+    payment_status: str = Field(default="pending") # pending, paid, failed
     error_message: Optional[str] = None
 
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: Optional[datetime] = None
     
     # Relationships
-    rental: "Rental" = Relationship(back_populates="swaps")
+    rental: Optional["Rental"] = Relationship(back_populates="swaps")
     user: "User" = Relationship()
     station: "Station" = Relationship()
-    old_battery: "Battery" = Relationship(sa_relationship_kwargs={"foreign_keys": "[SwapSession.old_battery_id]"})
-    new_battery: "Battery" = Relationship(sa_relationship_kwargs={"foreign_keys": "[SwapSession.new_battery_id]"})
+    old_battery: Optional["Battery"] = Relationship(sa_relationship_kwargs={"foreign_keys": "[SwapSession.old_battery_id]"})
+    new_battery: Optional["Battery"] = Relationship(sa_relationship_kwargs={"foreign_keys": "[SwapSession.new_battery_id]"})

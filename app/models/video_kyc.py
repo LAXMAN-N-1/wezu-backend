@@ -4,7 +4,7 @@ from datetime import datetime
 
 class VideoKYCSession(SQLModel, table=True):
     __tablename__ = "video_kyc_sessions"
-    __table_args__ = {"schema": "core"}
+    __table_args__ = {"schema": "core", "extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="core.users.id")
     session_id: str = Field(unique=True, index=True) # ID from 3rd party provider

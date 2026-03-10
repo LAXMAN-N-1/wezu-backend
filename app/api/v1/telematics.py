@@ -2,6 +2,7 @@ from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlmodel import Session, select
 from datetime import datetime
+
 from app.models.telemetry import Telemetry
 from app.models.battery import Battery, BatteryLifecycleEvent
 from app.schemas.telematics import TelematicsDataIngest, TelematicsDataResponse
@@ -33,7 +34,7 @@ def process_alerts(session: Session, data: TelematicsDataIngest, battery_id: int
     
     session.commit()
 
-@router.post("/ingest", response_model=TelemeticsDataResponse)
+@router.post("/ingest", response_model=TelematicsDataResponse)
 def ingest_telemetry(
     *,
     session: Session = Depends(deps.get_db),

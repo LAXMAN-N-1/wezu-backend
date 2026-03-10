@@ -3,7 +3,9 @@ from typing import Optional
 from datetime import datetime
 
 class RentalEvent(SQLModel, table=True):
-    __table_args__ = {"schema": "rentals"}
+    __tablename__ = "rental_events"
+    __table_args__ = {"schema": "rentals", "extend_existing": True}
+    
     id: Optional[int] = Field(default=None, primary_key=True)
     rental_id: int = Field(foreign_key="rentals.rentals.id")
     event_type: str # start, stop, swap_request, swap_complete, extend, late_fee

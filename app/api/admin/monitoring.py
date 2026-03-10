@@ -4,6 +4,7 @@ from typing import Dict
 from datetime import datetime, timedelta
 from app.api import deps
 from app.models.user import User
+from app.core.database import get_db
 
 router = APIRouter()
 
@@ -12,7 +13,7 @@ router = APIRouter()
 @router.get("/health")
 def system_health(
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(deps.get_db)
+    session: Session = Depends(get_db)
 ):
     """Comprehensive system health check"""
     import logging
@@ -49,7 +50,7 @@ def system_health(
 @router.get("/metrics")
 def performance_metrics(
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(deps.get_db)
+    session: Session = Depends(get_db)
 ):
     """Get performance KPIs"""
     from app.models.rental import Rental
@@ -127,7 +128,7 @@ def performance_metrics(
 @router.get("/uptime")
 def uptime_tracking(
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(deps.get_db)
+    session: Session = Depends(get_db)
 ):
     """Get uptime and SLA metrics"""
     # In production, this would query from monitoring service
@@ -159,7 +160,7 @@ def error_logs(
     limit: int = 100,
     severity: str = None,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(deps.get_db)
+    session: Session = Depends(get_db)
 ):
     """Get recent error logs"""
     from app.models.audit_log import SecurityEvent
@@ -211,7 +212,7 @@ def api_performance(
 @router.get("/database/stats")
 def database_stats(
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(deps.get_db)
+    session: Session = Depends(get_db)
 ):
     """Get database statistics"""
     # Table sizes and counts
