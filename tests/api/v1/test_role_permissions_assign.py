@@ -1,3 +1,4 @@
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
@@ -11,7 +12,7 @@ def create_superuser(session):
     user = session.exec(select(AdminUser).where(AdminUser.email == "admin@roles.com")).first()
     if user:
         return user
-    user = AdminUser(
+    user = AdminUser(phone_number='2231896905', 
         email="admin@roles.com",
         hashed_password="hashed",
         is_active=True,
@@ -123,7 +124,7 @@ def test_assign_permissions_invalidates_sessions(client: TestClient, session: Se
     session.commit()
     
     # Create User assigned to Role
-    user = User(email="u@test.com", is_active=True)
+    user = User(phone_number='3049981769', email="u@test.com", is_active=True)
     session.add(user)
     session.commit()
     

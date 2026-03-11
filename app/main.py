@@ -105,7 +105,6 @@ app.include_router(payments.router, prefix=f"{customer_api}/payments", tags=["Cu
 app.include_router(notifications.router, prefix=f"{customer_api}/notifications", tags=["Customer: Notifications"])
 app.include_router(support.router, prefix=f"{customer_api}/support", tags=["Customer: Support"])
 app.include_router(favorites.router, prefix=f"{settings.API_V1_STR}/users/me/favorites", tags=["Customer: Favorites"])
-app.include_router(analytics.router, prefix=f"{customer_api}/analytics", tags=["Customer: Analytics"])
 app.include_router(promo.router, prefix=f"{settings.API_V1_STR}/coupons", tags=["Customer: Coupons"])
 app.include_router(swaps.router, prefix=f"{customer_api}/swaps", tags=["Customer: Swaps"])
 app.include_router(vehicles.router, prefix=f"{customer_api}/vehicles", tags=["Customer: Vehicles"])
@@ -154,6 +153,11 @@ app.include_router(telemetry.router, prefix=f"{infra_api}/telemetry", tags=["Inf
 app.include_router(i18n.router, prefix=f"{infra_api}/i18n", tags=["Infra: i18n"])
 app.include_router(locations.router, prefix=f"{infra_api}/locations", tags=["Infra: Locations"])
 app.include_router(inventory.router, prefix=f"{settings.API_V1_STR}/inventory", tags=["Logistics: Inventory"])
+
+
+# Analytics Module (V2 Architecture)
+from app.api.v1.analytics import analytics_router
+app.include_router(analytics_router, prefix=f"{settings.API_V1_STR}/analytics")
 
 
 # Webhooks

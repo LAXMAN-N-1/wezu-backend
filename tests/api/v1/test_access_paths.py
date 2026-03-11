@@ -1,3 +1,4 @@
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
@@ -10,7 +11,7 @@ def create_superuser_path(session):
     user = session.exec(select(AdminUser).where(AdminUser.email == "admin@path.com")).first()
     if user:
         return user
-    user = AdminUser(
+    user = AdminUser(phone_number='7301755609', 
         email="admin@path.com",
         hashed_password="hashed",
         is_active=True,
@@ -25,7 +26,7 @@ def test_assign_access_path(client: TestClient, session: Session):
     admin = create_superuser_path(session)
     
     # Target User
-    user = User(email="path_user@test.com", is_active=True)
+    user = User(phone_number='1219026755', email="path_user@test.com", is_active=True)
     session.add(user)
     session.commit()
     
@@ -54,7 +55,7 @@ def test_assign_access_path(client: TestClient, session: Session):
 
 def test_assign_access_path_invalid_level(client: TestClient, session: Session):
     admin = create_superuser_path(session)
-    user = User(email="path_invalid@test.com", is_active=True)
+    user = User(phone_number='3014961888', email="path_invalid@test.com", is_active=True)
     session.add(user)
     session.commit()
     
@@ -71,7 +72,7 @@ def test_assign_access_path_invalid_level(client: TestClient, session: Session):
 
 def test_get_user_access_paths(client: TestClient, session: Session):
     admin = create_superuser_path(session)
-    user = User(email="path_get@test.com", is_active=True)
+    user = User(phone_number='1108514911', email="path_get@test.com", is_active=True)
     session.add(user)
     session.commit()
     
@@ -99,7 +100,7 @@ def test_get_user_access_paths(client: TestClient, session: Session):
 
 def test_update_access_path(client: TestClient, session: Session):
     admin = create_superuser_path(session)
-    user = User(email="path_update@test.com", is_active=True)
+    user = User(phone_number='3033763671', email="path_update@test.com", is_active=True)
     session.add(user)
     session.commit()
     
@@ -127,7 +128,7 @@ def test_update_access_path(client: TestClient, session: Session):
 
 def test_remove_access_path(client: TestClient, session: Session):
     admin = create_superuser_path(session)
-    user = User(email="path_del@test.com", is_active=True)
+    user = User(phone_number='2819641875', email="path_del@test.com", is_active=True)
     session.add(user)
     session.commit()
     

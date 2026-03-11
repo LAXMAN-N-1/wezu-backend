@@ -1,3 +1,4 @@
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select, func
@@ -13,7 +14,7 @@ def create_superuser(session):
     user = session.exec(select(AdminUser).where(AdminUser.email == "admin@remove.com")).first()
     if user:
         return user
-    user = AdminUser(
+    user = AdminUser(phone_number='4749443409', 
         email="admin@remove.com",
         hashed_password="hashed",
         is_active=True,
@@ -28,7 +29,7 @@ def test_remove_role_success(client: TestClient, session: Session):
     admin = create_superuser(session)
     
     # Setup: User with 2 roles
-    user = User(email="target_remove@test.com", is_active=True)
+    user = User(phone_number='3355609824', email="target_remove@test.com", is_active=True)
     session.add(user)
     session.commit()
     
@@ -73,7 +74,7 @@ def test_remove_role_success(client: TestClient, session: Session):
 
 def test_remove_last_role_failure(client: TestClient, session: Session):
     admin = create_superuser(session)
-    user = User(email="last_role@test.com", is_active=True)
+    user = User(phone_number='5107412828', email="last_role@test.com", is_active=True)
     session.add(user)
     
     r1 = Role(name="Role Last", is_active=True)

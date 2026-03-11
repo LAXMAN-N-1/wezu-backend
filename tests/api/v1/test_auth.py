@@ -1,6 +1,6 @@
 def test_register_user(client):
     response = client.post(
-        "/api/v1/auth/register",
+        "/api/v1/customer/auth/register",
         json={
             "email": "test@example.com",
             "password": "Password123!",
@@ -16,7 +16,7 @@ def test_register_user(client):
 def test_login_user(client):
     # Register first
     client.post(
-        "/api/v1/auth/register",
+        "/api/v1/customer/auth/register",
         json={
             "email": "login@example.com",
             "password": "Password123!",
@@ -27,7 +27,7 @@ def test_login_user(client):
     
     # Login
     response = client.post(
-        "/api/v1/auth/token",
+        "/api/v1/customer/auth/token",
         data={
             "username": "login@example.com",
             "password": "Password123!"
