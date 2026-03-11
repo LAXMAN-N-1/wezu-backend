@@ -98,24 +98,23 @@ app.add_middleware(
 # Shared Auth Routes (needed for admin login at /api/v1/auth/admin/login)
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Auth"])
 
-# 1. Customer Endpoints
-app.include_router(auth.router, prefix=f"{v1_prefix}/auth", tags=["Auth"])
-app.include_router(profile.router, prefix=f"{v1_prefix}/profile", tags=["Customer: Profile"])
-app.include_router(users.router, prefix=f"{v1_prefix}/users", tags=["Customer: Users"])
-app.include_router(kyc.router, prefix=f"{v1_prefix}/kyc", tags=["Customer: KYC"])
-app.include_router(stations.router, prefix=f"{v1_prefix}/stations", tags=["Customer: Stations"])
-app.include_router(bookings.router, prefix=f"{v1_prefix}/bookings", tags=["Customer: Bookings"])
-app.include_router(batteries.router, prefix=f"{v1_prefix}/batteries", tags=["Customer: Batteries"])
-app.include_router(rentals.router, prefix=f"{v1_prefix}/rentals", tags=["Customer: Rentals"])
-app.include_router(wallet.router, prefix=f"{v1_prefix}/wallet", tags=["Customer: Wallet"])
-app.include_router(payments.router, prefix=f"{v1_prefix}/payments", tags=["Customer: Payments"])
-app.include_router(notifications.router, prefix=f"{v1_prefix}/notifications", tags=["Customer: Notifications"])
-app.include_router(support.router, prefix=f"{v1_prefix}/support", tags=["Customer: Support"])
-app.include_router(favorites.router, prefix=f"{v1_prefix}/users/me/favorites", tags=["Customer: Favorites"])
-app.include_router(analytics.router, prefix=f"{v1_prefix}/analytics", tags=["Customer: Analytics"])
-app.include_router(promo.router, prefix=f"{v1_prefix}/coupons", tags=["Customer: Coupons"])
-app.include_router(swaps.router, prefix=f"{v1_prefix}/swaps", tags=["Customer: Swaps"])
-app.include_router(vehicles.router, prefix=f"{v1_prefix}/vehicles", tags=["Customer: Vehicles"])
+# Customer API Routes
+# 1. Customer Application Endpoints
+customer_api = f"{settings.API_V1_STR}/customer"
+app.include_router(auth.router, prefix=f"{customer_api}/auth", tags=["Customer: Auth"])
+app.include_router(users.router, prefix=f"{customer_api}/users", tags=["Customer: Users"])
+app.include_router(kyc.router, prefix=f"{customer_api}/kyc", tags=["Customer: KYC"])
+app.include_router(stations.router, prefix=f"{customer_api}/stations", tags=["Customer: Stations"])
+app.include_router(batteries.router, prefix=f"{customer_api}/batteries", tags=["Customer: Batteries"])
+app.include_router(rentals.router, prefix=f"{customer_api}/rentals", tags=["Customer: Rentals"])
+app.include_router(wallet.router, prefix=f"{customer_api}/wallet", tags=["Customer: Wallet"])
+app.include_router(payments.router, prefix=f"{customer_api}/payments", tags=["Customer: Payments"])
+app.include_router(notifications.router, prefix=f"{customer_api}/notifications", tags=["Customer: Notifications"])
+app.include_router(support.router, prefix=f"{customer_api}/support", tags=["Customer: Support"])
+app.include_router(favorites.router, prefix=f"{settings.API_V1_STR}/users/me/favorites", tags=["Customer: Favorites"])
+app.include_router(promo.router, prefix=f"{settings.API_V1_STR}/coupons", tags=["Customer: Coupons"])
+app.include_router(swaps.router, prefix=f"{customer_api}/swaps", tags=["Customer: Swaps"])
+app.include_router(vehicles.router, prefix=f"{customer_api}/vehicles", tags=["Customer: Vehicles"])
 
 # 2. Admin Application Endpoints
 admin_api = f"{settings.API_V1_STR}/admin"
@@ -164,6 +163,11 @@ app.include_router(telemetry.router, prefix=f"{infra_api}/telemetry", tags=["Inf
 app.include_router(i18n.router, prefix=f"{infra_api}/i18n", tags=["Infra: i18n"])
 app.include_router(locations.router, prefix=f"{infra_api}/locations", tags=["Infra: Locations"])
 app.include_router(inventory.router, prefix=f"{settings.API_V1_STR}/inventory", tags=["Logistics: Inventory"])
+
+
+# Analytics Module (V2 Architecture)
+from app.api.v1.analytics import analytics_router
+app.include_router(analytics_router, prefix=f"{settings.API_V1_STR}/analytics")
 
 
 # Webhooks

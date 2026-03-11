@@ -27,8 +27,8 @@ class AdminUserRole(SQLModel, table=True):
 class UserRole(SQLModel, table=True):
     __tablename__ = "user_roles"
     __table_args__ = {"schema": "core"}
-    user_id: Optional[int] = Field(default=None, foreign_key="core.users.id", primary_key=True)
-    role_id: Optional[int] = Field(default=None, foreign_key="core.roles.id", primary_key=True)
+    user_id: int = Field(foreign_key="core.users.id", primary_key=True)
+    role_id: int = Field(foreign_key="core.roles.id", primary_key=True)
     
     assigned_by: Optional[int] = Field(default=None, foreign_key="core.admin_users.id")
     notes: Optional[str] = None

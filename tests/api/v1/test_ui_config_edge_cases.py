@@ -1,3 +1,4 @@
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -13,7 +14,7 @@ from app.api.v1.screens import MASTER_SCREEN_CONFIG
 def create_roleless_user(session: Session, email: str) -> User:
     user = session.exec(select(User).where(User.email == email)).first()
     if not user:
-        user = User(email=email, is_active=True)
+        user = User(phone_number='6437645498', email=email, is_active=True)
         session.add(user)
         session.commit()
     # Remove any existing roles
