@@ -42,6 +42,10 @@ class Station(SQLModel, table=True):
     station_type: str = Field(default="automated") # automated, manual, hybrid
     total_slots: int = Field(default=0)
     power_rating_kw: Optional[float] = None
+    max_capacity: Optional[int] = Field(default=None)
+    charger_type: Optional[str] = Field(default=None)
+    temperature_control: bool = Field(default=False)
+    safety_features: Optional[str] = None
     
     # Operational Status
     status: StationStatus = Field(default=StationStatus.OPERATIONAL, index=True)

@@ -12,8 +12,80 @@ from app.api import deps
 from app.models.user import User
 from app.models.rbac import Role, UserRole
 from app.models.address import Address
-
 router = APIRouter()
+
+import secrets
+import string
+import logging
+from app.core.security import get_password_hash
+from app.services.email_service import EmailService
+from app.schemas.user import UserInviteRequest
+
+logger = logging.getLogger("wezu_admin")
+
+@router.post("/invite")
+async def invite_user(
+    invite_data: UserInviteRequest,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_superuser),
+):
+    """
+    Invite a new user by generating a temporary password and sending an email.
+    """
+    # 1. Check if user already exists
+    existing_user = db.exec(select(User).where(User.email == invite_data.email)).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="A user with this email already exists."
+        )
+
+    # 2. Get the role
+    role = db.exec(select(Role).where(Role.name == invite_data.role)).first()
+    if not role:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Role '{invite_data.role}' not found."
+        )
+
+    # 3. Generate a secure temporary password
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    temp_password = ''.join(secrets.choice(alphabet) for i in range(12))
+
+    # 4. Create the user
+    new_user = User(
+        email=invite_data.email,
+        full_name=invite_data.full_name or "Invited User",
+        hashed_password=get_password_hash(temp_password),
+        status="active",
+        kyc_status="pending",
+        is_active=True,
+    )
+    new_user.role = role
+    
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    # 5. Send Invite Email
+    subject = "You've been invited to Wezu!"
+    content = f"""
+    <h3>Welcome to Wezu, {new_user.full_name}!</h3>
+    <p>An administrator has invited you to join the Wezu platform as a {role.name}.</p>
+    <p>Your temporary password is: <strong>{temp_password}</strong></p>
+    <p>Please log in and change your password immediately.</p>
+    """
+    email_sent = EmailService.send_email(new_user.email, subject, content)
+    
+    if not email_sent:
+        logger.error(f"Failed to send invite email to {new_user.email}")
+        # We still return success as the user is created, but maybe log a warning
+    
+    return {
+        "status": "success", 
+        "message": f"User invited successfully. Email sent: {email_sent}",
+        "user_id": new_user.id
+    }
 
 
 # Response Schemas

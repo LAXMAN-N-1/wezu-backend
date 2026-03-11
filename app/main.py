@@ -5,6 +5,16 @@ from contextlib import asynccontextmanager
 
 from app.core.config import settings
 
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+
+if settings.SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.ENVIRONMENT,
+        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+        integrations=[FastApiIntegration()]
+    )
 
 # Customer-facing endpoints
 from app.api.v1 import (
@@ -23,7 +33,11 @@ from app.api.v1.admin import (
     users as admin_users,
     promo as admin_coupons,
     reviews as admin_reviews,
-    roles as admin_roles
+    roles as admin_roles,
+    legal as admin_legal,
+    banners as admin_banners,
+    media as admin_media,
+    blogs as admin_blogs
 )
 from app.api.admin import router as admin_router
 from app.api.webhooks import razorpay as razorpay_webhook
@@ -83,13 +97,17 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # ----------------------------
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
+from app.middleware.security import SecureHeadersMiddleware
+app.add_middleware(SecureHeadersMiddleware)
+
 # Audit Logging Middleware
 app.add_middleware(AuditMiddleware)
 
-# Configure CORS - Outermost
+
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In development "*" is often safest for dynamic ports
+    allow_origins=settings.CORS_ORIGINS if settings.ENVIRONMENT == "production" else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -121,7 +139,7 @@ admin_api = f"{settings.API_V1_STR}/admin"
 from app.api import deps
 admin_deps = [Depends(deps.get_current_active_superuser)]
 app.include_router(admin_router, prefix=f"{admin_api}", tags=["Admin: Main"], dependencies=admin_deps)
-app.include_router(admin_user_mgmt.router, prefix=f"{admin_api}/users", tags=["Admin: Users"], dependencies=admin_deps)
+app.include_router(admin_users.router, prefix=f"{admin_api}/users", tags=["Admin: Users"], dependencies=admin_deps)
 app.include_router(admin_roles.router, prefix=f"{admin_api}/roles", tags=["Admin: Roles"], dependencies=admin_deps)
 app.include_router(admin_kyc.router, prefix=f"{admin_api}/kyc", tags=["Admin: KYC"], dependencies=admin_deps)
 app.include_router(audit.router, prefix=f"{admin_api}/audit", tags=["Admin: Audit"], dependencies=admin_deps)
@@ -139,7 +157,7 @@ app.include_router(admin_reviews.router, prefix=f"{admin_api}/reviews", tags=["A
 app.include_router(admin_stations.router, prefix=f"{admin_api}/stations", tags=["Admin: Stations"], dependencies=admin_deps)
 
 # 3. Monitoring Application Endpoints
-monitoring_api = f"{v1_prefix}/monitoring"
+monitoring_api = f"{settings.API_V1_STR}/monitoring"
 app.include_router(station_monitoring.router, prefix=f"{monitoring_api}/stations", tags=["Monitoring: Stations"])
 
 # 3. Dealer Application Endpoints

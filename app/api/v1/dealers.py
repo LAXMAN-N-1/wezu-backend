@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlmodel import Session, select
 from typing import List, Optional, Any
 from datetime import datetime
+from app.api import deps
 from app.api.deps import get_current_user, get_db
 from app.models.dealer import DealerProfile, DealerApplication
 from app.models.user import User

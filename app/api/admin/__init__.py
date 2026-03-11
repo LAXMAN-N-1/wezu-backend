@@ -1,9 +1,10 @@
 from fastapi import APIRouter
 
-from app.api.admin import main, fraud, jobs, monitoring, users, rentals, finance, iot, batteries, stock, health
+from app.api.admin import main, fraud, jobs, monitoring, users, rentals, finance, iot, batteries, stock, health, stations
 
 router = APIRouter()
 router.include_router(main.router)
+router.include_router(stations.router, prefix="/stations", tags=["Admin Stations"])
 router.include_router(users.router, prefix="/users", tags=["Admin Users"])
 router.include_router(batteries.router, prefix="/batteries", tags=["Admin Batteries"]) # New
 router.include_router(stock.router, prefix="/stock", tags=["Admin Stock Levels"])

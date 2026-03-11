@@ -1,37 +1,46 @@
-# Production-ready Dockerfile
-FROM python:3.11-slim
-
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONPATH /app
-ENV PYTHONUNBUFFERED 1
+# ---- Build Stage ----
+FROM python:3.11-slim as builder
 
 WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    libpq-dev \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Install build dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gcc libpq-dev && \
+    rm -rf /var/lib/apt/lists/*
 
 # Install python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
 
-# Copy application code
+# ---- Final Stage ----
+FROM python:3.11-slim
+
+# Create a non-root user
+RUN adduser --disabled-password --gecos '' wezu_user
+
+WORKDIR /app
+ENV PYTHONPATH=/app
+
+# Install runtime dependencies (like postgres libs)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libpq5 && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app/wheels /wheels
+COPY --from=builder /app/requirements.txt .
+
+RUN pip install --no-cache /wheels/*
+
 COPY . .
 
-# Create uploads directory
-RUN mkdir -p uploads/avatars
+# Change ownership to non-root user
+RUN chown -R wezu_user:wezu_user /app
 
-# Expose port
+USER wezu_user
+
 EXPOSE 8000
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
-
-# Run with Gunicorn for production or Uvicorn for local dev
-# The default is production
-CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000", "app.main:app", "--workers", "4", "--timeout", "120"]
+# Use Gunicorn with Uvicorn workers for production load handling
+CMD ["gunicorn", "app.main:app", "--workers", "4", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--log-level", "info"]

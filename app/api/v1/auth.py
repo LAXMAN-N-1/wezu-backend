@@ -14,6 +14,7 @@ from app.core.security import create_access_token, create_refresh_token, get_pas
 from app.schemas.user import TokenPayload
 from app.core.config import settings
 from app.api import deps
+from app.repositories.user_repository import user_repository
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from app.schemas.auth import (
     LoginRequest, LoginResponse, SocialLoginRequest, RoleSelectRequest, ForgotPasswordRequest,
@@ -67,16 +68,16 @@ async def register(
         )
 
     if user_in.email:
-        user = db.exec(select(User).where(User.email == user_in.email)).first()
-        if user:
+        existing_user = user_repository.get_by_email(db, user_in.email)
+        if existing_user:
             raise HTTPException(
                 status_code=400,
                 detail="The user with this email already exists in the system",
             )
             
     if user_in.phone_number:
-         user = db.exec(select(User).where(User.phone_number == user_in.phone_number)).first()
-         if user:
+         existing_user = user_repository.get_by_phone(db, user_in.phone_number)
+         if existing_user:
             raise HTTPException(
                 status_code=400,
                 detail="The user with this phone number already exists in the system",
@@ -160,14 +161,11 @@ async def login_access_token(
 async def _process_login(username: str, password: str, db: Session, request: Request) -> Any:
     logger.info(f"Authenticating: {username}")
     
-    # Try by email
-    statement = select(User).where(User.email == username)
-    user = db.exec(statement).first()
+    user = user_repository.get_by_email(db, username)
     
     if not user:
         # Try by phone number if email fails
-        statement = select(User).where(User.phone_number == username)
-        user = db.exec(statement).first()
+        user = user_repository.get_by_phone(db, username)
 
     if not user:
         logger.warning(f"USER_NOT_FOUND: {username}")

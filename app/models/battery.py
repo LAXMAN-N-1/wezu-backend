@@ -26,7 +26,6 @@ class BatteryHealth(str, Enum):
     POOR = "poor"
     CRITICAL = "critical"
     EXCELLENT = "excellent"
-    POOR = "poor"
     DAMAGED = "damaged"
 
 

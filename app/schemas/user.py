@@ -42,6 +42,10 @@ class UserCreate(UserBase):
     is_active: bool = True
     role_id: Optional[int] = None
 
+class UserInviteRequest(BaseModel):
+    email: str
+    role: str
+    full_name: Optional[str] = None
 
 class UserUpdate(BaseModel):
     """
