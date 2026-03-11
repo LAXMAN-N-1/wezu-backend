@@ -48,9 +48,4 @@ logs/
 # IDE
 .vscode/
 .idea/
-
-# App Specific Ignores
-check_*.py
-token.json
-*.exe
-verify_*.py
+walkthrough.md

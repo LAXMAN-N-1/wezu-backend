@@ -152,38 +152,10 @@ from app.models.feedback import Feedback
 # Operations & Logistics
 from app.models.logistics import BatteryTransfer, DeliveryOrder, DeliveryType, DeliveryStatus
 from app.models.delivery_assignment import DeliveryAssignment
-from app.models.delivery_route import DeliveryRoute, RouteStop
-from app.models.swap import SwapSession
-from app.models.swap_suggestion import SwapSuggestion, SwapPreference
-from app.models.telemetry import Telemetry
-from app.models.battery_reservation import BatteryReservation
-from app.models.batch_job import BatchJob, JobExecution
-
-# Security & Sessions
-from app.models.otp import OTP
-from app.models.two_factor_auth import TwoFactorAuth
-from app.models.session import UserSession
-from app.models.login_history import LoginHistory
-from app.models.favorite import Favorite
-from app.models.device_fingerprint import DeviceFingerprint, DuplicateAccount
-from app.models.security_question import SecurityQuestion, UserSecurityQuestion
-from app.models.token import SessionToken
-
-# Misc & History
-from app.models.user_history import UserStatusLog
-from app.models.search_history import SearchHistory
-from app.models.address import Address
-from app.models.vehicle import Vehicle
-from app.models.device import Device
-from app.models.review import Review
-from app.models.notification import Notification
-from app.models.notification_preference import NotificationPreference
-from app.models.membership import UserMembership
-from app.models.analytics import DemandForecast, ChurnPrediction, PricingRecommendation
-
-# Profiles
-from app.models.admin_user import AdminUser
-from app.models.staff import StaffProfile
-from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
-from app.models.driver_profile import DriverProfile
-from app.models.vendor import Vendor
+from app.models.oauth import BlacklistedToken
+from app.models.commission import CommissionConfig, CommissionLog, CommissionTier
+from app.models.dealer_kyc import DealerKYCApplication, KYCStateTransition
+from app.models.chargeback import Chargeback
+from app.models.settlement_dispute import SettlementDispute
+from app.models.password_history import PasswordHistory
+from app.models.revenue_report import RevenueReport

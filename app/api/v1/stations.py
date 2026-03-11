@@ -20,6 +20,7 @@ router = APIRouter()
 
 @router.get("/", response_model=List[StationResponse])
 async def read_stations(
+    request: Request,
     skip: int = 0,
     limit: int = 100,
     current_user: User = Depends(deps.require_permission("station:read")),
@@ -30,11 +31,14 @@ async def read_stations(
     """
     from sqlmodel import select
     from app.models.station import Station
+    from app.models.roles import RoleEnum
     
     query = select(Station)
     
-    # Row-level filtering: Dealers only see their own stations
-    if not current_user.is_superuser and current_user.dealer_profile:
+    # Row-level filtering: Dealers only see their own stations using Request Context Role
+    user_role = getattr(request.state, 'user_role', None)
+
+    if user_role == RoleEnum.DEALER and current_user.dealer_profile:
         query = query.where(Station.dealer_id == current_user.dealer_profile.id)
     
     stations = db.exec(query.offset(skip).limit(limit)).all()

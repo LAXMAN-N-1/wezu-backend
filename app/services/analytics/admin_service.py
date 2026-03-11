@@ -6,14 +6,16 @@ from typing import Dict, Any
 from app.schemas.analytics.admin import AdminOverviewResponse
 from app.schemas.analytics.base import KpiCard, TrendPoint, DistributionPoint
 from .base import BaseAnalyticsService
-from app.models.user import User, UserType, UserStatus
-from app.models.rental import Rental, RentalStatus
-from app.models.battery import Battery, BatteryStatus, BatteryHealth
+from app.models.user import User
+from app.models.rbac import UserRole
+from app.models.rental import Rental
+from app.utils.constants import RentalStatus, BatteryStatus
+from app.models.battery import Battery
 from app.models.station import Station
 from app.models.dealer import DealerProfile
-from app.models.logistics import DeliveryOrder
-from app.models.support import SupportTicket, TicketStatus
-from app.models.payment import PaymentTransaction
+from app.models.logistics import BatteryTransfer
+from app.models.support import SupportTicket
+from app.utils.constants import PaymentStatus
 
 class AnalyticsAdminService(BaseAnalyticsService):
     @staticmethod
@@ -29,10 +31,18 @@ class AnalyticsAdminService(BaseAnalyticsService):
             return KpiCard(value=float(current_val), trend_percentage=round(trend, 2), status=status)
 
         # 1. Platform Overview
-        total_users = db.query(func.count(User.id)).filter(User.user_type == UserType.CUSTOMER).scalar() or 0
-        active_users_24h = db.query(func.count(User.id)).filter(User.last_login_at >= datetime.utcnow() - timedelta(hours=24)).scalar() or 0
+        # Assuming customers don't have a specific role_id or use UserRole.USER
+        from app.utils.constants import UserRole
+        from app.models.rbac import UserRole as UserRoleTable, Role
+        
+        # Approximate: Users that are just regular users
+        total_users = db.query(func.count(User.id)).scalar() or 0
+        active_users_24h = db.query(func.count(User.id)).filter(User.last_login >= datetime.utcnow() - timedelta(hours=24)).scalar() or 0
         total_dealers = db.query(func.count(DealerProfile.id)).scalar() or 0
-        total_logistics = db.query(func.count(User.id)).filter(User.user_type == UserType.LOGISTICS).scalar() or 0
+        
+        # Approximate: logistics users (if we don't have UserType, maybe count drivers or skip exact count)
+        total_logistics = 0  # To be refined if Logistics has a specific role
+        
         total_stations = db.query(func.count(Station.id)).scalar() or 0
         total_batteries = db.query(func.count(Battery.id)).scalar() or 0
 
@@ -46,8 +56,8 @@ class AnalyticsAdminService(BaseAnalyticsService):
         }
 
         # 2. Rental Analytics
-        rentals_today = db.query(func.count(Rental.id)).filter(Rental.created_at >= datetime.utcnow().replace(hour=0, minute=0, second=0)).scalar() or 0
-        rentals_week = db.query(func.count(Rental.id)).filter(Rental.created_at >= datetime.utcnow() - timedelta(days=7)).scalar() or 0
+        rentals_today = db.query(func.count(Rental.id)).filter(Rental.start_time >= datetime.utcnow().replace(hour=0, minute=0, second=0)).scalar() or 0
+        rentals_week = db.query(func.count(Rental.id)).filter(Rental.start_time >= datetime.utcnow() - timedelta(days=7)).scalar() or 0
         avg_duration = db.query(func.avg(extract('epoch', Rental.end_time - Rental.start_time) / 3600)).filter(Rental.status == RentalStatus.COMPLETED).scalar() or 0
         
         rental_analytics = {
@@ -57,11 +67,13 @@ class AnalyticsAdminService(BaseAnalyticsService):
             "battery_utilization_rate": 85.0 # Mocked for now
         }
 
-        # 3. Revenue Analytics
-        total_rev_month = db.query(func.sum(Rental.total_amount)).filter(Rental.created_at >= datetime.utcnow().replace(day=1)).scalar() or 0
-        revenue_rentals = db.query(func.sum(Rental.total_amount)).filter(Rental.created_at >= target_date).scalar() or 0
+        # 3. Financial Overview
+        total_rev_today = db.query(func.sum(Rental.total_price)).filter(Rental.start_time >= datetime.utcnow().replace(hour=0, minute=0, second=0)).scalar() or 0
+        total_rev_month = db.query(func.sum(Rental.total_price)).filter(Rental.start_time >= datetime.utcnow().replace(day=1)).scalar() or 0
+        revenue_rentals = db.query(func.sum(Rental.total_price)).filter(Rental.start_time >= target_date).scalar() or 0
         
         revenue_analytics = {
+            "total_revenue_today": float(total_rev_today),
             "total_revenue_month": float(total_rev_month),
             "revenue_from_rentals": float(revenue_rentals),
             "commission_paid_dealers": float(revenue_rentals * 0.1) # Assuming 10%
@@ -83,7 +95,7 @@ class AnalyticsAdminService(BaseAnalyticsService):
         }
 
         # 5. Station Analytics
-        top_stations = db.query(Station.name, func.count(Rental.id)).join(Rental, Rental.start_station_id == Station.id).group_by(Station.name).order_by(desc(func.count(Rental.id))).limit(5).all()
+        top_stations = db.query(Station.name, func.count(Rental.id)).join(Rental, Station.id == Rental.pickup_station_id).group_by(Station.name).order_by(desc(func.count(Rental.id))).limit(5).all()
         
         station_analytics = {
             "top_performing_stations": [{"name": row[0], "rentals": row[1]} for row in top_stations],
@@ -91,7 +103,7 @@ class AnalyticsAdminService(BaseAnalyticsService):
         }
 
         # 6. Financial & Operational
-        pending_tickets = db.query(func.count(SupportTicket.id)).filter(SupportTicket.status == TicketStatus.OPEN).scalar() or 0
+        pending_tickets = db.query(func.count(SupportTicket.id)).filter(SupportTicket.status == "open").scalar() or 0
         
         financial_analytics = {
             "daily_revenue": float(revenue_rentals / days if days > 0 else 0),

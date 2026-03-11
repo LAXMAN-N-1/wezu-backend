@@ -11,21 +11,20 @@ import logging
 logger = logging.getLogger(__name__)
 
 def commission_settlement():
-    """Process monthly dealer commission settlements"""
+    """Process monthly dealer commission settlements on 1st of each month."""
     logger.info("Starting monthly commission settlement...")
     execution = create_job_execution("monthly_commission_settlement")
     
     try:
         from app.models.dealer import DealerProfile
-        from app.models.commission import Commission, Settlement
-        from app.services.financial_service import FinancialService
+        from app.services.settlement_service import SettlementService
         
         with Session(engine) as session:
-            # Get previous month date range
+            # Get previous month
             today = datetime.utcnow()
             first_of_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             last_month_end = first_of_month - timedelta(days=1)
-            last_month_start = last_month_end.replace(day=1)
+            month_str = last_month_end.strftime("%Y-%m")
             
             dealers = session.exec(select(DealerProfile).where(DealerProfile.is_active == True)).all()
             
@@ -33,34 +32,19 @@ def commission_settlement():
             total_amount = 0.0
             
             for dealer in dealers:
-                # Get unpaid commissions for last month
-                commissions = session.exec(
-                    select(Commission)
-                    .where(Commission.dealer_id == dealer.id)
-                    .where(Commission.earned_date >= last_month_start)
-                    .where(Commission.earned_date < first_of_month)
-                    .where(Commission.settlement_id == None)
-                ).all()
+                settlement = SettlementService.generate_monthly_settlement(
+                    session, dealer.user_id, month_str
+                )
+                settlements_created += 1
+                total_amount += settlement.net_payable
                 
-                if commissions:
-                    # Generate settlement
-                    settlement = FinancialService.generate_settlement(
-                        dealer.id,
-                        last_month_start,
-                        last_month_end
-                    )
-                    
-                    settlements_created += 1
-                    total_amount += settlement.total_amount
-                    
-                    logger.info(
-                        f"Settlement created for dealer {dealer.id}: "
-                        f"₹{settlement.total_amount}"
-                    )
+                logger.info(
+                    f"Settlement created for dealer {dealer.user_id}: "
+                    f"₹{settlement.net_payable}"
+                )
             
             result = {
-                "period_start": last_month_start.isoformat(),
-                "period_end": last_month_end.isoformat(),
+                "period": month_str,
                 "dealers_processed": len(dealers),
                 "settlements_created": settlements_created,
                 "total_amount": total_amount
@@ -72,6 +56,32 @@ def commission_settlement():
     except Exception as e:
         logger.error(f"Commission settlement failed: {str(e)}")
         complete_job_execution(execution.execution_id, "FAILED", error=str(e))
+
+
+def batch_payment_processing():
+    """Process batch payments for generated settlements on 5th of each month."""
+    logger.info("Starting batch payment processing...")
+    execution = create_job_execution("monthly_batch_payment")
+    
+    try:
+        from app.services.settlement_service import SettlementService
+        
+        with Session(engine) as session:
+            # Pay last month's settlements
+            today = datetime.utcnow()
+            first_of_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            last_month_end = first_of_month - timedelta(days=1)
+            month_str = last_month_end.strftime("%Y-%m")
+            
+            result = SettlementService.process_batch_payments(session, month_str)
+            
+            logger.info(f"Batch payment completed: {result}")
+            complete_job_execution(execution.execution_id, "COMPLETED", result)
+            
+    except Exception as e:
+        logger.error(f"Batch payment processing failed: {str(e)}")
+        complete_job_execution(execution.execution_id, "FAILED", error=str(e))
+
 
 def financial_reconciliation():
     """Reconcile financial transactions with bank statements"""

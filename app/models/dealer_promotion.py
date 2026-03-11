@@ -1,6 +1,10 @@
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from datetime import datetime
+
+if TYPE_CHECKING:
+    from app.models.dealer import DealerProfile
+    from app.models.user import User
 
 class DealerPromotion(SQLModel, table=True):
     __tablename__ = "dealer_promotions"
@@ -19,11 +23,21 @@ class DealerPromotion(SQLModel, table=True):
     min_purchase_amount: Optional[float] = None
     max_discount_amount: Optional[float] = None
     
+    # Budget and Controls
+    budget_limit: Optional[float] = None
+    daily_cap: Optional[int] = None
+    
     usage_limit_total: Optional[int] = None  # Total times this can be used
     usage_limit_per_user: int = Field(default=1)
+    
+    # Tracking
     usage_count: int = Field(default=0)
+    total_discount_given: float = Field(default=0.0)
+    impressions: int = Field(default=0)
     
     applicable_to: str = Field(default="ALL")  # ALL, RENTAL, PURCHASE, SPECIFIC_MODELS
+    applicable_station_ids: Optional[str] = None  # JSON array of station IDs
+
     applicable_models: Optional[str] = None  # JSON array of battery models
     
     start_date: datetime

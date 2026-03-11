@@ -74,15 +74,22 @@ class User(SQLModel, table=True):
 
     # Security
     two_factor_enabled: bool = Field(default=False)
-    two_factor_secret: Optional[str] = None
-    backup_codes: Optional[List[str]] = Field(default=None, sa_column=sa.Column(sa.JSON))
-    
-    # Email Verification
-    is_email_verified: bool = Field(default=False)
-    email_verification_token: Optional[str] = None
-    email_verification_sent_at: Optional[datetime] = None
-    
-    last_login_at: Optional[datetime] = None
+    biometric_login_enabled: bool = Field(default=False)
+    security_question: Optional[str] = None
+    security_answer: Optional[str] = None
+    reset_token: Optional[str] = Field(default=None, index=True)
+    reset_token_expires: Optional[datetime] = None
+    reset_token_expires: Optional[datetime] = None
+    last_global_logout_at: Optional[datetime] = None
+    last_login: Optional[datetime] = Field(default=None, index=True)
+
+    # Password policy
+    password_changed_at: Optional[datetime] = None
+    force_password_change: bool = Field(default=False)
+
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Soft Delete
     is_deleted: bool = Field(default=False)

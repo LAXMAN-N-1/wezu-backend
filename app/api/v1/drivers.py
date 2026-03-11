@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session, select
 from typing import List, Optional
 from datetime import datetime
@@ -90,3 +90,30 @@ def get_my_driver_profile(
         raise HTTPException(status_code=404, detail="Driver profile not found")
         
     return DataResponse(data=profile)
+
+@router.get("/routes")
+def get_assigned_routes(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """Get driver's assigned routes."""
+    from app.models.delivery_route import DeliveryRoute
+    from app.models.roles import RoleEnum
+    
+    # Check driver profile existence
+    profile = DriverService.get_profile(current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Driver profile not found")
+        
+    query = select(DeliveryRoute)
+    
+    # Auto-filter: Driver context can ONLY see assigned routes
+    user_role = getattr(request.state, 'user_role', None)
+    if user_role == RoleEnum.DRIVER:
+        query = query.where(DeliveryRoute.driver_id == profile.id)
+        
+    routes = session.exec(query).all()
+    # Safe dump since we do not have a response model here setup yet
+    return DataResponse(data=routes)
+

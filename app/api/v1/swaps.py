@@ -27,6 +27,12 @@ def initiate_swap(
     """
     User initiates a swap at a station.
     """
+    # Enforce station operational hours and maintenance schedules
+    from app.services.dealer_station_service import DealerStationService
+    is_operational, msg = DealerStationService.is_station_operational(session, swap_in.station_id)
+    if not is_operational:
+         raise HTTPException(status_code=400, detail=msg)
+
     # 1. Validate Station
     station = session.get(Station, swap_in.station_id)
     if not station:

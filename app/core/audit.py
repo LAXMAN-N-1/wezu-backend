@@ -31,9 +31,12 @@ class AuditLogger:
         action: str,
         resource_type: str,
         resource_id: Optional[str] = None,
+        target_id: Optional[int] = None,
         metadata: Optional[Dict[str, Any]] = None,
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
+        old_value: Optional[Dict[str, Any]] = None,
+        new_value: Optional[Dict[str, Any]] = None,
     ) -> Optional[AuditLog]:
         """
         Create an AuditLog record. Never raises — fails silently with logging.
@@ -41,12 +44,15 @@ class AuditLogger:
         Args:
             db: Active database session
             user_id: ID of acting user (None for system actions)
-            action: Action identifier e.g. LOGIN, CREATE_USER
+            action: Action identifier e.g. AUTH_LOGIN, USER_CREATION
             resource_type: Entity type e.g. USER, BATTERY, AUTH
-            resource_id: Optional entity ID
+            resource_id: Optional entity ID (string, backward compat)
+            target_id: Optional typed entity ID (int, indexed)
             metadata: Optional structured JSON context
             ip_address: Client IP address
             user_agent: Client user-agent string
+            old_value: JSON dict of previous values (change tracking)
+            new_value: JSON dict of new values (change tracking)
         """
         try:
             log_entry = AuditLog(
@@ -54,9 +60,12 @@ class AuditLogger:
                 action=action,
                 resource_type=resource_type,
                 resource_id=str(resource_id) if resource_id is not None else None,
+                target_id=target_id,
                 meta_data=metadata,
                 ip_address=ip_address,
                 user_agent=user_agent,
+                old_value=old_value,
+                new_value=new_value,
             )
             db.add(log_entry)
             db.commit()
@@ -75,22 +84,20 @@ def audit_log(action: str, resource_type: str, resource_id_param: Optional[str] 
 
     Usage:
         @router.post("/users/")
-        @audit_log("CREATE_USER", "USER")
-        async def create_user(request: Request, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
+        @audit_log("USER_CREATION", "USER")
+        async def create_user(request: Request, db: Session = Depends(get_db), ...):
             ...
 
     Args:
-        action: Action identifier e.g. "LOGIN", "CREATE_USER"
+        action: Action identifier e.g. "AUTH_LOGIN", "USER_CREATION"
         resource_type: Entity type e.g. "USER", "BATTERY"
-        resource_id_param: Name of the kwarg holding the resource ID (e.g. "user_id", "battery_id")
+        resource_id_param: Name of the kwarg holding the resource ID
     """
 
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         async def async_wrapper(*args, **kwargs):
-            # Execute the original endpoint first
             result = await func(*args, **kwargs)
-            # Then log the event (non-blocking failure)
             _log_from_context(kwargs, result, action, resource_type, resource_id_param)
             return result
 
@@ -116,14 +123,14 @@ def _log_from_context(
 ):
     """Extract request context from FastAPI kwargs and result, then log the event."""
     try:
-        # Extract database session (supports both 'db' and 'session' param names)
+        # Extract database session
         db: Optional[Session] = kwargs.get("db") or kwargs.get("session")
         if db is None:
             logger.warning(f"Audit log skipped (no db session): {action}")
             return
 
         # Extract request for IP and User-Agent
-        request: Optional[Request] = kwargs.get("request")
+        request: Optional[Request] = kwargs.get("request") or kwargs.get("http_request")
         ip_address = None
         user_agent_str = None
         if request is not None:
@@ -136,33 +143,51 @@ def _log_from_context(
 
         # Extract resource ID
         resource_id = None
-        
-        # 1. Try from explicit param in input (e.g. update/delete)
+        target_id = None
+
+        # 1. Try from explicit param in input
         if resource_id_param and resource_id_param in kwargs:
-             resource_id = kwargs[resource_id_param]
-             
+            resource_id = kwargs[resource_id_param]
+            try:
+                target_id = int(resource_id)
+            except (ValueError, TypeError):
+                pass
+
         # 2. Try from result (e.g. create returns the object)
         if not resource_id and result:
             resource_id = getattr(result, "id", None)
-            
+            if resource_id:
+                try:
+                    target_id = int(resource_id)
+                except (ValueError, TypeError):
+                    pass
+
         # 3. Auto-detect from input kwargs (fallback)
         if not resource_id:
             for key in ("user_id", "battery_id", "station_id", "swap_id", "payment_id", "order_id"):
-                if key in kwargs and key != "user_id" or (key == "user_id" and key in kwargs and current_user and kwargs[key] != getattr(current_user, "id", None)):
+                if key in kwargs and key != "user_id" or (
+                    key == "user_id"
+                    and key in kwargs
+                    and current_user
+                    and kwargs[key] != getattr(current_user, "id", None)
+                ):
                     resource_id = kwargs[key]
+                    try:
+                        target_id = int(resource_id)
+                    except (ValueError, TypeError):
+                        pass
                     break
 
-        # Extract Metadata: JSON body from kwargs (e.g. battery_in, user_in)
+        # Extract Metadata: JSON body from kwargs
         metadata = {}
         for k, v in kwargs.items():
             if k.endswith("_in") or k == "payload":
                 try:
-                    # Try to dump pydantic model
                     if hasattr(v, "model_dump"):
                         metadata[k] = v.model_dump()
                     elif hasattr(v, "dict"):
                         metadata[k] = v.dict()
-                except:
+                except Exception:
                     pass
 
         AuditLogger.log_event(
@@ -171,6 +196,7 @@ def _log_from_context(
             action=action,
             resource_type=resource_type,
             resource_id=resource_id,
+            target_id=target_id,
             metadata=metadata if metadata else None,
             ip_address=ip_address,
             user_agent=user_agent_str,
@@ -183,9 +209,6 @@ def cleanup_old_logs(db: Session, retention_days: int = 90) -> int:
     """
     Delete AuditLog records older than retention_days.
     Intended to be called by APScheduler or a management command.
-
-    Returns:
-        Number of deleted records.
     """
     try:
         cutoff = datetime.utcnow() - timedelta(days=retention_days)

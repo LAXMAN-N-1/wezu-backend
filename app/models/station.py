@@ -47,12 +47,9 @@ class Station(SQLModel, table=True):
     temperature_control: bool = Field(default=False)
     safety_features: Optional[str] = None
     
-    # Operational Status
-    status: StationStatus = Field(default=StationStatus.OPERATIONAL, index=True)
-    available_batteries: int = Field(default=0) # Cached count
-    available_slots: int = Field(default=0) # Cached count
-    
-    # Contact & Info
+    # Status
+    status: str = Field(default="active")
+    approval_status: str = Field(default="approved") # pending, approved, rejected
     contact_phone: Optional[str] = None
     operating_hours: Optional[str] = None # JSON string: {"mon": "09:00-18:00", ...}
     is_24x7: bool = Field(default=False)
@@ -62,6 +59,11 @@ class Station(SQLModel, table=True):
     # Ratings
     rating: float = Field(default=0.0)
     total_reviews: int = Field(default=0)
+    last_maintenance_date: Optional[datetime] = None
+    
+    # Inventory settings
+    low_stock_threshold_pct: float = Field(default=20.0)
+
     
     # Timestamps
     last_heartbeat: Optional[datetime] = None

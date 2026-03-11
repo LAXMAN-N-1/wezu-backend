@@ -92,9 +92,12 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# ----------------------------
-# Middleware
-# ----------------------------
+# RBAC Middleware
+from app.middleware.rbac_middleware import RBACMiddleware
+app.add_middleware(RBACMiddleware)
+
+# GZip Compression
+from fastapi.middleware.gzip import GZipMiddleware
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 from app.middleware.security import SecureHeadersMiddleware
@@ -121,8 +124,9 @@ app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Aut
 from app.api.v1 import sessions
 app.include_router(sessions.router, prefix=f"{settings.API_V1_STR}/sessions", tags=["Session Management"])
 app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["Users"])
-from app.api.v1 import admin_users
+from app.api.v1 import admin_users, admin_user_bulk
 app.include_router(admin_users.router, prefix=f"{settings.API_V1_STR}/admin/users", tags=["Admin User Management"])
+app.include_router(admin_user_bulk.router, prefix=f"{settings.API_V1_STR}/admin/users", tags=["Admin User Bulk Operations"])
 app.include_router(kyc.router, prefix=f"{settings.API_V1_STR}", tags=["KYC"])
 app.include_router(stations.router, prefix=f"{settings.API_V1_STR}/stations", tags=["Stations"])
 app.include_router(batteries.router, prefix=f"{settings.API_V1_STR}/batteries", tags=["Batteries"])
@@ -214,16 +218,29 @@ app.include_router(rentals_enhanced.router, prefix=f"{settings.API_V1_STR}/renta
 app.include_router(purchases_enhanced.router, prefix=f"{settings.API_V1_STR}/purchases", tags=["Purchases Enhanced"])
 app.include_router(analytics_enhanced.router, prefix=f"{settings.API_V1_STR}/analytics", tags=["Analytics Enhanced"])
 
+# Dealer Analytics
+from app.api.v1 import dealer_analytics
+app.include_router(dealer_analytics.router, prefix=f"{settings.API_V1_STR}/dealer-analytics", tags=["Dealer Analytics"])
+
+# Dealer Campaigns
+from app.api.v1 import dealer_campaigns
+app.include_router(dealer_campaigns.router, prefix=f"{settings.API_V1_STR}/dealer-campaigns", tags=["Dealer Campaigns"])
+
+# Dealer Stations (Inventory & Management)
+from app.api.v1 import dealer_stations
+app.include_router(dealer_stations.router, prefix=f"{settings.API_V1_STR}/dealer-stations", tags=["Dealer Stations"])
+
 # RBAC API Routes
 app.include_router(roles.router, prefix=f"{settings.API_V1_STR}/roles", tags=["Roles"])
 app.include_router(menus.router, prefix=f"{settings.API_V1_STR}/menus", tags=["Menus"])
 app.include_router(role_rights.router, prefix=f"{settings.API_V1_STR}/role-rights", tags=["Role Rights"])
 
 # ML & Dynamics (Phase 5)
-from app.api.v1 import ml, admin_roles, admin_kyc
+from app.api.v1 import ml, admin_roles, admin_kyc, admin_financial_reports
 app.include_router(ml.router, prefix=f"{settings.API_V1_STR}/ml", tags=["Machine Learning"])
 app.include_router(admin_roles.router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin Role Management"])
 app.include_router(admin_kyc.router, prefix=f"{settings.API_V1_STR}/admin/kyc", tags=["Admin KYC Management"])
+app.include_router(admin_financial_reports.router, prefix=f"{settings.API_V1_STR}/admin/reports", tags=["Admin Financial Reports"])
 
 
 # Webhooks
@@ -238,8 +255,10 @@ from app.api.v1 import logistics
 app.include_router(logistics.router, prefix=f"{settings.API_V1_STR}/logistics", tags=["Logistics & Supply Chain"])
 
 # Dealer Onboarding
-from app.api.v1 import dealers
+from app.api.v1 import dealers, dealer_kyc, dealer_commission
 app.include_router(dealers.router, prefix=f"{settings.API_V1_STR}/dealers", tags=["Dealers"])
+app.include_router(dealer_kyc.router, prefix=f"{settings.API_V1_STR}/dealer-kyc", tags=["Dealer KYC"])
+app.include_router(dealer_commission.router, prefix=f"{settings.API_V1_STR}/dealer-commission", tags=["Dealer Commission & Settlement"])
 
 # Driver Onboarding
 from app.api.v1 import drivers

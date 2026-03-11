@@ -207,6 +207,69 @@ def require_permission(permission_slug: str):
     
     return permission_checker
 
+from app.models.roles import RoleEnum
+
+def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.is_superuser:
+        return current_user
+        
+    user_role_names = [r.name.lower() for r in current_user.roles]
+    if current_user.role:
+        user_role_names.append(current_user.role.name.lower())
+        
+    if RoleEnum.ADMIN.value not in user_role_names:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required"
+        )
+    return current_user
+
+def get_current_dealer(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.is_superuser:
+        return current_user
+        
+    user_role_names = [r.name.lower() for r in current_user.roles]
+    if current_user.role:
+        user_role_names.append(current_user.role.name.lower())
+        
+    if RoleEnum.DEALER.value not in user_role_names:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Dealer privileges required"
+        )
+    return current_user
+
+def get_current_driver(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.is_superuser:
+        return current_user
+        
+    user_role_names = [r.name.lower() for r in current_user.roles]
+    if current_user.role:
+        user_role_names.append(current_user.role.name.lower())
+        
+    if RoleEnum.DRIVER.value not in user_role_names:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Driver privileges required"
+        )
+    return current_user
+
+def get_current_customer(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.is_superuser:
+        return current_user
+        
+    user_role_names = [r.name.lower() for r in current_user.roles]
+    if current_user.role:
+        user_role_names.append(current_user.role.name.lower())
+        
+    if RoleEnum.CUSTOMER.value not in user_role_names:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Customer privileges required"
+        )
+    return current_user
+
+
 
 from fastapi import Header
 

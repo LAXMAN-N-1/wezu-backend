@@ -11,6 +11,6 @@ router = APIRouter()
 async def get_customer_overview(
     period: str = Query("30d", description="Filter period: 7d, 30d, 90d, 365d, weekly, monthly, yearly"),
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_user)
+    current_user: User = Depends(deps.get_current_customer)
 ):
     return await analytics_customer_service.get_overview(db, period, customer_id=current_user.id)

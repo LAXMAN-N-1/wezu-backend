@@ -618,6 +618,9 @@ async def register_with_password(
     # Check Fraud Risk
     FraudService.calculate_risk_score(new_user.id)
     
+    # Audit log
+    AuditLogger.log_event(db, new_user.id, "USER_CREATION", "USER", resource_id=str(new_user.id), target_id=new_user.id)
+    
     # Create Dual Tokens
     access_token = create_access_token(subject=new_user.id)
     refresh_token = create_refresh_token(subject=new_user.id)

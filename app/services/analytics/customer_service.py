@@ -6,11 +6,12 @@ from typing import Dict, List, Any
 from app.schemas.analytics.customer import CustomerOverviewResponse
 from app.schemas.analytics.base import KpiCard, TrendPoint, DistributionPoint
 from .base import BaseAnalyticsService
-from app.models.rental import Rental, RentalStatus
+from app.models.rental import Rental
+from app.utils.constants import RentalStatus
 from app.models.user import User
 from app.models.battery import Battery
-from app.models.membership import UserMembership, MembershipTier
-from app.models.financial import Wallet, Transaction, TransactionType
+from app.models.financial import Wallet, Transaction
+from app.utils.constants import PaymentStatus # Maybe replace TransactionType logic
 
 class AnalyticsCustomerService(BaseAnalyticsService):
     @staticmethod
@@ -22,7 +23,6 @@ class AnalyticsCustomerService(BaseAnalyticsService):
 
         # 1. Personal Overview
         user = db.query(User).filter(User.id == c_id).first()
-        membership = db.query(UserMembership).filter(UserMembership.user_id == c_id).first()
         wallet = db.query(Wallet).filter(Wallet.user_id == c_id).first()
         total_rentals = db.query(func.count(Rental.id)).filter(Rental.user_id == c_id).scalar() or 0
         active_rental = db.query(Rental).filter(Rental.user_id == c_id, Rental.status == RentalStatus.ACTIVE).first()
@@ -30,31 +30,37 @@ class AnalyticsCustomerService(BaseAnalyticsService):
         personal_overview = {
             "active_rentals": 1 if active_rental else 0,
             "total_rentals": total_rentals,
-            "membership_level": membership.tier.value if membership else MembershipTier.BRONZE.value,
+            "membership_level": "Bronze", # Fallback since membership module is missing
             "wallet_balance": float(wallet.balance) if wallet else 0.0
         }
 
         # 2. Spending Analytics
-        total_spent = db.query(func.sum(Transaction.amount)).filter(
-            Transaction.user_id == c_id, 
-            Transaction.status == "success"
+        transactions = db.query(Transaction).join(Wallet).filter(
+            Wallet.user_id == c_id,
+            Transaction.created_at >= target_date
+        ).all() or 0.0
+        
+        total_spent = db.query(func.sum(Transaction.amount)).join(Wallet).filter(
+            Wallet.user_id == c_id,
+            Transaction.type == "payment",
+            Transaction.created_at >= target_date
         ).scalar() or 0.0
         
-        monthly_spent = db.query(func.sum(Transaction.amount)).filter(
-            Transaction.user_id == c_id,
+        monthly_spent = db.query(func.sum(Transaction.amount)).join(Wallet).filter(
+            Wallet.user_id == c_id,
             Transaction.status == "success",
             Transaction.created_at >= datetime.utcnow().replace(day=1)
         ).scalar() or 0.0
 
-        rental_spending = db.query(func.sum(Transaction.amount)).filter(
-            Transaction.user_id == c_id,
-            Transaction.transaction_type == TransactionType.RENTAL_PAYMENT,
+        rental_spending = db.query(func.sum(Transaction.amount)).join(Wallet).filter(
+            Wallet.user_id == c_id,
+            Transaction.category == "rental_payment",
             Transaction.status == "success"
         ).scalar() or 0.0
         
-        purchase_spending = db.query(func.sum(Transaction.amount)).filter(
-            Transaction.user_id == c_id,
-            Transaction.transaction_type == TransactionType.PURCHASE,
+        purchase_spending = db.query(func.sum(Transaction.amount)).join(Wallet).filter(
+            Wallet.user_id == c_id,
+            Transaction.category == "subscription_payment",
             Transaction.status == "success"
         ).scalar() or 0.0
 
@@ -92,7 +98,7 @@ class AnalyticsCustomerService(BaseAnalyticsService):
         }
 
         # 5. Environmental Impact
-        total_dist = db.query(func.sum(Rental.distance_traveled_km)).filter(Rental.user_id == c_id).scalar() or 0.0
+        total_dist = 0.0 # Distance tracking not currently supported by Rental schema
         carbon_saved = total_dist * 0.12 # Assuming 120g/km for ICE
         
         environmental_impact = {
@@ -101,12 +107,12 @@ class AnalyticsCustomerService(BaseAnalyticsService):
         }
 
         # 6. Rental History
-        history = db.query(Rental).filter(Rental.user_id == c_id).order_by(desc(Rental.created_at)).limit(10).all()
+        history = db.query(Rental).filter(Rental.user_id == c_id).order_by(desc(Rental.start_time)).limit(10).all()
         rental_history = [{
             "id": r.id,
-            "cost": float(r.total_amount),
+            "cost": float(r.total_price),
             "duration": "2h 30m", # Mocked formatting
-            "timestamp": r.created_at.isoformat()
+            "timestamp": r.start_time.isoformat()
         } for r in history]
 
         return CustomerOverviewResponse(

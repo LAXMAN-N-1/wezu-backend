@@ -160,6 +160,14 @@ def register_jobs():
         replace_existing=True
     )
     
+    scheduler.add_job(
+        monthly_jobs.batch_payment_processing,
+        CronTrigger(day=5, hour=2, minute=0),
+        id='monthly_batch_payment',
+        name='Monthly Batch Payment Processing',
+        replace_existing=True
+    )
+    
     logger.info(f"Registered {len(scheduler.get_jobs())} scheduled jobs")
 
 def start_scheduler():

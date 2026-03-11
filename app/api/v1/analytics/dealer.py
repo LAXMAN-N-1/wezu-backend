@@ -13,7 +13,7 @@ router = APIRouter()
 async def get_dealer_overview(
     period: str = Query("30d", description="Filter period: 7d, 30d, 90d, 365d, weekly, monthly, yearly"),
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_user)
+    current_user: User = Depends(deps.get_current_dealer)
 ):
     dealer_profile = db.query(DealerProfile).filter(DealerProfile.user_id == current_user.id).first()
     d_id = dealer_profile.id if dealer_profile else None
