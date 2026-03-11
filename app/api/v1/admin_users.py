@@ -9,7 +9,6 @@ from datetime import datetime, timedelta
 from pydantic import BaseModel, ConfigDict
 
 from app.api import deps
-from app.db.session import get_session
 from app.models.user import User
 from app.models.rbac import Role, UserRole
 from app.models.address import Address
@@ -68,7 +67,7 @@ class UserStatisticsResponse(BaseModel):
 @router.get("/statistics", response_model=UserStatisticsResponse)
 async def get_user_statistics(
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Get overall user statistics (Admin only).
@@ -234,7 +233,7 @@ class UserEngagementResponse(BaseModel):
 @router.get("/engagement", response_model=UserEngagementResponse)
 async def get_user_engagement(
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Get user engagement metrics (Admin only).
@@ -462,7 +461,7 @@ async def impersonate_user(
     user_id: int,
     request: ImpersonateRequest,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Impersonate a user (Super Admin only).
@@ -610,7 +609,7 @@ class EndImpersonationResponse(BaseModel):
 @router.post("/impersonation/end", response_model=EndImpersonationResponse)
 async def end_impersonation(
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
     authorization: str = Depends(deps.oauth2_scheme),
 ):
     """
@@ -752,7 +751,7 @@ async def bulk_import_users(
     file: UploadFile = File(...),
     send_notifications: bool = True,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Bulk import users from CSV file (Admin only).
@@ -1003,7 +1002,7 @@ class BulkStatusUpdateResponse(BaseModel):
 async def bulk_status_update(
     request: BulkStatusUpdateRequest,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Bulk suspend/activate/delete multiple users (Admin only).
@@ -1194,7 +1193,7 @@ async def export_users(
     # Options
     send_email: bool = False,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Export user data with filters (Admin only).

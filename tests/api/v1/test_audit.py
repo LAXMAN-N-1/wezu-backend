@@ -1,3 +1,4 @@
+import uuid
 import pytest
 from sqlmodel import Session, select
 from app.models.user import User
@@ -97,7 +98,7 @@ def test_audit_log_flow(client, session: Session):
     assert len(logs) >= 1
     assert logs[0].action == "login"
     
-    # 3. Test GET /audit/users/{user_id} as User (Self)
+    # 3. Test GET /audit/users/{user_id} as User (phone_number='5272000918', Self)
     response = client.get(
         f"{settings.API_V1_STR}/audit/users/{user.id}",
         headers=user_headers

@@ -1,3 +1,4 @@
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
@@ -10,7 +11,7 @@ def create_superuser_transfer(session):
     user = session.exec(select(AdminUser).where(AdminUser.email == "admin@transfer.com")).first()
     if user:
         return user
-    user = AdminUser(
+    user = AdminUser(phone_number='2966816205', 
         email="admin@transfer.com",
         hashed_password="hashed",
         is_active=True,
@@ -30,8 +31,8 @@ def test_transfer_role(client: TestClient, session: Session):
     session.commit()
     
     # Setup Source and Target Users
-    u_source = User(email="source@test.com", is_active=True)
-    u_target = User(email="target@test.com", is_active=True)
+    u_source = User(phone_number='3373134861', email="source@test.com", is_active=True)
+    u_target = User(phone_number='2185998576', email="target@test.com", is_active=True)
     session.add(u_source)
     session.add(u_target)
     session.commit()
@@ -79,8 +80,8 @@ def test_transfer_role(client: TestClient, session: Session):
 def test_transfer_fail_no_role(client: TestClient, session: Session):
     admin = create_superuser_transfer(session)
     role = Role(name="Missing Role", is_active=True)
-    u1 = User(email="u1_nofail@test.com", is_active=True)
-    u2 = User(email="u2_nofail@test.com", is_active=True)
+    u1 = User(phone_number='2647459781', email="u1_nofail@test.com", is_active=True)
+    u2 = User(phone_number='4217243722', email="u2_nofail@test.com", is_active=True)
     session.add(role)
     session.add(u1)
     session.add(u2)

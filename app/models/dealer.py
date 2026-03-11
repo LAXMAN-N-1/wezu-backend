@@ -13,8 +13,9 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 class DealerProfile(SQLModel, table=True):
     __tablename__ = "dealer_profiles"
+    __table_args__ = {"schema": "dealers"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id", unique=True)
+    user_id: int = Field(foreign_key="core.users.id", unique=True)
     
     business_name: str
     gst_number: Optional[str] = None
@@ -42,11 +43,13 @@ class DealerProfile(SQLModel, table=True):
     # commissions: List["Commission"] = Relationship(back_populates="dealer")
     documents: List["DealerDocument"] = Relationship(back_populates="dealer")
     staff_members: List["StaffProfile"] = Relationship(back_populates="dealer")
+    settlements: List["Settlement"] = Relationship(back_populates="dealer")
 
 class DealerDocument(SQLModel, table=True):
     __tablename__ = "dealer_documents"
+    __table_args__ = {"schema": "dealers"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    dealer_id: int = Field(foreign_key="dealer_profiles.id")
+    dealer_id: int = Field(foreign_key="dealers.dealer_profiles.id")
     document_type: str = Field(index=True) # gst, pan, registration, cancelled_cheque
     file_url: str
     uploaded_at: datetime = Field(default_factory=datetime.utcnow)
@@ -56,11 +59,12 @@ class DealerDocument(SQLModel, table=True):
 
 class DealerApplication(SQLModel, table=True):
     __tablename__ = "dealer_applications"
+    __table_args__ = {"schema": "dealers"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    dealer_id: int = Field(foreign_key="dealer_profiles.id", unique=True)
+    dealer_id: int = Field(foreign_key="dealers.dealer_profiles.id", unique=True)
     
-    # Stages: SUBMITTED, AUTO_VERIFIED, KYC_SUBMITTED, REVIEW_PENDING, 
-    # FIELD_VISIT_SCHEDULED, FIELD_VISIT_COMPLETED, REJECTED, APPROVED
+    # Stages: SUBMITTED, KYC_PENDING, KYC_SUBMITTED, REVIEW_PENDING, 
+    # FIELD_VISIT_SCHEDULED, FIELD_VISIT_COMPLETED, REJECTED, APPROVED, ACTIVE
     current_stage: str = Field(default="SUBMITTED")
     
     risk_score: float = Field(default=0.0)
@@ -76,9 +80,10 @@ class DealerApplication(SQLModel, table=True):
 
 class FieldVisit(SQLModel, table=True):
     __tablename__ = "field_visits"
+    __table_args__ = {"schema": "dealers"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    application_id: int = Field(foreign_key="dealer_applications.id")
-    officer_id: int = Field(foreign_key="users.id") # Field Officer
+    application_id: int = Field(foreign_key="dealers.dealer_applications.id")
+    officer_id: int = Field(foreign_key="core.users.id") # Field Officer
     
     scheduled_date: datetime
     completed_date: Optional[datetime] = None

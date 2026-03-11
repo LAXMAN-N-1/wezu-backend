@@ -9,9 +9,13 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://user:password@localhost:5432/wezy_db"
     
     # Redis (Sessions & Caching)
-    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_URL: str = "redis://127.0.0.1:6379/0"
     REDIS_SESSION_DB: int = 1
     REDIS_CACHE_DB: int = 2
+    
+    # MongoDB (Audit Logs & Unstructured Data)
+    MONGODB_URL: str = "mongodb://localhost:27017"
+    MONGODB_DB: str = "wezu_audit"
     
     # Security
     SECRET_KEY: str  # Must be loaded from env
@@ -62,7 +66,7 @@ class Settings(BaseSettings):
     VIDEO_KYC_SESSION_TIMEOUT_MINUTES: int = 30
     
     # IoT/MQTT (for customer battery tracking)
-    MQTT_BROKER_URL: str = "mqtt://localhost:1883"
+    MQTT_BROKER_URL: str = "mqtt://127.0.0.1:1883"
     MQTT_USERNAME: Optional[str] = None
     MQTT_PASSWORD: Optional[str] = None
     MQTT_CLIENT_ID_PREFIX: str = "wezu_backend"
@@ -113,7 +117,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "Wezu Battery App"
     DEBUG: bool = False
     ENVIRONMENT: str = "production"
-    CORS_ORIGINS: list[str] = []
+    CORS_ORIGINS: list[str] = ["*"]
     
     # Customer Support
     SUPPORT_EMAIL: str = "support@wezu.com"

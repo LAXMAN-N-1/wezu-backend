@@ -4,9 +4,10 @@ from datetime import datetime
 
 class SearchHistory(SQLModel, table=True):
     __tablename__ = "search_histories"
+    __table_args__ = {"schema": "core"}
     """User search patterns for analytics and personalization"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: Optional[int] = Field(default=None, foreign_key="users.id", index=True)
+    user_id: Optional[int] = Field(default=None, foreign_key="core.users.id", index=True)
     session_id: Optional[str] = None  # For anonymous users
     
     # Search details

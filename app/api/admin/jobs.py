@@ -6,7 +6,7 @@ from datetime import datetime
 from app.api import deps
 from app.models.user import User
 from app.models.batch_job import BatchJob, JobExecution
-from app.db.session import get_session
+from app.core.database import get_db
 
 router = APIRouter()
 
@@ -16,7 +16,7 @@ router = APIRouter()
 def list_jobs(
     is_active: Optional[bool] = None,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_db)
 ):
     """List all scheduled batch jobs"""
     query = select(BatchJob)
@@ -30,7 +30,7 @@ def list_jobs(
 def get_job(
     job_id: int,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_db)
 ):
     """Get job details"""
     job = session.get(BatchJob, job_id)
@@ -46,7 +46,7 @@ def trigger_job(
     job_id: int,
     req: JobTrigger,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_db)
 ):
     """Manually trigger a job"""
     import uuid
@@ -85,7 +85,7 @@ def get_job_history(
     limit: int = 50,
     status: Optional[str] = None,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_db)
 ):
     """Get job execution history"""
     query = select(JobExecution).where(JobExecution.job_id == job_id)
@@ -101,7 +101,7 @@ def get_execution_logs(
     job_id: int,
     execution_id: str,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_db)
 ):
     """Get execution logs"""
     execution = session.exec(
@@ -138,7 +138,7 @@ def update_job(
     job_id: int,
     req: JobUpdate,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_db)
 ):
     """Update job configuration"""
     job = session.get(BatchJob, job_id)
@@ -165,7 +165,7 @@ def get_recent_executions(
     limit: int = 100,
     status: Optional[str] = None,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_db)
 ):
     """Get recent job executions across all jobs"""
     query = select(JobExecution)

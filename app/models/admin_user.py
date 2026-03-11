@@ -10,6 +10,7 @@ from .rbac import AdminUserRole
 
 class AdminUser(SQLModel, table=True):
     __tablename__ = "admin_users"
+    __table_args__ = {"schema": "core"}
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True)
     hashed_password: str

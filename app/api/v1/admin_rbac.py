@@ -70,13 +70,13 @@ def create_role(
     if existing:
         raise HTTPException(status_code=400, detail="Role name already exists")
         
-    role_data = role_in.dict(exclude={"permissions", "parent_role_id"})
+    role_data = role_in.dict(exclude={"permissions", "parent_id"})
     
     # 2. Inheritance Logic
     permissions_to_assign = set(role_in.permissions)
     
-    if role_in.parent_role_id:
-        parent_role = db.get(Role, role_in.parent_role_id)
+    if role_in.parent_id:
+        parent_role = db.get(Role, role_in.parent_id)
         if not parent_role:
              raise HTTPException(status_code=404, detail="Parent role not found")
         
@@ -86,7 +86,7 @@ def create_role(
         parent_perms = db.exec(select(Permission.slug).join(RolePermission).where(RolePermission.role_id == parent_role.id)).all()
         permissions_to_assign.update(parent_perms)
         
-        role_data["parent_role_id"] = role_in.parent_role_id
+        role_data["parent_id"] = role_in.parent_id
 
     role = Role(**role_data)
     db.add(role)
@@ -232,8 +232,8 @@ def get_role_permissions(
     
     # Traverse Parents
     current = role
-    while current.parent_role_id:
-        parent = db.get(Role, current.parent_role_id)
+    while current.parent_id:
+        parent = db.get(Role, current.parent_id)
         if not parent:
             break
             

@@ -39,9 +39,17 @@ fpdf
 reportlab
 slowapi
 pytest
+pytest-asyncio
 paho-mqtt
 psutil
 apscheduler
 bcrypt==3.2.2
 twilio
 pyotp==2.9.0
+motor
+pymongo
+qrcode[pil]
+joblib
+numpy>=1.24.0
+scikit-learn
+pandas

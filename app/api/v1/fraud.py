@@ -6,7 +6,6 @@ from app.api import deps
 from app.models.user import User
 from app.models.fraud import RiskScore, FraudCheckLog
 from app.models.device_fingerprint import DeviceFingerprint, DuplicateAccount
-from app.db.session import get_session
 
 router = APIRouter()
 
@@ -39,7 +38,7 @@ class DeviceFingerprintSubmit(BaseModel):
 def get_user_risk_score(
     user_id: int,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Get fraud risk score for a user (admin or self)"""
     # Allow users to see their own score or admins to see any
@@ -67,7 +66,7 @@ def get_user_risk_score(
 def verify_pan(
     req: PANVerifyRequest,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Verify PAN number (mock implementation)"""
     # In production, integrate with government API
@@ -106,7 +105,7 @@ def verify_pan(
 def verify_gst(
     req: GSTVerifyRequest,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Verify GST number (mock implementation)"""
     # In production, integrate with GST API
@@ -133,7 +132,7 @@ def verify_gst(
 def verify_phone(
     req: PhoneCheckRequest,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Check phone number for fraud indicators"""
     from app.models.fraud import Blacklist
@@ -167,7 +166,7 @@ def verify_phone(
 def submit_device_fingerprint(
     req: DeviceFingerprintSubmit,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Submit device fingerprint for tracking"""
     from datetime import datetime

@@ -1,42 +1,46 @@
-from typing import Optional
-from datetime import datetime
 from sqlmodel import SQLModel, Field, Relationship
-from app.models.user import User
-from app.models.station import Station
-from app.models.battery import Battery
+from typing import Optional, TYPE_CHECKING
+from datetime import datetime
+import uuid
+
+if TYPE_CHECKING:
+    from app.models.user import User
+    from app.models.rental import Rental
+    from app.models.battery import Battery
+    from app.models.station import Station
 
 class SwapSession(SQLModel, table=True):
     __tablename__ = "swap_sessions"
+    __table_args__ = {"schema": "rentals", "extend_existing": True}
+    
     id: Optional[int] = Field(default=None, primary_key=True)
+    rental_id: Optional[int] = Field(default=None, foreign_key="rentals.rentals.id", index=True)
+    user_id: int = Field(foreign_key="core.users.id", index=True)
+    station_id: int = Field(foreign_key="stations.stations.id", index=True)
     
-    # Actors
-    user_id: int = Field(foreign_key="users.id")
-    station_id: int = Field(foreign_key="stations.id")
+    # Battery Details
+    old_battery_id: Optional[int] = Field(default=None, foreign_key="inventory.batteries.id")
+    new_battery_id: Optional[int] = Field(default=None, foreign_key="inventory.batteries.id")
     
-    # Battery In (Returned)
-    old_battery_id: Optional[int] = Field(default=None, foreign_key="batteries.id")
-    old_battery_soc: Optional[float] = None # State of Charge when returned
-    return_slot_id: Optional[int] = None # StationSlot ID
+    old_battery_soc: float = Field(default=0.0)
+    new_battery_soc: float = Field(default=0.0)
     
-    # Battery Out (Taken)
-    new_battery_id: Optional[int] = Field(default=None, foreign_key="batteries.id")
-    new_battery_soc: Optional[float] = None # SoC when taken (usually 100%)
-    dispense_slot_id: Optional[int] = None # StationSlot ID
-    
-    # Financials
-    amount: float = Field(default=0.0)
+    # Metrics
+    swap_amount: float = Field(default=0.0)
     currency: str = Field(default="INR")
+    
+    # Status
+    status: str = Field(default="initiated") # initiated, processing, completed, failed
     payment_status: str = Field(default="pending") # pending, paid, failed
-    
-    # Operational Status
-    status: str = Field(default="initiated") # initiated, battery_returned, battery_dispensed, completed, failed
-    
+    error_message: Optional[str] = None
+
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: Optional[datetime] = None
     
     # Relationships
-    user: User = Relationship()
-    station: Station = Relationship()
-    # old_battery: Optional[Battery] = Relationship(sa_relationship_kwargs={"foreign_keys": "SwapSession.old_battery_id"})
-    # new_battery: Optional[Battery] = Relationship(sa_relationship_kwargs={"foreign_keys": "SwapSession.new_battery_id"})
+    rental: Optional["Rental"] = Relationship(back_populates="swaps")
+    user: "User" = Relationship()
+    station: "Station" = Relationship()
+    old_battery: Optional["Battery"] = Relationship(sa_relationship_kwargs={"foreign_keys": "[SwapSession.old_battery_id]"})
+    new_battery: Optional["Battery"] = Relationship(sa_relationship_kwargs={"foreign_keys": "[SwapSession.new_battery_id]"})

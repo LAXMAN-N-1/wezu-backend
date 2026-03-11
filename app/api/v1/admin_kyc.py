@@ -12,11 +12,10 @@ router = APIRouter()
 class KYCAction(BaseModel):
     reason: str = None
 
-from datetime import datetime
-from datetime import datetime
-from app.schemas.kyc import KYCDocumentResponse, KYCQueueItem, KYCQueueResponse, KYCVerifyRequest
+import datetime
+from app.models.user import User, KYCStatus
+from app.schemas.kyc import KYCDocumentResponse, KYCQueueItem, KYCQueueResponse, KYCVerifyRequest, KYCDashboardResponse
 from app.schemas.kyc_admin import KYCRejectRequest
-from app.models.user import User
 
 @router.get("/pending", response_model=KYCQueueResponse)
 def get_pending_kyc_queue(
@@ -32,7 +31,7 @@ def get_pending_kyc_queue(
     offset = (page - 1) * size
     
     # 1. Base Query: Users with pending status
-    query = select(User).where(User.kyc_status == "pending_verification")
+    query = select(User).where(User.kyc_status == KYCStatus.PENDING)
     
     # 2. Filter by User Type (Role) if provided
     # Note: This assumes Role integration. If simplistic, we might just return all.
@@ -95,9 +94,9 @@ def verify_kyc_submission(
     
     # Update User Status
     if request.decision == "approved":
-        user.kyc_status = "verified"
+        user.kyc_status = KYCStatus.APPROVED
     elif request.decision == "rejected":
-        user.kyc_status = "rejected"
+        user.kyc_status = KYCStatus.REJECTED
     else:
         raise HTTPException(status_code=400, detail="Invalid decision")
     
@@ -188,7 +187,7 @@ def reject_kyc_submission(
         raise HTTPException(status_code=404, detail="User not found")
     
     # Update User Status and Reason
-    user.kyc_status = "rejected"
+    user.kyc_status = KYCStatus.REJECTED
     user.kyc_rejection_reason = request.reason
     db.add(user)
     
@@ -244,10 +243,10 @@ def complete_video_kyc(
     user = db.get(User, vks.user_id)
     if user:
         if request.verification_result == "approved":
-            user.kyc_status = "verified"
+            user.kyc_status = KYCStatus.APPROVED
             # user.kyc_video_url = request.recording_link 
         elif request.verification_result == "rejected":
-            user.kyc_status = "rejected"
+            user.kyc_status = KYCStatus.REJECTED
             if request.agent_notes:
                 user.kyc_rejection_reason = request.agent_notes
         
@@ -255,3 +254,47 @@ def complete_video_kyc(
         db.commit()
             
     return {"status": "success", "session_status": vks.status}
+
+@router.get("/dashboard", response_model=KYCDashboardResponse)
+def get_kyc_admin_dashboard(
+    db: Session = Depends(deps.get_db),
+    current_user: Any = Depends(deps.get_current_active_superuser),
+):
+    """Admin: KYC status counts (pending, approved, rejected today)"""
+    return KYCService.get_admin_dashboard_stats(db)
+
+@router.put("/{user_id}/approve")
+def approve_user_kyc(
+    user_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: Any = Depends(deps.get_current_active_superuser),
+):
+    """Admin: approve a user's KYC submission"""
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    user.kyc_status = KYCStatus.APPROVED
+    user.updated_at = datetime.datetime.utcnow()
+    db.add(user)
+    db.commit()
+    return {"message": "User KYC approved successfully"}
+
+@router.put("/{user_id}/reject")
+def reject_user_kyc(
+    user_id: int,
+    request: KYCRejectRequest,
+    db: Session = Depends(deps.get_db),
+    current_user: Any = Depends(deps.get_current_active_superuser),
+):
+    """Admin: reject KYC with mandatory reason code and notes"""
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    user.kyc_status = KYCStatus.REJECTED
+    user.kyc_rejection_reason = request.reason
+    user.updated_at = datetime.datetime.utcnow()
+    db.add(user)
+    db.commit()
+    return {"message": "User KYC rejected successfully", "reason": request.reason}

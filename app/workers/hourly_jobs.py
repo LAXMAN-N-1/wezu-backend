@@ -60,6 +60,48 @@ def battery_health_checks():
         logger.error(f"Battery health checks failed: {str(e)}")
         complete_job_execution(execution.execution_id, "FAILED", error=str(e))
 
+def smart_battery_swap_notifications():
+    """FR-MOB-ACTIVE-004: Smart Battery Swap Notifications
+    Checks if active rentals have batteries < 20% and sends swap alerts."""
+    logger.info("Starting smart battery swap notifications...")
+    execution = create_job_execution("hourly_swap_alerts")
+    
+    try:
+        from app.models.rental import Rental
+        from app.models.battery import Battery
+        from app.services.notification_service import NotificationService
+        
+        with Session(engine) as session:
+            # Join rentals with batteries to check charge
+            active_rentals = session.exec(
+                select(Rental).where(Rental.status == "active")
+            ).all()
+            
+            alerts_sent = 0
+            for rental in active_rentals:
+                battery = session.get(Battery, rental.battery_id)
+                if battery and battery.current_charge and battery.current_charge < 20.0:
+                    # Notify user they need to swap
+                    NotificationService(session).send_notification(
+                         user_id=rental.user_id,
+                         title="Battery Low - Swap Recommended",
+                         message=f"Your battery is at {battery.current_charge}%. Head to a nearby station to swap it out for a fully charged one.",
+                         notification_type="alert",
+                         reference_id=str(rental.id)
+                    )
+                    alerts_sent += 1
+            
+            result = {
+                "rentals_checked": len(active_rentals),
+                "swap_alerts_sent": alerts_sent
+            }
+            logger.info(f"Swap notifications completed: {alerts_sent} sent")
+            complete_job_execution(execution.execution_id, "COMPLETED", result)
+            
+    except Exception as e:
+        logger.error(f"Swap notifications failed: {str(e)}")
+        complete_job_execution(execution.execution_id, "FAILED", error=str(e))
+
 def geofence_violation_detection():
     """Detect geofence boundary violations"""
     logger.info("Starting geofence violation detection...")

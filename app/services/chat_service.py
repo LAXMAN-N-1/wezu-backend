@@ -1,3 +1,4 @@
+from app.core.database import get_db
 """
 Chat Service
 Live chat and automated responses

@@ -1,9 +1,9 @@
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
-from app.db.session import get_session
 from app.models.vendor import Vendor
 from app.schemas.vendor import VendorCreate, VendorUpdate, VendorResponse, VendorList
+from app.api import deps
 
 router = APIRouter()
 
@@ -11,7 +11,7 @@ router = APIRouter()
 def read_vendors(
     skip: int = 0,
     limit: int = 100,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
 ) -> Any:
     """
     Retrieve vendors.
@@ -23,7 +23,7 @@ def read_vendors(
 @router.post("/", response_model=VendorResponse)
 def create_vendor(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     vendor_in: VendorCreate,
 ) -> Any:
     """
@@ -38,7 +38,7 @@ def create_vendor(
 @router.get("/{vendor_id}", response_model=VendorResponse)
 def read_vendor(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     vendor_id: int,
 ) -> Any:
     """
@@ -52,7 +52,7 @@ def read_vendor(
 @router.put("/{vendor_id}", response_model=VendorResponse)
 def update_vendor(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     vendor_id: int,
     vendor_in: VendorUpdate,
 ) -> Any:

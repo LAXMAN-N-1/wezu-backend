@@ -4,9 +4,10 @@ from datetime import datetime
 
 class TwoFactorAuth(SQLModel, table=True):
     __tablename__ = "two_factor_auth"
+    __table_args__ = {"schema": "core"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id", index=True)
+    user_id: int = Field(foreign_key="core.users.id", index=True)
     secret_key: str
     is_enabled: bool = Field(default=False)
     backup_codes: Optional[str] = None # JSON list of codes (encrypted ideally)

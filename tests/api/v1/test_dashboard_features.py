@@ -1,3 +1,4 @@
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,7 +12,7 @@ from unittest.mock import patch
 def create_test_user(session: Session, email: str, role_name: str) -> User:
     user = session.exec(select(User).where(User.email == email)).first()
     if not user:
-        user = User(email=email, is_active=True)
+        user = User(phone_number='2516995984', email=email, is_active=True)
         session.add(user)
         session.commit()
     

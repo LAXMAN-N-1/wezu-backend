@@ -36,6 +36,19 @@ def render_item(type_, obj, autogen_context):
     return False
 
 
+def include_object(object, name, type_, reflected, compare_to):
+    """
+    Control which objects are included in the autogeneration process.
+    """
+    if type_ == "table":
+        # Include specific schemas plus public
+        return object.schema in [
+            "core", "inventory", "stations", "rentals", 
+            "finance", "dealers", "logistics", "public", None
+        ]
+    return True
+
+
 def run_migrations_offline() -> None:
     """Run migrations in offline mode."""
     url = settings.DATABASE_URL
@@ -46,6 +59,8 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         render_item=render_item,   # ✅ Important
+        include_schemas=True,       # ✅ Support multiple schemas
+        include_object=include_object, # ✅ Filter schemas
     )
 
     with context.begin_transaction():
@@ -70,6 +85,8 @@ def run_migrations_online() -> None:
             connection=connection,
             target_metadata=target_metadata,
             render_item=render_item,   # ✅ Important
+            include_schemas=True,       # ✅ Support multiple schemas
+            include_object=include_object, # ✅ Filter schemas
         )
 
         with context.begin_transaction():

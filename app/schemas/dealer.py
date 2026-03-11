@@ -3,7 +3,7 @@ Dealer-related Pydantic schemas
 Request and response models for dealer operations
 """
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
 
@@ -52,6 +52,10 @@ class DealerApplicationUpdate(BaseModel):
     stage: DealerApplicationStage
     notes: Optional[str] = None
 
+class DealerRejectionRequest(BaseModel):
+    """Reject dealer application with reason"""
+    reason: str
+
 class FieldVisitSchedule(BaseModel):
     """Schedule field visit"""
     application_id: int
@@ -98,7 +102,7 @@ class DealerProfileResponse(BaseModel):
     pan_number: Optional[str]
     is_active: bool
     created_at: datetime
-    updated_at: datetime
+    updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -168,8 +172,26 @@ class DealerDashboardResponse(BaseModel):
     total_sales: float
     total_rentals: int
     active_rentals: int
-    total_revenue: float
+    total_earnings: float
     pending_commissions: float
-    inventory_summary: dict
-    recent_orders: List[dict]
-    performance_metrics: dict
+    inventory_summary: Dict[str, int]
+    recent_orders: List[Dict]
+    performance_metrics: Dict[str, Any]
+
+class CommissionStatementResponse(BaseModel):
+    """Monthly commission statement"""
+    month: str
+    total_earnings: float
+    total_transactions: int
+    status: str
+    download_url: Optional[str] = None
+
+class PromotionCampaignRequest(BaseModel):
+    """Request to create a promotion"""
+    name: str
+    promo_code: str
+    discount_type: str
+    discount_value: float
+    start_date: datetime
+    end_date: datetime
+    applicable_to: str = "ALL"

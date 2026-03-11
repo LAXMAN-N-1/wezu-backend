@@ -4,9 +4,10 @@ from datetime import datetime
 
 class DealerPromotion(SQLModel, table=True):
     __tablename__ = "dealer_promotions"
+    __table_args__ = {"schema": "dealers"}
     """Dealer-created promotional campaigns"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    dealer_id: int = Field(foreign_key="dealer_profiles.id")
+    dealer_id: int = Field(foreign_key="dealers.dealer_profiles.id")
     
     name: str
     description: Optional[str] = None
@@ -30,7 +31,7 @@ class DealerPromotion(SQLModel, table=True):
     
     is_active: bool = Field(default=True)
     requires_approval: bool = Field(default=True)  # Admin approval required
-    approved_by: Optional[int] = Field(default=None, foreign_key="users.id")
+    approved_by: Optional[int] = Field(default=None, foreign_key="core.users.id")
     approved_at: Optional[datetime] = None
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
@@ -41,13 +42,14 @@ class DealerPromotion(SQLModel, table=True):
 
 class PromotionUsage(SQLModel, table=True):
     __tablename__ = "promotion_usages"
+    __table_args__ = {"schema": "dealers"}
     """Track promotion redemptions"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    promotion_id: int = Field(foreign_key="dealer_promotions.id")
-    user_id: int = Field(foreign_key="users.id")
+    promotion_id: int = Field(foreign_key="dealers.dealer_promotions.id")
+    user_id: int = Field(foreign_key="core.users.id")
     
-    order_id: Optional[int] = Field(default=None, foreign_key="ecommerce_orders.id")
-    rental_id: Optional[int] = Field(default=None, foreign_key="rentals.id")
+    order_id: Optional[int] = Field(default=None, foreign_key="core.ecommerce_orders.id")
+    rental_id: Optional[int] = Field(default=None, foreign_key="rentals.rentals.id")
     
     discount_applied: float
     original_amount: float

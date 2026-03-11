@@ -19,103 +19,54 @@ class MLFraudDetectionService:
     @staticmethod
     def calculate_risk_score(user_id: int, session: Session) -> Dict:
         """
-        Calculate fraud risk score for user
-        
-        Returns:
-            Risk score (0-100) and risk factors
+        Calculate fraud risk score for user using real features.
         """
-        user = session.get(User, user_id)
-        if not user:
-            return {'risk_score': 100, 'risk_level': 'HIGH', 'factors': ['User not found']}
+        from app.ml.feature_store import FeatureStore
+        features = FeatureStore.get_user_features(session, user_id)
+        if not features:
+            return {'risk_score': 100, 'risk_level': 'HIGH', 'factors': ['User metrics not found']}
         
         risk_score = 0
         risk_factors = []
         
-        # 1. KYC Verification Status (30 points)
-        kyc = session.exec(
-            select(KYCVerification)
-            .where(KYCVerification.user_id == user_id)
-            .where(KYCVerification.status == "VERIFIED")
-        ).first()
-        
-        if not kyc:
+        # 1. Payment History (25 points)
+        if features["failed_payment_count"] > 3:
+            risk_score += 25
+            risk_factors.append(f"High payment failure count ({features['failed_payment_count']})")
+        elif features["failed_payment_count"] > 0:
+            risk_score += 10
+            risk_factors.append("Payment history has failures")
+
+        # 2. Overdue Rental Rate (25 points)
+        if features["overdue_rate"] > 0.5:
+            risk_score += 25
+            risk_factors.append(f"Critical overdue rate ({features['overdue_rate']:.0%})")
+        elif features["overdue_rate"] > 0.2:
+            risk_score += 15
+            risk_factors.append(f"Suspicious overdue rate ({features['overdue_rate']:.0%})")
+
+        # 3. Swap Anomalies (20 points)
+        if features["avg_swap_interval_days"] > 0 and features["avg_swap_interval_days"] < 1:
+            risk_score += 20
+            risk_factors.append("Extremely high swap frequency (< 1 day average)")
+
+        # 4. KYC Status (30 points)
+        from app.models.kyc_verification import KYCVerification
+        kyc = session.exec(select(KYCVerification).where(KYCVerification.user_id == user_id)).first()
+        if not kyc or kyc.status != "VERIFIED":
             risk_score += 30
             risk_factors.append("KYC not verified")
-        elif kyc.verification_score and kyc.verification_score < 70:
-            risk_score += 15
-            risk_factors.append("Low KYC verification score")
-        
-        # 2. Account Age (15 points)
-        account_age_days = (datetime.utcnow() - user.created_at).days
-        if account_age_days < 7:
-            risk_score += 15
-            risk_factors.append("New account (< 7 days)")
-        elif account_age_days < 30:
-            risk_score += 8
-            risk_factors.append("Recent account (< 30 days)")
-        
-        # 3. Rental History (20 points)
-        rentals = session.exec(
-            select(Rental).where(Rental.user_id == user_id)
-        ).all()
-        
-        if len(rentals) == 0:
-            risk_score += 20
-            risk_factors.append("No rental history")
-        else:
-            # Check for late returns
-            late_returns = sum(1 for r in rentals if r.status == "overdue")
-            if late_returns > 0:
-                late_rate = late_returns / len(rentals)
-                if late_rate > 0.3:
-                    risk_score += 15
-                    risk_factors.append(f"High late return rate ({late_rate:.0%})")
-        
-        # 4. Device Fingerprinting (20 points)
-        devices = session.exec(
-            select(DeviceFingerprint).where(DeviceFingerprint.user_id == user_id)
-        ).all()
-        
-        if len(devices) > 5:
-            risk_score += 20
-            risk_factors.append(f"Multiple devices ({len(devices)})")
-        
-        # Check for suspicious device patterns
-        for device in devices:
-            if device.is_emulator or device.is_rooted:
-                risk_score += 15
-                risk_factors.append("Emulator or rooted device detected")
-                break
-        
-        # 5. Transaction Patterns (15 points)
-        from app.models.financial import Transaction
-        
-        # Check for failed transactions
-        failed_txns = session.exec(
-            select(Transaction)
-            .where(Transaction.user_id == user_id)
-            .where(Transaction.status == "FAILED")
-        ).all()
-        
-        if len(failed_txns) > 3:
-            risk_score += 15
-            risk_factors.append(f"Multiple failed transactions ({len(failed_txns)})")
-        
-        # Determine risk level
-        if risk_score >= 70:
-            risk_level = "HIGH"
-        elif risk_score >= 40:
-            risk_level = "MEDIUM"
-        else:
-            risk_level = "LOW"
+
+        # Determine level
+        risk_level = "LOW"
+        if risk_score >= 80: risk_level = "HIGH"
+        elif risk_score >= 40: risk_level = "MEDIUM"
         
         return {
             'risk_score': min(risk_score, 100),
             'risk_level': risk_level,
             'factors': risk_factors,
-            'kyc_verified': kyc is not None,
-            'account_age_days': account_age_days,
-            'total_rentals': len(rentals)
+            'metrics': features
         }
     
     @staticmethod

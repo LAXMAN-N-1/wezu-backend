@@ -1,3 +1,4 @@
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select, func
@@ -10,7 +11,7 @@ def create_superuser_bulk(session):
     user = session.exec(select(AdminUser).where(AdminUser.email == "admin@bulk.com")).first()
     if user:
         return user
-    user = AdminUser(
+    user = AdminUser(phone_number='2658997906', 
         email="admin@bulk.com",
         hashed_password="hashed",
         is_active=True,
@@ -25,8 +26,8 @@ def test_bulk_role_assign(client: TestClient, session: Session):
     admin = create_superuser_bulk(session)
     
     # Setup Users
-    u1 = User(email="bulk1@test.com", is_active=True)
-    u2 = User(email="bulk2@test.com", is_active=True)
+    u1 = User(phone_number='3341369027', email="bulk1@test.com", is_active=True)
+    u2 = User(phone_number='2958179346', email="bulk2@test.com", is_active=True)
     session.add(u1)
     session.add(u2)
     session.commit()

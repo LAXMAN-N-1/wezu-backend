@@ -61,3 +61,15 @@ class NotificationPreferencesUpdate(BaseModel):
     sms: Optional[SMSPreferences] = None
     push: Optional[PushPreferences] = None
     quiet_hours: Optional[QuietHours] = None
+
+# --- New Gaps Schemas ---
+class AdminNotificationSendRequest(BaseModel):
+    user_id: Optional[int] = None
+    segment: Optional[str] = None # all, dealers, drivers, customers
+    title: str
+    message: str
+    type: str = "info"
+    channel: str = "push"
+
+class UnreadCountResponse(BaseModel):
+    unread_count: int

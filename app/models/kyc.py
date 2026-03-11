@@ -1,12 +1,29 @@
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional
+from typing import Optional, Any, TYPE_CHECKING
 from datetime import datetime
+from enum import Enum
+import uuid
+
+if TYPE_CHECKING:
+     from app.models.user import User
+
+class KYCDocumentType(str, Enum):
+    AADHAAR = "aadhaar"
+    PAN = "pan"
+    DRIVING_LICENSE = "driving_license"
+    PASSPORT = "passport"
+
+class KYCDocumentStatus(str, Enum):
+    PENDING = "pending"
+    VERIFIED = "verified"
+    REJECTED = "rejected"
 
 class KYCRecord(SQLModel, table=True):
     __tablename__ = "kyc_records"
+    __table_args__ = {"schema": "core"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id", index=True)
+    user_id: int = Field(foreign_key="core.users.id", index=True)
     
     # Encrypted identifiers
     aadhaar_number_enc: Optional[str] = None
@@ -26,7 +43,7 @@ class KYCRecord(SQLModel, table=True):
     rejection_reason: Optional[str] = None
     
     # Audit
-    verified_by: Optional[int] = Field(default=None, foreign_key="users.id") # Admin User ID
+    verified_by: Optional[int] = Field(default=None, foreign_key="core.users.id") # Admin User ID
     submitted_at: datetime = Field(default_factory=datetime.utcnow)
     verified_at: Optional[datetime] = None
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -36,24 +53,36 @@ class KYCRecord(SQLModel, table=True):
 
 class KYCDocument(SQLModel, table=True):
     __tablename__ = "kyc_documents"
+    __table_args__ = {"schema": "core"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id", index=True)
-    document_type: str
-    document_number: Optional[str] = None
-    file_url: str
-    status: str = Field(default="pending") # pending, verified, rejected
-    verification_response: Optional[str] = None # JSON string or similar
-    metadata_: Optional[str] = Field(default=None, sa_column_kwargs={"name": "metadata"}) # JSON string: {"side": "front"}
-    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+    user_id: int = Field(foreign_key="core.users.id", index=True)
     
-    user: "User" = Relationship(back_populates="kyc_documents")
+    document_type: KYCDocumentType
+    document_number: Optional[str] = None # Encrypted
+    
+    file_url: str
+    status: KYCDocumentStatus = Field(default=KYCDocumentStatus.PENDING)
+    
+    verification_response: Optional[str] = None # JSON string
+    rejection_reason: Optional[str] = None
+    
+    verified_by: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+    verified_at: Optional[datetime] = None
+    
+    # Relationships
+    user: "User" = Relationship(
+        back_populates="kyc_documents",
+        sa_relationship_kwargs={"foreign_keys": "[KYCDocument.user_id]"}
+    )
 
 class KYCRequest(SQLModel, table=True):
     __tablename__ = "kyc_requests"
+    __table_args__ = {"schema": "core"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id")
+    user_id: int = Field(foreign_key="core.users.id")
     status: str = Field(default="pending")
     request_data: Optional[str] = None # JSON string
     created_at: datetime = Field(default_factory=datetime.utcnow)

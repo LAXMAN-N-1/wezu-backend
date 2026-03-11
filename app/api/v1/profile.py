@@ -1,91 +1,106 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlmodel import Session, select
-from app.db.session import get_session
+from typing import List
+import os
+import shutil
+from PIL import Image
+import json
+
 from app.models.user import User
 from app.models.address import Address
-from app.schemas.user import UserResponse, UserUpdate, AddressCreate, AddressUpdate, AddressResponse
+from app.models.session import UserSession
+from app.models.login_history import LoginHistory
+
+from app.schemas.user import (
+    UserResponse,
+    UserUpdate,
+    AddressCreate,
+    AddressUpdate,
+    AddressResponse,
+)
+
 from app.api import deps
-import shutil
-import os
-from typing import List
+from app.core.security import verify_password, get_password_hash
 
 router = APIRouter()
 
-@router.get("/", response_model=UserResponse)
-async def get_profile(
-    current_user: User = Depends(deps.get_current_user),
-):
-    """Get current user's profile"""
+# -------------------------
+# PROFILE ENDPOINTS
+# -------------------------
+
+@router.get("", response_model=UserResponse)
+def get_profile(current_user: User = Depends(deps.get_current_user)):
+    """Get full customer profile"""
     return current_user
 
-@router.put("/", response_model=UserResponse)
-async def update_profile(
+
+@router.put("", response_model=UserResponse)
+def update_profile(
     user_in: UserUpdate,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db),
 ):
-    """Update user profile details"""
-    if user_in.full_name is not None:
+    """Update profile details"""
+
+    if user_in.full_name:
         current_user.full_name = user_in.full_name
-    if user_in.email is not None:
-        # Check uniqueness if email changes
-        if user_in.email != current_user.email:
-            existing = db.exec(select(User).where(User.email == user_in.email)).first()
-            if existing:
-                raise HTTPException(status_code=400, detail="Email already in use")
-            current_user.email = user_in.email
-            # Trigger email verification logic here if needed
-    
+
+    if user_in.phone:
+        current_user.phone = user_in.phone
+
+    if user_in.date_of_birth:
+        current_user.date_of_birth = user_in.date_of_birth
+
     db.add(current_user)
     db.commit()
     db.refresh(current_user)
+
     return current_user
 
-@router.post("/picture", response_model=UserResponse)
-async def upload_profile_picture(
-    file: UploadFile = File(...),
+
+@router.delete("/account")
+def deactivate_account(
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db),
 ):
-    """Upload profile picture"""
-    # 1. Validate file size/type (Basic validation)
-    if not file.content_type.startswith('image/'):
-        raise HTTPException(status_code=400, detail="File must be an image")
-        
-    # 2. Save file (Local storage for MVP)
-    upload_dir = "uploads/profiles"
-    os.makedirs(upload_dir, exist_ok=True)
-    
-    file_path = f"{upload_dir}/{current_user.id}_{file.filename}"
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-        
-    # 3. Update User
-    # In production, this would be a CDN URL
-    current_user.profile_picture = file_path
+    """Deactivate customer account"""
+
+    current_user.is_active = False
     db.add(current_user)
     db.commit()
-    db.refresh(current_user)
-    return current_user
 
-# Address Management
+    return {"message": "Account deactivated successfully"}
 
-@router.post("/address", response_model=AddressResponse)
-async def create_address(
+
+# -------------------------
+# ADDRESS MANAGEMENT
+# -------------------------
+
+@router.get("/addresses", response_model=List[AddressResponse])
+def get_addresses(
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    """Get all user addresses"""
+
+    addresses = db.exec(
+        select(Address).where(Address.user_id == current_user.id)
+    ).all()
+
+    return addresses
+
+
+@router.post("/addresses", response_model=AddressResponse)
+def create_address(
     address_in: AddressCreate,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db),
 ):
-    """Add a new address"""
-    # Create Address object
-    # Note: Address model has address_line1, address_line2 but schema uses street_address
-    # Mapping for backward compatibility or updating schema is needed.
-    # checking schema from view_file earlier: AddressCreate (AddressBase) has street_address.
-    # model has address_line1. We map street_address -> address_line1
-    
+    """Create new address"""
+
     address = Address(
         user_id=current_user.id,
-        address_line1=address_in.street_address, # Mapping
+        address_line1=address_in.street_address,
         city=address_in.city,
         state=address_in.state,
         postal_code=address_in.postal_code,
@@ -93,68 +108,222 @@ async def create_address(
         type=address_in.type,
         latitude=address_in.latitude,
         longitude=address_in.longitude,
-        is_default=address_in.is_default
+        is_default=address_in.is_default,
     )
-    
+
     if address.is_default:
-        # Unset other defaults
-        existing_defaults = db.exec(select(Address).where(Address.user_id == current_user.id, Address.is_default == True)).all()
+
+        existing_defaults = db.exec(
+            select(Address).where(
+                Address.user_id == current_user.id,
+                Address.is_default == True,
+            )
+        ).all()
+
         for addr in existing_defaults:
             addr.is_default = False
             db.add(addr)
-    
+
     db.add(address)
     db.commit()
     db.refresh(address)
+
     return address
 
-@router.put("/address/{address_id}", response_model=AddressResponse)
-async def update_address(
+
+@router.put("/addresses/{address_id}", response_model=AddressResponse)
+def update_address(
     address_id: int,
     address_in: AddressUpdate,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db),
 ):
-    """Update an existing address"""
+    """Update address"""
+
     address = db.get(Address, address_id)
+
     if not address or address.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Address not found")
-        
-    if address_in.street_address is not None:
+
+    if address_in.street_address:
         address.address_line1 = address_in.street_address
-    if address_in.city is not None:
+
+    if address_in.city:
         address.city = address_in.city
-    if address_in.state is not None:
+
+    if address_in.state:
         address.state = address_in.state
-    if address_in.postal_code is not None:
+
+    if address_in.postal_code:
         address.postal_code = address_in.postal_code
-    if address_in.type is not None:
+
+    if address_in.type:
         address.type = address_in.type
-    if address_in.is_default is not None:
-        address.is_default = address_in.is_default
-        if address.is_default:
-             # Unset other defaults
-            existing_defaults = db.exec(select(Address).where(Address.user_id == current_user.id, Address.is_default == True, Address.id != address_id)).all()
-            for addr in existing_defaults:
-                addr.is_default = False
-                db.add(addr)
-                
+
     db.add(address)
     db.commit()
     db.refresh(address)
+
     return address
 
-@router.delete("/address/{address_id}")
-async def delete_address(
+
+@router.delete("/addresses/{address_id}")
+def delete_address(
     address_id: int,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db),
 ):
-    """Delete an address"""
+    """Delete address"""
+
     address = db.get(Address, address_id)
+
     if not address or address.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Address not found")
-        
+
     db.delete(address)
     db.commit()
+
     return {"message": "Address deleted successfully"}
+
+
+# -------------------------
+# PREFERENCES CONFIGURATION
+# -------------------------
+
+@router.get("/preferences")
+def get_preferences(
+    current_user: User = Depends(deps.get_current_user),
+):
+    """Get notification preferences"""
+
+    if current_user.notification_preferences:
+        return json.loads(current_user.notification_preferences)
+
+    return {}
+
+
+@router.put("/preferences")
+def update_preferences(
+    preferences: dict,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    """Update preferences"""
+
+    current_user.notification_preferences = json.dumps(preferences)
+
+    db.add(current_user)
+    db.commit()
+
+    return {"message": "Preferences updated"}
+
+
+# -------------------------
+# PROFILE PICTURE
+# -------------------------
+
+@router.post("/picture", response_model=UserResponse)
+def upload_profile_picture(
+    file: UploadFile = File(...),
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    """Upload profile picture and resize"""
+
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    upload_dir = "uploads/profiles"
+    os.makedirs(upload_dir, exist_ok=True)
+
+    file_path = f"{upload_dir}/{current_user.id}.jpg"
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    img = Image.open(file_path)
+    img = img.resize((300, 300))
+    img.save(file_path)
+
+    current_user.profile_picture = file_path
+
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+
+    return current_user
+
+
+# -------------------------
+# ACCOUNT SECURITY
+# -------------------------
+
+@router.post("/change-password")
+def change_password(
+    data: dict,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    """Change password"""
+
+    if not verify_password(data["old_password"], current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect password")
+
+    current_user.hashed_password = get_password_hash(data["new_password"])
+
+    db.add(current_user)
+    db.commit()
+
+    return {"message": "Password updated successfully"}
+
+
+@router.get("/login-history")
+def login_history(
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    """Get login history"""
+
+    history = db.exec(
+        select(LoginHistory).where(LoginHistory.user_id == current_user.id)
+    ).all()
+
+    return history
+
+
+@router.get("/sessions")
+def get_sessions(
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    """List active sessions"""
+
+    sessions = db.exec(
+        select(UserSession).where(
+            UserSession.user_id == current_user.id,
+            UserSession.is_active == True,
+        )
+    ).all()
+
+    return sessions
+
+
+@router.delete("/sessions/{session_id}")
+def revoke_session(
+    session_id: int,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    """Revoke session"""
+
+    session = db.get(UserSession, session_id)
+
+    if not session or session.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session.is_active = False
+
+    db.add(session)
+    db.commit()
+
+    return {"message": "Session revoked"}

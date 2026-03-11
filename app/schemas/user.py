@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
-from typing import Optional, List, Dict
-from datetime import datetime
+from typing import Optional, List, Dict, Any, Union
+from datetime import datetime, date
 from app.models.user import User
 
 class AddressBase(BaseModel):
@@ -53,7 +53,19 @@ class UserUpdate(BaseModel):
     profile_picture: Optional[str] = None
     is_active: Optional[bool] = None
     role_id: Optional[int] = None
-    address: Optional[str] = None
+    
+    # Extended Profile Fields
+    address_line_1: Optional[str] = None
+    address_line_2: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    pin_code: Optional[str] = None
+    country: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = None
+    preferred_language: Optional[str] = None
+    
+    # Legacy / Other
     emergency_contact: Optional[str] = None
     notification_preferences: Optional[str] = None  # JSON: {"push": true, "email": true, "sms": false}
     security_question: Optional[str] = None
@@ -63,7 +75,7 @@ class UserStatusUpdate(BaseModel):
     status: str # active, suspended, banned
     reason: str
 
-from app.schemas.rbac import RoleRead as RoleResponse
+from app.schemas.rbac import RoleResponse
 
 class UserResponse(UserBase):
     id: int
@@ -73,7 +85,8 @@ class UserResponse(UserBase):
     kyc_status: str
     wallet_balance: float = 0.0 # Virtual field
     addresses: List[AddressResponse] = []
-    roles: List[RoleResponse] = []
+    # roles: List[RoleResponse] = [] # Deprecated
+    role: Optional[RoleResponse] = None # New single role
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -131,6 +144,17 @@ class UserProfileResponse(BaseModel):
     phone_number: Optional[str] = None
     profile_picture: Optional[str] = None
     
+    # Extended Profile Info from UserProfile
+    address_line_1: Optional[str] = None
+    address_line_2: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    pin_code: Optional[str] = None
+    country: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = None
+    preferred_language: Optional[str] = None
+    
     # Status
     is_active: bool
     is_superuser: bool
@@ -138,7 +162,7 @@ class UserProfileResponse(BaseModel):
     
     # Roles & Permissions
     current_role: Optional[str] = None
-    available_roles: List[str] = []
+    available_roles: List[str] = [] # Legacy compatibility
     permissions: List[str] = []
     menu: List[MenuItem] = []
     
@@ -187,8 +211,6 @@ class UserSessionResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-from typing import Any
-
 class KYCDocumentResponse(BaseModel):
     id: int
     document_type: str
@@ -214,3 +236,50 @@ class Token(BaseModel):
 
 class TokenPayload(BaseModel):
     sub: Optional[str] = None
+
+# Profile Gaps Schemas
+class AccountDeletionRequest(BaseModel):
+    reason: str
+
+class MembershipResponse(BaseModel):
+    tier: str
+    points_balance: float
+    status: str
+    tier_expiry: Optional[datetime] = None
+    benefits: List[str] = []
+    upgrade_eligibility: Dict[str, Any] = {}
+
+class DashboardSummaryResponse(BaseModel):
+    total_spent_this_month: float
+    active_rentals_count: int
+    lifetime_rentals_count: int
+    membership_tier: str
+    wallet_balance: float
+    carbon_saved_kg: float
+    quick_stats: Dict[str, Any] = {}
+
+class LoginHistoryResponse(BaseModel):
+    sessions: List[UserSessionResponse]
+    total_count: int
+    page: int
+    limit: int
+
+class UserSearchItem(BaseModel):
+    id: int
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
+    profile_picture: Optional[str] = None
+    is_active: bool
+    kyc_status: str
+    roles: List[str]
+    created_at: datetime
+    last_login: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+class UserSearchResponse(BaseModel):
+    users: List[UserSearchItem]
+    total_count: int
+    page: int
+    limit: int
+    filters_applied: Dict[str, Any] = {}

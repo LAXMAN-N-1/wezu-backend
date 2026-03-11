@@ -10,6 +10,9 @@ from app.models.user import User
 from app.models.station import Station
 from app.models.battery import Battery
 from app.models.ecommerce import EcommerceProduct as Product
+from app.models.staff import StaffProfile
+import app.models
+
 from app.core.security import get_password_hash
 
 def seed_data():

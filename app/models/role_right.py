@@ -6,8 +6,8 @@ class RoleRight(SQLModel, table=True):
     __tablename__ = "role_rights"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    role_id: int = Field(foreign_key="roles.id", nullable=False)
-    menu_id: int = Field(foreign_key="menus.id", nullable=False)
+    role_id: int = Field(foreign_key="core.roles.id", nullable=False)
+    menu_id: int = Field(foreign_key="core.menus.id", nullable=False)
     
     can_view: bool = Field(default=False)
     can_create: bool = Field(default=False)
@@ -25,4 +25,5 @@ class RoleRight(SQLModel, table=True):
 
     __table_args__ = (
         UniqueConstraint("role_id", "menu_id", name="unique_role_menu"),
+        {"schema": "core"}
     )

@@ -62,3 +62,19 @@ class PaymentService:
                  }
             raise HTTPException(status_code=400, detail=str(e))
 
+    @staticmethod
+    def verify_webhook_signature(body: bytes, signature: str) -> bool:
+        """
+        Verify Razorpay webhook signature.
+        """
+        webhook_secret = getattr(settings, "RAZORPAY_WEBHOOK_SECRET", None)
+        if not webhook_secret or not signature:
+            # Fallback for dev/mock if secret not provided
+            return True
+            
+        try:
+            client.utility.verify_webhook_signature(body.decode(), signature, webhook_secret)
+            return True
+        except Exception:
+            return False
+

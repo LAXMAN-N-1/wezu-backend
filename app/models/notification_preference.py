@@ -3,9 +3,11 @@ from typing import Optional
 from datetime import time, datetime
 
 class NotificationPreference(SQLModel, table=True):
+    __tablename__ = "notification_preferences"
+    __table_args__ = {"schema": "core"}
     """User notification settings per channel and category"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id", unique=True)
+    user_id: int = Field(foreign_key="core.users.id", unique=True)
     
     # Global settings
     notifications_enabled: bool = Field(default=True)

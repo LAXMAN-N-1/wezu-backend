@@ -12,21 +12,31 @@ from app.models.role_right import RoleRight
 from app.schemas.user import TokenPayload
 from app.models.oauth import BlacklistedToken
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.API_V1_STR}/auth/token",
+    description="Please enter your **Email** address (e.g., admin@wezu.com) in the **username** field below."
+)
 
 def get_current_user(
     db: Session = Depends(get_db),
     token: str = Depends(oauth2_scheme)
 ) -> User:
+    if not token or token.lower() in ["bearer null", "bearer undefined", "null", "undefined"]:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Valid token required",
+        )
     try:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
         token_data = TokenPayload(**payload)
-    except (JWTError, ValidationError):
+    except (JWTError, ValidationError) as e:
+        import logging
+        logging.error(f"AUTHENTICATION_ERROR: JWT/Validation failure: {str(e)} | Token provided: {token[:10]}...")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Could not validate credentials",
+            detail=f"Could not validate credentials: {str(e)}",
         )
     
     # Check if token is blacklisted
@@ -41,10 +51,15 @@ def get_current_user(
     # User model inherits from SQLModel, so we can use db.get(User, id) or query.
     # To be safe and consistent with typical patterns:
     from sqlalchemy.orm import selectinload
-    user = db.query(User).filter(User.id == int(token_data.sub)).options(selectinload(User.roles)).first()
+    user = db.query(User).filter(User.id == int(token_data.sub)).options(selectinload(User.role)).first()
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
+    if user.is_deleted:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Account has been deleted"
+        )
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
         
@@ -76,6 +91,16 @@ def get_current_active_superuser(
         )
     return current_user
 
+def get_current_active_admin(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    from app.models.user import UserType
+    if not (current_user.is_superuser or current_user.user_type == UserType.ADMIN):
+        raise HTTPException(
+            status_code=403, detail="The user doesn't have enough privileges (Admin required)"
+        )
+    return current_user
+
 def check_permission(menu_name: str, permission_type: str = "view"):
     """
     Dependency to check if user has specific permission for a menu by name
@@ -94,28 +119,8 @@ def check_permission(menu_name: str, permission_type: str = "view"):
                 detail="User has no role assigned"
             )
 
-        # Check role rights by joining with Menu to filter by name
-        from app.models.menu import Menu
-        role_right = db.query(RoleRight).join(Menu).filter(
-            RoleRight.role_id == current_user.role_id,
-            Menu.name == menu_name
-        ).first()
-        
-        if not role_right:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"No access to resource: {menu_name}"
-            )
-        
-        # Check specific permission
-        permission_map = {
-            "view": role_right.can_view,
-            "create": role_right.can_create,
-            "edit": role_right.can_edit,
-            "delete": role_right.can_delete
-        }
-        
-        if not permission_map.get(permission_type, False):
+        from app.services.rbac_service import rbac_service
+        if not rbac_service.check_menu_access(db, current_user.role_id, menu_name, permission_type):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Insufficient permissions: {permission_type} on {menu_name}"

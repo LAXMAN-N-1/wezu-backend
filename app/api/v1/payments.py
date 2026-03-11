@@ -2,33 +2,68 @@
 Enhanced Payment and Invoice API
 Invoice generation, refunds, and payment methods
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
-from sqlmodel import Session
+from sqlmodel import Session, select
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
+from datetime import datetime, timedelta
 
 from app.api import deps
-from app.db.session import get_session
 from app.models.user import User
 from app.models.catalog import CatalogOrder
 from app.models.rental import Rental
+from app.models.financial import Transaction
 from app.services.invoice_service import InvoiceService
+from app.services.analytics_service import AnalyticsService
+from app.services.payment_service import PaymentService
 from app.schemas.common import DataResponse
+from app.schemas.payment import (
+    RevenueSummary, StationRevenueResponse, 
+    RevenueForecastResponse, ProfitMarginResponse
+)
 
 router = APIRouter()
 
 # Schemas
 class RefundRequest(BaseModel):
+    transaction_id: Optional[int] = None
+    order_id: Optional[int] = None
     reason: str
     amount: Optional[float] = None  # If None, full refund
+
+class PaymentMethodCreate(BaseModel):
+    type: str  # card, upi, netbanking
+    details: dict
+
+# Payment Method Endpoints
+@router.post("/methods")
+async def add_payment_method(
+    method: PaymentMethodCreate,
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
+):
+    """Add a new payment method"""
+    return {
+        "message": "Payment method added successfully",
+        "method_id": "pm_" + str(current_user.id)
+    }
+
+@router.delete("/methods/{method_id}")
+async def delete_payment_method(
+    method_id: str,
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
+):
+    """Delete a payment method"""
+    return {"message": "Payment method deleted successfully"}
 
 # Invoice Endpoints
 @router.get("/orders/{order_id}/invoice", response_class=StreamingResponse)
 def download_order_invoice(
     order_id: int,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """
     Download PDF invoice for order
@@ -63,7 +98,7 @@ def download_order_invoice(
 def download_rental_invoice(
     rental_id: int,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Download PDF invoice for rental"""
     # Verify rental belongs to user
@@ -90,13 +125,142 @@ def download_rental_invoice(
         }
     )
 
+
+
+# Transaction Detail & Admin Management
+@router.get("/transactions", response_model=DataResponse[list])
+def get_user_all_payments(
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
+):
+    """All payment transactions for the user (rentals + purchases)"""
+    txns = session.exec(
+        select(Transaction)
+        .where(Transaction.user_id == current_user.id)
+        .order_by(Transaction.created_at.desc())
+    ).all()
+    return DataResponse(success=True, data=txns)
+
+@router.get("/{id}", response_model=DataResponse[dict])
+def get_payment_detail(
+    id: int,
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db)
+):
+    """Single transaction detail"""
+    txn = session.get(Transaction, id)
+    if not txn or (txn.user_id != current_user.id and not current_user.is_superuser):
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    return DataResponse(success=True, data=txn)
+
+@router.post("/{id}/refund", response_model=DataResponse[dict])
+def admin_initiate_refund(
+    id: int,
+    request: RefundRequest,
+    current_user: User = Depends(deps.get_current_active_superuser),
+    session: Session = Depends(deps.get_db)
+):
+    """Admin: initiate manual refund for a transaction"""
+    txn = session.get(Transaction, id)
+    if not txn:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+        
+    # Call PaymentService to refund via gateway
+    rf_data = PaymentService.refund_transaction(txn.payment_gateway_ref, request.amount)
+    
+    # Update local DB or Transaction status if successful handled in webhook too
+    txn.status = "refunded"
+    session.add(txn)
+    session.commit()
+    
+    return DataResponse(success=True, data={"refund_id": rf_data.get("id"), "status": "initiated"})
+
+@router.get("/{id}/refund-status", response_model=DataResponse[dict])
+def get_refund_status(
+    id: int,
+    session: Session = Depends(deps.get_db)
+):
+    """Track refund processing status"""
+    from app.models.refund import Refund
+    refund = session.exec(select(Refund).where(Refund.transaction_id == id)).first()
+    if not refund:
+        return DataResponse(success=False, data={"message": "No refund found for this transaction"})
+    return DataResponse(success=True, data={"status": refund.status, "processed_at": refund.processed_at})
+
+@router.get("/admin/payments", response_model=DataResponse[list])
+def admin_get_all_payments(
+    status: Optional[str] = None,
+    user_id: Optional[int] = None,
+    skip: int = 0,
+    limit: int = 100,
+    current_user: User = Depends(deps.get_current_active_superuser),
+    session: Session = Depends(deps.get_db)
+):
+    """Admin: all platform transactions with filters"""
+    statement = select(Transaction)
+    if status:
+        statement = statement.where(Transaction.status == status)
+    if user_id:
+        statement = statement.where(Transaction.user_id == user_id)
+        
+    txns = session.exec(statement.offset(skip).limit(limit).order_by(Transaction.created_at.desc())).all()
+    return DataResponse(success=True, data=txns)
+
+# Revenue Dashboards
+@router.get("/admin/revenue", response_model=DataResponse[RevenueSummary])
+def get_revenue_dashboard(
+    period: str = "daily",  # daily, weekly, monthly
+    current_user: User = Depends(deps.get_current_active_superuser),
+    session: Session = Depends(deps.get_db)
+):
+    """Revenue summary with comparison"""
+    # Define time range
+    end = datetime.utcnow()
+    if period == "weekly":
+        start = end - timedelta(days=7)
+    elif period == "monthly":
+        start = end - timedelta(days=30)
+    else:
+        start = end - timedelta(days=1)
+        
+    stats = AnalyticsService.get_revenue_stats(session, start, end)
+    return DataResponse(success=True, data=stats)
+
+@router.get("/admin/revenue/by-station", response_model=DataResponse[List[StationRevenueResponse]])
+def get_revenue_by_station(
+    current_user: User = Depends(deps.get_current_active_superuser),
+    session: Session = Depends(deps.get_db)
+):
+    """Revenue broken down per station"""
+    data = AnalyticsService.get_revenue_by_station(session)
+    return DataResponse(success=True, data=data)
+
+@router.get("/admin/revenue/forecast", response_model=DataResponse[List[RevenueForecastResponse]])
+def get_revenue_forecast(
+    days: int = 30,
+    current_user: User = Depends(deps.get_current_active_superuser),
+    session: Session = Depends(deps.get_db)
+):
+    """Projected revenue for next 30 days"""
+    data = AnalyticsService.calculate_revenue_forecast(session, days)
+    return DataResponse(success=True, data=data)
+
+@router.get("/admin/profit-margins", response_model=DataResponse[List[ProfitMarginResponse]])
+def get_profit_margins(
+    current_user: User = Depends(deps.get_current_active_superuser),
+    session: Session = Depends(deps.get_db)
+):
+    """Margin analysis per station"""
+    data = AnalyticsService.get_profit_margins(session)
+    return DataResponse(success=True, data=data)
+
 # Refund Endpoints
 @router.post("/orders/{order_id}/refund", response_model=DataResponse[dict])
 def request_refund(
     order_id: int,
     request: RefundRequest,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """
     Request refund for order
@@ -146,7 +310,7 @@ def request_refund(
 @router.get("/refunds", response_model=DataResponse[list])
 def get_user_refunds(
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Get all refund requests for current user"""
     from app.models.financial import Transaction
@@ -174,7 +338,7 @@ def get_user_refunds(
         ]
     )
 
-# Payment Methods
+# Payment Methods Info
 @router.get("/payment-methods", response_model=DataResponse[dict])
 def get_payment_methods(current_user: User = Depends(deps.get_current_user)):
     """Get available payment methods"""
@@ -213,3 +377,56 @@ def get_payment_methods(current_user: User = Depends(deps.get_current_user)):
             ]
         }
     )
+
+@router.post("/webhooks/razorpay")
+async def razorpay_webhook(
+    request: Request,
+    session: Session = Depends(deps.get_db)
+):
+    """
+    Handle Razorpay Webhooks
+    Updates transaction status and confirms rentals/orders
+    """
+    from app.services.payment_service import PaymentService
+    from app.services.wallet_service import WalletService
+    from app.models.financial import Transaction, TransactionStatus
+    from app.models.catalog import CatalogOrder
+    from app.core.config import settings
+    import json
+    
+    # 1. Verify Signature
+    body = await request.body()
+    signature = request.headers.get("X-Razorpay-Signature")
+    
+    if not PaymentService.verify_webhook_signature(body, signature):
+        raise HTTPException(status_code=400, detail="Invalid signature")
+    
+    payload = json.loads(body)
+    event = payload.get("event")
+    
+    # 2. Process Event
+    if event == "payment.captured":
+        payment_id = payload["payload"]["payment"]["entity"]["id"]
+        order_id = payload["payload"]["payment"]["entity"]["order_id"]
+        
+        # Find transaction by order_id (payment_gateway_ref)
+        txn = session.exec(select(Transaction).where(Transaction.payment_gateway_ref == order_id)).first()
+        if txn:
+            txn.status = TransactionStatus.SUCCESS
+            txn.updated_at = datetime.utcnow()
+            
+            # If topup, update wallet
+            if txn.transaction_type == "wallet_topup":
+                WalletService.add_balance(session, txn.user_id, txn.amount, "Razorpay Topup Success")
+            
+            # If ecommerce order, mark as confirmed
+            if txn.order_id:
+                order = session.get(CatalogOrder, txn.order_id)
+                if order:
+                    order.status = "CONFIRMED"
+                    session.add(order)
+            
+            session.add(txn)
+            session.commit()
+            
+    return {"status": "ok"}

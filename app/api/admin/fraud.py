@@ -6,7 +6,7 @@ from app.api import deps
 from app.models.user import User
 from app.models.fraud import RiskScore, Blacklist
 from app.models.device_fingerprint import DeviceFingerprint, DuplicateAccount
-from app.db.session import get_session
+from app.core.database import get_db
 
 router = APIRouter()
 
@@ -17,7 +17,7 @@ def get_high_risk_users(
     threshold: float = 50.0,
     limit: int = 100,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_db)
 ):
     """List users with high fraud risk scores"""
     high_risk = session.exec(
@@ -46,7 +46,7 @@ def get_duplicate_accounts(
     status: Optional[str] = None,
     min_confidence: float = 50.0,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_db)
 ):
     """Get potential duplicate accounts"""
     query = select(DuplicateAccount).where(
@@ -70,7 +70,7 @@ class BlacklistAdd(BaseModel):
 def add_to_blacklist(
     req: BlacklistAdd,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_db)
 ):
     """Add entry to blacklist"""
     # Check if already exists
@@ -97,7 +97,7 @@ def add_to_blacklist(
 def get_blacklist(
     type: Optional[str] = None,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_db)
 ):
     """Get blacklist entries"""
     query = select(Blacklist)
@@ -111,7 +111,7 @@ def get_blacklist(
 def remove_from_blacklist(
     id: int,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_db)
 ):
     """Remove from blacklist"""
     blacklist = session.get(Blacklist, id)
@@ -128,7 +128,7 @@ def get_device_fingerprints(
     suspicious_only: bool = False,
     limit: int = 100,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_db)
 ):
     """Get device fingerprints for analysis"""
     query = select(DeviceFingerprint)
@@ -171,7 +171,7 @@ def handle_duplicate_account(
     id: int,
     req: DuplicateAction,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_db)
 ):
     """Take action on duplicate account detection"""
     dup = session.get(DuplicateAccount, id)

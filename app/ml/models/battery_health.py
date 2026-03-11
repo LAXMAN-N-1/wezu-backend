@@ -34,13 +34,29 @@ class BatteryHealthModel:
 
 class DemandForecastModel:
     """
-    Baseline ML Model for Demand Forecasting.
+    Weighted Moving Average Demand Forecasting.
     """
     @staticmethod
     def predict(history: List[int]) -> List[int]:
         if not history:
             return [0] * 7
         
-        avg_demand = sum(history) / len(history)
-        # Simple rolling average + slight seasonality (mock)
-        return [int(round(avg_demand * (1 + (i % 2) * 0.1))) for i in range(1, 8)]
+        # Weighted average of last 14 days if available, otherwise all history
+        window_size = min(len(history), 14)
+        recent_history = history[-window_size:]
+        
+        # Weights: more weight to more recent days [1, 2, 3, ... window_size]
+        weights = list(range(1, window_size + 1))
+        total_weight = sum(weights)
+        
+        weighted_avg = sum(h * w for h, w in zip(recent_history, weights)) / total_weight
+        
+        # Generate 7-day forecast with slight day-of-week seasonality simulation
+        # In a real model, we'd use Prophet or an LSTM
+        forecast = []
+        for i in range(1, 8):
+            seasonality = 1.1 if i in [5, 6] else 0.9 # Weekends usually have higher demand
+            val = int(round(weighted_avg * seasonality))
+            forecast.append(max(0, val))
+            
+        return forecast

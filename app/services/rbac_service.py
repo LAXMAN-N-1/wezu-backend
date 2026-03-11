@@ -1,113 +1,150 @@
-from typing import List, Set, Dict, Any
+from typing import List, Optional
 from sqlmodel import Session, select
-from app.models.rbac import Role, Permission, UserRole, AdminUserRole
-from app.models.user import User
-from app.models.admin_user import AdminUser
+from app.models.rbac import Role, Permission, RolePermission
+from app.models.role_right import RoleRight
+from app.models.menu import Menu
 
 class RBACService:
     @staticmethod
-    def get_role_permissions(db: Session, role_id: int, visited_roles: Set[int] = None) -> Set[str]:
-        """
-        Recursively fetch all permission slugs for a role including inherited ones.
-        """
-        if visited_roles is None:
-            visited_roles = set()
+    def get_role_by_name(db: Session, name: str) -> Optional[Role]:
+        return db.exec(select(Role).where(Role.name == name)).first()
+
+    @staticmethod
+    def list_roles(db: Session) -> List[Role]:
+        from sqlalchemy.orm import selectinload
+        return db.exec(select(Role).options(selectinload(Role.permissions))).all()
+
+    @staticmethod
+    def create_role(db: Session, role_in: Role, permission_ids: List[int] = []) -> Role:
+        db.add(role_in)
+        db.commit()
+        db.refresh(role_in)
         
-        if role_id in visited_roles:
-            return set()
-        
-        visited_roles.add(role_id)
+        if permission_ids:
+            for pid in permission_ids:
+                rp = RolePermission(role_id=role_in.id, permission_id=pid)
+                db.add(rp)
+            db.commit()
+            db.refresh(role_in)
+        return role_in
+
+    @staticmethod
+    def update_role(db: Session, role_id: int, update_data: dict, permission_ids: Optional[List[int]] = None) -> Role:
         role = db.get(Role, role_id)
         if not role:
-            return set()
-        
-        permissions = {p.slug for p in role.permissions}
-        
-        # Inherit from parent
-        if role.parent_id:
-            permissions.update(RBACService.get_role_permissions(db, role.parent_id, visited_roles))
+            return None
             
-        return permissions
+        for key, value in update_data.items():
+            setattr(role, key, value)
+            
+        if permission_ids is not None:
+            # Simple replace: delete old associations, add new ones
+            db.exec(sa.delete(RolePermission).where(RolePermission.role_id == role_id))
+            for pid in permission_ids:
+                rp = RolePermission(role_id=role_id, permission_id=pid)
+                db.add(rp)
+                
+        db.add(role)
+        db.commit()
+        db.refresh(role)
+        return role
 
     @staticmethod
-    def get_user_permissions(db: Session, user_id: int, is_admin: bool = False) -> Set[str]:
-        """
-        Get all permissions for a specific user or admin.
-        """
-        if is_admin:
-            roles = db.exec(select(Role).join(AdminUserRole).where(AdminUserRole.admin_id == user_id)).all()
-        else:
-            roles = db.exec(select(Role).join(UserRole).where(UserRole.user_id == user_id)).all()
-            
-        all_permissions = set()
-        for role in roles:
-            all_permissions.update(RBACService.get_role_permissions(db, role.id))
-            
-        return all_permissions
+    def list_permissions(db: Session) -> List[Permission]:
+        return db.exec(select(Permission)).all()
 
     @staticmethod
-    def generate_menu_config(permissions: Set[str]) -> Dict[str, Any]:
+    def get_user_permissions(db: Session, role_id: int) -> List[str]:
         """
-        Generate dynamic menu structure based on user permissions.
-        This follows the schema requested in the user prompt.
+        Get all permission slugs for a given role.
         """
-        # Define baseline menu template
-        menu = {
-            "dashboard": {
-                "enabled": True,
-                "icon": "dashboard",
-                "route": "/dashboard",
-                "label": "Dashboard",
-                "order": 1
-            }
-        }
-        
-        # Mapping permissions to menu items
-        if "battery:view" in permissions or "battery:view:all" in permissions:
-            menu["batteries"] = {
-                "enabled": True,
-                "icon": "battery_charging",
-                "route": "/batteries",
-                "label": "Battery Management",
-                "order": 2,
-                "submenu": [
-                    {
-                        "label": "All Batteries",
-                        "route": "/batteries/list",
-                        "permission": "battery:view:all",
-                        "enabled": "battery:view:all" in permissions
-                    },
-                    {
-                        "label": "Add Battery",
-                        "route": "/batteries/add",
-                        "permission": "battery:create",
-                        "enabled": "battery:create" in permissions
-                    },
-                    {
-                        "label": "Battery Health",
-                        "route": "/batteries/health",
-                        "permission": "battery:view:health",
-                        "enabled": "battery:view:health" in permissions or "battery:view:all" in permissions
-                    }
-                ]
-            }
+        # This joins RolePermission and Permission to get the slugs
+        # Assuming a link model RolePermission exists
+        statement = (
+            select(Permission.slug)
+            .join(RolePermission)
+            .where(RolePermission.role_id == role_id)
+        )
+        return list(db.exec(statement).all())
 
-        if "station:view" in permissions or "station:view:all" in permissions:
-            menu["stations"] = {
-                "enabled": True,
-                "icon": "store",
-                "route": "/stations",
-                "label": "Stations",
-                "order": 3
+    @staticmethod
+    def check_menu_access(db: Session, role_id: int, menu_name: str, permission_type: str = "view") -> bool:
+        """
+        Check if a role has a specific right on a menu.
+        """
+        statement = (
+            select(RoleRight)
+            .join(Menu)
+            .where(RoleRight.role_id == role_id)
+            .where(Menu.name == menu_name)
+        )
+        right = db.exec(statement).first()
+        if not right:
+            return False
+        
+        if permission_type == "view": return right.can_view
+        if permission_type == "create": return right.can_create
+        if permission_type == "edit": return right.can_edit
+        if permission_type == "delete": return right.can_delete
+        return False
+
+    @staticmethod
+    def assign_role_to_user(db: Session, user_id: int, role_id: int):
+        from app.models.user import User
+        user = db.get(User, user_id)
+        if user:
+            user.role_id = role_id
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        return user
+
+    @staticmethod
+    def get_menu_for_role(db: Session, role_id: int) -> List[dict]:
+        """
+        Get hierarchical menu structure for a role based on RoleRight.
+        """
+        # Fetch root menus where role has view permission
+        statement = (
+            select(Menu)
+            .join(RoleRight)
+            .where(RoleRight.role_id == role_id)
+            .where(RoleRight.can_view == True)
+            .where(Menu.parent_id == None)
+            .where(Menu.is_active == True)
+            .order_by(Menu.menu_order)
+        )
+        root_menus = db.exec(statement).all()
+        
+        menu_data = []
+        for menu in root_menus:
+            item = {
+                "label": menu.display_name,
+                "path": menu.route,
+                "icon": menu.icon,
+                "children": []
             }
             
-        if "analytics:view" in permissions:
-            menu["analytics"] = {
-                "enabled": True,
-                "icon": "analytics",
-                "route": "/analytics",
-                "label": "Analytics",
-                "order": 4
-            }
+            # Fetch children
+            child_statement = (
+                select(Menu)
+                .join(RoleRight)
+                .where(RoleRight.role_id == role_id)
+                .where(RoleRight.can_view == True)
+                .where(Menu.parent_id == menu.id)
+                .where(Menu.is_active == True)
+                .order_by(Menu.menu_order)
+            )
+            children = db.exec(child_statement).all()
+            for child in children:
+                item["children"].append({
+                    "label": child.display_name,
+                    "path": child.route,
+                    "icon": child.icon
+                })
             
-        return menu
+            menu_data.append(item)
+            
+        return menu_data
+
+rbac_service = RBACService()

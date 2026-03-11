@@ -1,34 +1,57 @@
-from typing import Optional, List
-from datetime import datetime
 from sqlmodel import SQLModel, Field, Relationship
+from typing import Optional, List, TYPE_CHECKING
+from datetime import datetime
+import uuid
 
-class BatterySpec(SQLModel, table=True):
-    __tablename__ = "battery_specs"
-    id: Optional[int] = Field(default=None, primary_key=True)
-    name: str = Field(index=True, unique=True) # e.g. "60V Li-ion Type A"
-    manufacturer: str
-    voltage: float
-    capacity_ah: float
-    weight_kg: Optional[float] = None
-    dimensions: Optional[str] = None # LxWxH
-    cycle_life_expectancy: int = 1500
+if TYPE_CHECKING:
+    from app.models.battery import Battery
+
+class BatteryCatalog(SQLModel, table=True):
+    __tablename__ = "battery_catalog"
+    __table_args__ = {"schema": "inventory"}
     
+    id: Optional[int] = Field(default=None, primary_key=True)
+    
+    # Product Info
+    name: str = Field(index=True)
+    brand: str
+    model: Optional[str] = None
+    image_url: Optional[str] = None
+    description: Optional[str] = None
+    
+    # Specs
+    capacity_mah: int
+    voltage: float
+    battery_type: str = Field(default="lithium_ion") # lithium_ion, lfp, nmc
+    weight_kg: Optional[float] = None
+    dimensions: Optional[str] = None # "10x20x30 cm"
+    
+    # Commercial
+    price_full_purchase: float = Field(default=0.0)
+    price_per_day: float = Field(default=0.0)
+    warranty_months: int = Field(default=0)
+    
+    # Meta
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
     # Relationships
-    batches: List["BatteryBatch"] = Relationship(back_populates="spec")
-    batteries: List["Battery"] = Relationship(back_populates="spec")
+    batteries: List["Battery"] = Relationship(
+        back_populates="sku",
+        sa_relationship_kwargs={
+            "foreign_keys": "[Battery.sku_id]",
+            "overlaps": "product"
+        }
+    )
+
+BatterySpec = BatteryCatalog
 
 class BatteryBatch(SQLModel, table=True):
     __tablename__ = "battery_batches"
+    __table_args__ = {"schema": "inventory"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    batch_number: str = Field(index=True, unique=True)
-    spec_id: int = Field(foreign_key="battery_specs.id")
-    
-    manufacturer_date: datetime
-    purchase_order_ref: Optional[str] = None
-    quantity: int
-    
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    
-    # Relationships
-    spec: BatterySpec = Relationship(back_populates="batches")
-    batteries: List["Battery"] = Relationship(back_populates="batch")
+    batch_number: str = Field(unique=True, index=True)
+    manufacturer: str
+    production_date: datetime = Field(default_factory=datetime.utcnow)
+

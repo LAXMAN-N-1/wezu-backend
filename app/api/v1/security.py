@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
-from app.db.session import get_session
 from app.models.user import User
 from app.models.two_factor_auth import TwoFactorAuth
 from app.models.audit_log import SecurityEvent
@@ -20,7 +19,7 @@ class Enable2FAResponse(BaseModel):
 @router.post("/enable-2fa", response_model=Enable2FAResponse)
 async def enable_2fa(
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """Generate 2FA secret and enable it"""
     # 1. Generate Secret
@@ -56,7 +55,7 @@ class Verify2FARequest(BaseModel):
 async def verify_enable_2fa(
     request: Verify2FARequest,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """Verify code to finalize 2FA enabling"""
     two_fa = db.exec(select(TwoFactorAuth).where(TwoFactorAuth.user_id == current_user.id)).first()
@@ -78,7 +77,7 @@ async def verify_enable_2fa(
 @router.get("/activity-logs")
 async def get_activity_logs(
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
     skip: int = 0,
     limit: int = 50
 ):

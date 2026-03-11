@@ -1,138 +1,118 @@
 from sqlmodel import Session, select
-from app.models.financial import Wallet, Transaction, WalletWithdrawalRequest
 from app.models.user import User
-from fastapi import HTTPException
-from app.services.security_service import SecurityService
-from app.models.refund import Refund
+from app.models.financial import Transaction, TransactionType, TransactionStatus
+from app.services.payment_service import PaymentService
 from typing import Optional, List
+from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 class WalletService:
     @staticmethod
-    def get_wallet(db: Session, user_id: int) -> Wallet:
-        wallet = db.exec(select(Wallet).where(Wallet.user_id == user_id)).first()
-        if not wallet:
-            # Create wallet if not exists (auto-provision)
-            wallet = Wallet(user_id=user_id, balance=0.0)
-            db.add(wallet)
-            db.commit()
-            db.refresh(wallet)
-        return wallet
-
-    @staticmethod
-    def add_balance(db: Session, user_id: int, amount: float, description: str = "Deposit") -> Wallet:
-        wallet = WalletService.get_wallet(db, user_id)
-        wallet.balance += amount
-        db.add(wallet)
+    def initiate_topup(db: Session, user_id: int, amount: float) -> Transaction:
+        """Create a Razorpay order and a pending transaction record"""
+        # 1. Create Razorpay order
+        order = PaymentService.create_order(amount)
         
-        # Log Transaction
-        txn = Transaction(
-            wallet_id=wallet.id,
+        # 2. Save Transaction
+        tx = Transaction(
+            user_id=user_id,
             amount=amount,
-            balance_after=wallet.balance,
-            type="credit",
-            category="deposit",
-            status="success",
-            description=description
+            transaction_type=TransactionType.WALLET_TOPUP,
+            status=TransactionStatus.PENDING,
+            payment_gateway_ref=order["id"],
+            description=f"Wallet topup of {amount}"
         )
-        db.add(txn)
-        
+        db.add(tx)
         db.commit()
-        db.refresh(wallet)
-        return wallet
+        db.refresh(tx)
+        return tx
 
     @staticmethod
-    def deduct_balance(db: Session, user_id: int, amount: float, description: str = "Payment") -> Wallet:
-        wallet = WalletService.get_wallet(db, user_id)
-        if wallet.balance < amount:
-            raise HTTPException(status_code=400, detail="Insufficient balance")
+    def confirm_topup(
+        db: Session, 
+        user_id: int, 
+        order_id: str, 
+        payment_id: str, 
+        signature: str
+    ) -> Transaction:
+        """Verify payment and update user wallet balance"""
+        # 1. Verify Signature
+        params = {
+            "razorpay_order_id": order_id,
+            "razorpay_payment_id": payment_id,
+            "razorpay_signature": signature
+        }
+        if not PaymentService.verify_payment_signature(params):
+            raise ValueError("Invalid payment signature")
             
-        wallet.balance -= amount
-        db.add(wallet)
-        
-        # Log Transaction
-        txn = Transaction(
-            wallet_id=wallet.id,
-            amount=-amount,
-            balance_after=wallet.balance,
-            type="debit",
-            category="withdrawal", # or rental_payment
-            status="success",
-            description=description
+        # 2. Find Transaction
+        statement = select(Transaction).where(
+            Transaction.payment_gateway_ref == order_id,
+            Transaction.user_id == user_id
         )
-        db.add(txn)
+        tx = db.exec(statement).first()
+        if not tx:
+            raise ValueError("Transaction not found")
+            
+        if tx.status == TransactionStatus.SUCCESS:
+            return tx
+            
+        # 3. Update Transaction and Wallet
+        tx.status = TransactionStatus.SUCCESS
+        tx.payment_gateway_ref = payment_id # Update with final payment ID
+        tx.updated_at = datetime.utcnow()
         
+        user = db.get(User, user_id)
+        user.wallet_balance += tx.amount
+        
+        db.add(tx)
+        db.add(user)
         db.commit()
-        db.refresh(wallet)
-        return wallet
+        db.refresh(tx)
+        return tx
 
     @staticmethod
-    def request_withdrawal(db: Session, user_id: int, amount: float, bank_details: dict) -> WalletWithdrawalRequest:
-        wallet = WalletService.get_wallet(db, user_id)
-        if wallet.balance < amount:
-            raise HTTPException(status_code=400, detail="Insufficient balance")
-
-        # Create Request
-        req = WalletWithdrawalRequest(
-            wallet_id=wallet.id,
+    def deduct_for_swap(db: Session, user_id: int, amount: float, swap_id: int) -> Transaction:
+        """Deduct funds from wallet for a swap"""
+        user = db.get(User, user_id)
+        if user.wallet_balance < amount:
+            raise ValueError("Insufficient wallet balance")
+            
+        user.wallet_balance -= amount
+        
+        tx = Transaction(
+            user_id=user_id,
             amount=amount,
-            bank_details=str(bank_details),
-            status="requested"
+            transaction_type=TransactionType.SWAP_FEE,
+            status=TransactionStatus.SUCCESS,
+            description=f"Swap fee for swap #{swap_id}",
+            metadata={"swap_id": swap_id}
         )
-        db.add(req)
         
-        # Deduct balance temporarily or lock it? 
-        # For now, we deduct immediately to prevent double spend.
-        wallet.balance -= amount
-        db.add(wallet)
-
-        txn = Transaction(
-            wallet_id=wallet.id,
-            amount=-amount,
-            balance_after=wallet.balance,
-            type="debit",
-            category="withdrawal_request",
-            status="pending",
-            description=f"Withdrawal Request"
-        )
-        db.add(txn)
-        
+        db.add(tx)
+        db.add(user)
         db.commit()
-        db.refresh(req)
-
-        # Log Security Event for withdrawal
-        SecurityService.log_event(
-            db,
-            event_type="withdrawal_request",
-            severity="medium",
-            details=f"User {user_id} requested withdrawal of {amount}",
-            user_id=user_id
-        )
-
-        return req
-
-    @staticmethod
-    def apply_cashback(db: Session, user_id: int, amount: float, reason: str = "Cashback"):
-        return WalletService.add_balance(db, user_id, amount, description=reason)
-
-    @staticmethod
-    def initiate_refund(db: Session, transaction_id: int, amount: Optional[float] = None, reason: str = "Customer Request") -> Optional[Refund]:
-        """
-        Record a refund request for a specific transaction.
-        """
-        orig_txn = db.get(Transaction, transaction_id)
-        if not orig_txn or orig_txn.type != "credit":
-            return None
+        db.refresh(tx)
+        return tx
         
-        refund_amount = amount if amount else orig_txn.amount
+    @staticmethod
+    def refund_to_wallet(db: Session, user_id: int, amount: float, reason: str) -> Transaction:
+        """Refund funds back to user wallet"""
+        user = db.get(User, user_id)
+        user.wallet_balance += amount
         
-        refund = Refund(
-            transaction_id=transaction_id,
-            amount=refund_amount,
-            reason=reason,
-            status="pending"
+        tx = Transaction(
+            user_id=user_id,
+            amount=amount,
+            transaction_type=TransactionType.REFUND,
+            status=TransactionStatus.SUCCESS,
+            description=f"Refund: {reason}"
         )
-        db.add(refund)
+        
+        db.add(tx)
+        db.add(user)
         db.commit()
-        db.refresh(refund)
-        return refund
-
+        db.refresh(tx)
+        return tx

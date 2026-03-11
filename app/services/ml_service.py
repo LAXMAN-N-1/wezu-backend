@@ -1,10 +1,11 @@
-from sqlmodel import Session
+from sqlmodel import Session, select
 from app.ml.feature_store import FeatureStore
 from app.ml.models.battery_health import BatteryHealthModel, DemandForecastModel
 from typing import Dict, Any
 
 from app.ml.registry import ModelRegistry
 import numpy as np
+from datetime import datetime, timedelta
 
 class MLService:
     @staticmethod
@@ -35,12 +36,36 @@ class MLService:
 
     @staticmethod
     def get_demand_forecast(db: Session, station_id: int) -> Dict[str, Any]:
-        # In a real system, we'd fetch actual historical swaps for the station
-        # Mocking history here for demonstration
-        mock_history = [45, 52, 48, 60, 55, 50, 47]
-        predictions = DemandForecastModel.predict(mock_history)
+        """
+        Generate demand forecast based on last 30 days of swap history.
+        """
+        from app.models.swap import SwapSession
+        from sqlalchemy import func
+        
+        # 1. Fetch swap counts per day for the last 30 days
+        since = datetime.utcnow() - timedelta(days=30)
+        history_stmt = select(
+            func.date(SwapSession.created_at).label("date"),
+            func.count(SwapSession.id).label("count")
+        ).where(
+            SwapSession.station_id == station_id,
+            SwapSession.created_at >= since
+        ).group_by(func.date(SwapSession.created_at)).order_by(func.date(SwapSession.created_at).asc())
+        
+        results = db.exec(history_stmt).all()
+        # Convert to list of counts, filling missing days with 0
+        history_map = {str(r.date): r.count for r in results}
+        history = []
+        for i in range(30):
+            d = (since + timedelta(days=i)).date()
+            history.append(history_map.get(str(d), 0))
+
+        # 2. Predict next 7 days
+        predictions = DemandForecastModel.predict(history)
+        
         return {
             "station_id": station_id,
             "forecast_7_days": predictions,
+            "history_30_days": history[-7:], # Return last week for UI comparison
             "unit": "swaps"
         }

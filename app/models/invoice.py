@@ -4,9 +4,10 @@ from datetime import datetime
 
 class Invoice(SQLModel, table=True):
     __tablename__ = "invoices"
+    __table_args__ = {"schema": "finance"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id")
-    transaction_id: int = Field(foreign_key="transactions.id")
+    user_id: int = Field(foreign_key="core.users.id")
+    transaction_id: int = Field(foreign_key="finance.transactions.id")
     invoice_number: str = Field(unique=True)
     amount: float
     tax_amount: float

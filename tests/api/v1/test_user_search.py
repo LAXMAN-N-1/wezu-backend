@@ -1,3 +1,4 @@
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
@@ -24,7 +25,7 @@ def create_user_with_role(session, email, role_name, address_state=None, name="T
             phone_number=f"999{hash(email) % 10000000}", # Unique dummy phone
             hashed_password="hashed_password",
             is_active=True,
-            kyc_status="verified"
+            kyc_status="approved"
         )
         session.add(user)
         session.commit()

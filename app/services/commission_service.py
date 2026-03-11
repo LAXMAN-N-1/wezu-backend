@@ -14,7 +14,7 @@ class CommissionService:
         """
         # Find active configs for this transaction type
         statement = select(CommissionConfig).where(
-            CommissionConfig.transaction_type == transaction.type,
+            CommissionConfig.transaction_type == transaction.transaction_type,
             CommissionConfig.is_active == True
         )
         configs = db.exec(statement).all()
@@ -35,7 +35,7 @@ class CommissionService:
                     status="pending"
                 )
                 db.add(log)
-                logger.info(f"Commission logged: {amount} for Transaction {transaction.id}")
+                logger.info(f"Commission logged: ₹{amount} for Transaction {transaction.id} ({transaction.transaction_type})")
         
         db.commit()
 

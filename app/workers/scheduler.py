@@ -22,7 +22,7 @@ scheduler = BackgroundScheduler(
 
 def register_jobs():
     """Register all scheduled jobs"""
-    from app.workers import daily_jobs, hourly_jobs, monthly_jobs
+    from app.workers import daily_jobs, hourly_jobs, monthly_jobs, rental_worker
     
     logger.info("Registering scheduled jobs...")
     
@@ -92,6 +92,22 @@ def register_jobs():
         replace_existing=True
     )
     
+    scheduler.add_job(
+        rental_worker.process_overdue_rentals,
+        IntervalTrigger(hours=1),
+        id='hourly_rental_overdue_check',
+        name='Hourly Rental Overdue Check',
+        replace_existing=True
+    )
+    
+    scheduler.add_job(
+        hourly_jobs.smart_battery_swap_notifications,
+        IntervalTrigger(minutes=30), # Every 30 minutes to ensure timely swapping
+        id='smart_battery_swap_notifications',
+        name='Smart Battery Swap Notifications',
+        replace_existing=True
+    )
+    
     # Monthly Jobs (1st of month, 02:00 IST)
     scheduler.add_job(
         monthly_jobs.commission_settlement,
@@ -114,6 +130,33 @@ def register_jobs():
         CronTrigger(day=1, hour=4, minute=0),
         id='monthly_data_archival',
         name='Monthly Data Archival',
+        replace_existing=True
+    )
+
+    # Real-time Health Monitoring
+    from app.tasks import station_monitor, battery_health_monitor, charging_optimizer
+    
+    scheduler.add_job(
+        station_monitor.monitor_stations,
+        IntervalTrigger(minutes=2),
+        id='periodic_station_health_check',
+        name='Periodic Station Health Check',
+        replace_existing=True
+    )
+
+    scheduler.add_job(
+        battery_health_monitor.monitor_battery_health,
+        IntervalTrigger(hours=1),
+        id='periodic_battery_health_monitor',
+        name='Periodic Battery Health Monitor',
+        replace_existing=True
+    )
+
+    scheduler.add_job(
+        charging_optimizer.optimize_charging_queues,
+        IntervalTrigger(minutes=30),
+        id='periodic_charging_optimization',
+        name='Periodic Charging Optimization',
         replace_existing=True
     )
     

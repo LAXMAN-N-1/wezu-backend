@@ -1,5 +1,6 @@
-from sqlmodel import create_engine, Session, SQLModel
+from sqlmodel import Session, SQLModel
 from app.core.config import settings
+from app.core.database import engine
 from app.models import *
 
 print(f"DEBUG: app/db/session.py - DATABASE_URL: {settings.DATABASE_URL}")
@@ -20,27 +21,32 @@ except Exception as e:
 
 def init_db():
     from sqlmodel import Session, text
-    SQLModel.metadata.create_all(engine)
     
-    # TimescaleDB initialization
+    # 1. Create Required Schemas
+    schemas = ["core", "inventory", "rentals", "finance", "logistics", "dealers", "stations"]
+    with engine.connect() as conn:
+        for schema in schemas:
+            conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema};"))
+        conn.commit()
+    
+    # 2. Create Tables within schemas - Only if not using Alembic or for initial dev
+    # SQLModel.metadata.create_all(engine)
+    
+    # 3. TimescaleDB initialization
     with Session(engine) as session:
-        # TimescaleDB initialization (Creating extension requires system install)
-        # try:
-        #     session.execute(text("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"))
-        #     
-        #     # Create hypertable for telematics if it doesn't exist
-        #     session.execute(text(
-        #         "SELECT create_hypertable('telemetics_data', 'timestamp', if_not_exists => TRUE, migrate_data => TRUE);"
-        #     ))
-        #     session.commit()
-        #     print("TimescaleDB hypertable 'telemetics_data' ensured.")
-        # except Exception as e:
-        #     print(f"Hypertable creation info/error: {e} (TimescaleDB might not be installed, skipping)")
-        #     session.rollback()
-            
-        # 3. Seed Initial Data (Roles)
+        try:
+            # Enable TimescaleDB extension - silence noise
+            session.execute(text("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;"))
+            session.commit()
+        except Exception as e:
+            import logging
+            logging.warning(f"TimescaleDB extension check failed: {e}")
+            session.rollback()
+
+        # 4. Seed Initial Data (Roles)
         from app.db.initial_data import seed_roles
         seed_roles(session)
+        session.commit()
 
 def get_session():
     with Session(engine) as session:

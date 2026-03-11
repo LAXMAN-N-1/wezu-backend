@@ -9,6 +9,7 @@ from app.models.rental import Rental
 from app.models.battery import Battery
 from app.models.station import Station
 from app.services.gps_service import GPSTrackingService
+from app.services.wallet_service import WalletService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -145,19 +146,10 @@ class SwapService:
             new_battery.station_id = None
             session.add(new_battery)
             
-            # Update rental
-            rental.battery_id = new_battery_id
-            session.add(rental)
-            
-            # Log swap event
-            from app.models.rental import RentalHistory
-            swap_event = RentalHistory(
-                rental_id=rental_id,
-                event_type="BATTERY_SWAP",
-                description=f"Swapped battery from {old_battery.serial_number} to {new_battery.serial_number} at station {station_id}",
-                timestamp=datetime.utcnow()
-            )
-            session.add(swap_event)
+            # 5. Handle Payment
+            fee = self.calculate_swap_fee(rental_id, session)
+            if fee > 0:
+                WalletService.deduct_for_swap(session, rental.user_id, fee, rental_id) # Using rental_id as swap context
             
             session.commit()
             
@@ -181,8 +173,8 @@ class SwapService:
         Returns:
             Swap fee amount
         """
-        # Currently free as per requirements
-        return 0.0
+        # For demo purposes, let's charge 50 INR
+        return 50.0
     
     @staticmethod
     def get_swap_history(rental_id: int, session: Session) -> List[Dict]:

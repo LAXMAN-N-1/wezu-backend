@@ -6,20 +6,31 @@ class WalletResponse(BaseModel):
     id: int
     user_id: int
     balance: float
-    deposit_amount: float
+    currency: str = "INR"
+    is_frozen: bool = False
     
     model_config = ConfigDict(from_attributes=True)
 
 class TransactionResponse(BaseModel):
     id: int
-    wallet_id: int
+    wallet_id: Optional[int] = None
+    user_id: int
+    rental_id: Optional[int] = None
+    
     amount: float
-    type: str
+    currency: str
+    
+    transaction_type: str
     status: str
-    description: Optional[str]
+    
+    payment_method: Optional[str] = None
+    payment_gateway_ref: Optional[str] = None
+    
+    description: Optional[str] = None
     created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
 
 class RechargeRequest(BaseModel):
     amount: float
+    payment_method: str = "upi"

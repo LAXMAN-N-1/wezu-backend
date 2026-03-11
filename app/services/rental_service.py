@@ -4,7 +4,7 @@ from app.models.rental_event import RentalEvent
 from app.models.battery import Battery
 from app.models.user import User
 from app.schemas.rental import RentalCreate
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from fastapi import HTTPException
 from app.services.security_service import SecurityService
@@ -38,33 +38,42 @@ class RentalService:
 
     @staticmethod
     def initiate_rental(db: Session, user_id: int, rental_in: RentalCreate) -> Rental:
-        # 1. Verify battery availability
+        # 1. Enforce single active rental constraint
+        active_rental = db.exec(
+            select(Rental).where(
+                Rental.user_id == user_id, 
+                Rental.status.in_(["active", "pending_payment"])
+            )
+        ).first()
+        if active_rental:
+            raise HTTPException(
+                status_code=400, 
+                detail="User already has an active rental or pending payment"
+            )
+
+        # 2. Verify battery availability
         battery = db.get(Battery, rental_in.battery_id)
-        if not battery or battery.status not in ["ready", "available"]: # "ready" is the status set in StationService check
-             # If station slot says 'ready', battery status should be 'ready' or 'available'
-             pass
+        if not battery or battery.status not in ["ready", "available"]:
+             raise HTTPException(status_code=400, detail="Battery is not available for rental")
         
-        # 2. Calculate final price (ensure consistency)
+        # 3. Calculate final price
         price_details = RentalService.calculate_price(db, rental_in.battery_id, rental_in.duration_days, rental_in.promo_code)
         
-        # 3. Create Rental (PENDING_PAYMENT)
+        # 4. Create Rental (PENDING_PAYMENT)
         rental = Rental(
             user_id=user_id,
             battery_id=rental_in.battery_id,
-            pickup_station_id=rental_in.pickup_station_id,
+            start_station_id=rental_in.pickup_station_id, # Corrected field name
             start_time=datetime.utcnow(),
-            end_time=datetime.utcnow() + timedelta(days=rental_in.duration_days),
+            expected_end_time=datetime.utcnow() + timedelta(days=rental_in.duration_days),
             status="pending_payment",
-            rental_duration_days=rental_in.duration_days,
-            daily_rate=price_details["daily_rate"],
-            damage_deposit=price_details["deposit"],
-            discount_amount=price_details["discount"],
-            total_price=price_details["total_payable"],
-            promo_code_id=price_details["promo_code_id"]
+            # Metrics
+            total_amount=price_details["total_payable"], # Corrected field name
+            security_deposit=price_details["deposit"],
         )
         db.add(rental)
         
-        # Reserve battery?
+        # Reserve battery
         battery.status = "reserved"
         db.add(battery)
         
@@ -73,41 +82,74 @@ class RentalService:
         return rental
 
     @staticmethod
-    def confirm_rental(db: Session, rental_id: int, payment_ref: str) -> Rental:
+    def confirm_rental(db: Session, user_id: int, rental_id: int, payment_ref: str) -> Rental:
         rental = db.get(Rental, rental_id)
         if not rental or rental.status != "pending_payment":
             raise HTTPException(status_code=400, detail="Invalid rental state")
             
+        if rental.user_id != user_id:
+             raise HTTPException(status_code=403, detail="Not authorized")
+
+        # 1. Deduct from Wallet
+        from app.services.wallet_service import WalletService
+        from app.services.commission_service import CommissionService
+        try:
+            txn = WalletService.deduct_balance(
+                db, 
+                user_id, 
+                rental.total_amount, 
+                f"Rental Payment for Battery {rental.battery_id}"
+            )
+            # 1.1 Calculate and Log Commissions
+            CommissionService.calculate_and_log(db, txn)
+        except HTTPException as e:
+            # Re-raise insufficient funds or other wallet errors
+            raise e
+            
+        # 2. Update Rental Status
         rental.status = "active"
-        rental.payment_transaction_id = payment_ref # Assuming field exists or add it
+        rental.payment_transaction_id = payment_ref
         rental.terms_accepted_at = datetime.utcnow()
         
-        # Unlock battery
+        # 3. Update Battery status
         battery = db.get(Battery, rental.battery_id)
-        battery.status = "rented"
-        
-        # Unlock slot
-        # Access slot via battery location or query
-        # This part requires integrating with StationService or Slot logic
+        if battery:
+            battery.status = "rented"
+            battery.current_user_id = user_id
+            db.add(battery)
         
         db.add(rental)
-        db.add(battery)
         db.commit()
         db.refresh(rental)
         return rental
 
-    # Legacy wrapper if needed
-    @staticmethod
-    def create_rental(db: Session, user_id: int, rental_in: RentalCreate) -> Rental:
-        return RentalService.initiate_rental(db, user_id, rental_in)
-
     @staticmethod
     def get_active_rentals(db: Session, user_id: int) -> List[Rental]:
-        return db.exec(select(Rental).where(Rental.user_id == user_id, Rental.status == "active")).all()
+        from sqlalchemy.orm import selectinload
+        return db.exec(
+            select(Rental)
+            .where(Rental.user_id == user_id, Rental.status == "active")
+            .options(selectinload(Rental.battery))
+        ).all()
+
+    @staticmethod
+    def get_current_rental(db: Session, user_id: int) -> Optional[Rental]:
+        from sqlalchemy.orm import selectinload
+        return db.exec(
+            select(Rental)
+            .where(Rental.user_id == user_id, Rental.status.in_(["active", "pending_payment"]))
+            .options(selectinload(Rental.battery))
+        ).first()
 
     @staticmethod
     def get_history(db: Session, user_id: int) -> List[Rental]:
-        return db.exec(select(Rental).where(Rental.user_id == user_id).order_by(Rental.start_time.desc())).all()
+        from sqlalchemy.orm import selectinload
+        return db.exec(
+            select(Rental)
+            .where(Rental.user_id == user_id)
+            .options(selectinload(Rental.battery))
+            .order_by(Rental.start_time.desc())
+        ).all()
 
     @staticmethod
     def return_battery(db: Session, rental_id: int, station_id: int) -> Rental:
@@ -115,27 +157,106 @@ class RentalService:
         if not rental or rental.status != "active":
              raise HTTPException(status_code=400, detail="Invalid rental")
              
+        from app.services.late_fee_service import LateFeeService
+        fee_details = LateFeeService.calculate_late_fee(rental_id, db)
+        
+        if fee_details.get("late_fee", 0) > 0:
+            LateFeeService.apply_late_fee(rental_id, db)
+            
         rental.status = "completed"
-        rental.drop_station_id = station_id
-        # Calculate final price if needed (or late fees)
+        rental.end_station_id = station_id # Corrected field name
+        rental.end_time = datetime.utcnow() # Corrected field name
         
         battery = db.get(Battery, rental.battery_id)
-        battery.status = "available"
-        # Update battery location to this station? Station needs slots update.
-        # Assuming IoT updates station slot.
+        if battery:
+            battery.status = "available"
+            db.add(battery)
          
         db.add(rental)
-        db.add(battery)
+        
+        # 1. Award loyalty points on completion
+        from app.services.membership_service import MembershipService
+        MembershipService.earn_points(db, rental.user_id, rental.total_amount)
         
         event = RentalEvent(
             rental_id=rental.id,
             event_type="stop",
             station_id=station_id,
             battery_id=rental.battery_id,
-            description="Rental completed"
+            description=f"Rental completed. Points awarded."
         )
         db.add(event)
         
         db.commit()
         db.refresh(rental)
         return rental
+
+    @staticmethod
+    def cancel_rental(db: Session, rental_id: int, user_id: int) -> bool:
+        rental = db.get(Rental, rental_id)
+        if not rental or rental.status != "pending_payment":
+            return False
+            
+        if rental.user_id != user_id:
+            raise HTTPException(status_code=403, detail="Not authorized")
+            
+        battery = db.get(Battery, rental.battery_id)
+        if battery:
+            battery.status = "available"
+            db.add(battery)
+            
+        rental.status = "cancelled"
+        db.add(rental)
+        db.commit()
+        return True
+
+    @staticmethod
+    def initiate_return(db: Session, rental_id: int, station_id: int) -> Rental:
+        rental = db.get(Rental, rental_id)
+        if not rental or rental.status != "active":
+             raise HTTPException(status_code=400, detail="Rental is not in a returnable state")
+             
+        rental.status = "returning"
+        rental.end_station_id = station_id
+        db.add(rental)
+        db.commit()
+        db.refresh(rental)
+        return rental
+
+    @staticmethod
+    def complete_rental(db: Session, rental_id: int) -> Rental:
+        rental = db.get(Rental, rental_id)
+        if not rental or rental.status not in ["active", "returning"]:
+             raise HTTPException(status_code=400, detail="Invalid rental state for completion")
+             
+        # Reuse existing return logic but make it definitive
+        return RentalService.return_battery(db, rental_id, rental.end_station_id or rental.start_station_id)
+
+    @staticmethod
+    def get_analytics(db: Session, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
+        stmt = select(Rental).where(Rental.start_time >= start_date, Rental.start_time <= end_date)
+        rentals = db.exec(stmt).all()
+        
+        total = len(rentals)
+        active = len([r for r in rentals if r.status == "active"])
+        completed = len([r for r in rentals if r.status == "completed"])
+        
+        total_revenue = sum(r.total_amount for r in rentals)
+        
+        completed_durations = [(r.end_time - r.start_time).total_seconds() for r in rentals if r.end_time]
+        avg_dur = (sum(completed_durations) / len(completed_durations)) / 3600 if completed_durations else 0
+        
+        # Group by station
+        station_counts = {}
+        for r in rentals:
+            s_id = r.start_station_id
+            station_counts[s_id] = station_counts.get(s_id, 0) + 1
+            
+        return {
+            "total_rentals": total,
+            "active_rentals": active,
+            "completed_rentals": completed,
+            "avg_duration_hours": round(avg_dur, 2),
+            "total_revenue": round(total_revenue, 2),
+            "rentals_by_station": [{"station_id": sid, "count": count} for sid, count in station_counts.items()]
+        }

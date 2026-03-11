@@ -10,6 +10,10 @@ class ReviewCreate(ReviewBase):
     station_id: Optional[int] = None
     battery_id: Optional[int] = None
 
+class ReviewUpdate(BaseModel):
+    rating: Optional[int] = None
+    comment: Optional[str] = None
+
 class ReviewResponse(ReviewBase):
     id: int
     user_id: int
