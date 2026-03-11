@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session
 
 from app.api import deps
-from app.db.session import get_session
 from app.models.user import User
 from app.services.analytics_service import AnalyticsService
 from app.schemas.common import DataResponse
@@ -16,7 +15,7 @@ router = APIRouter()
 @router.get("/dashboard", response_model=DataResponse[dict])
 def get_dashboard(
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """
     Get customer dashboard
@@ -32,7 +31,7 @@ def get_dashboard(
 @router.get("/rental-history", response_model=DataResponse[dict])
 def get_rental_history_stats(
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Get rental history statistics"""
     stats = AnalyticsService.get_rental_history_stats(current_user.id, session)
@@ -46,7 +45,7 @@ def get_rental_history_stats(
 def get_cost_analytics(
     months: int = Query(3, ge=1, le=12),
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """
     Get cost analytics
@@ -62,7 +61,7 @@ def get_cost_analytics(
 @router.get("/usage-patterns", response_model=DataResponse[dict])
 def get_usage_patterns(
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """
     Get usage patterns
@@ -78,7 +77,7 @@ def get_usage_patterns(
 @router.get("/carbon-savings", response_model=DataResponse[dict])
 async def get_carbon_savings(
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Calculate carbon savings from battery usage"""
     from app.models.rental import Rental
@@ -118,7 +117,7 @@ async def get_carbon_savings(
 @router.get("/export")
 async def export_analytics_data(
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     format: str = "json"
 ):
     """Export user analytics data"""

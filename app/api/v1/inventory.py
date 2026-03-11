@@ -2,7 +2,6 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlmodel import Session, select
 from app.api import deps
-from app.db.session import get_session
 from app.models.user import User
 from app.models.logistics import BatteryTransfer
 from app.models.inventory_audit import InventoryAuditLog
@@ -16,7 +15,7 @@ router = APIRouter()
 @router.post("/transfers", response_model=TransferResponse)
 def create_transfer_order(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     transfer_in: TransferCreate,
     current_user: User = Depends(deps.get_current_active_superuser),
 ) -> Any:
@@ -29,7 +28,7 @@ def create_transfer_order(
 @router.get("/transfers", response_model=List[TransferResponse])
 def list_transfers(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     status: Optional[str] = None,
     battery_id: Optional[int] = None,
     current_user: User = Depends(deps.get_current_active_superuser),
@@ -46,7 +45,7 @@ def list_transfers(
 @router.get("/low-stock", response_model=List[dict])
 def get_low_stock_alerts(
     threshold: int = Query(5, description="Low stock threshold"),
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_superuser),
 ):
     """Admin: stations or warehouses with battery counts below threshold"""
@@ -65,7 +64,7 @@ def get_low_stock_alerts(
 @router.get("/transfers/{id}", response_model=TransferResponse)
 def get_transfer_detail(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     id: int,
     current_user: User = Depends(deps.get_current_active_superuser),
 ) -> Any:
@@ -78,7 +77,7 @@ def get_transfer_detail(
 @router.put("/transfers/{id}/confirm", response_model=TransferResponse)
 def confirm_transfer_receipt(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     id: int,
     current_user: User = Depends(deps.get_current_active_superuser),
 ) -> Any:
@@ -91,7 +90,7 @@ def confirm_transfer_receipt(
 @router.get("/audit-trail", response_model=List[AuditLogResponse])
 def get_inventory_audit_trail(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     battery_id: Optional[int] = None,
     action: Optional[str] = None,
     current_user: User = Depends(deps.get_current_active_superuser),
@@ -109,7 +108,7 @@ def get_inventory_audit_trail(
 @router.post("/audit-trail/export")
 def export_inventory_audit(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     battery_id: Optional[int] = None,
     current_user: User = Depends(deps.get_current_active_superuser),
 ):

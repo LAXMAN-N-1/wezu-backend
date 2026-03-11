@@ -18,11 +18,13 @@ class TransactionType(str, Enum):
     SUBSCRIPTION = "subscription"
     WITHDRAWAL = "withdrawal"
     PURCHASE = "purchase"
+    SWAP_FEE = "swap_fee"
 
 class TransactionStatus(str, Enum):
     PENDING = "pending"
     SUCCESS = "success"
     FAILED = "failed"
+    CANCELLED = "cancelled"
     REFUNDED = "refunded"
 
 class Transaction(SQLModel, table=True):

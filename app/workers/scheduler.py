@@ -132,6 +132,33 @@ def register_jobs():
         name='Monthly Data Archival',
         replace_existing=True
     )
+
+    # Real-time Health Monitoring
+    from app.tasks import station_monitor, battery_health_monitor, charging_optimizer
+    
+    scheduler.add_job(
+        station_monitor.monitor_stations,
+        IntervalTrigger(minutes=2),
+        id='periodic_station_health_check',
+        name='Periodic Station Health Check',
+        replace_existing=True
+    )
+
+    scheduler.add_job(
+        battery_health_monitor.monitor_battery_health,
+        IntervalTrigger(hours=1),
+        id='periodic_battery_health_monitor',
+        name='Periodic Battery Health Monitor',
+        replace_existing=True
+    )
+
+    scheduler.add_job(
+        charging_optimizer.optimize_charging_queues,
+        IntervalTrigger(minutes=30),
+        id='periodic_charging_optimization',
+        name='Periodic Charging Optimization',
+        replace_existing=True
+    )
     
     logger.info(f"Registered {len(scheduler.get_jobs())} scheduled jobs")
 

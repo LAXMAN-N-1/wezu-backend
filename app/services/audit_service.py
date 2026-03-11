@@ -133,4 +133,34 @@ class AuditService:
             "limit": limit
         }
 
+    @staticmethod
+    def log_action(
+        db: Any,
+        action: str,
+        resource_type: str,
+        user_id: Optional[int] = None,
+        resource_id: Optional[str] = None,
+        details: Optional[str] = None,
+        ip_address: Optional[str] = None,
+        device_info: Optional[str] = None
+    ):
+        """
+        Record an audit log entry in the SQL database.
+        """
+        from app.models.audit_log import AuditLog
+        
+        log_entry = AuditLog(
+            user_id=user_id,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            details=details,
+            ip_address=ip_address,
+            device_info=device_info
+        )
+        db.add(log_entry)
+        db.commit()
+        db.refresh(log_entry)
+        return log_entry
+
 audit_service = AuditService()

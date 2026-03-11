@@ -2,16 +2,16 @@ from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from app.api.deps import get_current_user
-from app.db.session import get_session
 from app.models.user import User
 from app.models.vehicle import Vehicle
 from app.schemas.vehicle import VehicleCreate, VehicleUpdate, VehicleResponse
+from app.api import deps
 
 router = APIRouter()
 
 @router.get("/", response_model=List[VehicleResponse])
 def read_my_vehicles(
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """
@@ -22,7 +22,7 @@ def read_my_vehicles(
 @router.post("/", response_model=VehicleResponse)
 def create_vehicle(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     vehicle_in: VehicleCreate,
     current_user: User = Depends(get_current_user),
 ) -> Any:
@@ -44,7 +44,7 @@ def create_vehicle(
 @router.delete("/{vehicle_id}")
 def delete_vehicle(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     vehicle_id: int,
     current_user: User = Depends(get_current_user),
 ) -> Any:

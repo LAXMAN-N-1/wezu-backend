@@ -2,8 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlmodel import Session, select
 from typing import List, Optional, Any
 from datetime import datetime
-from app.api import deps
-from app.db.session import get_session
+from app.api.deps import get_current_user, get_db
 from app.models.dealer import DealerProfile, DealerApplication
 from app.models.user import User
 from app.services.dealer_service import DealerService
@@ -44,8 +43,8 @@ def read_dealers(
 
 @router.get("/registration-status", response_model=DataResponse[dict])
 def get_registration_status(
-    current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(deps.get_db)
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
 ):
     """Dealer: check their own onboarding stage and status"""
     profile = DealerService.get_dealer_by_user(session, current_user.id)
@@ -61,8 +60,8 @@ def get_registration_status(
 
 @router.get("/me/dashboard", response_model=DataResponse[dict])
 def get_dealer_dashboard(
-    current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(deps.get_db)
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
 ):
     """Dealer: own dashboard (sales, inventory, commissions, KPIs)"""
     profile = DealerService.get_dealer_by_user(session, current_user.id)
@@ -74,8 +73,8 @@ def get_dealer_dashboard(
 
 @router.get("/me/stations", response_model=DataResponse[list])
 def get_dealer_stations(
-    current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(deps.get_db)
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
 ):
     """Dealer: list of their own stations"""
     profile = DealerService.get_dealer_by_user(session, current_user.id)
@@ -88,8 +87,8 @@ def get_dealer_stations(
 
 @router.get("/me/inventory", response_model=DataResponse[list])
 def get_dealer_inventory(
-    current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(deps.get_db)
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
 ):
     """Dealer: inventory across all their stations"""
     profile = DealerService.get_dealer_by_user(session, current_user.id)
@@ -104,8 +103,8 @@ def get_dealer_inventory(
 def get_dealer_commissions(
     skip: int = 0,
     limit: int = 50,
-    current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(deps.get_db)
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
 ):
     """Dealer: commission history and pending amounts"""
     profile = DealerService.get_dealer_by_user(session, current_user.id)
@@ -158,8 +157,8 @@ def update_dealer(
 def upload_dealer_document(
     doc_type: str = Body(...),
     file_url: str = Body(...),
-    current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(deps.get_db)
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
 ):
     """Dealer: upload business license, GST cert, insurance docs"""
     profile = DealerService.get_dealer_by_user(session, current_user.id)
@@ -174,8 +173,8 @@ def upload_dealer_document(
 
 @router.get("/me/documents", response_model=DataResponse[list])
 def list_dealer_documents(
-    current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(deps.get_db)
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
 ):
     """Dealer: list uploaded documents with versions"""
     profile = DealerService.get_dealer_by_user(session, current_user.id)
@@ -189,8 +188,8 @@ def list_dealer_documents(
 @router.delete("/me/documents/{id}", response_model=DataResponse[dict])
 def delete_dealer_document(
     id: int,
-    current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(deps.get_db)
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
 ):
     """Remove or replace a document"""
     profile = DealerService.get_dealer_by_user(session, current_user.id)
@@ -209,8 +208,8 @@ def delete_dealer_document(
 @router.post("/me/promotions", response_model=DataResponse[dict])
 def create_dealer_promotion(
     request: dict = Body(...),
-    current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(deps.get_db)
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
 ):
     """Dealer: create a discount/promotion campaign"""
     profile = DealerService.get_dealer_by_user(session, current_user.id)
@@ -225,8 +224,8 @@ def create_dealer_promotion(
 
 @router.get("/me/promotions", response_model=DataResponse[list])
 def list_dealer_promotions(
-    current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(deps.get_db)
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
 ):
     """Dealer: list all campaigns and their performance"""
     profile = DealerService.get_dealer_by_user(session, current_user.id)
@@ -240,8 +239,8 @@ def list_dealer_promotions(
 @router.get("/me/commission-statement/{month}")
 def get_commission_statement(
     month: str,
-    current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(deps.get_db)
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
 ):
     """Monthly commission statement PDF"""
     # Placeholder for actual PDF generation
@@ -249,8 +248,8 @@ def get_commission_statement(
 
 @router.get("/me/support-tickets", response_model=DataResponse[list])
 def get_dealer_support_tickets(
-    current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(deps.get_db)
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
 ):
     """Dealer: view support tickets raised for their stations"""
     profile = DealerService.get_dealer_by_user(session, current_user.id)
@@ -262,8 +261,8 @@ def get_dealer_support_tickets(
 
 @router.get("/me/sales", response_model=DataResponse[dict])
 def get_dealer_sales(
-    current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(deps.get_db)
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
 ):
     """Dealer: daily/weekly/monthly sales summary"""
     profile = DealerService.get_dealer_by_user(session, current_user.id)
@@ -277,8 +276,8 @@ def get_dealer_sales(
 def update_dealer_promotion(
     id: int,
     request: dict = Body(...),
-    current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(deps.get_db)
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
 ):
     """Update or deactivate a campaign"""
     profile = DealerService.get_dealer_by_user(session, current_user.id)

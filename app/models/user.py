@@ -1,10 +1,17 @@
 from sqlmodel import SQLModel, Field, Relationship
+from app.models.kyc import KYCRecord
+from app.models.rbac import UserRole
+from app.models.two_factor_auth import TwoFactorAuth
+
 from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
 from enum import Enum
 import sqlalchemy as sa
 
+from app.models.two_factor_auth import TwoFactorAuth
+
 if TYPE_CHECKING:
+    from app.models.session import UserSession
     from app.models.financial import Wallet
     from app.models.location import Address
     from app.models.kyc import KYCDocument, KYCRecord
@@ -14,13 +21,7 @@ if TYPE_CHECKING:
     from app.models.driver_profile import DriverProfile
     from app.models.staff import StaffProfile
     from app.models.rbac import Role, UserAccessPath
-    from app.models.session import UserSession
-    from app.models.user_profile import UserProfile
-    from app.models.membership import UserMembership
-    from app.models.finance.transaction import Transaction
-    from app.models.rental import Rental
-    from app.models.support import SupportTicket
-    from app.models.logistics import DeliveryOrder
+    from app.models.token import SessionToken
 
 class UserType(str, Enum):
     CUSTOMER = "customer"
@@ -42,6 +43,7 @@ class KYCStatus(str, Enum):
     REJECTED = "rejected"
 
 class User(SQLModel, table=True):
+
     __tablename__ = "users"
     __table_args__ = {"schema": "core"}
     
@@ -57,6 +59,7 @@ class User(SQLModel, table=True):
     user_type: UserType = Field(default=UserType.CUSTOMER, index=True)
     status: UserStatus = Field(default=UserStatus.ACTIVE, index=True)
     is_superuser: bool = Field(default=False)
+    is_active: bool = Field(default=True, index=True)
     role_id: Optional[int] = Field(default=None, foreign_key="core.roles.id")
     
     # Profile & Media
@@ -80,6 +83,7 @@ class User(SQLModel, table=True):
     email_verification_token: Optional[str] = None
     email_verification_sent_at: Optional[datetime] = None
     
+    last_global_logout_at: Optional[datetime] = None
     last_login_at: Optional[datetime] = None
     last_global_logout_at: Optional[datetime] = None
     

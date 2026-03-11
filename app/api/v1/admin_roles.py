@@ -4,7 +4,6 @@ from sqlalchemy.exc import IntegrityError
 from app.api import deps
 from app.models.rbac import Role, Permission, UserRole
 from app.models.user import User
-from app.db.session import get_session
 from typing import List, Any, Optional
 from pydantic import BaseModel
 from datetime import datetime, timedelta
@@ -87,7 +86,7 @@ class RoleDistributionResponse(BaseModel):
 @router.get("/roles/distribution", response_model=RoleDistributionResponse)
 async def get_role_distribution(
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Get role distribution analytics (Admin only).
@@ -260,7 +259,7 @@ class RoleTestResponse(BaseModel):
 async def test_role_configuration(
     role_id: int,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Test/preview a role configuration without activating (Admin only).
@@ -469,7 +468,7 @@ class BulkRoleAssignResponse(BaseModel):
 async def bulk_assign_role(
     request: BulkRoleAssignRequest,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Assign a role to multiple users (Admin only).

@@ -1,6 +1,6 @@
 from typing import Any, List, Optional, Dict
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect, status, UploadFile, File
-from fastapi.responses import Response
+from datetime import datetime
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, WebSocket, WebSocketDisconnect, UploadFile, File
 from sqlmodel import Session, select
 from pydantic import BaseModel
 from sqlalchemy.orm import selectinload
@@ -29,14 +29,17 @@ from app.schemas.common import DataResponse
 
 router = APIRouter()
 
-class QRCodeRequest(BaseModel):
-    qr_code_data: str
+from app.schemas.station_monitoring import BatteryListResponse, BatteryHealthReport
+from app.services.battery_service import BatteryService
 
 class QRGenerateRequest(BaseModel):
     battery_id: int
 
 class QRVerifyRequest(BaseModel):
     qr_data: str
+
+class QRCodeRequest(BaseModel):
+    qr_code_data: str
 
 class BatteryTelemetryResponse(BaseModel):
     battery_id: int
@@ -57,7 +60,7 @@ class BatteryAlertResponse(BaseModel):
 @router.post("/scan-qr", response_model=BatteryDetailResponse)
 def scan_battery_qr(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     qr_in: QRCodeRequest,
 ) -> Any:
     """
@@ -81,7 +84,7 @@ def scan_battery_qr(
 @router.get("/{battery_id}/health-history", response_model=DataResponse[List[BatteryHealthHistoryResponse]])
 def get_battery_health_history(
     battery_id: int,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     limit: int = Query(50, le=200)
 ):
     """Historical health percentage (SOH) readings over time."""
@@ -91,7 +94,7 @@ def get_battery_health_history(
 @router.get("/{battery_id}/audit-logs", response_model=DataResponse[List[BatteryAuditLogResponse]])
 def get_battery_audit_logs(
     battery_id: int,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     limit: int = Query(50, le=200)
 ):
     """Audit trail of all changes to this battery."""
@@ -108,7 +111,7 @@ def get_battery_audit_logs(
 @router.get("/{battery_id}/rental-history")
 def get_battery_rental_history(
     battery_id: int,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     limit: int = Query(20, le=100)
 ):
     """All past rentals associated with this battery."""
@@ -119,7 +122,7 @@ def log_battery_maintenance(
     battery_id: int,
     maintenance_in: BatteryMaintenanceCreate,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Log a maintenance event on a battery."""
     data = maintenance_in.model_dump()
@@ -129,7 +132,7 @@ def log_battery_maintenance(
 @router.get("/{battery_id}/maintenance-history")
 def get_battery_maintenance_history(
     battery_id: int,
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """All maintenance records for a battery."""
     return MaintenanceService.get_maintenance_history(session, battery_id)
@@ -140,7 +143,7 @@ def update_battery_status(
     status: str,
     description: str = "Manual status update",
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Manually change battery status (available/maintenance/retired)."""
     battery = BatteryService.update_status(session, battery_id, status, description, current_user.id)
@@ -153,7 +156,7 @@ def assign_battery_station(
     battery_id: int,
     station_id: int,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Assign a battery to a specific station."""
     battery = BatteryService.assign_station(session, battery_id, station_id)
@@ -167,7 +170,7 @@ def transfer_battery(
     to_station_id: int,
     notes: Optional[str] = None,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Transfer battery from one station to another (logs movement)."""
     # Simply re-use assign_station but with better logging description
@@ -190,7 +193,7 @@ def transfer_battery(
 @router.get("/low-health", response_model=List[BatteryResponse])
 def get_low_health_batteries(
     threshold: float = Query(80.0, description="Health percentage threshold"),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """List all batteries below a configurable health threshold."""
     batteries = session.exec(
@@ -200,7 +203,7 @@ def get_low_health_batteries(
 
 @router.get("/utilization-report", response_model=BatteryUtilizationResponse)
 def get_battery_utilization_report(
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_superuser)
 ):
     """Utilization percentage across fleet."""
@@ -210,7 +213,7 @@ def get_battery_utilization_report(
 def generate_qr_code(
     request: QRGenerateRequest,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Generate QR code for battery verification"""
     qr_image = QRCodeService.generate_battery_qr(request.battery_id, session)
@@ -230,7 +233,7 @@ def generate_qr_code(
 def verify_qr_code(
     request: QRVerifyRequest,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Verify scanned QR code and get battery details"""
     battery_data = QRCodeService.verify_qr_code(request.qr_data, session)
@@ -248,7 +251,7 @@ def read_batteries(
     sku_id: Optional[int] = None,
     station_id: Optional[int] = None,
     location_type: Optional[str] = None,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
 ) -> Any:
     """Retrieve batteries with filters."""
     statement = select(Battery).options(
@@ -273,7 +276,7 @@ def read_batteries(
 @router.post("/", response_model=BatteryResponse)
 def create_battery(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     battery_in: BatteryCreate,
     current_user: User = Depends(deps.get_current_active_superuser)
 ) -> Any:
@@ -283,7 +286,7 @@ def create_battery(
 @router.put("/{battery_id}", response_model=BatteryResponse)
 def update_battery(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     battery_id: int,
     battery_in: BatteryUpdate,
     current_user: User = Depends(deps.get_current_active_superuser)
@@ -315,7 +318,7 @@ def update_battery(
 @router.delete("/{battery_id}")
 def decommission_battery(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     battery_id: int,
     current_user: User = Depends(deps.get_current_active_superuser)
 ) -> Any:
@@ -330,7 +333,7 @@ def import_batteries_csv(
     file: UploadFile = File(...),
     dry_run: bool = Query(False, description="If true, validation only; no commit"),
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Import batteries via CSV"""
     if not file.filename.endswith('.csv'):
@@ -345,7 +348,7 @@ def import_batteries_csv(
 @router.get("/batch/export")
 def export_batteries_csv(
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Export battery inventory to CSV"""
     csv_str = battery_batch_service.generate_export_csv(session)
@@ -360,7 +363,7 @@ def export_batteries_csv(
 def update_batteries_batch(
     updates: List[Dict[str, Any]],
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """
     Batch update batteries. 
@@ -376,7 +379,7 @@ def update_batteries_batch(
 def get_battery_telemetry(
     battery_id: int,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Get real-time battery telemetry data"""
     telemetry = mqtt_service.get_realtime_data(battery_id)
@@ -443,7 +446,7 @@ async def battery_telemetry_stream(
 @router.get("/{battery_id}", response_model=BatteryDetailResponse)
 def read_battery(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     battery_id: int,
 ) -> Any:
     """Get battery by ID with history."""

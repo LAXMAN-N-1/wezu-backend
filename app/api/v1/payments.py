@@ -7,10 +7,9 @@ from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from pydantic import BaseModel
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.api import deps
-from app.db.session import get_session
 from app.models.user import User
 from app.models.catalog import CatalogOrder
 from app.models.rental import Rental
@@ -42,7 +41,7 @@ class PaymentMethodCreate(BaseModel):
 async def add_payment_method(
     method: PaymentMethodCreate,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Add a new payment method"""
     return {
@@ -54,7 +53,7 @@ async def add_payment_method(
 async def delete_payment_method(
     method_id: str,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Delete a payment method"""
     return {"message": "Payment method deleted successfully"}
@@ -64,7 +63,7 @@ async def delete_payment_method(
 def download_order_invoice(
     order_id: int,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """
     Download PDF invoice for order
@@ -99,7 +98,7 @@ def download_order_invoice(
 def download_rental_invoice(
     rental_id: int,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Download PDF invoice for rental"""
     # Verify rental belongs to user
@@ -132,7 +131,7 @@ def download_rental_invoice(
 @router.get("/transactions", response_model=DataResponse[list])
 def get_user_all_payments(
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """All payment transactions for the user (rentals + purchases)"""
     txns = session.exec(
@@ -146,7 +145,7 @@ def get_user_all_payments(
 def get_payment_detail(
     id: int,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Single transaction detail"""
     txn = session.get(Transaction, id)
@@ -159,7 +158,7 @@ def admin_initiate_refund(
     id: int,
     request: RefundRequest,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Admin: initiate manual refund for a transaction"""
     txn = session.get(Transaction, id)
@@ -179,7 +178,7 @@ def admin_initiate_refund(
 @router.get("/{id}/refund-status", response_model=DataResponse[dict])
 def get_refund_status(
     id: int,
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Track refund processing status"""
     from app.models.refund import Refund
@@ -195,7 +194,7 @@ def admin_get_all_payments(
     skip: int = 0,
     limit: int = 100,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Admin: all platform transactions with filters"""
     statement = select(Transaction)
@@ -212,7 +211,7 @@ def admin_get_all_payments(
 def get_revenue_dashboard(
     period: str = "daily",  # daily, weekly, monthly
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Revenue summary with comparison"""
     # Define time range
@@ -230,7 +229,7 @@ def get_revenue_dashboard(
 @router.get("/admin/revenue/by-station", response_model=DataResponse[List[StationRevenueResponse]])
 def get_revenue_by_station(
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Revenue broken down per station"""
     data = AnalyticsService.get_revenue_by_station(session)
@@ -240,7 +239,7 @@ def get_revenue_by_station(
 def get_revenue_forecast(
     days: int = 30,
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Projected revenue for next 30 days"""
     data = AnalyticsService.calculate_revenue_forecast(session, days)
@@ -249,7 +248,7 @@ def get_revenue_forecast(
 @router.get("/admin/profit-margins", response_model=DataResponse[List[ProfitMarginResponse]])
 def get_profit_margins(
     current_user: User = Depends(deps.get_current_active_superuser),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Margin analysis per station"""
     data = AnalyticsService.get_profit_margins(session)
@@ -261,7 +260,7 @@ def request_refund(
     order_id: int,
     request: RefundRequest,
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """
     Request refund for order
@@ -311,7 +310,7 @@ def request_refund(
 @router.get("/refunds", response_model=DataResponse[list])
 def get_user_refunds(
     current_user: User = Depends(deps.get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """Get all refund requests for current user"""
     from app.models.financial import Transaction
@@ -382,7 +381,7 @@ def get_payment_methods(current_user: User = Depends(deps.get_current_user)):
 @router.post("/webhooks/razorpay")
 async def razorpay_webhook(
     request: Request,
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     """
     Handle Razorpay Webhooks

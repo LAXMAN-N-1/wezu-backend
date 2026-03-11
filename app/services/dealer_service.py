@@ -1,4 +1,4 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 from app.core.database import engine
 from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
 from app.models.dealer_inventory import DealerInventory

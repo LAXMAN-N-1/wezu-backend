@@ -2,13 +2,16 @@ from datetime import datetime
 from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
+from sqlalchemy import Column, JSON
+from sqlmodel import Column as SQLColumn
 import uuid
 
 if TYPE_CHECKING:
-    from app.models.battery_catalog import BatteryCatalog
+    from app.models.battery_catalog import BatteryCatalog, BatterySpec, BatteryBatch
     from app.models.rental import Rental
     from app.models.station import Station, StationSlot
     from app.models.iot import IoTDevice
+    from app.models.logistics import BatteryTransfer
 
 class BatteryStatus(str, Enum):
     AVAILABLE = "available"
@@ -22,6 +25,10 @@ class BatteryHealth(str, Enum):
     FAIR = "fair"
     POOR = "poor"
     CRITICAL = "critical"
+    EXCELLENT = "excellent"
+    POOR = "poor"
+    DAMAGED = "damaged"
+
 
 class LocationType(str, Enum):
     STATION = "station"
@@ -41,6 +48,7 @@ class Battery(SQLModel, table=True):
     
     # Product Catalog Link
     sku_id: Optional[int] = Field(default=None, foreign_key="inventory.battery_catalog.id")
+    spec_id: Optional[int] = Field(default=None, foreign_key="inventory.battery_catalog.id")
     
     # Location tracking
     station_id: Optional[int] = Field(default=None, foreign_key="stations.stations.id", index=True)
@@ -70,6 +78,20 @@ class Battery(SQLModel, table=True):
     last_charged_at: Optional[datetime] = None
     last_inspected_at: Optional[datetime] = None
     last_maintenance_date: Optional[datetime] = None
+    last_maintenance_cycles: int = Field(default=0)
+    
+    # Health Tracking (New)
+    state_of_health: float = Field(default=100.0)
+    health_status: BatteryHealth = Field(default=BatteryHealth.EXCELLENT) # EXCELLENT, GOOD, FAIR, POOR, DAMAGED
+    temperature_history: List[float] = Field(default_factory=list, sa_column=Column(JSON))
+    charge_cycles: int = Field(default=0) # Distinct from cycle_count for lifecycle tracking
+
+    
+    # Current Location Context
+    # Polymorphic-like tracking: location_type enum ('warehouse', 'station', 'customer', 'transit')
+    location_type: Optional[str] = None 
+    location_id: Optional[int] = None 
+
     
     # Timestamps
     last_telemetry_at: Optional[datetime] = None
@@ -80,10 +102,18 @@ class Battery(SQLModel, table=True):
     warehouse_id: Optional[int] = Field(default=None, foreign_key="logistics.warehouses.id")
 
     # Relationships
-    sku: Optional["BatteryCatalog"] = Relationship(back_populates="batteries")
-    product: Optional["BatteryCatalog"] = Relationship(
+    sku: Optional["BatteryCatalog"] = Relationship(
         back_populates="batteries",
-        sa_relationship_kwargs={"overlaps": "sku"}
+        sa_relationship_kwargs={"foreign_keys": "[Battery.sku_id]"}
+    )
+    product: Optional["BatteryCatalog"] = Relationship(
+        sa_relationship_kwargs={
+            "foreign_keys": "[Battery.sku_id]",
+            "overlaps": "sku"
+        }
+    )
+    spec: Optional["BatteryCatalog"] = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "[Battery.spec_id]"}
     )
     rentals: List["Rental"] = Relationship(back_populates="battery")
     lifecycle_events: List["BatteryLifecycleEvent"] = Relationship(back_populates="battery")

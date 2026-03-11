@@ -2,7 +2,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator, model_validato
 from typing import Optional, List, Any, Dict
 
 class LoginRequest(BaseModel):
-    username: str # email or phone
+    email: str = Field(..., description="Email address or phone number")
     password: str
     totp_code: Optional[str] = None # For 2FA
     role: Optional[str] = None

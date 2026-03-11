@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select, func
 from typing import List, Optional, Dict, Any
 from app.api import deps
-from app.db.session import get_session
+
 from app.models.user import User
 from app.models.audit_log import AuditLog
 from app.models.address import Address
@@ -48,6 +48,12 @@ class MongoAuditResponse(BaseModel):
     page: int
     limit: int
 
+class AuditLogResponse(BaseModel):
+    logs: List[AuditLog]
+    total_count: int
+    page: int
+    limit: int
+
 @router.get("/users/{user_id}", response_model=MongoAuditResponse)
 async def get_user_audit_log(
     user_id: int,
@@ -78,7 +84,7 @@ async def get_role_audit_log(
     page: int = 1,
     limit: int = 20,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Get audit history for a specific role.
@@ -124,7 +130,7 @@ async def get_role_audit_log(
 @router.get("/permissions/usage")
 async def get_permission_usage_analytics(
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Get permission usage analytics.
@@ -209,7 +215,7 @@ async def get_permission_usage_analytics(
 async def get_auth_failures(
     user_id: Optional[int] = None,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
     page: int = 1,
     limit: int = 20,
 ):
@@ -262,7 +268,7 @@ async def get_data_access_log(
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
     page: int = 1,
     limit: int = 20,
 ):

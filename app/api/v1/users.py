@@ -5,7 +5,6 @@ from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict
 from datetime import datetime
 from app.api import deps
-from app.db.session import get_session
 from app.models.user import User
 from app.models.address import Address
 from app.models.user_profile import UserProfile
@@ -165,7 +164,7 @@ def _build_user_profile_response(user: User, db: Session = None) -> UserProfileR
 @router.get("/me", response_model=UserProfileResponse)
 async def read_user_me(
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Get current user's full profile.
@@ -185,7 +184,7 @@ async def read_user_me(
 async def update_user_me(
     user_in: UserUpdate,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Update authenticated user's profile.
@@ -254,7 +253,7 @@ MAX_PROFILE_PICTURE_SIZE = 5 * 1024 * 1024  # 5MB
 async def upload_profile_picture(
     file: UploadFile = File(...),
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Upload profile picture for authenticated user.
@@ -465,7 +464,7 @@ async def update_address(
     address_id: int,
     address_in: AddressUpdate,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """Update a specific saved address"""
     statement = select(Address).where(
@@ -521,7 +520,7 @@ async def delete_address(
 async def delete_my_account(
     data: AccountDeletionRequest,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """Soft delete current user's account with reason"""
     UserService.delete_account(db, current_user, data.reason)
@@ -533,7 +532,7 @@ async def get_my_login_history(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """Get paginated login history for current user"""
     sessions, total = UserService.get_login_history(db, current_user.id, page, limit)
@@ -564,7 +563,7 @@ async def get_my_activity_log(
 @router.get("/me/membership", response_model=MembershipResponse)
 async def get_my_membership(
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """Get current user's membership details"""
     membership = MembershipService.get_user_membership(db, current_user.id)
@@ -584,7 +583,7 @@ async def get_my_membership(
 @router.get("/me/dashboard-summary", response_model=DashboardSummaryResponse)
 async def get_my_dashboard_summary(
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """Get aggregated dashboard stats for home screen"""
     summary = AnalyticsService.get_customer_dashboard(current_user.id, db)
@@ -708,7 +707,7 @@ def get_notification_preferences(
 def update_notification_preferences(
     prefs_in: NotificationPreferencesUpdate,
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Update current user's notification preferences.
@@ -766,7 +765,7 @@ async def read_users(
     status: Optional[str] = None, # active, inactive
     # Dependencies
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Get all users with pagination, sorting, and filtering (Admin Only).
@@ -895,8 +894,9 @@ async def search_users(
     name: Optional[str] = None,
     # Dependencies
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     # Reusing Read Users logic effectively
     # ... (skipping generic search implementation for now in this snippet)
     return UserSearchResponse(users=[], total_count=0, page=1, limit=10, filters_applied={})
+

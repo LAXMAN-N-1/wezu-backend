@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlmodel import Session, select
-from app.db.session import get_session
 from app.models.user import User
 from app.models.kyc import KYCRecord
 from app.api import deps
@@ -15,7 +14,7 @@ router = APIRouter()
 @router.get("/status")
 async def get_kyc_status(
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """Get current user's KYC status"""
     # Fetch KYC record
@@ -34,7 +33,7 @@ async def submit_kyc_document(
     document_type: str = Form(...), # aadhaar_front, aadhaar_back, pan_card, utility_bill
     file: UploadFile = File(...),
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """Upload KYC document"""
     # 1. Validate
@@ -85,7 +84,7 @@ async def submit_kyc_document(
 async def verify_aadhaar(
     aadhaar_number: str = Form(...),
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """
     Verify Aadhaar Number using KYCService.
@@ -115,7 +114,7 @@ async def verify_aadhaar(
 async def verify_pan(
     pan_number: str = Form(...),
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """
     Verify PAN Number using KYCService.
@@ -144,7 +143,7 @@ async def verify_pan(
 async def upload_video_kyc(
     file: UploadFile = File(...),
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """
     Upload Video KYC and Perform Liveness Check
@@ -188,7 +187,7 @@ def request_video_kyc(
 @router.post("/resubmit")
 async def resubmit_kyc(
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Resubmit KYC after rejection. Resets status and documents logic.
@@ -211,7 +210,7 @@ async def verify_utility_bill(
     file: UploadFile = File(...),
     bill_type: str = Form("electricity"),
     current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session)
+    db: Session = Depends(deps.get_db)
 ):
     """Upload and verify utility bill for address proof"""
     # 1. Save File

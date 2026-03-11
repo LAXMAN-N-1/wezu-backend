@@ -65,3 +65,13 @@ class Rental(SQLModel, table=True):
     swaps: List["SwapSession"] = Relationship(back_populates="rental")
     transactions: List["Transaction"] = Relationship(back_populates="rental")
     events: List["RentalEvent"] = Relationship(back_populates="rental")
+
+class Purchase(SQLModel, table=True):
+    __tablename__ = "purchases"
+    __table_args__ = {"schema": "rentals"}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="core.users.id", index=True)
+    battery_id: int = Field(foreign_key="inventory.batteries.id", index=True)
+    amount: float
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+

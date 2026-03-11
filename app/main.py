@@ -1,32 +1,29 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
+from contextlib import asynccontextmanager
+
 from app.core.config import settings
 
 
-# Customer-facing endpoints only
+# Customer-facing endpoints
 from app.api.v1 import (
-    auth, users, kyc, stations, batteries, rentals, wallet, payments, 
-    notifications, support, favorites, analytics, transactions, promo, 
-    faqs, iot, swaps, i18n, fraud, branches, organizations, warehouses, screens, stock, dealers, logistics,
-    vehicles, settlements, telemetry, locations, audit, ml
+    auth, users, profile, kyc, stations, batteries, rentals, bookings,
+    wallet, payments, notifications, support, favorites, analytics, 
+    transactions, promo, faqs, iot, swaps, i18n, fraud, branches, 
+    organizations, warehouses, screens, stock, dealers, logistics, 
+    settlements, telemetry, vehicles, locations, system, roles, 
+    menus, role_rights, admin_kyc, audit, ml, inventory,
+    admin_stations, station_monitoring
 )
-from app.api.v1.admin import support as admin_support
-from app.api.v1.admin import faqs as admin_faqs
-from app.api.v1.admin import analytics as admin_analytics
-from app.api.v1 import inventory
-from app.api.v1.admin import promo as admin_coupons
-from app.api.v1.admin import reviews as admin_reviews
-from app.api.v1.admin import roles as admin_roles
-from app.api.v1.admin import users as admin_user_mgmt
-from app.api.v1.admin import blogs as admin_blogs
-from app.api.v1.admin import legal as admin_legal
-from app.api.v1.admin import banners as admin_banners
-from app.api.v1.admin import media as admin_media
-from app.api.v1 import admin_kyc
-# Enhanced customer endpoints
-from app.api.v1 import (
-    system,
-    roles, menus, role_rights
+from app.api.v1.admin import (
+    support as admin_support, 
+    faqs as admin_faqs, 
+    analytics as admin_analytics, 
+    users as admin_users,
+    promo as admin_coupons,
+    reviews as admin_reviews,
+    roles as admin_roles
 )
 from app.api.admin import router as admin_router
 from app.api.webhooks import razorpay as razorpay_webhook
@@ -34,14 +31,14 @@ from app.middleware.rate_limit import limiter
 from app.middleware.audit import AuditMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-
-# Background Workers
 from app.workers import start_scheduler, stop_scheduler
 from app.services.websocket_service import heartbeat_task
 from app.services.mqtt_service import start_mqtt_service, stop_mqtt_service
 import asyncio
-from contextlib import asynccontextmanager
 
+# ----------------------------
+# Lifespan
+# ----------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start background scheduler on app startup and init DB"""
@@ -58,22 +55,32 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(heartbeat_task())
     
     yield
-    """Stop background scheduler on app shutdown"""
-    stop_scheduler()
-    stop_mqtt_service()
+    
+    # 4. Cleanup
+    try:
+        stop_scheduler()
+    except:
+        pass
+    try:
+        stop_mqtt_service()
+    except:
+        pass
 
 app = FastAPI(
-    title=settings.PROJECT_NAME, 
+    title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
-# Rate Limit
+# ----------------------------
+# Rate Limiting
+# ----------------------------
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# GZip Compression
-from fastapi.middleware.gzip import GZipMiddleware
+# ----------------------------
+# Middleware
+# ----------------------------
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # Audit Logging Middleware
@@ -129,8 +136,11 @@ app.include_router(admin_analytics.router, prefix=f"{admin_api}/analytics", tags
 app.include_router(admin_coupons.router, prefix=f"{admin_api}/coupons", tags=["Admin: Coupons"], dependencies=admin_deps)
 app.include_router(admin_blogs.router, prefix=f"{admin_api}/blogs", tags=["Admin: CMS - Blogs"], dependencies=admin_deps)
 app.include_router(admin_reviews.router, prefix=f"{admin_api}/reviews", tags=["Admin: Review Moderation"], dependencies=admin_deps)
-app.include_router(admin_roles.router, prefix=f"{admin_api}/roles", tags=["Admin: RBAC"], dependencies=admin_deps)
-app.include_router(admin_user_mgmt.router, prefix=f"{admin_api}/users", tags=["Admin: User Management"], dependencies=admin_deps)
+app.include_router(admin_stations.router, prefix=f"{admin_api}/stations", tags=["Admin: Stations"], dependencies=admin_deps)
+
+# 3. Monitoring Application Endpoints
+monitoring_api = f"{v1_prefix}/monitoring"
+app.include_router(station_monitoring.router, prefix=f"{monitoring_api}/stations", tags=["Monitoring: Stations"])
 
 # 3. Dealer Application Endpoints
 dealer_api = f"{settings.API_V1_STR}/dealer"
@@ -169,9 +179,11 @@ async def root():
     return {
         "message": "Welcome to WEZU Energy API",
         "status": "Running",
-        "version": "1.0.0"
+        "version": "1.0.0",
     }
+
 
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+

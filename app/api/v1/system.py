@@ -4,8 +4,8 @@ Provides health checks and system information
 """
 from fastapi import APIRouter, Depends
 from sqlmodel import Session
-from app.db.session import get_session
 from app.core.config import settings
+from app.api import deps
 from datetime import datetime
 import psutil
 import platform
@@ -23,7 +23,7 @@ async def health_check():
 
 
 @router.get("/health/detailed")
-async def detailed_health_check(db: Session = Depends(get_session)):
+async def detailed_health_check(db: Session = Depends(deps.get_db)):
     """Detailed health check with system metrics"""
     try:
         # Test database connection

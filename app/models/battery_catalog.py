@@ -37,4 +37,21 @@ class BatteryCatalog(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     # Relationships
-    batteries: List["Battery"] = Relationship(back_populates="sku")
+    batteries: List["Battery"] = Relationship(
+        back_populates="sku",
+        sa_relationship_kwargs={
+            "foreign_keys": "[Battery.sku_id]",
+            "overlaps": "product"
+        }
+    )
+
+BatterySpec = BatteryCatalog
+
+class BatteryBatch(SQLModel, table=True):
+    __tablename__ = "battery_batches"
+    __table_args__ = {"schema": "inventory"}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    batch_number: str = Field(unique=True, index=True)
+    manufacturer: str
+    production_date: datetime = Field(default_factory=datetime.utcnow)
+

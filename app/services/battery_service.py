@@ -4,8 +4,12 @@ from app.models.rental import Rental
 from app.schemas.battery import BatteryCreate, BatteryUpdate
 from app.services.qr_service import QRCodeService
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlmodel import Session, select, func
+from sqlalchemy import desc
+from app.models.battery_health_log import BatteryHealthLog as BatteryHealthLogModel
+from app.models.battery_catalog import BatterySpec
+from app.schemas.station_monitoring import BatteryHealthStatus, BatteryHealthReport, BatteryHealthLog
 
 class BatteryService:
     @staticmethod
@@ -27,6 +31,16 @@ class BatteryService:
             
         battery = Battery(**data)
         db.add(battery)
+        
+        # Log event
+        event = BatteryLifecycleEvent(
+            battery_id=battery_id,
+            event_type="maintenance_complete",
+            description=notes,
+            actor_id=actor_id
+        )
+        db.add(event)
+        
         db.commit()
         db.refresh(battery)
         

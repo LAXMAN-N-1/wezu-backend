@@ -8,6 +8,28 @@ class TicketCreate(BaseModel):
     description: str # Initial message
     priority: Optional[str] = "medium"
 
+class TicketUpdate(BaseModel):
+    subject: Optional[str] = None
+    category: Optional[str] = None
+    priority: Optional[str] = None
+    status: Optional[str] = None
+
+class CommentCreate(BaseModel):
+    message: str
+    is_internal_note: bool = False
+
+class TicketResponse(BaseModel):
+    id: int
+    user_id: int
+    subject: str
+    category: str
+    priority: str
+    status: str
+    created_at: datetime
+    assigned_to_id: Optional[int] = None
+    
+    model_config = ConfigDict(from_attributes=True)
+
 class TicketMessageCreate(BaseModel):
     message: str
     is_internal_note: bool = False

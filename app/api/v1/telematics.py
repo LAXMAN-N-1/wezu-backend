@@ -2,14 +2,15 @@ from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlmodel import Session, select
 from datetime import datetime
-from app.db.session import get_session
+
 from app.models.telemetry import Telemetry
 from app.models.battery import Battery, BatteryLifecycleEvent
-from app.schemas.telematics import TelemeticsDataIngest, TelemeticsDataResponse
+from app.schemas.telematics import TelematicsDataIngest, TelematicsDataResponse
+from app.api import deps
 
 router = APIRouter()
 
-def process_alerts(session: Session, data: TelemeticsDataIngest, battery_id: int):
+def process_alerts(session: Session, data: TelematicsDataIngest, battery_id: int):
     """
     Background logic to check for critical conditions
     """
@@ -33,11 +34,11 @@ def process_alerts(session: Session, data: TelemeticsDataIngest, battery_id: int
     
     session.commit()
 
-@router.post("/ingest", response_model=TelemeticsDataResponse)
+@router.post("/ingest", response_model=TelematicsDataResponse)
 def ingest_telemetry(
     *,
-    session: Session = Depends(get_session),
-    data_in: TelemeticsDataIngest,
+    session: Session = Depends(deps.get_db),
+    data_in: TelematicsDataIngest,
     background_tasks: BackgroundTasks
 ) -> Any:
     """
@@ -50,17 +51,10 @@ def ingest_telemetry(
         raise HTTPException(status_code=404, detail="Battery not found")
         
     # 2. Save Time-Series Data
-    telemetry_entry = Telemetry(
-        battery_id=data_in.battery_id,
-        timestamp=data_in.timestamp,
-        voltage=data_in.voltage,
-        current=data_in.current,
-        temperature=data_in.temperature,
-        soc=data_in.soc,
-        soh=data_in.soh,
-        latitude=data_in.gps_latitude,
-        longitude=data_in.gps_longitude
-    )
+    if not data_in.timestamp:
+        data_in.timestamp = datetime.utcnow()
+        
+    telemetry_entry = Telemetry.model_validate(data_in)
     session.add(telemetry_entry)
     
     # 3. Update Battery "Current State" (Snapshot)
@@ -83,10 +77,10 @@ def ingest_telemetry(
     
     return telemetry_entry
 
-@router.get("/battery/{battery_id}/latest", response_model=TelemeticsDataResponse)
+@router.get("/battery/{battery_id}/latest", response_model=TelematicsDataResponse)
 def get_latest_telemetry(
     *,
-    session: Session = Depends(get_session),
+    session: Session = Depends(deps.get_db),
     battery_id: int
 ) -> Any:
     """

@@ -276,10 +276,10 @@ class UserSearchItem(BaseModel):
     created_at: datetime
     last_login: Optional[datetime] = None
 
+    model_config = ConfigDict(from_attributes=True)
 class UserSearchResponse(BaseModel):
     users: List[UserSearchItem]
     total_count: int
     page: int
     limit: int
     filters_applied: Dict[str, Any] = {}
-

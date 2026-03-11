@@ -1,7 +1,12 @@
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
 from enum import Enum
+
+if TYPE_CHECKING:
+    from app.models.commission import CommissionLog
+    from app.models.dealer import DealerProfile
+
 
 class SettlementStatus(str, Enum):
     PENDING = "pending"

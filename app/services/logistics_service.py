@@ -1,5 +1,5 @@
 from typing import Any, List, Optional
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 from app.core.database import engine
 from app.models.logistics import BatteryTransfer, Manifest
 from app.models.warehouse import Warehouse
@@ -10,7 +10,7 @@ from app.models.station import Station, StationSlot
 from app.models.battery import Battery
 from app.services.notification_service import NotificationService
 from datetime import datetime
-from sqlmodel import func, select
+from typing import List, Optional, Any
 
 class LogisticsService:
     @staticmethod
@@ -227,5 +227,3 @@ class LogisticsService:
         db.commit()
         db.refresh(manifest)
         return manifest
-
-

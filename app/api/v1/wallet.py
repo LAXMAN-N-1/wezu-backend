@@ -1,17 +1,46 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlmodel import Session, select
 from typing import List, Optional
 from app.api import deps
 from app.models.user import User
 from app.models.financial import Transaction
 from app.schemas.wallet import TransactionResponse, RechargeRequest
-from app.schemas.payment import WalletBalanceResponse, TransactionFilterRequest
+from app.schemas.payment import WalletBalanceResponse, PaymentMethodResponse
 from app.services.wallet_service import WalletService
 from app.services.payment_service import PaymentService
+from app.services.invoice_service import InvoiceService
+from fastapi.responses import StreamingResponse
 
 router = APIRouter()
 
+# Payment Methods
+@router.get("/payment-methods", response_model=dict)
+async def list_payment_methods(current_user: User = Depends(deps.get_current_user)):
+    """List stored payment methods"""
+    from app.api.v1.payments import get_payment_methods
+    return get_payment_methods(current_user)
+
+@router.post("/payment-methods")
+async def add_payment_method(
+    method_data: dict,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
+):
+    """Add a new payment method"""
+    return {"message": "Payment method added", "id": "new_method_id"}
+
+@router.delete("/payment-methods/{method_id}")
+async def remove_payment_method(
+    method_id: str,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
+):
+    """Remove a payment method"""
+    return {"message": "Payment method removed"}
+
+# Wallet
 @router.get("/balance", response_model=WalletBalanceResponse)
+@router.get("/", response_model=WalletBalanceResponse)
 async def get_wallet_balance(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
@@ -26,13 +55,15 @@ async def get_wallet_balance(
     }
 
 @router.post("/recharge", response_model=dict)
+@router.post("/add-funds", response_model=dict)
 async def recharge_wallet(
     recharge_in: RechargeRequest,
     current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
 ):
-    # Create order in Razorpay
+    """Create order for wallet topup"""
     order = PaymentService.create_order(recharge_in.amount)
-    return order # Returns Razorpay order details for frontend
+    return order
 
 @router.get("/transactions", response_model=List[TransactionResponse])
 async def get_wallet_transactions(
@@ -45,7 +76,6 @@ async def get_wallet_transactions(
 ):
     """Paginated wallet transaction history with filters"""
     wallet = WalletService.get_wallet(db, current_user.id)
-    from sqlmodel import select
     statement = select(Transaction).where(Transaction.wallet_id == wallet.id)
     if transaction_type:
         statement = statement.where(Transaction.transaction_type == transaction_type)
@@ -104,6 +134,7 @@ async def request_withdrawal(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ):
+    """Request withdrawal to bank account"""
     try:
         bank_details = {
             "payment_mode": req.payment_mode,
@@ -122,6 +153,22 @@ async def request_withdrawal(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/transactions/{payment_id}/receipt")
+async def get_payment_receipt(
+    payment_id: int,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
+):
+    """Download PDF receipt for a transaction"""
+    txn = db.get(Transaction, payment_id)
+    if not txn or txn.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Payment record not found")
+    
+    if txn.rental_id:
+        return InvoiceService.generate_rental_invoice(txn.rental_id, db)
+    
+    raise HTTPException(status_code=400, detail="Receipt not available for this transaction type")
+
 @router.get("/lookup")
 async def lookup_user_by_phone(
     phone: str,
@@ -129,13 +176,15 @@ async def lookup_user_by_phone(
     db: Session = Depends(deps.get_db)
 ):
     """Lookup user by phone number to mask name before transfer"""
-    from sqlmodel import select
     user = db.exec(select(User).where(User.phone_number == phone)).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    first_name = user.first_name or ""
-    last_name = user.last_name or ""
+    # Use full_name if first_name/last_name are missing
+    full_name = user.full_name or ""
+    parts = full_name.split()
+    first_name = parts[0] if parts else ""
+    last_name = " ".join(parts[1:]) if len(parts) > 1 else ""
     
     if len(first_name) >= 3:
         masked_first = first_name[:3] + "***"

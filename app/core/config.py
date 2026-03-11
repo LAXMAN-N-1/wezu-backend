@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://user:password@localhost:5432/wezy_db"
     
     # Redis (Sessions & Caching)
-    REDIS_URL: str = "redis://localhost:6379/0"
+    REDIS_URL: str = "redis://127.0.0.1:6379/0"
     REDIS_SESSION_DB: int = 1
     REDIS_CACHE_DB: int = 2
     
@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     VIDEO_KYC_SESSION_TIMEOUT_MINUTES: int = 30
     
     # IoT/MQTT (for customer battery tracking)
-    MQTT_BROKER_URL: str = "mqtt://localhost:1883"
+    MQTT_BROKER_URL: str = "mqtt://127.0.0.1:1883"
     MQTT_USERNAME: Optional[str] = None
     MQTT_PASSWORD: Optional[str] = None
     MQTT_CLIENT_ID_PREFIX: str = "wezu_backend"
