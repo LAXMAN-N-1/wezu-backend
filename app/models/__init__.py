@@ -23,6 +23,7 @@ from app.models.geofence import Geofence
 from app.models.favorite import Favorite
 from app.models.promo_code import PromoCode
 from app.models.faq import FAQ
+from app.models.blog import Blog
 from app.models.referral import Referral
 from app.models.admin_user import AdminUser
 from app.models.ecommerce import EcommerceProduct, EcommerceOrder, EcommerceOrderItem

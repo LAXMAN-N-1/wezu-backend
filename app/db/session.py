@@ -2,13 +2,21 @@ from sqlmodel import create_engine, Session, SQLModel
 from app.core.config import settings
 from app.models import *
 
-engine = create_engine(
-    settings.DATABASE_URL, 
-    echo=True,
-    pool_size=20,
-    max_overflow=40,
-    pool_pre_ping=True
-)
+print(f"DEBUG: app/db/session.py - DATABASE_URL: {settings.DATABASE_URL}")
+try:
+    engine = create_engine(
+        settings.DATABASE_URL, 
+        echo=True,
+        pool_size=20,
+        max_overflow=40,
+        pool_pre_ping=True
+    )
+    print("DEBUG: app/db/session.py - Engine created")
+except Exception as e:
+    print(f"DEBUG: app/db/session.py - Engine creation FAILED: {e}")
+    import traceback
+    traceback.print_exc()
+    raise
 
 def init_db():
     from sqlmodel import Session, text

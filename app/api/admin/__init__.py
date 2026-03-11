@@ -1,9 +1,10 @@
 from fastapi import APIRouter
 
-from app.api.admin import main, fraud, jobs, monitoring, users, rentals, finance, iot
+from app.api.admin import main, fraud, jobs, monitoring, users, rentals, finance, iot, cms
 
 router = APIRouter()
 router.include_router(main.router)
+router.include_router(cms.router, prefix="/cms", tags=["Admin CMS"])
 router.include_router(users.router, prefix="/users", tags=["Admin Users"])
 router.include_router(rentals.router, prefix="/rentals", tags=["Admin Rentals"])
 router.include_router(finance.router, prefix="/finance", tags=["Admin Finance"])

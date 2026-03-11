@@ -126,3 +126,4 @@ class Settings(BaseSettings):
     )
 
 settings = Settings()
+print(f"DEBUG: Loaded DATABASE_URL: {settings.DATABASE_URL}")

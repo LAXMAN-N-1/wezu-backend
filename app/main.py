@@ -1,6 +1,15 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from app.core.config import settings
+import traceback
+import sys
+
+try:
+    from fastapi import FastAPI
+    from fastapi.middleware.cors import CORSMiddleware
+    from app.core.config import settings
+except Exception:
+    traceback.print_exc()
+    sys.exit(1)
+
+print("DEBUG: main.py - Imports started")
 
 
 # Customer-facing endpoints only
@@ -129,6 +138,11 @@ app.include_router(support_enhanced.router, prefix=f"{settings.API_V1_STR}/suppo
 app.include_router(rentals_enhanced.router, prefix=f"{settings.API_V1_STR}/rentals", tags=["Rentals Enhanced"])
 app.include_router(purchases_enhanced.router, prefix=f"{settings.API_V1_STR}/purchases", tags=["Purchases Enhanced"])
 app.include_router(analytics_enhanced.router, prefix=f"{settings.API_V1_STR}/analytics", tags=["Analytics Enhanced"])
+
+    # Admin Analytics - Updated 
+from app.api.v1 import admin_analytics
+app.include_router(admin_analytics.router, prefix=f"{settings.API_V1_STR}/admin/analytics", tags=["Admin Analytics"])
+
 
 # RBAC API Routes
 app.include_router(roles.router, prefix=f"{settings.API_V1_STR}/roles", tags=["Roles"])
