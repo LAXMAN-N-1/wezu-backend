@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
+import uuid
 
 if TYPE_CHECKING:
     from app.models.battery_catalog import BatteryCatalog
@@ -19,12 +20,19 @@ class BatteryStatus(str, Enum):
 class BatteryHealth(str, Enum):
     GOOD = "good"
     FAIR = "fair"
+    POOR = "poor"
     CRITICAL = "critical"
+
+class LocationType(str, Enum):
+    STATION = "station"
+    WAREHOUSE = "warehouse"
+    SERVICE_CENTER = "service_center"
+    RECYCLING = "recycling"
 
 class Battery(SQLModel, table=True):
     __tablename__ = "batteries"
     __table_args__ = {"schema": "inventory"}
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: Optional[uuid.UUID] = Field(default_factory=uuid.uuid4, primary_key=True)
     
     # Identity
     serial_number: str = Field(index=True, unique=True)
@@ -37,6 +45,7 @@ class Battery(SQLModel, table=True):
     # Location tracking
     station_id: Optional[int] = Field(default=None, foreign_key="stations.stations.id", index=True)
     current_user_id: Optional[int] = Field(default=None, foreign_key="core.users.id", index=True)
+    created_by: Optional[int] = Field(default=None, foreign_key="core.users.id")
     
     # Technical State
     status: BatteryStatus = Field(default=BatteryStatus.AVAILABLE, index=True)
@@ -45,11 +54,21 @@ class Battery(SQLModel, table=True):
     current_charge: float = Field(default=100.0)
     health_percentage: float = Field(default=100.0)
     cycle_count: int = Field(default=0)
+    total_cycles: int = Field(default=0)
     temperature_c: float = Field(default=25.0)
     
+    # New Battery Management Fields
+    manufacturer: Optional[str] = Field(default=None)
+    battery_type: Optional[str] = Field(default="48V/30Ah")
+    notes: Optional[str] = Field(default=None)
+    location_type: LocationType = Field(default=LocationType.WAREHOUSE)
+    
     # Lifecycle
+    manufacture_date: Optional[datetime] = None
     purchase_date: Optional[datetime] = None
     warranty_expiry: Optional[datetime] = None
+    last_charged_at: Optional[datetime] = None
+    last_inspected_at: Optional[datetime] = None
     last_maintenance_date: Optional[datetime] = None
     
     # Timestamps
@@ -62,7 +81,10 @@ class Battery(SQLModel, table=True):
 
     # Relationships
     sku: Optional["BatteryCatalog"] = Relationship(back_populates="batteries")
-    product: Optional["BatteryCatalog"] = Relationship(back_populates="batteries") # Alias for backward compat if needed
+    product: Optional["BatteryCatalog"] = Relationship(
+        back_populates="batteries",
+        sa_relationship_kwargs={"overlaps": "sku"}
+    )
     rentals: List["Rental"] = Relationship(back_populates="battery")
     lifecycle_events: List["BatteryLifecycleEvent"] = Relationship(back_populates="battery")
     
@@ -70,16 +92,12 @@ class Battery(SQLModel, table=True):
         back_populates="battery",
         sa_relationship_kwargs={"uselist": False}
     )
-    
-    # The station relationship is implicit via station_id, but cleaner to define if Station is imported
-    # Defining it as generic object to avoid circular dep issues in file
-    # station: Optional["Station"] = Relationship()
 
 class BatteryLifecycleEvent(SQLModel, table=True):
     __tablename__ = "battery_lifecycle_events"
     __table_args__ = {"schema": "inventory"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    battery_id: int = Field(foreign_key="inventory.batteries.id")
+    battery_id: uuid.UUID = Field(foreign_key="inventory.batteries.id")
     
     event_type: str = Field(index=True) # created, assigned, maintenance_start, maintenance_end, retired
     description: Optional[str] = None
@@ -88,3 +106,26 @@ class BatteryLifecycleEvent(SQLModel, table=True):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     
     battery: Battery = Relationship(back_populates="lifecycle_events")
+
+class BatteryAuditLog(SQLModel, table=True):
+    __tablename__ = "battery_audit_logs"
+    __table_args__ = {"schema": "inventory"}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    battery_id: uuid.UUID = Field(foreign_key="inventory.batteries.id", index=True)
+    
+    changed_by: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    field_changed: str
+    old_value: Optional[str] = None
+    new_value: Optional[str] = None
+    reason: Optional[str] = None
+    
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+class BatteryHealthHistory(SQLModel, table=True):
+    __tablename__ = "battery_health_history"
+    __table_args__ = {"schema": "inventory"}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    battery_id: uuid.UUID = Field(foreign_key="inventory.batteries.id", index=True)
+    
+    health_percentage: float
+    recorded_at: datetime = Field(default_factory=datetime.utcnow)

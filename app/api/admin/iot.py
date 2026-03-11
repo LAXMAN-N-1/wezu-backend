@@ -7,14 +7,14 @@ from app.models.user import User
 from app.models.battery import Battery
 from app.models.station import Station
 from app.models.telemetry import Telemetry
-from app.db.session import get_session
+from app.core.database import get_db
 
 router = APIRouter()
 
 @router.get("/batteries/health")
 def get_battery_health_overview(
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session),
+    db: Session = Depends(get_db),
 ):
     """Get health status distribution of all batteries."""
     # Group by status or health range
@@ -31,7 +31,7 @@ def get_battery_health_overview(
 @router.get("/stations/status")
 def get_stations_status(
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session),
+    db: Session = Depends(get_db),
 ):
     """Get real-time status of all charging stations."""
     stations = db.exec(select(Station)).all()
@@ -42,7 +42,7 @@ def get_battery_telematics(
     battery_id: int,
     hours: int = 24,
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session),
+    db: Session = Depends(get_db),
 ):
     """Get historical telematics for a specific battery."""
     since = datetime.utcnow() - timedelta(hours=hours)

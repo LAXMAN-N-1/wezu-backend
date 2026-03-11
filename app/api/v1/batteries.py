@@ -9,13 +9,14 @@ import csv
 import io
 
 from app.db.session import get_session
-from app.models.battery import Battery, BatteryLifecycleEvent
+from app.models.battery import Battery, BatteryLifecycleEvent, BatteryAuditLog, BatteryHealthHistory
 from app.models.user import User
 from app.api import deps
 from app.schemas.battery import (
     BatteryCreate, BatteryBulkCreate, BatteryResponse, 
     BatteryDetailResponse, BatteryUpdate, BatteryHealthReading,
-    BatteryUtilizationResponse, BatteryMaintenanceCreate
+    BatteryUtilizationResponse, BatteryMaintenanceCreate,
+    BatteryAuditLogResponse, BatteryHealthHistoryResponse
 )
 from app.services.qr_service import QRCodeService
 from app.services.mqtt_service import mqtt_service
@@ -77,14 +78,32 @@ def scan_battery_qr(
         raise HTTPException(status_code=404, detail="Battery not found")
     return battery
 
-@router.get("/{battery_id}/health-history", response_model=List[BatteryHealthReading])
+@router.get("/{battery_id}/health-history", response_model=DataResponse[List[BatteryHealthHistoryResponse]])
 def get_battery_health_history(
     battery_id: int,
     session: Session = Depends(get_session),
     limit: int = Query(50, le=200)
 ):
     """Historical health percentage (SOH) readings over time."""
-    return BatteryService.get_health_history(session, battery_id, limit)
+    history = BatteryService.get_health_history(session, battery_id, limit)
+    return DataResponse(success=True, data=history)
+
+@router.get("/{battery_id}/audit-logs", response_model=DataResponse[List[BatteryAuditLogResponse]])
+def get_battery_audit_logs(
+    battery_id: int,
+    session: Session = Depends(get_session),
+    limit: int = Query(50, le=200)
+):
+    """Audit trail of all changes to this battery."""
+    logs = session.exec(
+        select(BatteryAuditLog)
+        .where(BatteryAuditLog.battery_id == battery_id)
+        .order_by(BatteryAuditLog.timestamp.desc())
+        .limit(limit)
+    ).all()
+    
+    # We could join with User to get names, or just return as is
+    return DataResponse(success=True, data=logs)
 
 @router.get("/{battery_id}/rental-history")
 def get_battery_rental_history(
@@ -124,7 +143,7 @@ def update_battery_status(
     session: Session = Depends(get_session)
 ):
     """Manually change battery status (available/maintenance/retired)."""
-    battery = BatteryService.update_status(session, battery_id, status, description)
+    battery = BatteryService.update_status(session, battery_id, status, description, current_user.id)
     if not battery:
         raise HTTPException(status_code=404, detail="Battery not found")
     return battery
@@ -228,6 +247,7 @@ def read_batteries(
     health: Optional[str] = None,
     sku_id: Optional[int] = None,
     station_id: Optional[int] = None,
+    location_type: Optional[str] = None,
     session: Session = Depends(get_session),
 ) -> Any:
     """Retrieve batteries with filters."""
@@ -244,6 +264,8 @@ def read_batteries(
         statement = statement.where(Battery.sku_id == sku_id)
     if station_id:
         statement = statement.where(Battery.station_id == station_id)
+    if location_type:
+        statement = statement.where(Battery.location_type == location_type)
         
     batteries = session.exec(statement.offset(skip).limit(limit)).all()
     return batteries
@@ -256,7 +278,7 @@ def create_battery(
     current_user: User = Depends(deps.get_current_active_superuser)
 ) -> Any:
     """Create a new battery record manually."""
-    return BatteryService.create_battery(session, battery_in)
+    return BatteryService.create_battery(session, battery_in, current_user.id)
 
 @router.put("/{battery_id}", response_model=BatteryResponse)
 def update_battery(
@@ -272,8 +294,17 @@ def update_battery(
         raise HTTPException(status_code=404, detail="Battery not found")
         
     update_data = battery_in.model_dump(exclude_unset=True)
+    description = update_data.pop("description", "Manual update")
+    
     for key, value in update_data.items():
-        setattr(battery, key, value)
+        old_val = getattr(battery, key)
+        if old_val != value:
+            setattr(battery, key, value)
+            # Record Audit for each change
+            BatteryService.record_audit(
+                session, battery_id, key, old_val, value, 
+                reason=description, user_id=current_user.id
+            )
     
     battery.updated_at = datetime.utcnow()
     session.add(battery)
@@ -297,6 +328,7 @@ def decommission_battery(
 @router.post("/batch/import", response_model=DataResponse[dict])
 def import_batteries_csv(
     file: UploadFile = File(...),
+    dry_run: bool = Query(False, description="If true, validation only; no commit"),
     current_user: User = Depends(deps.get_current_user),
     session: Session = Depends(get_session)
 ):
@@ -306,7 +338,7 @@ def import_batteries_csv(
     
     content = file.file.read().decode("utf-8")
     parsed_data = battery_batch_service.parse_import_csv(content)
-    result = battery_batch_service.process_import(session, parsed_data)
+    result = battery_batch_service.process_import(session, parsed_data, dry_run=dry_run)
     
     return DataResponse(success=True, data=result, message=f"Processed {len(parsed_data)} items")
 

@@ -6,7 +6,7 @@ from app.api import deps
 from app.models.user import User
 from app.models.rental import Rental
 from app.schemas.rental import RentalResponse
-from app.db.session import get_session
+from app.core.database import get_db
 
 router = APIRouter()
 
@@ -17,7 +17,7 @@ def list_rentals(
     status: Optional[str] = None,
     user_id: Optional[int] = None,
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session),
+    db: Session = Depends(get_db),
 ):
     """List all rentals with filters."""
     statement = select(Rental)
@@ -35,7 +35,7 @@ def terminate_rental(
     rental_id: int,
     reason: str = Query(...),
     current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(get_session),
+    db: Session = Depends(get_db),
 ):
     """Forcefully terminate a rental."""
     rental = db.get(Rental, rental_id)

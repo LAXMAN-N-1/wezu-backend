@@ -81,6 +81,7 @@ class User(SQLModel, table=True):
     email_verification_sent_at: Optional[datetime] = None
     
     last_login_at: Optional[datetime] = None
+    last_global_logout_at: Optional[datetime] = None
     
     # Soft Delete
     is_deleted: bool = Field(default=False)

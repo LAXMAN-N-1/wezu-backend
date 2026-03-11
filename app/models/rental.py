@@ -3,6 +3,8 @@ from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
 
+import uuid
+
 if TYPE_CHECKING:
     from app.models.user import User
     from app.models.battery import Battery
@@ -25,7 +27,7 @@ class Rental(SQLModel, table=True):
     
     # Core References
     user_id: int = Field(foreign_key="core.users.id", index=True)
-    battery_id: int = Field(foreign_key="inventory.batteries.id", index=True)
+    battery_id: uuid.UUID = Field(foreign_key="inventory.batteries.id", index=True)
     
     # Location
     start_station_id: int = Field(foreign_key="stations.stations.id")

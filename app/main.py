@@ -18,6 +18,10 @@ from app.api.v1.admin import promo as admin_coupons
 from app.api.v1.admin import reviews as admin_reviews
 from app.api.v1.admin import roles as admin_roles
 from app.api.v1.admin import users as admin_user_mgmt
+from app.api.v1.admin import blogs as admin_blogs
+from app.api.v1.admin import legal as admin_legal
+from app.api.v1.admin import banners as admin_banners
+from app.api.v1.admin import media as admin_media
 from app.api.v1 import admin_kyc
 # Enhanced customer endpoints
 from app.api.v1 import (
@@ -72,17 +76,20 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 from fastapi.middleware.gzip import GZipMiddleware
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# Configure CORS
+# Audit Logging Middleware
+app.add_middleware(AuditMiddleware)
+
+# Configure CORS - Outermost
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=["*"], # In development "*" is often safest for dynamic ports
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Audit Logging Middleware
-app.add_middleware(AuditMiddleware)
+# Shared Auth Routes (needed for admin login at /api/v1/auth/admin/login)
+app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Auth"])
 
 # Customer API Routes
 # 1. Customer Application Endpoints
@@ -115,8 +122,12 @@ app.include_router(fraud.router, prefix=f"{admin_api}/fraud", tags=["Admin: Frau
 app.include_router(ml.router, prefix=f"{admin_api}/ml", tags=["Admin: ML & Analytics"], dependencies=admin_deps)
 app.include_router(admin_support.router, prefix=f"{admin_api}/support", tags=["Admin: Support"], dependencies=admin_deps)
 app.include_router(admin_faqs.router, prefix=f"{admin_api}/faq", tags=["Admin: FAQ"], dependencies=admin_deps)
+app.include_router(admin_legal.router, prefix=f"{admin_api}/legal", tags=["Admin: CMS - Legal"], dependencies=admin_deps)
+app.include_router(admin_banners.router, prefix=f"{admin_api}/banners", tags=["Admin: CMS - Banners"], dependencies=admin_deps)
+app.include_router(admin_media.router, prefix=f"{admin_api}/media", tags=["Admin: CMS - Media"], dependencies=admin_deps)
 app.include_router(admin_analytics.router, prefix=f"{admin_api}/analytics", tags=["Admin: Analytics"], dependencies=admin_deps)
 app.include_router(admin_coupons.router, prefix=f"{admin_api}/coupons", tags=["Admin: Coupons"], dependencies=admin_deps)
+app.include_router(admin_blogs.router, prefix=f"{admin_api}/blogs", tags=["Admin: CMS - Blogs"], dependencies=admin_deps)
 app.include_router(admin_reviews.router, prefix=f"{admin_api}/reviews", tags=["Admin: Review Moderation"], dependencies=admin_deps)
 app.include_router(admin_roles.router, prefix=f"{admin_api}/roles", tags=["Admin: RBAC"], dependencies=admin_deps)
 app.include_router(admin_user_mgmt.router, prefix=f"{admin_api}/users", tags=["Admin: User Management"], dependencies=admin_deps)
