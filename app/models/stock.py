@@ -10,11 +10,11 @@ if TYPE_CHECKING:
 
 class Stock(SQLModel, table=True):
     __tablename__ = "stocks"
-    __table_args__ = {"schema": "inventory"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    warehouse_id: int = Field(foreign_key="logistics.warehouses.id", index=True)
-    product_id: int = Field(foreign_key="inventory.battery_catalog.id", index=True)
+    warehouse_id: int = Field(foreign_key="warehouses.id", index=True)
+    product_id: int = Field(foreign_key="battery_catalog.id", index=True)
     
     # Stock Quantities
     quantity_on_hand: int = Field(default=0, ge=0)

@@ -16,11 +16,11 @@ class SettlementStatus(str, Enum):
 
 class Settlement(SQLModel, table=True):
     __tablename__ = "settlements"
-    __table_args__ = {"schema": "finance"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     
-    dealer_id: int = Field(foreign_key="dealers.dealer_profiles.id", index=True)
-    vendor_id: Optional[int] = Field(default=None, foreign_key="finance.vendors.id")
+    dealer_id: int = Field(foreign_key="dealer_profiles.id", index=True)
+    vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id")
     
     amount: float
     currency: str = Field(default="INR")

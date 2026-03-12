@@ -45,7 +45,7 @@ class KYCStatus(str, Enum):
 class User(SQLModel, table=True):
 
     __tablename__ = "users"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -59,7 +59,7 @@ class User(SQLModel, table=True):
     user_type: UserType = Field(default=UserType.CUSTOMER, index=True)
     status: UserStatus = Field(default=UserStatus.ACTIVE, index=True)
     is_superuser: bool = Field(default=False)
-    role_id: Optional[int] = Field(default=None, foreign_key="core.roles.id")
+    role_id: Optional[int] = Field(default=None, foreign_key="roles.id")
     
     # Profile & Media
     profile_picture: Optional[str] = None

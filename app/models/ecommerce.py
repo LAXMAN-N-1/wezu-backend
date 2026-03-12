@@ -4,7 +4,7 @@ from datetime import datetime
 
 class EcommerceProduct(SQLModel, table=True):
     __tablename__ = "ecommerce_products"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     sku: str = Field(unique=True, index=True)
@@ -21,14 +21,14 @@ class EcommerceProduct(SQLModel, table=True):
 
 class EcommerceOrder(SQLModel, table=True):
     __tablename__ = "ecommerce_orders"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id")
+    user_id: int = Field(foreign_key="users.id")
     total_amount: float
     status: str = Field(default="pending") # pending, paid, shipped, delivered, cancelled
-    shipping_address_id: Optional[int] = Field(default=None, foreign_key="core.addresses.id")
-    payment_transaction_id: Optional[int] = Field(default=None, foreign_key="finance.payment_transactions.id") # Link to payment_transactions if needed
+    shipping_address_id: Optional[int] = Field(default=None, foreign_key="addresses.id")
+    payment_transaction_id: Optional[int] = Field(default=None, foreign_key="payment_transactions.id") # Link to payment_transactions if needed
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -40,11 +40,11 @@ class EcommerceOrder(SQLModel, table=True):
 
 class EcommerceOrderItem(SQLModel, table=True):
     __tablename__ = "ecommerce_order_items"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    order_id: int = Field(foreign_key="core.ecommerce_orders.id")
-    product_id: int = Field(foreign_key="core.ecommerce_products.id")
+    order_id: int = Field(foreign_key="ecommerce_orders.id")
+    product_id: int = Field(foreign_key="ecommerce_products.id")
     quantity: int = Field(default=1)
     unit_price: float
     total_price: float

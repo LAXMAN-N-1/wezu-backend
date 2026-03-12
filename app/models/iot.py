@@ -5,7 +5,7 @@ import uuid
 
 class IoTDevice(SQLModel, table=True):
     __tablename__ = "iot_devices"
-    __table_args__ = {"schema": "inventory"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     device_id: str = Field(unique=True, index=True) # Hardware Serial / MAC / UUID
     device_type: str = Field(default="tracker_v1")
@@ -14,7 +14,7 @@ class IoTDevice(SQLModel, table=True):
     status: str = Field(default="offline") # online, offline, error
     communication_protocol: str = Field(default="mqtt")
     
-    battery_id: Optional[uuid.UUID] = Field(default=None, foreign_key="inventory.batteries.id")
+    battery_id: Optional[int] = Field(default=None, foreign_key="batteries.id")
     
     auth_token: Optional[str] = None # For device authentication
     
@@ -31,9 +31,9 @@ class IoTDevice(SQLModel, table=True):
 
 class DeviceCommand(SQLModel, table=True):
     __tablename__ = "device_commands"
-    __table_args__ = {"schema": "inventory"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    device_id: int = Field(foreign_key="inventory.iot_devices.id")
+    device_id: int = Field(foreign_key="iot_devices.id")
     
     command_type: str # LOCK, UNLOCK, REBOOT, DIAGNOSTIC
     payload: Optional[str] = None # JSON string params
@@ -51,7 +51,7 @@ class DeviceCommand(SQLModel, table=True):
 
 class FirmwareUpdate(SQLModel, table=True):
     __tablename__ = "firmware_updates"
-    __table_args__ = {"schema": "inventory"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     version: str
     file_url: str

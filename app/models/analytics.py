@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 class DemandForecast(SQLModel, table=True):
     __tablename__ = "demand_forecasts"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     """Predicted demand per station/region"""
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -43,10 +43,10 @@ class DemandForecast(SQLModel, table=True):
 
 class ChurnPrediction(SQLModel, table=True):
     __tablename__ = "churn_predictions"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     """User churn risk scores"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id", index=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
     
     # Churn probability
     churn_probability: float = Field(default=0.0)  # 0-1
@@ -94,7 +94,7 @@ class ChurnPrediction(SQLModel, table=True):
 
 class PricingRecommendation(SQLModel, table=True):
     __tablename__ = "pricing_recommendations"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     """Dynamic pricing suggestions"""
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -130,7 +130,7 @@ class PricingRecommendation(SQLModel, table=True):
     # Implementation status
     status: str = Field(default="PENDING")  # PENDING, APPROVED, REJECTED, IMPLEMENTED
     implemented_at: Optional[datetime] = None
-    implemented_by: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    implemented_by: Optional[int] = Field(default=None, foreign_key="users.id")
     
     # Actual results (filled after implementation)
     actual_revenue_change: Optional[float] = None

@@ -4,10 +4,10 @@ from datetime import datetime
 
 class DealerInventory(SQLModel, table=True):
     __tablename__ = "dealer_inventories"
-    __table_args__ = {"schema": "dealers"}
+    # __table_args__ = {"schema": "public"}
     """Track dealer-specific battery inventory"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    dealer_id: int = Field(foreign_key="dealers.dealer_profiles.id")
+    dealer_id: int = Field(foreign_key="dealer_profiles.id")
     battery_model: str  # e.g., "Lithium-X1", "Lead-Acid-Y2"
     
     quantity_available: int = Field(default=0)
@@ -27,10 +27,10 @@ class DealerInventory(SQLModel, table=True):
 
 class InventoryTransaction(SQLModel, table=True):
     __tablename__ = "inventory_transactions"
-    __table_args__ = {"schema": "dealers"}
+    # __table_args__ = {"schema": "public"}
     """Log all inventory movements"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    inventory_id: int = Field(foreign_key="dealers.dealer_inventories.id")
+    inventory_id: int = Field(foreign_key="dealer_inventories.id")
     
     transaction_type: str  # RECEIVED, SOLD, RETURNED, DAMAGED, ADJUSTED
     quantity: int
@@ -38,7 +38,7 @@ class InventoryTransaction(SQLModel, table=True):
     reference_id: Optional[int] = None  # ID of the related order/rental
     
     notes: Optional[str] = None
-    performed_by: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    performed_by: Optional[int] = Field(default=None, foreign_key="users.id")
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
     

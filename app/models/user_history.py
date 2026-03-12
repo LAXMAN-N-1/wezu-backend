@@ -4,11 +4,11 @@ from datetime import datetime
 
 class UserStatusLog(SQLModel, table=True):
     __tablename__ = "user_status_logs"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id", index=True)
-    actor_id: int = Field(foreign_key="core.users.id")
+    user_id: int = Field(foreign_key="users.id", index=True)
+    actor_id: int = Field(foreign_key="users.id")
     
     action_type: str = Field(index=True) # role_change, suspension, reactivation
     old_value: Optional[str] = None

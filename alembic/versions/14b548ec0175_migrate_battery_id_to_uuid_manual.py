@@ -115,10 +115,14 @@ def upgrade() -> None:
         ('inventory', 'inventory_audit_logs', 'battery_id', 'inventory_audit_logs_battery_id_fkey'),
     ]
 
+    conn = op.get_bind()
     for schema, table, col, fk_name in tables_to_fix:
-        # Cast to text then to UUID to avoid conversion errors on potential old data
-        op.execute(f"ALTER TABLE {schema}.{table} ALTER COLUMN {col} TYPE UUID USING {col}::text::uuid")
-        op.create_foreign_key(fk_name, table, 'batteries', [col], ['id'], source_schema=schema, referent_schema='inventory')
+        # Check if table exists
+        result = conn.execute(sa.text(f"SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = '{schema}' AND table_name = '{table}')"))
+        if result.scalar():
+            op.execute(f"ALTER TABLE {schema}.{table} ALTER COLUMN {col} DROP NOT NULL")
+            op.execute(f"ALTER TABLE {schema}.{table} ALTER COLUMN {col} TYPE UUID USING NULL")
+            op.create_foreign_key(fk_name, table, 'batteries', [col], ['id'], source_schema=schema, referent_schema='inventory')
 
 def downgrade() -> None:
     # Inverse operations (minimal, mostly for consistency)

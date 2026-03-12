@@ -28,7 +28,7 @@ from app.models.support import SupportTicket, TicketStatus, TicketPriority
 from app.models.kyc import KYCDocument, KYCRecord, KYCRequest, KYCDocumentType, KYCDocumentStatus
 
 # Location
-from app.models.location import Zone, City, Region, Country
+from app.models.location import Zone, City, Region, Country, Continent
 
 # Legacy / Other (Keep specific ones if needed, comment out if replaced)
 from app.models.address import Address

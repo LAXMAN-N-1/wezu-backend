@@ -59,6 +59,22 @@ def get_demand_forecast(
     """Admin: 30-day demand forecast per station"""
     return AnalyticsService.get_demand_forecast_per_station(db)
 
+@router.get("/recent-activity")
+def get_recent_activity(
+    current_user: User = Depends(deps.get_current_active_superuser),
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """Admin: Recent Activities"""
+    return AnalyticsService.get_recent_activity(db)
+
+@router.get("/top-stations")
+def get_top_stations(
+    current_user: User = Depends(deps.get_current_active_superuser),
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """Admin: Top Stations Dashboard Endpoint"""
+    return AnalyticsService.get_top_stations(db)
+
 @router.get("/revenue/by-region")
 def get_revenue_by_region(
     current_user: User = Depends(deps.get_current_active_superuser),

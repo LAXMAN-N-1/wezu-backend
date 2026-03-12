@@ -4,10 +4,10 @@ from datetime import datetime
 
 class UserSession(SQLModel, table=True):
     __tablename__ = "user_sessions"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id", index=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
     
     # Token Tracking
     token_id: Optional[str] = Field(default=None, index=True) # JTI of the refresh token

@@ -66,7 +66,7 @@ def get_current_user(
     # Global Logout Check
     
     # Global Logout Check
-    if user.last_global_logout_at:
+    if getattr(user, "last_global_logout_at", None):
         # Get 'iat' (Issued At) from token
         iat = payload.get("iat")
         if iat:

@@ -4,7 +4,7 @@ from datetime import datetime
 
 class OTP(SQLModel, table=True):
     __tablename__ = "otps"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     target: str = Field(index=True) # Phone or Email
     code: str

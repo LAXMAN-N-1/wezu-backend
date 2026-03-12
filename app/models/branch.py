@@ -8,7 +8,7 @@ from datetime import datetime
 
 class Branch(SQLModel, table=True):
     __tablename__ = "branches"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
@@ -20,8 +20,8 @@ class Branch(SQLModel, table=True):
     pincode: str
     
     contact_number: Optional[str] = None
-    manager_id: Optional[int] = Field(default=None, foreign_key="core.users.id")
-    organization_id: Optional[int] = Field(default=None, foreign_key="core.organizations.id")
+    manager_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    organization_id: Optional[int] = Field(default=None, foreign_key="organizations.id")
     
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)

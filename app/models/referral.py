@@ -4,10 +4,10 @@ from datetime import datetime
 
 class Referral(SQLModel, table=True):
     __tablename__ = "referrals"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    referrer_id: int = Field(foreign_key="core.users.id")
-    referred_user_id: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    referrer_id: int = Field(foreign_key="users.id")
+    referred_user_id: Optional[int] = Field(default=None, foreign_key="users.id")
     referral_code: str = Field(unique=True, index=True)
     
     status: str = Field(default="pending") # pending, completed, expired

@@ -4,12 +4,12 @@ from datetime import datetime
 
 class Review(SQLModel, table=True):
     __tablename__ = "reviews"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id")
-    station_id: Optional[int] = Field(default=None, foreign_key="stations.stations.id")
-    battery_id: Optional[int] = Field(default=None, foreign_key="inventory.batteries.id")
-    rental_id: Optional[int] = Field(default=None, foreign_key="rentals.rentals.id")
+    user_id: int = Field(foreign_key="users.id")
+    station_id: Optional[int] = Field(default=None, foreign_key="stations.id")
+    battery_id: Optional[int] = Field(default=None, foreign_key="batteries.id")
+    rental_id: Optional[int] = Field(default=None, foreign_key="rentals.id")
     
     rating: int = Field(default=5) # 1-5
     comment: Optional[str] = None

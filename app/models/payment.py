@@ -4,9 +4,9 @@ from datetime import datetime
 
 class PaymentTransaction(SQLModel, table=True):
     __tablename__ = "payment_transactions"
-    __table_args__ = {"schema": "finance"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id")
+    user_id: int = Field(foreign_key="users.id")
     amount: float
     currency: str = Field(default="INR")
     status: str = Field(default="pending") # pending, success, failed, refunded
