@@ -1,3 +1,4 @@
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
@@ -12,7 +13,7 @@ def create_superuser(session):
     user = session.exec(select(AdminUser).where(AdminUser.email == "admin@e2e.com")).first()
     if user:
         return user
-    user = AdminUser(
+    user = AdminUser(phone_number='5609461609', 
         email="admin@e2e.com",
         hashed_password="hashed",
         is_active=True,
@@ -36,7 +37,7 @@ def test_rbac_full_lifecycle(client: TestClient, session: Session):
     session.commit()
     
     # 2. Setup Data: Create Users
-    user = User(email="e2e_user@test.com", is_active=True)
+    user = User(phone_number='2010230066', email="e2e_user@test.com", is_active=True)
     session.add(user)
     session.commit()
     
@@ -61,7 +62,7 @@ def test_rbac_full_lifecycle(client: TestClient, session: Session):
     assert resp.status_code == 200
     assert len(resp.json()["active_permissions"]) == 2
     
-    # 5. Assign Role to User (POST /users/{id}/roles)
+    # 5. Assign Role to User (phone_number='2317982085', POST /users/{id}/roles)
     payload_role = {
         "role_id": role.id,
         "notes": "E2E Assignment",
