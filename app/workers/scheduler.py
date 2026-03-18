@@ -159,6 +159,25 @@ def register_jobs():
         name='Periodic Charging Optimization',
         replace_existing=True
     )
+
+    # Campaign Engine Jobs
+    from app.workers import campaign_worker
+
+    scheduler.add_job(
+        campaign_worker.process_birthday_campaigns,
+        CronTrigger(hour=8, minute=0),
+        id='daily_birthday_campaigns',
+        name='Daily Birthday Campaign Trigger',
+        replace_existing=True
+    )
+
+    scheduler.add_job(
+        campaign_worker.process_scheduled_campaigns,
+        IntervalTrigger(minutes=15),
+        id='scheduled_campaign_sender',
+        name='Scheduled Campaign Sender',
+        replace_existing=True
+    )
     
     scheduler.add_job(
         monthly_jobs.batch_payment_processing,

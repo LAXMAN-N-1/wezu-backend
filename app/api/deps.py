@@ -280,3 +280,17 @@ def get_current_tenant(
     Extract tenant_id from the 'X-Tenant-ID' header.
     """
     return x_tenant_id
+
+def get_optional_user(
+    db: Session = Depends(get_db),
+    token: Optional[str] = Depends(OAuth2PasswordBearer(
+        tokenUrl=f"{settings.API_V1_STR}/auth/token",
+        auto_error=False
+    ))
+) -> Optional[User]:
+    if not token or token.lower() in ["bearer null", "bearer undefined", "null", "undefined"]:
+        return None
+    try:
+        return get_current_user(db=db, token=token)
+    except HTTPException:
+        return None

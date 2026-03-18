@@ -1,3 +1,4 @@
+import uuid
 """
 GPS Tracking Log Model
 Stores location history for active rentals

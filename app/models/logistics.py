@@ -1,8 +1,8 @@
+import uuid
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, TYPE_CHECKING, List
 from datetime import datetime
 from enum import Enum
-import uuid
 
 if TYPE_CHECKING:
     from app.models.user import User

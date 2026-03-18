@@ -1,7 +1,7 @@
+import uuid
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
-import uuid
 
 if TYPE_CHECKING:
     from app.models.battery import Battery

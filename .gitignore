@@ -40,7 +40,7 @@ uploads/
 # Logs
 logs/
 *.log
-
+we_env/
 # Database
 *.db
 *.sqlite
@@ -48,4 +48,26 @@ logs/
 # IDE
 .vscode/
 .idea/
-walkthrough.md
+
+# App Specific Ignores
+check_*.py
+token.json
+*.exe
+verify_*.py
+
+# Virtual Environment
+we_env/
+
+# Pytest / Testing
+.pytest_cache/
+report.xml
+test_out*.txt
+
+# AI Assistants
+.gemini/
+.cursor/
+
+# Generated API Docs
+openapi*.json
+wezu_openapi.json
+swagger_test.html

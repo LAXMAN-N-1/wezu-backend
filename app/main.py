@@ -17,16 +17,16 @@ if settings.ENVIRONMENT != "production":
     else:
         ssl._create_default_https_context = _create_unverified_https_context
 
-import sentry_sdk
-from sentry_sdk.integrations.fastapi import FastApiIntegration
+# import sentry_sdk
+# from sentry_sdk.integrations.fastapi import FastApiIntegration
 
-if settings.SENTRY_DSN:
-    sentry_sdk.init(
-        dsn=settings.SENTRY_DSN,
-        environment=settings.ENVIRONMENT,
-        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
-        integrations=[FastApiIntegration()]
-    )
+# if settings.SENTRY_DSN:
+#     sentry_sdk.init(
+#         dsn=settings.SENTRY_DSN,
+#         environment=settings.ENVIRONMENT,
+#         traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+#         integrations=[FastApiIntegration()]
+#     )
 
 # Customer-facing endpoints
 from app.api.v1 import (
@@ -36,7 +36,7 @@ from app.api.v1 import (
     organizations, warehouses, screens, stock, dealers, logistics, 
     settlements, telemetry, vehicles, locations, system, roles, 
     menus, role_rights, admin_kyc, audit, ml, inventory,
-    admin_stations, station_monitoring
+    admin_stations, station_monitoring, user_analytics, knowledge_base
 )
 from app.api.v1.admin import (
     support as admin_support, 
@@ -49,7 +49,8 @@ from app.api.v1.admin import (
     legal as admin_legal,
     banners as admin_banners,
     media as admin_media,
-    blogs as admin_blogs
+    blogs as admin_blogs,
+    campaigns as admin_campaigns
 )
 from app.api.admin import router as admin_router
 from app.api.v1.dashboard import router as dashboard_router
@@ -124,9 +125,13 @@ async def lifespan(app: FastAPI):
         except Exception:
             logger.exception("MQTT shutdown failed")
 
+from fastapi.openapi.docs import get_swagger_ui_html
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    docs_url=None,  # Disable default docs because we're overriding it
+    redoc_url=f"{settings.API_V1_STR}/redoc",
     lifespan=lifespan,
 )
 
@@ -137,6 +142,16 @@ def debug_routes():
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
+@app.get("/docs", include_in_schema=False)
+async def custom_swagger_ui_html():
+    """Override Swagger UI CDN to use cdnjs instead of jsdelivr/unpkg (which might be blocked)"""
+    return get_swagger_ui_html(
+        openapi_url=app.openapi_url,
+        title=app.title + " - Swagger UI",
+        oauth2_redirect_url=app.swagger_ui_oauth2_redirect_url,
+        swagger_js_url="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-bundle.min.js",
+        swagger_css_url="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui.min.css",
+    )
 
 # ----------------------------
 # Rate Limiting
@@ -204,6 +219,24 @@ app.include_router(branches.router, prefix=f"{settings.API_V1_STR}/branches", ta
 app.include_router(organizations.router, prefix=f"{settings.API_V1_STR}/organizations", tags=["Organizations"])
 app.include_router(warehouses.router, prefix=f"{settings.API_V1_STR}/warehouses", tags=["Warehouses"])
 app.include_router(screens.router, prefix=f"{settings.API_V1_STR}/screens", tags=["UI Configuration"])
+# 1. Customer Application Endpoints
+customer_api = f"{settings.API_V1_STR}/customer"
+app.include_router(auth.router, prefix=f"{customer_api}/auth", tags=["Customer: Auth"])
+app.include_router(users.router, prefix=f"{customer_api}/users", tags=["Customer: Users"])
+app.include_router(kyc.router, prefix=f"{customer_api}/kyc", tags=["Customer: KYC"])
+app.include_router(stations.router, prefix=f"{customer_api}/stations", tags=["Customer: Stations"])
+app.include_router(batteries.router, prefix=f"{customer_api}/batteries", tags=["Customer: Batteries"])
+app.include_router(rentals.router, prefix=f"{customer_api}/rentals", tags=["Customer: Rentals"])
+app.include_router(wallet.router, prefix=f"{customer_api}/wallet", tags=["Customer: Wallet"])
+app.include_router(payments.router, prefix=f"{customer_api}/payments", tags=["Customer: Payments"])
+app.include_router(notifications.router, prefix=f"{customer_api}/notifications", tags=["Customer: Notifications"])
+app.include_router(support.router, prefix=f"{customer_api}/support", tags=["Customer: Support"])
+app.include_router(favorites.router, prefix=f"{settings.API_V1_STR}/users/me/favorites", tags=["Customer: Favorites"])
+app.include_router(promo.router, prefix=f"{settings.API_V1_STR}/coupons", tags=["Customer: Coupons"])
+app.include_router(swaps.router, prefix=f"{customer_api}/swaps", tags=["Customer: Swaps"])
+app.include_router(vehicles.router, prefix=f"{customer_api}/vehicles", tags=["Customer: Vehicles"])
+app.include_router(user_analytics.router, prefix=f"{customer_api}/users", tags=["Customer: User Analytics"])
+app.include_router(knowledge_base.customer_router, prefix=f"{customer_api}/knowledge", tags=["Customer: Knowledge Base"])
 
 # 2. Admin Application Endpoints
 admin_api = f"{settings.API_V1_STR}/admin"
@@ -215,6 +248,24 @@ app.include_router(admin_router, prefix=f"{admin_api}", tags=["Admin: Main"], de
 
 # Dashboard specific
 app.include_router(dashboard_router, prefix=f"{settings.API_V1_STR}/dashboard", tags=["Admin: Dashboard"], dependencies=admin_deps)
+app.include_router(admin_users.router, prefix=f"{admin_api}/users", tags=["Admin: Users"], dependencies=admin_deps)
+app.include_router(admin_roles.router, prefix=f"{admin_api}/roles", tags=["Admin: Roles"], dependencies=admin_deps)
+app.include_router(admin_kyc.router, prefix=f"{admin_api}/kyc", tags=["Admin: KYC"], dependencies=admin_deps)
+app.include_router(audit.router, prefix=f"{admin_api}/audit", tags=["Admin: Audit"], dependencies=admin_deps)
+app.include_router(fraud.router, prefix=f"{admin_api}/fraud", tags=["Admin: Fraud"], dependencies=admin_deps)
+app.include_router(ml.router, prefix=f"{admin_api}/ml", tags=["Admin: ML & Analytics"], dependencies=admin_deps)
+app.include_router(admin_support.router, prefix=f"{admin_api}/support", tags=["Admin: Support"], dependencies=admin_deps)
+app.include_router(admin_faqs.router, prefix=f"{admin_api}/faq", tags=["Admin: FAQ"], dependencies=admin_deps)
+app.include_router(admin_legal.router, prefix=f"{admin_api}/legal", tags=["Admin: CMS - Legal"], dependencies=admin_deps)
+app.include_router(admin_banners.router, prefix=f"{admin_api}/banners", tags=["Admin: CMS - Banners"], dependencies=admin_deps)
+app.include_router(admin_media.router, prefix=f"{admin_api}/media", tags=["Admin: CMS - Media"], dependencies=admin_deps)
+app.include_router(admin_analytics.router, prefix=f"{admin_api}/analytics", tags=["Admin: Analytics"], dependencies=admin_deps)
+app.include_router(admin_coupons.router, prefix=f"{admin_api}/coupons", tags=["Admin: Coupons"], dependencies=admin_deps)
+app.include_router(admin_blogs.router, prefix=f"{admin_api}/blogs", tags=["Admin: CMS - Blogs"], dependencies=admin_deps)
+app.include_router(admin_reviews.router, prefix=f"{admin_api}/reviews", tags=["Admin: Review Moderation"], dependencies=admin_deps)
+app.include_router(admin_stations.router, prefix=f"{admin_api}/stations", tags=["Admin: Stations"], dependencies=admin_deps)
+app.include_router(admin_campaigns.router, prefix=f"{admin_api}/campaigns", tags=["Admin: Campaigns"], dependencies=admin_deps)
+app.include_router(knowledge_base.admin_router, prefix=f"{admin_api}/knowledge", tags=["Admin: Knowledge Base"], dependencies=admin_deps)
 
 # 3. Monitoring Application Endpoints
 monitoring_api = f"{settings.API_V1_STR}/monitoring"

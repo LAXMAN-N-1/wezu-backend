@@ -1,9 +1,9 @@
+import uuid
 from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
 
-import uuid
 
 if TYPE_CHECKING:
     from app.models.dealer import DealerProfile

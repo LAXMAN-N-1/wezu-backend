@@ -58,6 +58,7 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
         cursor.execute("ATTACH DATABASE ':memory:' AS inventory")
         cursor.execute("ATTACH DATABASE ':memory:' AS stations")
         cursor.execute("ATTACH DATABASE ':memory:' AS logistics")
+        cursor.execute("ATTACH DATABASE ':memory:' AS public")
         cursor.close()
 
 # Initialize all tables before any test session

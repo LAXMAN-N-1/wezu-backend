@@ -101,6 +101,7 @@ class Settings(BaseSettings):
     RENTAL_GRACE_PERIOD_HOURS: int = 2
     LATE_FEE_MULTIPLIER: float = 1.5
     SWAP_FEE_PERCENTAGE: float = 0.0  # Free swaps for customers
+    CARBON_FACTOR_KG_PER_HOUR: float = 0.05  # kg CO₂ saved per rental hour
     
     # Geofencing
     GEOFENCE_CHECK_INTERVAL_MINUTES: int = 60

@@ -26,10 +26,12 @@ def seed_admin_analytics():
         logger.info("👨‍💼 Seeding Admin Analytics Data...")
         
         # Fetch existing base data
-        users = session.exec(select(User).where(User.user_type == UserType.CUSTOMER)).all()
+        all_users = session.exec(select(User)).all()
+        users = [u for u in all_users if u.user_type == "customer" or (hasattr(u.user_type, "value") and u.user_type.value == "customer")]
         stations = session.exec(select(Station)).all()
         batteries = session.exec(select(Battery)).all()
-        admin_user = session.exec(select(User).where(User.user_type == UserType.ADMIN)).first()
+        admin_user = session.exec(select(User).where(User.email == "admin@wezu.com")).first()
+
 
         if not users or not stations or not batteries or not admin_user:
             logger.error("❌ Missing base data. Run seed_full_db.py first.")

@@ -1162,3 +1162,308 @@ class AnalyticsService:
             if total_batteries
             else 0,
         }
+
+    # ─── Personal Cost Analytics (Task 7) ───────────────────────────
+
+    @staticmethod
+    def _resolve_period_dates(period: str):
+        """Convert a period string (3m|6m|1y|all) into (start_date, end_date) for
+        the *current* window and the equivalent *previous* window."""
+        from dateutil.relativedelta import relativedelta
+
+        now = datetime.utcnow()
+        if period == "3m":
+            delta = relativedelta(months=3)
+        elif period == "6m":
+            delta = relativedelta(months=6)
+        elif period == "1y":
+            delta = relativedelta(years=1)
+        else:  # "all"
+            # Use a very early date for "all"
+            return datetime(2000, 1, 1), now, datetime(2000, 1, 1), datetime(2000, 1, 1)
+
+        current_start = now - delta
+        previous_start = current_start - delta
+        return current_start, now, previous_start, current_start
+
+    @staticmethod
+    def _sum_rental_spending(db: Session, user_id: int, start: datetime, end: datetime) -> float:
+        """Sum successful rental_payment transactions for a user in range."""
+        stmt = select(func.coalesce(func.sum(Transaction.amount), 0.0)).where(
+            Transaction.user_id == user_id,
+            Transaction.transaction_type == TransactionType.RENTAL_PAYMENT,
+            Transaction.status == TransactionStatus.SUCCESS,
+            Transaction.created_at >= start,
+            Transaction.created_at <= end,
+        )
+        return float(db.exec(stmt).one())
+
+    @staticmethod
+    def _sum_purchase_spending(db: Session, user_id: int, start: datetime, end: datetime) -> float:
+        """Sum purchase amounts for a user in range (from Purchase model)."""
+        from app.models.rental import Purchase
+        stmt = select(func.coalesce(func.sum(Purchase.amount), 0.0)).where(
+            Purchase.user_id == user_id,
+            Purchase.timestamp >= start,
+            Purchase.timestamp <= end,
+        )
+        return float(db.exec(stmt).one())
+
+    @staticmethod
+    def get_personal_cost_analytics(
+        db: Session,
+        user_id: int,
+        period: str = "3m",
+        transaction_type: str = "all",
+    ) -> dict:
+        """Full personal cost analytics for a customer.
+
+        Returns total_spent_this_month, this_year, lifetime, avg_monthly,
+        breakdown, month-over-month change, inline trends, and period comparison.
+        """
+        from dateutil.relativedelta import relativedelta
+
+        now = datetime.utcnow()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        year_start = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+        lifetime_start = datetime(2000, 1, 1)
+        prev_month_start = month_start - relativedelta(months=1)
+
+        # --- lifetime / year / month totals ---
+        include_rental = transaction_type in ("rental", "all")
+        include_purchase = transaction_type in ("purchase", "all")
+
+        def _range_total(start, end):
+            total = 0.0
+            if include_rental:
+                total += AnalyticsService._sum_rental_spending(db, user_id, start, end)
+            if include_purchase:
+                total += AnalyticsService._sum_purchase_spending(db, user_id, start, end)
+            return round(total, 2)
+
+        total_lifetime = _range_total(lifetime_start, now)
+        total_year = _range_total(year_start, now)
+        total_month = _range_total(month_start, now)
+        total_prev_month = _range_total(prev_month_start, month_start)
+
+        # avg monthly (over the requested period window)
+        current_start, current_end, prev_start, prev_end = AnalyticsService._resolve_period_dates(period)
+        period_total = _range_total(current_start, current_end)
+        months_in_period = max(
+            1,
+            (current_end.year - current_start.year) * 12 + current_end.month - current_start.month
+        )
+        avg_monthly = round(period_total / months_in_period, 2)
+
+        # breakdown
+        rental_total = round(
+            AnalyticsService._sum_rental_spending(db, user_id, current_start, current_end), 2
+        ) if include_rental else 0.0
+        purchase_total = round(
+            AnalyticsService._sum_purchase_spending(db, user_id, current_start, current_end), 2
+        ) if include_purchase else 0.0
+
+        # month-over-month change %
+        mom_change = 0.0
+        if total_prev_month > 0:
+            mom_change = round(((total_month - total_prev_month) / total_prev_month) * 100, 2)
+
+        # period comparison
+        prev_period_total = _range_total(prev_start, prev_end)
+        period_change = 0.0
+        if prev_period_total > 0:
+            period_change = round(((period_total - prev_period_total) / prev_period_total) * 100, 2)
+
+        # inline trends (reuse the trends helper)
+        trends = AnalyticsService.get_personal_cost_trends(db, user_id, period, transaction_type)
+
+        return {
+            "total_spent_this_month": total_month,
+            "total_spent_this_year": total_year,
+            "total_spent_lifetime": total_lifetime,
+            "avg_monthly_spending": avg_monthly,
+            "breakdown": {
+                "rentals": rental_total,
+                "purchases": purchase_total,
+            },
+            "month_over_month_change": mom_change,
+            "trends": trends,
+            "comparison_with_previous_period": {
+                "current": period_total,
+                "previous": prev_period_total,
+                "change_percent": period_change,
+            },
+        }
+
+    @staticmethod
+    def get_personal_cost_trends(
+        db: Session,
+        user_id: int,
+        period: str = "3m",
+        transaction_type: str = "all",
+    ) -> list:
+        """Monthly trend chart data for the requested period.
+
+        Returns a list of {month, rentals, purchases} dicts.
+        """
+        from dateutil.relativedelta import relativedelta
+
+        current_start, current_end, _, _ = AnalyticsService._resolve_period_dates(period)
+
+        include_rental = transaction_type in ("rental", "all")
+        include_purchase = transaction_type in ("purchase", "all")
+
+        # Build month buckets
+        trends = []
+        cursor = current_start.replace(day=1)
+        while cursor <= current_end:
+            m_start = cursor
+            m_end = (cursor + relativedelta(months=1)) - timedelta(seconds=1)
+            if m_end > current_end:
+                m_end = current_end
+
+            rental_val = 0.0
+            purchase_val = 0.0
+            if include_rental:
+                rental_val = round(
+                    AnalyticsService._sum_rental_spending(db, user_id, m_start, m_end), 2
+                )
+            if include_purchase:
+                purchase_val = round(
+                    AnalyticsService._sum_purchase_spending(db, user_id, m_start, m_end), 2
+                )
+
+            trends.append({
+                "month": cursor.strftime("%Y-%m"),
+                "rentals": rental_val,
+                "purchases": purchase_val,
+            })
+            cursor += relativedelta(months=1)
+
+        return trends
+
+    # ─── Battery Usage Stats (Task 8) ───────────────────────────────
+
+    @staticmethod
+    def get_personal_usage_stats(db: Session, user_id: int) -> dict:
+        """Comprehensive battery usage statistics for a customer.
+
+        Computes rental counts, durations, peak usage patterns, carbon savings,
+        favorite station, usage streaks, and earned badges.
+        """
+        from app.models.rental import Rental, Purchase
+        from app.models.battery import Battery
+        from app.models.station import Station
+        from app.core.config import settings
+        from collections import Counter
+
+        # ── 1. Total rentals & purchases ──────────────────────────
+        rentals = db.exec(
+            select(Rental).where(Rental.user_id == user_id)
+        ).all()
+
+        total_rented = len(rentals)
+
+        total_purchased = db.exec(
+            select(func.count(Purchase.id)).where(Purchase.user_id == user_id)
+        ).one() or 0
+
+        # ── 2. Duration stats (completed rentals only) ────────────
+        completed = [r for r in rentals if r.status == "completed" and r.end_time]
+        durations_hours = []
+        for r in completed:
+            dur = (r.end_time - r.start_time).total_seconds() / 3600
+            durations_hours.append(dur)
+
+        avg_duration = round(sum(durations_hours) / len(durations_hours), 2) if durations_hours else 0.0
+        longest_duration = round(max(durations_hours), 2) if durations_hours else 0.0
+
+        # ── 3. Most rented battery type ───────────────────────────
+        battery_ids = [r.battery_id for r in rentals]
+        most_rented_type = None
+        if battery_ids:
+            batteries = db.exec(
+                select(Battery.battery_type).where(Battery.id.in_(battery_ids))
+            ).all()
+            if batteries:
+                type_counts = Counter(batteries)
+                most_rented_type = type_counts.most_common(1)[0][0]
+
+        # ── 4. Usage patterns ─────────────────────────────────────
+        day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        day_counter: Counter = Counter()
+        hour_counter: Counter = Counter()
+
+        for r in rentals:
+            day_counter[day_names[r.start_time.weekday()]] += 1
+            hour_counter[str(r.start_time.hour)] += 1
+
+        # Ensure every day is present
+        by_day = {d: day_counter.get(d, 0) for d in day_names}
+
+        peak_day = max(by_day, key=by_day.get) if by_day and any(by_day.values()) else None
+        peak_hour = hour_counter.most_common(1)[0][0] if hour_counter else None
+
+        usage_patterns = {
+            "by_day_of_week": by_day,
+            "by_hour_of_day": dict(hour_counter),
+            "peak_usage_day": peak_day,
+            "peak_usage_hour": f"{peak_hour}:00" if peak_hour is not None else None,
+        }
+
+        # ── 5. Carbon saved ───────────────────────────────────────
+        total_hours = sum(durations_hours)
+        carbon_saved = round(total_hours * settings.CARBON_FACTOR_KG_PER_HOUR, 2)
+
+        # ── 6. Favorite station ───────────────────────────────────
+        station_counter: Counter = Counter(r.start_station_id for r in rentals)
+        fav_station = {"id": None, "name": None, "rental_count": 0}
+        if station_counter:
+            fav_id, fav_count = station_counter.most_common(1)[0]
+            station = db.get(Station, fav_id)
+            fav_station = {
+                "id": fav_id,
+                "name": station.name if station else None,
+                "rental_count": fav_count,
+            }
+
+        # ── 7. Current streak (consecutive days with a rental) ────
+        if rentals:
+            rental_dates = sorted({r.start_time.date() for r in rentals}, reverse=True)
+            streak = 0
+            today = datetime.utcnow().date()
+            expected = today
+            for d in rental_dates:
+                if d == expected:
+                    streak += 1
+                    expected -= timedelta(days=1)
+                elif d < expected:
+                    # Allow gap: the streak only counts from today backwards
+                    break
+            current_streak = streak
+        else:
+            current_streak = 0
+
+        # ── 8. Badges ─────────────────────────────────────────────
+        badges = []
+        completed_count = len(completed)
+        if completed_count >= 1:
+            badges.append("first_rental")
+        if carbon_saved >= 10:
+            badges.append("green_warrior")
+        if completed_count >= 10:
+            badges.append("regular_user")
+
+        return {
+            "total_batteries_rented": total_rented,
+            "total_batteries_purchased": total_purchased,
+            "avg_rental_duration_hours": avg_duration,
+            "longest_rental_hours": longest_duration,
+            "most_rented_battery_type": most_rented_type,
+            "usage_patterns": usage_patterns,
+            "carbon_saved_kg": carbon_saved,
+            "favorite_station": fav_station,
+            "current_streak_days": current_streak,
+            "badges_earned": badges,
+        }
+
