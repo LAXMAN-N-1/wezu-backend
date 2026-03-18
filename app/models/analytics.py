@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 class DemandForecast(SQLModel, table=True):
     __tablename__ = "demand_forecasts"
     __table_args__ = {"schema": "core"}
+    model_config = {"protected_namespaces": ()}
     """Predicted demand per station/region"""
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -44,6 +45,7 @@ class DemandForecast(SQLModel, table=True):
 class ChurnPrediction(SQLModel, table=True):
     __tablename__ = "churn_predictions"
     __table_args__ = {"schema": "core"}
+    model_config = {"protected_namespaces": ()}
     """User churn risk scores"""
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="core.users.id", index=True)

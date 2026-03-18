@@ -25,23 +25,20 @@ class StationService:
         lat: float, 
         lon: float, 
         radius_km: float = 50.0,
-        min_rating: Optional[float] = None,
         status: Optional[str] = None,
         is_24x7: Optional[bool] = None,
         sort_by: str = "distance",
-        battery_type: Optional[str] = None,
-        min_capacity: Optional[int] = None,
-        max_price: Optional[float] = None
+        filters: Optional['NearbyFilterSchema'] = None
     ) -> List['NearbyStationResponse']:
-        from app.schemas.station import NearbyStationResponse, StationImageResponse
+        from app.schemas.station import NearbyStationResponse, StationImageResponse, NearbyFilterSchema
         from app.models.battery_catalog import BatteryCatalog
         
         # 1. Base Query
         query = select(Station)
         if status:
             query = query.where(Station.status == status)
-        if min_rating:
-            query = query.where(Station.rating >= min_rating)
+        if filters and filters.min_rating is not None:
+            query = query.where(Station.rating >= filters.min_rating)
         if is_24x7:
              query = query.where(Station.is_24x7 == True)
              
@@ -57,13 +54,18 @@ class StationService:
         )
         
         # Apply filters to availability count
-        if battery_type:
-            availability_query = availability_query.where(BatteryCatalog.battery_type == battery_type)
-        if min_capacity:
-            availability_query = availability_query.where(BatteryCatalog.capacity_mah >= min_capacity)
-        if max_price:
-            availability_query = availability_query.where(BatteryCatalog.price_per_day <= max_price)
-            
+        if filters:
+            if filters.battery_type:
+                availability_query = availability_query.where(BatteryCatalog.battery_type == filters.battery_type)
+            if filters.capacity_min is not None:
+                availability_query = availability_query.where(BatteryCatalog.capacity_mah >= filters.capacity_min)
+            if filters.capacity_max is not None:
+                availability_query = availability_query.where(BatteryCatalog.capacity_mah <= filters.capacity_max)
+            if filters.price_max is not None:
+                availability_query = availability_query.where(BatteryCatalog.price_per_day <= filters.price_max)
+            if filters.price_min is not None:
+                availability_query = availability_query.where(BatteryCatalog.price_per_day >= filters.price_min)
+                
         availability_query = availability_query.group_by(StationSlot.station_id)
         
         availability_results = db.execute(availability_query).all()
@@ -71,6 +73,10 @@ class StationService:
         
         nearby = []
         for station in stations:
+            # If availability is required, skip stations with 0 matching batteries
+            if filters and filters.availability and availability_map.get(station.id, 0) == 0:
+                continue
+                
             dist = StationService.haversine(lon, lat, station.longitude, station.latitude)
             if dist <= radius_km:
                 # Create the response object

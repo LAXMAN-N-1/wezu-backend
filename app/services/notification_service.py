@@ -133,3 +133,69 @@ class NotificationService:
             NotificationService.send_notification(db, user, title, message, type, channel)
             
         return len(users)
+
+    @staticmethod
+    def dispatch_expiry_notification(
+        db: Session,
+        user_id: int,
+        rental,
+        milestone_hours: int,
+        stations: list
+    ):
+        from app.models.user import User
+        user = db.get(User, user_id)
+        if not user:
+            return
+
+        priority = "high"
+        if milestone_hours == 24:
+            title = "Rental Expiring Soon"
+            body = "Your rental expires tomorrow. Check the nearest return stations and plan your swap!"
+            priority = "normal"
+        elif milestone_hours == 12:
+            title = "12 Hours Left on Rental"
+            station_name = stations[0].name if stations else "a station"
+            body = f"12 hours left on your rental! Return your battery at {station_name}."
+        elif milestone_hours == 1:
+            title = "⚠ 1 Hour Left!"
+            station_name = stations[0].name if stations else "a station"
+            body = f"⚠ 1 hour left! Late fees apply after expiry. Return now at {station_name}."
+        else:
+            return
+
+        import json
+        
+        # Format station data for the payload
+        station_data = []
+        for s in stations[:3]:
+            dist = s.distance if hasattr(s, 'distance') else 0.0
+            station_data.append({"name": s.name, "distance_km": round(dist, 2)})
+
+        payload_data = {
+            "type": "rental_expiry",
+            "rental_id": str(rental.id),
+            "milestone_hours": str(milestone_hours),
+            "deep_link": "wezu://swap",
+            "stations": json.dumps(station_data)
+        }
+
+        # 1. Save to Notification table
+        notif = Notification(
+            user_id=user.id,
+            title=title,
+            message=body,
+            type="expiry_alert",
+            channel="push",
+            payload=json.dumps(payload_data),
+            status="sent"
+        )
+        db.add(notif)
+        db.commit()
+
+        # 2. Dispatch FCM
+        from app.models.device import Device
+        devices = db.exec(select(Device).where(Device.user_id == user.id)).all()
+        tokens = [d.fcm_token for d in devices if d.fcm_token]
+        if tokens:
+            FCMService.send_expiry_notification_multicast(tokens, title, body, payload_data, priority)
+

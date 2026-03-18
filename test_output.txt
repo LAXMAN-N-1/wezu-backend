@@ -1,0 +1,882 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend
+configfile: pytest.ini
+plugins: anyio-3.7.1
+collecting ... collected 4 items
+
+tests/test_stations.py::test_get_nearby_stations_no_filters ERROR        [ 25%]
+tests/test_stations.py::test_get_nearby_stations_with_filters ERROR      [ 50%]
+tests/test_stations.py::test_get_nearby_stations_invalid_rating ERROR    [ 75%]
+tests/test_stations.py::test_get_nearby_stations_invalid_price_range ERROR [100%]
+
+=================================== ERRORS ====================================
+____________ ERROR at setup of test_get_nearby_stations_no_filters ____________
+
+self = <sqlalchemy.engine.base.Connection object at 0x00000231C79C46D0>
+dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x00000231CB46CDD0>
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x00000231C7F9B710>
+statement = <sqlalchemy.dialects.sqlite.base.SQLiteDDLCompiler object at 0x00000231CB72F410>
+parameters = [()]
+
+    def _exec_single_context(
+        self,
+        dialect: Dialect,
+        context: ExecutionContext,
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+    ) -> CursorResult[Any]:
+        """continue the _execute_context() method for a single DBAPI
+        cursor.execute() or cursor.executemany() call.
+    
+        """
+        if dialect.bind_typing is BindTyping.SETINPUTSIZES:
+            generic_setinputsizes = context._prepare_set_input_sizes()
+    
+            if generic_setinputsizes:
+                try:
+                    dialect.do_set_input_sizes(
+                        context.cursor, generic_setinputsizes, context
+                    )
+                except BaseException as e:
+                    self._handle_dbapi_exception(
+                        e, str(statement), parameters, None, context
+                    )
+    
+        cursor, str_statement, parameters = (
+            context.cursor,
+            context.statement,
+            context.parameters,
+        )
+    
+        effective_parameters: Optional[_AnyExecuteParams]
+    
+        if not context.executemany:
+            effective_parameters = parameters[0]
+        else:
+            effective_parameters = parameters
+    
+        if self._has_events or self.engine._has_events:
+            for fn in self.dispatch.before_cursor_execute:
+                str_statement, effective_parameters = fn(
+                    self,
+                    cursor,
+                    str_statement,
+                    effective_parameters,
+                    context,
+                    context.executemany,
+                )
+    
+        if self._echo:
+            self._log_info(str_statement)
+    
+            stats = context._get_cache_stats()
+    
+            if not self.engine.hide_parameters:
+                self._log_info(
+                    "[%s] %r",
+                    stats,
+                    sql_util._repr_params(
+                        effective_parameters,
+                        batches=10,
+                        ismulti=context.executemany,
+                    ),
+                )
+            else:
+                self._log_info(
+                    "[%s] [SQL parameters hidden due to hide_parameters=True]",
+                    stats,
+                )
+    
+        evt_handled: bool = False
+        try:
+            if context.execute_style is ExecuteStyle.EXECUTEMANY:
+                effective_parameters = cast(
+                    "_CoreMultiExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_executemany:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_executemany(
+                        cursor,
+                        str_statement,
+                        effective_parameters,
+                        context,
+                    )
+            elif not effective_parameters and context.no_parameters:
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute_no_params:
+                        if fn(cursor, str_statement, context):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_execute_no_params(
+                        cursor, str_statement, context
+                    )
+            else:
+                effective_parameters = cast(
+                    "_CoreSingleExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+>                   self.dialect.do_execute(
+                        cursor, str_statement, effective_parameters, context
+                    )
+
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1969: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x00000231CB46CDD0>
+cursor = <sqlite3.Cursor object at 0x00000231CB6D7D40>
+statement = '\nCREATE TABLE core.permissions (\n\tid INTEGER NOT NULL, \n\tslug VARCHAR NOT NULL, \n\tmodule VARCHAR NOT NULL, \n\...AR NOT NULL, \n\tscope VARCHAR NOT NULL, \n\tconstraints VARCHAR, \n\tdescription VARCHAR, \n\tPRIMARY KEY (id)\n)\n\n'
+parameters = ()
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x00000231C7F9B710>
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       sqlite3.OperationalError: unknown database core
+
+wezu_e\Lib\site-packages\sqlalchemy\engine\default.py:922: OperationalError
+
+The above exception was the direct cause of the following exception:
+
+    @pytest.fixture(name="session")
+    def session_fixture():
+>       SQLModel.metadata.create_all(engine)
+
+tests\conftest.py:31: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+wezu_e\Lib\site-packages\sqlalchemy\sql\schema.py:5828: in create_all
+    bind._run_ddl_visitor(
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:3243: in _run_ddl_visitor
+    conn._run_ddl_visitor(visitorcallable, element, **kwargs)
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:2447: in _run_ddl_visitor
+    visitorcallable(self.dialect, self, **kwargs).traverse_single(element)
+wezu_e\Lib\site-packages\sqlalchemy\sql\visitors.py:671: in traverse_single
+    return meth(obj, **kw)
+           ^^^^^^^^^^^^^^^
+wezu_e\Lib\site-packages\sqlalchemy\sql\ddl.py:919: in visit_metadata
+    self.traverse_single(
+wezu_e\Lib\site-packages\sqlalchemy\sql\visitors.py:671: in traverse_single
+    return meth(obj, **kw)
+           ^^^^^^^^^^^^^^^
+wezu_e\Lib\site-packages\sqlalchemy\sql\ddl.py:957: in visit_table
+    )._invoke_with(self.connection)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+wezu_e\Lib\site-packages\sqlalchemy\sql\ddl.py:315: in _invoke_with
+    return bind.execute(self)
+           ^^^^^^^^^^^^^^^^^^
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1416: in execute
+    return meth(
+wezu_e\Lib\site-packages\sqlalchemy\sql\ddl.py:181: in _execute_on_connection
+    return connection._execute_ddl(
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1528: in _execute_ddl
+    ret = self._execute_context(
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1848: in _execute_context
+    return self._exec_single_context(
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1988: in _exec_single_context
+    self._handle_dbapi_exception(
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:2343: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x00000231CB46CDD0>
+cursor = <sqlite3.Cursor object at 0x00000231CB6D7D40>
+statement = '\nCREATE TABLE core.permissions (\n\tid INTEGER NOT NULL, \n\tslug VARCHAR NOT NULL, \n\tmodule VARCHAR NOT NULL, \n\...AR NOT NULL, \n\tscope VARCHAR NOT NULL, \n\tconstraints VARCHAR, \n\tdescription VARCHAR, \n\tPRIMARY KEY (id)\n)\n\n'
+parameters = ()
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x00000231C7F9B710>
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) unknown database core
+E       [SQL: 
+E       CREATE TABLE core.permissions (
+E       	id INTEGER NOT NULL, 
+E       	slug VARCHAR NOT NULL, 
+E       	module VARCHAR NOT NULL, 
+E       	resource_type VARCHAR, 
+E       	action VARCHAR NOT NULL, 
+E       	scope VARCHAR NOT NULL, 
+E       	constraints VARCHAR, 
+E       	description VARCHAR, 
+E       	PRIMARY KEY (id)
+E       )
+E       
+E       ]
+E       (Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+wezu_e\Lib\site-packages\sqlalchemy\engine\default.py:922: OperationalError
+___________ ERROR at setup of test_get_nearby_stations_with_filters ___________
+
+self = <sqlalchemy.engine.base.Connection object at 0x00000231CD1A1190>
+dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x00000231CB46CDD0>
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x00000231CD1A16D0>
+statement = <sqlalchemy.dialects.sqlite.base.SQLiteDDLCompiler object at 0x00000231CD1A1750>
+parameters = [()]
+
+    def _exec_single_context(
+        self,
+        dialect: Dialect,
+        context: ExecutionContext,
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+    ) -> CursorResult[Any]:
+        """continue the _execute_context() method for a single DBAPI
+        cursor.execute() or cursor.executemany() call.
+    
+        """
+        if dialect.bind_typing is BindTyping.SETINPUTSIZES:
+            generic_setinputsizes = context._prepare_set_input_sizes()
+    
+            if generic_setinputsizes:
+                try:
+                    dialect.do_set_input_sizes(
+                        context.cursor, generic_setinputsizes, context
+                    )
+                except BaseException as e:
+                    self._handle_dbapi_exception(
+                        e, str(statement), parameters, None, context
+                    )
+    
+        cursor, str_statement, parameters = (
+            context.cursor,
+            context.statement,
+            context.parameters,
+        )
+    
+        effective_parameters: Optional[_AnyExecuteParams]
+    
+        if not context.executemany:
+            effective_parameters = parameters[0]
+        else:
+            effective_parameters = parameters
+    
+        if self._has_events or self.engine._has_events:
+            for fn in self.dispatch.before_cursor_execute:
+                str_statement, effective_parameters = fn(
+                    self,
+                    cursor,
+                    str_statement,
+                    effective_parameters,
+                    context,
+                    context.executemany,
+                )
+    
+        if self._echo:
+            self._log_info(str_statement)
+    
+            stats = context._get_cache_stats()
+    
+            if not self.engine.hide_parameters:
+                self._log_info(
+                    "[%s] %r",
+                    stats,
+                    sql_util._repr_params(
+                        effective_parameters,
+                        batches=10,
+                        ismulti=context.executemany,
+                    ),
+                )
+            else:
+                self._log_info(
+                    "[%s] [SQL parameters hidden due to hide_parameters=True]",
+                    stats,
+                )
+    
+        evt_handled: bool = False
+        try:
+            if context.execute_style is ExecuteStyle.EXECUTEMANY:
+                effective_parameters = cast(
+                    "_CoreMultiExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_executemany:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_executemany(
+                        cursor,
+                        str_statement,
+                        effective_parameters,
+                        context,
+                    )
+            elif not effective_parameters and context.no_parameters:
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute_no_params:
+                        if fn(cursor, str_statement, context):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_execute_no_params(
+                        cursor, str_statement, context
+                    )
+            else:
+                effective_parameters = cast(
+                    "_CoreSingleExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+>                   self.dialect.do_execute(
+                        cursor, str_statement, effective_parameters, context
+                    )
+
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1969: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x00000231CB46CDD0>
+cursor = <sqlite3.Cursor object at 0x00000231CD2F86C0>
+statement = '\nCREATE TABLE core.permissions (\n\tid INTEGER NOT NULL, \n\tslug VARCHAR NOT NULL, \n\tmodule VARCHAR NOT NULL, \n\...AR NOT NULL, \n\tscope VARCHAR NOT NULL, \n\tconstraints VARCHAR, \n\tdescription VARCHAR, \n\tPRIMARY KEY (id)\n)\n\n'
+parameters = ()
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x00000231CD1A16D0>
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       sqlite3.OperationalError: unknown database core
+
+wezu_e\Lib\site-packages\sqlalchemy\engine\default.py:922: OperationalError
+
+The above exception was the direct cause of the following exception:
+
+    @pytest.fixture(name="session")
+    def session_fixture():
+>       SQLModel.metadata.create_all(engine)
+
+tests\conftest.py:31: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+wezu_e\Lib\site-packages\sqlalchemy\sql\schema.py:5828: in create_all
+    bind._run_ddl_visitor(
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:3243: in _run_ddl_visitor
+    conn._run_ddl_visitor(visitorcallable, element, **kwargs)
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:2447: in _run_ddl_visitor
+    visitorcallable(self.dialect, self, **kwargs).traverse_single(element)
+wezu_e\Lib\site-packages\sqlalchemy\sql\visitors.py:671: in traverse_single
+    return meth(obj, **kw)
+           ^^^^^^^^^^^^^^^
+wezu_e\Lib\site-packages\sqlalchemy\sql\ddl.py:919: in visit_metadata
+    self.traverse_single(
+wezu_e\Lib\site-packages\sqlalchemy\sql\visitors.py:671: in traverse_single
+    return meth(obj, **kw)
+           ^^^^^^^^^^^^^^^
+wezu_e\Lib\site-packages\sqlalchemy\sql\ddl.py:957: in visit_table
+    )._invoke_with(self.connection)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+wezu_e\Lib\site-packages\sqlalchemy\sql\ddl.py:315: in _invoke_with
+    return bind.execute(self)
+           ^^^^^^^^^^^^^^^^^^
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1416: in execute
+    return meth(
+wezu_e\Lib\site-packages\sqlalchemy\sql\ddl.py:181: in _execute_on_connection
+    return connection._execute_ddl(
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1528: in _execute_ddl
+    ret = self._execute_context(
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1848: in _execute_context
+    return self._exec_single_context(
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1988: in _exec_single_context
+    self._handle_dbapi_exception(
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:2343: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x00000231CB46CDD0>
+cursor = <sqlite3.Cursor object at 0x00000231CD2F86C0>
+statement = '\nCREATE TABLE core.permissions (\n\tid INTEGER NOT NULL, \n\tslug VARCHAR NOT NULL, \n\tmodule VARCHAR NOT NULL, \n\...AR NOT NULL, \n\tscope VARCHAR NOT NULL, \n\tconstraints VARCHAR, \n\tdescription VARCHAR, \n\tPRIMARY KEY (id)\n)\n\n'
+parameters = ()
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x00000231CD1A16D0>
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) unknown database core
+E       [SQL: 
+E       CREATE TABLE core.permissions (
+E       	id INTEGER NOT NULL, 
+E       	slug VARCHAR NOT NULL, 
+E       	module VARCHAR NOT NULL, 
+E       	resource_type VARCHAR, 
+E       	action VARCHAR NOT NULL, 
+E       	scope VARCHAR NOT NULL, 
+E       	constraints VARCHAR, 
+E       	description VARCHAR, 
+E       	PRIMARY KEY (id)
+E       )
+E       
+E       ]
+E       (Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+wezu_e\Lib\site-packages\sqlalchemy\engine\default.py:922: OperationalError
+__________ ERROR at setup of test_get_nearby_stations_invalid_rating __________
+
+self = <sqlalchemy.engine.base.Connection object at 0x00000231B0E00D90>
+dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x00000231CB46CDD0>
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x00000231CD1CB250>
+statement = <sqlalchemy.dialects.sqlite.base.SQLiteDDLCompiler object at 0x00000231CD1CB190>
+parameters = [()]
+
+    def _exec_single_context(
+        self,
+        dialect: Dialect,
+        context: ExecutionContext,
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+    ) -> CursorResult[Any]:
+        """continue the _execute_context() method for a single DBAPI
+        cursor.execute() or cursor.executemany() call.
+    
+        """
+        if dialect.bind_typing is BindTyping.SETINPUTSIZES:
+            generic_setinputsizes = context._prepare_set_input_sizes()
+    
+            if generic_setinputsizes:
+                try:
+                    dialect.do_set_input_sizes(
+                        context.cursor, generic_setinputsizes, context
+                    )
+                except BaseException as e:
+                    self._handle_dbapi_exception(
+                        e, str(statement), parameters, None, context
+                    )
+    
+        cursor, str_statement, parameters = (
+            context.cursor,
+            context.statement,
+            context.parameters,
+        )
+    
+        effective_parameters: Optional[_AnyExecuteParams]
+    
+        if not context.executemany:
+            effective_parameters = parameters[0]
+        else:
+            effective_parameters = parameters
+    
+        if self._has_events or self.engine._has_events:
+            for fn in self.dispatch.before_cursor_execute:
+                str_statement, effective_parameters = fn(
+                    self,
+                    cursor,
+                    str_statement,
+                    effective_parameters,
+                    context,
+                    context.executemany,
+                )
+    
+        if self._echo:
+            self._log_info(str_statement)
+    
+            stats = context._get_cache_stats()
+    
+            if not self.engine.hide_parameters:
+                self._log_info(
+                    "[%s] %r",
+                    stats,
+                    sql_util._repr_params(
+                        effective_parameters,
+                        batches=10,
+                        ismulti=context.executemany,
+                    ),
+                )
+            else:
+                self._log_info(
+                    "[%s] [SQL parameters hidden due to hide_parameters=True]",
+                    stats,
+                )
+    
+        evt_handled: bool = False
+        try:
+            if context.execute_style is ExecuteStyle.EXECUTEMANY:
+                effective_parameters = cast(
+                    "_CoreMultiExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_executemany:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_executemany(
+                        cursor,
+                        str_statement,
+                        effective_parameters,
+                        context,
+                    )
+            elif not effective_parameters and context.no_parameters:
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute_no_params:
+                        if fn(cursor, str_statement, context):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_execute_no_params(
+                        cursor, str_statement, context
+                    )
+            else:
+                effective_parameters = cast(
+                    "_CoreSingleExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+>                   self.dialect.do_execute(
+                        cursor, str_statement, effective_parameters, context
+                    )
+
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1969: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x00000231CB46CDD0>
+cursor = <sqlite3.Cursor object at 0x00000231CB4C5740>
+statement = '\nCREATE TABLE core.permissions (\n\tid INTEGER NOT NULL, \n\tslug VARCHAR NOT NULL, \n\tmodule VARCHAR NOT NULL, \n\...AR NOT NULL, \n\tscope VARCHAR NOT NULL, \n\tconstraints VARCHAR, \n\tdescription VARCHAR, \n\tPRIMARY KEY (id)\n)\n\n'
+parameters = ()
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x00000231CD1CB250>
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       sqlite3.OperationalError: unknown database core
+
+wezu_e\Lib\site-packages\sqlalchemy\engine\default.py:922: OperationalError
+
+The above exception was the direct cause of the following exception:
+
+    @pytest.fixture(name="session")
+    def session_fixture():
+>       SQLModel.metadata.create_all(engine)
+
+tests\conftest.py:31: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+wezu_e\Lib\site-packages\sqlalchemy\sql\schema.py:5828: in create_all
+    bind._run_ddl_visitor(
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:3243: in _run_ddl_visitor
+    conn._run_ddl_visitor(visitorcallable, element, **kwargs)
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:2447: in _run_ddl_visitor
+    visitorcallable(self.dialect, self, **kwargs).traverse_single(element)
+wezu_e\Lib\site-packages\sqlalchemy\sql\visitors.py:671: in traverse_single
+    return meth(obj, **kw)
+           ^^^^^^^^^^^^^^^
+wezu_e\Lib\site-packages\sqlalchemy\sql\ddl.py:919: in visit_metadata
+    self.traverse_single(
+wezu_e\Lib\site-packages\sqlalchemy\sql\visitors.py:671: in traverse_single
+    return meth(obj, **kw)
+           ^^^^^^^^^^^^^^^
+wezu_e\Lib\site-packages\sqlalchemy\sql\ddl.py:957: in visit_table
+    )._invoke_with(self.connection)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+wezu_e\Lib\site-packages\sqlalchemy\sql\ddl.py:315: in _invoke_with
+    return bind.execute(self)
+           ^^^^^^^^^^^^^^^^^^
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1416: in execute
+    return meth(
+wezu_e\Lib\site-packages\sqlalchemy\sql\ddl.py:181: in _execute_on_connection
+    return connection._execute_ddl(
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1528: in _execute_ddl
+    ret = self._execute_context(
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1848: in _execute_context
+    return self._exec_single_context(
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1988: in _exec_single_context
+    self._handle_dbapi_exception(
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:2343: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x00000231CB46CDD0>
+cursor = <sqlite3.Cursor object at 0x00000231CB4C5740>
+statement = '\nCREATE TABLE core.permissions (\n\tid INTEGER NOT NULL, \n\tslug VARCHAR NOT NULL, \n\tmodule VARCHAR NOT NULL, \n\...AR NOT NULL, \n\tscope VARCHAR NOT NULL, \n\tconstraints VARCHAR, \n\tdescription VARCHAR, \n\tPRIMARY KEY (id)\n)\n\n'
+parameters = ()
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x00000231CD1CB250>
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) unknown database core
+E       [SQL: 
+E       CREATE TABLE core.permissions (
+E       	id INTEGER NOT NULL, 
+E       	slug VARCHAR NOT NULL, 
+E       	module VARCHAR NOT NULL, 
+E       	resource_type VARCHAR, 
+E       	action VARCHAR NOT NULL, 
+E       	scope VARCHAR NOT NULL, 
+E       	constraints VARCHAR, 
+E       	description VARCHAR, 
+E       	PRIMARY KEY (id)
+E       )
+E       
+E       ]
+E       (Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+wezu_e\Lib\site-packages\sqlalchemy\engine\default.py:922: OperationalError
+_______ ERROR at setup of test_get_nearby_stations_invalid_price_range ________
+
+self = <sqlalchemy.engine.base.Connection object at 0x00000231CB9D7E90>
+dialect = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x00000231CB46CDD0>
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x00000231CBB4E350>
+statement = <sqlalchemy.dialects.sqlite.base.SQLiteDDLCompiler object at 0x00000231CBB4E2D0>
+parameters = [()]
+
+    def _exec_single_context(
+        self,
+        dialect: Dialect,
+        context: ExecutionContext,
+        statement: Union[str, Compiled],
+        parameters: Optional[_AnyMultiExecuteParams],
+    ) -> CursorResult[Any]:
+        """continue the _execute_context() method for a single DBAPI
+        cursor.execute() or cursor.executemany() call.
+    
+        """
+        if dialect.bind_typing is BindTyping.SETINPUTSIZES:
+            generic_setinputsizes = context._prepare_set_input_sizes()
+    
+            if generic_setinputsizes:
+                try:
+                    dialect.do_set_input_sizes(
+                        context.cursor, generic_setinputsizes, context
+                    )
+                except BaseException as e:
+                    self._handle_dbapi_exception(
+                        e, str(statement), parameters, None, context
+                    )
+    
+        cursor, str_statement, parameters = (
+            context.cursor,
+            context.statement,
+            context.parameters,
+        )
+    
+        effective_parameters: Optional[_AnyExecuteParams]
+    
+        if not context.executemany:
+            effective_parameters = parameters[0]
+        else:
+            effective_parameters = parameters
+    
+        if self._has_events or self.engine._has_events:
+            for fn in self.dispatch.before_cursor_execute:
+                str_statement, effective_parameters = fn(
+                    self,
+                    cursor,
+                    str_statement,
+                    effective_parameters,
+                    context,
+                    context.executemany,
+                )
+    
+        if self._echo:
+            self._log_info(str_statement)
+    
+            stats = context._get_cache_stats()
+    
+            if not self.engine.hide_parameters:
+                self._log_info(
+                    "[%s] %r",
+                    stats,
+                    sql_util._repr_params(
+                        effective_parameters,
+                        batches=10,
+                        ismulti=context.executemany,
+                    ),
+                )
+            else:
+                self._log_info(
+                    "[%s] [SQL parameters hidden due to hide_parameters=True]",
+                    stats,
+                )
+    
+        evt_handled: bool = False
+        try:
+            if context.execute_style is ExecuteStyle.EXECUTEMANY:
+                effective_parameters = cast(
+                    "_CoreMultiExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_executemany:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_executemany(
+                        cursor,
+                        str_statement,
+                        effective_parameters,
+                        context,
+                    )
+            elif not effective_parameters and context.no_parameters:
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute_no_params:
+                        if fn(cursor, str_statement, context):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+                    self.dialect.do_execute_no_params(
+                        cursor, str_statement, context
+                    )
+            else:
+                effective_parameters = cast(
+                    "_CoreSingleExecuteParams", effective_parameters
+                )
+                if self.dialect._has_events:
+                    for fn in self.dialect.dispatch.do_execute:
+                        if fn(
+                            cursor,
+                            str_statement,
+                            effective_parameters,
+                            context,
+                        ):
+                            evt_handled = True
+                            break
+                if not evt_handled:
+>                   self.dialect.do_execute(
+                        cursor, str_statement, effective_parameters, context
+                    )
+
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1969: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x00000231CB46CDD0>
+cursor = <sqlite3.Cursor object at 0x00000231ACDFA040>
+statement = '\nCREATE TABLE core.permissions (\n\tid INTEGER NOT NULL, \n\tslug VARCHAR NOT NULL, \n\tmodule VARCHAR NOT NULL, \n\...AR NOT NULL, \n\tscope VARCHAR NOT NULL, \n\tconstraints VARCHAR, \n\tdescription VARCHAR, \n\tPRIMARY KEY (id)\n)\n\n'
+parameters = ()
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x00000231CBB4E350>
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       sqlite3.OperationalError: unknown database core
+
+wezu_e\Lib\site-packages\sqlalchemy\engine\default.py:922: OperationalError
+
+The above exception was the direct cause of the following exception:
+
+    @pytest.fixture(name="session")
+    def session_fixture():
+>       SQLModel.metadata.create_all(engine)
+
+tests\conftest.py:31: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+wezu_e\Lib\site-packages\sqlalchemy\sql\schema.py:5828: in create_all
+    bind._run_ddl_visitor(
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:3243: in _run_ddl_visitor
+    conn._run_ddl_visitor(visitorcallable, element, **kwargs)
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:2447: in _run_ddl_visitor
+    visitorcallable(self.dialect, self, **kwargs).traverse_single(element)
+wezu_e\Lib\site-packages\sqlalchemy\sql\visitors.py:671: in traverse_single
+    return meth(obj, **kw)
+           ^^^^^^^^^^^^^^^
+wezu_e\Lib\site-packages\sqlalchemy\sql\ddl.py:919: in visit_metadata
+    self.traverse_single(
+wezu_e\Lib\site-packages\sqlalchemy\sql\visitors.py:671: in traverse_single
+    return meth(obj, **kw)
+           ^^^^^^^^^^^^^^^
+wezu_e\Lib\site-packages\sqlalchemy\sql\ddl.py:957: in visit_table
+    )._invoke_with(self.connection)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+wezu_e\Lib\site-packages\sqlalchemy\sql\ddl.py:315: in _invoke_with
+    return bind.execute(self)
+           ^^^^^^^^^^^^^^^^^^
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1416: in execute
+    return meth(
+wezu_e\Lib\site-packages\sqlalchemy\sql\ddl.py:181: in _execute_on_connection
+    return connection._execute_ddl(
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1528: in _execute_ddl
+    ret = self._execute_context(
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1848: in _execute_context
+    return self._exec_single_context(
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1988: in _exec_single_context
+    self._handle_dbapi_exception(
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:2343: in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+wezu_e\Lib\site-packages\sqlalchemy\engine\base.py:1969: in _exec_single_context
+    self.dialect.do_execute(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <sqlalchemy.dialects.sqlite.pysqlite.SQLiteDialect_pysqlite object at 0x00000231CB46CDD0>
+cursor = <sqlite3.Cursor object at 0x00000231ACDFA040>
+statement = '\nCREATE TABLE core.permissions (\n\tid INTEGER NOT NULL, \n\tslug VARCHAR NOT NULL, \n\tmodule VARCHAR NOT NULL, \n\...AR NOT NULL, \n\tscope VARCHAR NOT NULL, \n\tconstraints VARCHAR, \n\tdescription VARCHAR, \n\tPRIMARY KEY (id)\n)\n\n'
+parameters = ()
+context = <sqlalchemy.dialects.sqlite.base.SQLiteExecutionContext object at 0x00000231CBB4E350>
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+>       cursor.execute(statement, parameters)
+E       sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) unknown database core
+E       [SQL: 
+E       CREATE TABLE core.permissions (
+E       	id INTEGER NOT NULL, 
+E       	slug VARCHAR NOT NULL, 
+E       	module VARCHAR NOT NULL, 
+E       	resource_type VARCHAR, 
+E       	action VARCHAR NOT NULL, 
+E       	scope VARCHAR NOT NULL, 
+E       	constraints VARCHAR, 
+E       	description VARCHAR, 
+E       	PRIMARY KEY (id)
+E       )
+E       
+E       ]
+E       (Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+wezu_e\Lib\site-packages\sqlalchemy\engine\default.py:922: OperationalError
+============================== warnings summary ===============================
+wezu_e\Lib\site-packages\starlette\formparsers.py:10
+  C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\starlette\formparsers.py:10: PendingDeprecationWarning: Please use `import python_multipart` instead.
+    import multipart
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+ERROR tests/test_stations.py::test_get_nearby_stations_no_filters - sqlalchem...
+ERROR tests/test_stations.py::test_get_nearby_stations_with_filters - sqlalch...
+ERROR tests/test_stations.py::test_get_nearby_stations_invalid_rating - sqlal...
+ERROR tests/test_stations.py::test_get_nearby_stations_invalid_price_range - ...
+======================== 1 warning, 4 errors in 2.88s =========================

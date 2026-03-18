@@ -1,6 +1,22 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, List
 from datetime import datetime
+
+class NearbyFilterSchema(BaseModel):
+    price_min: Optional[float] = Field(None, description="Minimum rental price per day")
+    price_max: Optional[float] = Field(None, description="Maximum rental price per day")
+    min_rating: Optional[float] = Field(None, ge=1.0, le=5.0, description="Minimum station rating")
+    battery_type: Optional[str] = Field(None, description="Filter by battery type (e.g., lithium_ion, lfp, lead_acid)")
+    capacity_min: Optional[int] = Field(None, description="Minimum battery capacity in mAh")
+    capacity_max: Optional[int] = Field(None, description="Maximum battery capacity in mAh")
+    availability: Optional[bool] = Field(None, description="Filter only stations with available batteries")
+
+    @model_validator(mode='after')
+    def check_price_range(self) -> 'NearbyFilterSchema':
+        if self.price_min is not None and self.price_max is not None:
+            if self.price_min >= self.price_max:
+                raise ValueError("price_min must be strictly less than price_max")
+        return self
 
 class StationImageResponse(BaseModel):
     url: str

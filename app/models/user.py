@@ -127,6 +127,11 @@ class User(SQLModel, table=True):
     
     access_paths: List["UserAccessPath"] = Relationship(back_populates="user")
     sessions: List["UserSession"] = Relationship(back_populates="user")
+    session_tokens: List["SessionToken"] = Relationship(back_populates="user")
+    two_factor_auth: Optional["TwoFactorAuth"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"uselist": False}
+    )
 
     @property
     def is_active(self) -> bool:

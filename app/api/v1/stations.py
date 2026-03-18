@@ -9,7 +9,7 @@ from app.models.user import User
 from app.schemas.station import (
     StationResponse, StationCreate, NearbyStationResponse,
     StationUpdate, StationPerformanceResponse, StationMapResponse,
-    HeatmapPoint
+    HeatmapPoint, NearbyFilterSchema
 )
 from app.schemas.review import ReviewResponse, ReviewCreate, ReviewUpdate
 from app.services.station_service import StationService
@@ -45,16 +45,10 @@ async def search_nearby_stations(
     lat: float,
     lon: float,
     radius: float = 50.0,
-    min_rating: Optional[float] = Query(None, description="Minimum rating (1-5)"),
+    filters: NearbyFilterSchema = Depends(),
     status: Optional[str] = Query(None, description="Station status (active, maintenance)"),
     is_24x7: Optional[bool] = Query(None, description="Filter only 24x7 stations"),
     sort_by: str = Query("distance", description="Sort by: distance, rating, availability"),
-    
-    # Advanced Battery Filters (FR-MOB-DISC-002)
-    battery_type: Optional[str] = Query(None, description="Filter by battery type (e.g., lithium_ion, lfp)"),
-    min_capacity: Optional[int] = Query(None, description="Minimum battery capacity (mAh)"),
-    max_price: Optional[float] = Query(None, description="Maximum daily rental price"),
-    
     db: Session = Depends(deps.get_db),
 ):
     """
@@ -62,8 +56,8 @@ async def search_nearby_stations(
     """
     stations = StationService.get_nearby(
         db, lat, lon, radius,
-        min_rating=min_rating, status=status, is_24x7=is_24x7, sort_by=sort_by,
-        battery_type=battery_type, min_capacity=min_capacity, max_price=max_price
+        status=status, is_24x7=is_24x7, sort_by=sort_by,
+        filters=filters
     )
     return stations
 

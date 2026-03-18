@@ -51,3 +51,34 @@ class FCMService:
         except Exception as e:
             print(f"FCM Multicast Error: {e}")
             return False
+
+    @staticmethod
+    def send_expiry_notification_multicast(tokens: List[str], title: str, body: str, data: dict, priority: str = "high"):
+        if not tokens:
+            return False
+            
+        try:
+            android_config = messaging.AndroidConfig(
+                priority=priority,
+                notification=messaging.AndroidNotification(click_action="wezu://swap")
+            )
+            
+            apns_config = messaging.APNSConfig(
+                payload=messaging.APNSPayload(
+                    aps=messaging.Aps(badge=1, sound="default"),
+                )
+            )
+
+            message = messaging.MulticastMessage(
+                notification=messaging.Notification(title=title, body=body),
+                data=data or {},
+                android=android_config,
+                apns=apns_config,
+                tokens=tokens,
+            )
+            response = messaging.send_multicast(message)
+            return response.success_count > 0
+        except Exception as e:
+            print(f"FCM Expiry Multicast Error: {e}")
+            return False
+

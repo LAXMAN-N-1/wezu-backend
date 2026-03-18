@@ -22,13 +22,13 @@ class BatteryCatalog(SQLModel, table=True):
     # Specs
     capacity_mah: int
     voltage: float
-    battery_type: str = Field(default="lithium_ion") # lithium_ion, lfp, nmc
+    battery_type: str = Field(default="lithium_ion", index=True) # lithium_ion, lfp, nmc
     weight_kg: Optional[float] = None
     dimensions: Optional[str] = None # "10x20x30 cm"
     
     # Commercial
     price_full_purchase: float = Field(default=0.0)
-    price_per_day: float = Field(default=0.0)
+    price_per_day: float = Field(default=0.0, index=True)
     warranty_months: int = Field(default=0)
     
     # Meta

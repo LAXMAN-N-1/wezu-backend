@@ -1,20 +1,22 @@
-from fastapi import FastAPI, Depends, status
+from fastapi import FastAPI, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
+from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 from app.core.config import settings
 
 
 # Customer-facing endpoints
 from app.api.v1 import (
-    auth, users, profile, kyc, stations, batteries, rentals, bookings,
+    auth, users, profile, kyc, stations, station_clusters, batteries, rentals, bookings, warranty,
     wallet, payments, notifications, support, favorites, analytics, 
     transactions, promo, faqs, iot, swaps, i18n, fraud, branches, 
     organizations, warehouses, screens, stock, dealers, logistics, 
     settlements, telemetry, vehicles, locations, system, roles, 
     menus, role_rights, admin_kyc, audit, ml, inventory,
-    admin_stations, station_monitoring
+    admin_stations, station_monitoring, battery_alerts
 )
 from app.api.v1.admin import (
     support as admin_support, 
@@ -23,7 +25,11 @@ from app.api.v1.admin import (
     users as admin_users,
     promo as admin_coupons,
     reviews as admin_reviews,
-    roles as admin_roles
+    roles as admin_roles,
+    legal as admin_legal,
+    banners as admin_banners,
+    media as admin_media,
+    blogs as admin_blogs
 )
 from app.api.admin import router as admin_router
 from app.api.webhooks import razorpay as razorpay_webhook
@@ -73,10 +79,17 @@ app = FastAPI(
 )
 
 # ----------------------------
-# Rate Limiting
+# Rate Limiting & Exception Handlers
 # ----------------------------
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+@app.exception_handler(ValidationError)
+async def pydantic_validation_exception_handler(request: Request, exc: ValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()}
+    )
 
 # ----------------------------
 # Middleware
@@ -99,10 +112,12 @@ app.add_middleware(
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Auth"])
 
 # 1. Customer Endpoints
-app.include_router(auth.router, prefix=f"{v1_prefix}/auth", tags=["Auth"])
+v1_prefix = settings.API_V1_STR
+app.include_router(warranty.customer_router, prefix=f"{v1_prefix}/warranty", tags=["Customer: Warranty"])
 app.include_router(profile.router, prefix=f"{v1_prefix}/profile", tags=["Customer: Profile"])
 app.include_router(users.router, prefix=f"{v1_prefix}/users", tags=["Customer: Users"])
 app.include_router(kyc.router, prefix=f"{v1_prefix}/kyc", tags=["Customer: KYC"])
+app.include_router(station_clusters.router, prefix=f"{v1_prefix}/stations", tags=["Customer: Stations"])
 app.include_router(stations.router, prefix=f"{v1_prefix}/stations", tags=["Customer: Stations"])
 app.include_router(bookings.router, prefix=f"{v1_prefix}/bookings", tags=["Customer: Bookings"])
 app.include_router(batteries.router, prefix=f"{v1_prefix}/batteries", tags=["Customer: Batteries"])
@@ -116,13 +131,15 @@ app.include_router(analytics.router, prefix=f"{v1_prefix}/analytics", tags=["Cus
 app.include_router(promo.router, prefix=f"{v1_prefix}/coupons", tags=["Customer: Coupons"])
 app.include_router(swaps.router, prefix=f"{v1_prefix}/swaps", tags=["Customer: Swaps"])
 app.include_router(vehicles.router, prefix=f"{v1_prefix}/vehicles", tags=["Customer: Vehicles"])
+app.include_router(battery_alerts.router, prefix=f"{v1_prefix}/customer/battery-alerts", tags=["Customer: Battery Alerts"])
 
 # 2. Admin Application Endpoints
 admin_api = f"{settings.API_V1_STR}/admin"
 from app.api import deps
 admin_deps = [Depends(deps.get_current_active_superuser)]
 app.include_router(admin_router, prefix=f"{admin_api}", tags=["Admin: Main"], dependencies=admin_deps)
-app.include_router(admin_user_mgmt.router, prefix=f"{admin_api}/users", tags=["Admin: Users"], dependencies=admin_deps)
+app.include_router(warranty.admin_router, prefix=f"{admin_api}/warranty", tags=["Admin: Warranty"], dependencies=admin_deps)
+app.include_router(admin_users.router, prefix=f"{admin_api}/users", tags=["Admin: Users"], dependencies=admin_deps)
 app.include_router(admin_roles.router, prefix=f"{admin_api}/roles", tags=["Admin: Roles"], dependencies=admin_deps)
 app.include_router(admin_kyc.router, prefix=f"{admin_api}/kyc", tags=["Admin: KYC"], dependencies=admin_deps)
 app.include_router(audit.router, prefix=f"{admin_api}/audit", tags=["Admin: Audit"], dependencies=admin_deps)

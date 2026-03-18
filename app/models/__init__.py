@@ -26,6 +26,7 @@ from app.models.ecommerce import EcommerceProduct, EcommerceOrder, EcommerceOrde
 # Support & KYC
 from app.models.support import SupportTicket, TicketStatus, TicketPriority
 from app.models.kyc import KYCDocument, KYCRecord, KYCRequest, KYCDocumentType, KYCDocumentStatus
+from app.models.warranty_claim import WarrantyClaim
 
 # Location
 from app.models.location import Zone, City, Region, Country
@@ -137,7 +138,9 @@ from app.models.vehicle import Vehicle
 from app.models.device import Device
 from app.models.review import Review
 from app.models.notification import Notification
+from app.models.notification_log import NotificationLog
 from app.models.notification_preference import NotificationPreference
+from app.models.user_alert_config import UserAlertConfig
 from app.models.membership import UserMembership
 from app.models.analytics import DemandForecast, ChurnPrediction, PricingRecommendation
 
