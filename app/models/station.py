@@ -47,6 +47,10 @@ class Station(SQLModel, table=True):
     temperature_control: bool = Field(default=False)
     safety_features: Optional[str] = None
     
+    # Inventory
+    available_batteries: int = Field(default=0)
+    available_slots: int = Field(default=0)
+    
     # Status
     status: str = Field(default="active")
     approval_status: str = Field(default="approved") # pending, approved, rejected
