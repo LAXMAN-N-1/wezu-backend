@@ -1,6 +1,5 @@
-from typing import Any, List, Optional, Dict
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, WebSocket, WebSocketDisconnect, UploadFile, File
+from typing import Any, List
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session, select
 from pydantic import BaseModel
 from sqlalchemy.orm import selectinload
@@ -18,14 +17,10 @@ from app.schemas.battery import (
     BatteryUtilizationResponse, BatteryMaintenanceCreate,
     BatteryAuditLogResponse, BatteryHealthHistoryResponse
 )
-from app.services.qr_service import QRCodeService
-from app.services.mqtt_service import mqtt_service
-from app.services.websocket_service import manager
-from app.services.battery_batch_service import battery_batch_service
-from app.services.battery_service import BatteryService
-from app.services.maintenance_service import MaintenanceService
-from app.models.battery import BatteryStatus
-from app.schemas.common import DataResponse
+from app.api import deps
+from app.core.audit import audit_log
+from app.models.user import User
+from app.models.station import Station
 
 router = APIRouter()
 
@@ -246,37 +241,41 @@ def verify_qr_code(
 def read_batteries(
     skip: int = 0,
     limit: int = 100,
-    status: Optional[str] = None,
-    health: Optional[str] = None,
-    sku_id: Optional[int] = None,
-    station_id: Optional[int] = None,
-    location_type: Optional[str] = None,
-    session: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.require_permission("battery:read")),
+    session: Session = Depends(get_session),
 ) -> Any:
-    """Retrieve batteries with filters."""
-    statement = select(Battery).options(
-        selectinload(Battery.sku), 
-        selectinload(Battery.iot_device)
-    )
+    """
+    Retrieve batteries with row-level security:
+    - Admin/Superuser: all batteries
+    - Dealer: only batteries at their stations
+    - Driver: only batteries assigned to them
+    """
+    query = select(Battery)
     
-    if status:
-        statement = statement.where(Battery.status == status)
-    if health:
-        statement = statement.where(Battery.health_status == health)
-    if sku_id:
-        statement = statement.where(Battery.sku_id == sku_id)
-    if station_id:
-        statement = statement.where(Battery.station_id == station_id)
-    if location_type:
-        statement = statement.where(Battery.location_type == location_type)
-        
-    batteries = session.exec(statement.offset(skip).limit(limit)).all()
+    if not current_user.is_superuser:
+        # Driver filtering: batteries assigned to this driver
+        if current_user.driver_profile:
+            query = query.where(
+                Battery.location_type == "driver",
+                Battery.location_id == current_user.driver_profile.id
+            )
+        # Dealer filtering: batteries at their stations
+        elif current_user.dealer_profile:
+            query = query.join(Station, Battery.location_id == Station.id).where(
+                Battery.location_type == "station",
+                Station.dealer_id == current_user.dealer_profile.id
+            )
+    
+    batteries = session.exec(query.offset(skip).limit(limit)).all()
     return batteries
 
 @router.post("/", response_model=BatteryResponse)
+@audit_log("CREATE_BATTERY", "BATTERY")
 def create_battery(
     *,
-    session: Session = Depends(deps.get_db),
+    request: Request,
+    session: Session = Depends(get_session),
+    current_user: User = Depends(deps.get_current_active_user),
     battery_in: BatteryCreate,
     current_user: User = Depends(deps.get_current_active_superuser)
 ) -> Any:
@@ -449,14 +448,38 @@ def read_battery(
     session: Session = Depends(deps.get_db),
     battery_id: int,
 ) -> Any:
-    """Get battery by ID with history."""
-    battery = session.exec(
-        select(Battery)
-        .where(Battery.id == battery_id)
-        .options(
-            selectinload(Battery.sku), 
-            selectinload(Battery.iot_device),
-            selectinload(Battery.lifecycle_events)
+    """
+    Get battery by ID with history.
+    """
+    battery = session.get(Battery, battery_id)
+    if not battery:
+        raise HTTPException(status_code=404, detail="Battery not found")
+    return battery
+
+@router.put("/{battery_id}/lifecycle", response_model=BatteryResponse)
+@audit_log("STATUS_CHANGE", "BATTERY", resource_id_param="battery_id")
+def update_battery_lifecycle(
+    *,
+    request: Request,
+    session: Session = Depends(get_session),
+    battery_id: int,
+    update_in: BatteryUpdate,
+) -> Any:
+    """
+    Update battery status/lifecycle.
+    """
+    battery = session.get(Battery, battery_id)
+    if not battery:
+        raise HTTPException(status_code=404, detail="Battery not found")
+    
+    if update_in.status:
+        battery.status = update_in.status
+        
+        # Log event
+        event = BatteryLifecycleEvent(
+            battery_id=battery.id,
+            event_type="status_change",
+            description=f"Status changed to {update_in.status}. {update_in.description or ''}"
         )
     ).first()
     

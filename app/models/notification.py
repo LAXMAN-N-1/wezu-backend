@@ -4,9 +4,9 @@ from datetime import datetime
 
 class Notification(SQLModel, table=True):
     __tablename__ = "notifications"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id")
+    user_id: int = Field(foreign_key="users.id")
     title: str
     message: str
     type: str = Field(default="info") # info, alert, promo

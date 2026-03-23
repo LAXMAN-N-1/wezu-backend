@@ -46,6 +46,36 @@ def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has been revoked",
         )
+        
+    # --- SESSION VERIFICATION ---
+    # Extract Session ID (sid) from token
+    # Access tokens should have 'sid' claim linking to UserSession.token_id
+    sid = payload.get("sid")
+    if sid:
+        from app.models.session import UserSession
+        # Verify session exists and is active
+        # We query by token_id (which is the JTI/SID)
+        user_session = db.query(UserSession).filter(UserSession.token_id == sid).first()
+        
+        if not user_session:
+            # Session not found (maybe deleted?)
+            # Valid token but no session = Unauthorized (Revoked)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session not found or expired",
+            )
+            
+        if not user_session.is_active:
+             raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session has been revoked",
+            )
+            
+        # Update last_active_at (optional, but good for tracking)
+        # However, updating DB on every request can be heavy.
+        # Let's skip updating for now to avoid performance hit, 
+        # or only update if > 5 minutes passed? 
+        # For strict security, we just read.
     
     # Check if we are using SQLModel (which uses .get) or pure SQLAlchemy
     # User model inherits from SQLModel, so we can use db.get(User, id) or query.
@@ -66,7 +96,7 @@ def get_current_user(
     # Global Logout Check
     
     # Global Logout Check
-    if user.last_global_logout_at:
+    if getattr(user, "last_global_logout_at", None):
         # Get 'iat' (Issued At) from token
         iat = payload.get("iat")
         if iat:
@@ -132,6 +162,114 @@ def check_permission(menu_name: str, permission_type: str = "view"):
 
 # Alias for compatibility
 get_current_active_user = get_current_user
+
+# --- Granular RBAC Dependencies ---
+
+def require_role(role_name: str):
+    """
+    Dependency: Verify current user has a specific role.
+    Usage: current_user: User = Depends(require_role("Driver"))
+    """
+    def role_checker(
+        current_user: User = Depends(get_current_user)
+    ) -> User:
+        if current_user.is_superuser:
+            return current_user
+        
+        user_role_names = [r.name for r in current_user.roles]
+        if role_name not in user_role_names:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Role '{role_name}' required"
+            )
+        return current_user
+    
+    return role_checker
+
+
+def require_permission(permission_slug: str):
+    """
+    Dependency: Verify current user has a specific permission.
+    Usage: current_user: User = Depends(require_permission("battery:read"))
+    """
+    def permission_checker(
+        current_user: User = Depends(get_current_user)
+    ) -> User:
+        if current_user.is_superuser:
+            return current_user
+        
+        if not current_user.has_permission(permission_slug):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permission '{permission_slug}' required"
+            )
+        return current_user
+    
+    return permission_checker
+
+from app.models.roles import RoleEnum
+
+def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.is_superuser:
+        return current_user
+        
+    user_role_names = [r.name.lower() for r in current_user.roles]
+    if current_user.role:
+        user_role_names.append(current_user.role.name.lower())
+        
+    if RoleEnum.ADMIN.value not in user_role_names:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required"
+        )
+    return current_user
+
+def get_current_dealer(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.is_superuser:
+        return current_user
+        
+    user_role_names = [r.name.lower() for r in current_user.roles]
+    if current_user.role:
+        user_role_names.append(current_user.role.name.lower())
+        
+    if RoleEnum.DEALER.value not in user_role_names:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Dealer privileges required"
+        )
+    return current_user
+
+def get_current_driver(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.is_superuser:
+        return current_user
+        
+    user_role_names = [r.name.lower() for r in current_user.roles]
+    if current_user.role:
+        user_role_names.append(current_user.role.name.lower())
+        
+    if RoleEnum.DRIVER.value not in user_role_names:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Driver privileges required"
+        )
+    return current_user
+
+def get_current_customer(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.is_superuser:
+        return current_user
+        
+    user_role_names = [r.name.lower() for r in current_user.roles]
+    if current_user.role:
+        user_role_names.append(current_user.role.name.lower())
+        
+    if RoleEnum.CUSTOMER.value not in user_role_names:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Customer privileges required"
+        )
+    return current_user
+
+
 
 from fastapi import Header
 

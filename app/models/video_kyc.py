@@ -4,9 +4,9 @@ from datetime import datetime
 
 class VideoKYCSession(SQLModel, table=True):
     __tablename__ = "video_kyc_sessions"
-    __table_args__ = {"schema": "core", "extend_existing": True}
+    # __table_args__ = {"schema": "public", "extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id")
+    user_id: int = Field(foreign_key="users.id")
     session_id: str = Field(unique=True, index=True) # ID from 3rd party provider
     provider: str = Field(default="unknown")
     status: str = Field(default="initiated") # initiated, completed, failed, rejected, approved
@@ -22,7 +22,7 @@ class VideoKYCSession(SQLModel, table=True):
     
     # Scheduling
     scheduled_at: Optional[datetime] = None
-    agent_id: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    agent_id: Optional[int] = Field(default=None, foreign_key="users.id")
     agent_notes: Optional[str] = None
     
     # Relationships

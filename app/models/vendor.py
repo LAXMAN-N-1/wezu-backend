@@ -5,7 +5,7 @@ from app.models.location import Zone
 
 class Vendor(SQLModel, table=True):
     __tablename__ = "vendors"
-    __table_args__ = {"schema": "finance"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -24,7 +24,7 @@ class Vendor(SQLModel, table=True):
     status: str = Field(default="pending") # pending, active, suspended, rejected
     
     # Location Link (Primary Zone)
-    zone_id: Optional[int] = Field(default=None, foreign_key="core.zones.id")
+    zone_id: Optional[int] = Field(default=None, foreign_key="zones.id")
     address: Optional[str] = None
     gps_coordinates: Optional[str] = None # "lat,long"
     
@@ -37,10 +37,10 @@ class Vendor(SQLModel, table=True):
 
 class VendorDocument(SQLModel, table=True):
     __tablename__ = "vendor_documents"
-    __table_args__ = {"schema": "finance"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    vendor_id: int = Field(foreign_key="finance.vendors.id")
+    vendor_id: int = Field(foreign_key="vendors.id")
     document_type: str = Field(index=True) # license, gst, agreement, other
     file_path: str
     uploaded_at: datetime = Field(default_factory=datetime.utcnow)

@@ -97,3 +97,26 @@ class StationAvailabilityResponse(BaseModel):
     station_id: int
     available_count: int
     batteries: List[dict] # Use dict for now to avoid circular imports if any, or just Any
+
+# --- Station Specs Schemas ---
+
+class StationSpecsBase(BaseModel):
+    total_slots: int
+    station_type: str
+    power_rating_kw: Optional[float] = None
+    max_capacity: Optional[int] = None
+    charger_type: Optional[str] = None
+    temperature_control: bool = False
+    safety_features: Optional[str] = None
+
+class StationSpecsResponse(StationSpecsBase):
+    station_id: int
+
+class StationSpecsUpdate(BaseModel):
+    total_slots: Optional[int] = None
+    station_type: Optional[str] = None
+    power_rating_kw: Optional[float] = None
+    max_capacity: Optional[int] = None
+    charger_type: Optional[str] = None
+    temperature_control: Optional[bool] = None
+    safety_features: Optional[str] = None

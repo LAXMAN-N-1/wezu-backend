@@ -51,10 +51,10 @@ class AlertSeverity(str, Enum):
 
 class BatteryHealthSnapshot(SQLModel, table=True):
     __tablename__ = "battery_health_snapshots"
-    __table_args__ = {"schema": "inventory"}
+    # __table_args__ = {"schema": "public"}
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    battery_id: uuid.UUID = Field(foreign_key="inventory.batteries.id", index=True)
+    battery_id: int = Field(foreign_key="batteries.id", index=True)
 
     health_percentage: float  # 0-100
     voltage: Optional[float] = None  # e.g. 51.4V
@@ -63,21 +63,21 @@ class BatteryHealthSnapshot(SQLModel, table=True):
     charge_cycles: Optional[int] = None
 
     snapshot_type: SnapshotType = Field(default=SnapshotType.MANUAL)
-    recorded_by: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    recorded_by: Optional[int] = Field(default=None, foreign_key="users.id")
     recorded_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class BatteryMaintenanceSchedule(SQLModel, table=True):
     __tablename__ = "battery_maintenance_schedules"
-    __table_args__ = {"schema": "inventory"}
+    # __table_args__ = {"schema": "public"}
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    battery_id: uuid.UUID = Field(foreign_key="inventory.batteries.id", index=True)
+    battery_id: int = Field(foreign_key="batteries.id", index=True)
 
     scheduled_date: datetime
     maintenance_type: MaintenanceType
     priority: MaintenancePriority = Field(default=MaintenancePriority.MEDIUM)
-    assigned_to: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    assigned_to: Optional[int] = Field(default=None, foreign_key="users.id")
     status: MaintenanceStatus = Field(default=MaintenanceStatus.SCHEDULED, index=True)
     notes: Optional[str] = None
 
@@ -86,23 +86,23 @@ class BatteryMaintenanceSchedule(SQLModel, table=True):
     health_after: Optional[float] = None
 
     completed_at: Optional[datetime] = None
-    created_by: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    created_by: Optional[int] = Field(default=None, foreign_key="users.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class BatteryHealthAlert(SQLModel, table=True):
     __tablename__ = "battery_health_alerts"
-    __table_args__ = {"schema": "inventory"}
+    # __table_args__ = {"schema": "public"}
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    battery_id: uuid.UUID = Field(foreign_key="inventory.batteries.id", index=True)
+    battery_id: int = Field(foreign_key="batteries.id", index=True)
 
     alert_type: AlertType
     severity: AlertSeverity = Field(default=AlertSeverity.WARNING)
     message: str
 
     is_resolved: bool = Field(default=False, index=True)
-    resolved_by: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    resolved_by: Optional[int] = Field(default=None, foreign_key="users.id")
     resolved_at: Optional[datetime] = None
     resolution_reason: Optional[str] = None
 

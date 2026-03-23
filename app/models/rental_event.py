@@ -4,16 +4,16 @@ from datetime import datetime
 
 class RentalEvent(SQLModel, table=True):
     __tablename__ = "rental_events"
-    __table_args__ = {"schema": "rentals", "extend_existing": True}
+    # __table_args__ = {"schema": "public", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    rental_id: int = Field(foreign_key="rentals.rentals.id")
+    rental_id: int = Field(foreign_key="rentals.id")
     event_type: str # start, stop, swap_request, swap_complete, extend, late_fee
     
     # Details
     description: Optional[str] = None
-    station_id: Optional[int] = Field(default=None, foreign_key="stations.stations.id")
-    battery_id: Optional[int] = Field(default=None, foreign_key="inventory.batteries.id")
+    station_id: Optional[int] = Field(default=None, foreign_key="stations.id")
+    battery_id: Optional[int] = Field(default=None, foreign_key="batteries.id")
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
     

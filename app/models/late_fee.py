@@ -4,11 +4,11 @@ from datetime import datetime
 
 class LateFee(SQLModel, table=True):
     __tablename__ = "late_fees"
-    __table_args__ = {"schema": "rentals"}
+    # __table_args__ = {"schema": "public"}
     """Late fee calculations for overdue rentals"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    rental_id: int = Field(foreign_key="rentals.rentals.id", unique=True)
-    user_id: int = Field(foreign_key="core.users.id")
+    rental_id: int = Field(foreign_key="rentals.id", unique=True)
+    user_id: int = Field(foreign_key="users.id")
     
     original_end_date: datetime
     actual_return_date: Optional[datetime] = None
@@ -31,7 +31,7 @@ class LateFee(SQLModel, table=True):
     payment_status: str = Field(default="PENDING")  # PENDING, PARTIAL, PAID, WAIVED
     
     # Invoice generation
-    invoice_id: Optional[int] = Field(default=None, foreign_key="finance.invoices.id")
+    invoice_id: Optional[int] = Field(default=None, foreign_key="invoices.id")
     invoice_generated_at: Optional[datetime] = None
     
     # Waiver tracking
@@ -46,11 +46,11 @@ class LateFee(SQLModel, table=True):
 
 class LateFeeWaiver(SQLModel, table=True):
     __tablename__ = "late_fee_waivers"
-    __table_args__ = {"schema": "rentals"}
+    # __table_args__ = {"schema": "public"}
     """Waiver requests for late fees"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    late_fee_id: int = Field(foreign_key="rentals.late_fees.id", unique=True)
-    user_id: int = Field(foreign_key="core.users.id")
+    late_fee_id: int = Field(foreign_key="late_fees.id", unique=True)
+    user_id: int = Field(foreign_key="users.id")
     
     requested_waiver_amount: float
     requested_waiver_percentage: Optional[float] = None  # e.g., 50% waiver
@@ -63,7 +63,7 @@ class LateFeeWaiver(SQLModel, table=True):
     approved_waiver_amount: Optional[float] = None
     rejection_reason: Optional[str] = None
     
-    reviewed_by: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    reviewed_by: Optional[int] = Field(default=None, foreign_key="users.id")
     reviewed_at: Optional[datetime] = None
     
     admin_notes: Optional[str] = None

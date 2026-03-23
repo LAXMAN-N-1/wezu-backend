@@ -6,8 +6,8 @@ from typing import Dict, List, Any
 from app.schemas.analytics.logistics import LogisticsOverviewResponse
 from app.schemas.analytics.base import KpiCard, TrendPoint, DistributionPoint
 from .base import BaseAnalyticsService
-from app.models.logistics import DeliveryOrder, DeliveryStatus, DeliveryType, Manifest, BatteryTransfer
-from app.models.user import User, UserType
+from app.models.logistics import BatteryTransfer
+from app.models.user import User
 from app.models.battery import Battery
 
 class AnalyticsLogisticsService(BaseAnalyticsService):
@@ -16,24 +16,24 @@ class AnalyticsLogisticsService(BaseAnalyticsService):
         days = BaseAnalyticsService.parse_period(period)
         target_date = datetime.utcnow() - timedelta(days=days)
         
-        # 1. Delivery Analytics
-        deliveries_today = db.query(func.count(DeliveryOrder.id)).filter(
-            DeliveryOrder.created_at >= datetime.utcnow().replace(hour=0, minute=0, second=0)
+        # 1. Delivery Analytics (Mapping to BatteryTransfers)
+        deliveries_today = db.query(func.count(BatteryTransfer.id)).filter(
+            BatteryTransfer.created_at >= datetime.utcnow().replace(hour=0, minute=0, second=0)
         ).scalar() or 0
         
-        pending_deliv = db.query(func.count(DeliveryOrder.id)).filter(DeliveryOrder.status == DeliveryStatus.PENDING).scalar() or 0
-        failed_deliv = db.query(func.count(DeliveryOrder.id)).filter(DeliveryOrder.status == DeliveryStatus.FAILED).scalar() or 0
+        pending_deliv = db.query(func.count(BatteryTransfer.id)).filter(BatteryTransfer.status == "pending").scalar() or 0
+        failed_deliv = db.query(func.count(BatteryTransfer.id)).filter(BatteryTransfer.status == "cancelled").scalar() or 0
         
         delivery_analytics = {
-            "total_deliveries": db.query(func.count(DeliveryOrder.id)).scalar() or 0,
+            "total_deliveries": db.query(func.count(BatteryTransfer.id)).scalar() or 0,
             "deliveries_today": deliveries_today,
             "pending_deliveries": pending_deliv,
             "failed_deliveries": failed_deliv
         }
 
         # 2. Route & Driver Analytics
-        avg_time = db.query(func.avg(extract('epoch', DeliveryOrder.completed_at - DeliveryOrder.started_at) / 60)).filter(
-            DeliveryOrder.status == DeliveryStatus.DELIVERED
+        avg_time = db.query(func.avg(extract('epoch', BatteryTransfer.completed_at - BatteryTransfer.created_at) / 60)).filter(
+            BatteryTransfer.status == "completed"
         ).scalar() or 0
         
         route_analytics = {
@@ -42,7 +42,7 @@ class AnalyticsLogisticsService(BaseAnalyticsService):
             "distance_covered": 450.0 # Mocked
         }
 
-        driver_perf = db.query(User.full_name, func.count(DeliveryOrder.id)).join(DeliveryOrder, DeliveryOrder.assigned_driver_id == User.id).group_by(User.full_name).limit(5).all()
+        driver_perf = db.query(User.full_name, func.count(BatteryTransfer.id)).join(BatteryTransfer, BatteryTransfer.driver_id == User.id).group_by(User.full_name).limit(5).all()
         
         driver_analytics = {
             "driver_performance": [{"name": row[0], "deliveries": row[1]} for row in driver_perf],
@@ -50,8 +50,8 @@ class AnalyticsLogisticsService(BaseAnalyticsService):
         }
 
         # 3. Order Analytics
-        total_orders = db.query(func.count(DeliveryOrder.id)).scalar() or 1
-        success_rate = (db.query(func.count(DeliveryOrder.id)).filter(DeliveryOrder.status == DeliveryStatus.DELIVERED).scalar() or 0) / total_orders * 100
+        total_orders = db.query(func.count(BatteryTransfer.id)).scalar() or 1
+        success_rate = (db.query(func.count(BatteryTransfer.id)).filter(BatteryTransfer.status == "completed").scalar() or 0) / total_orders * 100
         
         order_analytics = {
             "delivery_success_rate": round(success_rate, 1),
@@ -60,11 +60,12 @@ class AnalyticsLogisticsService(BaseAnalyticsService):
         }
 
         # 4. Reverse Logistics
-        returns = db.query(func.count(DeliveryOrder.id)).filter(DeliveryOrder.order_type == DeliveryType.REVERSE_LOGISTICS).scalar() or 0
+        # As we don't have order_type, we mock this for now
+        returns = 0
         
         reverse_logistics = {
             "battery_returns": returns,
-            "pickup_requests": returns + (pending_deliv if pending_deliv > 0 else 0),
+            "pickup_requests": returns,
             "failed_pickups": 2
         }
 

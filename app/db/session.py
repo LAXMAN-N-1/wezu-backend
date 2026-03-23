@@ -3,6 +3,14 @@ from app.core.config import settings
 from app.core.database import engine
 from app.models import *
 
+engine = create_engine(
+    settings.DATABASE_URL, 
+    echo=settings.SQLALCHEMY_ECHO,
+    pool_size=20,
+    max_overflow=40,
+    pool_pre_ping=True
+)
+
 def init_db():
     from sqlmodel import Session, text
     

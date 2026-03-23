@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     
     # Database
     DATABASE_URL: str = "postgresql://user:password@localhost:5432/wezy_db"
+    SQLALCHEMY_ECHO: bool = False
     
     # Redis (Sessions & Caching)
     REDIS_URL: str = "redis://127.0.0.1:6379/0"

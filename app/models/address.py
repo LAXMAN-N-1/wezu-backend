@@ -7,9 +7,9 @@ from datetime import datetime
 
 class Address(SQLModel, table=True):
     __tablename__ = "addresses"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id")
+    user_id: int = Field(foreign_key="users.id")
     address_line1: str
     address_line2: Optional[str] = None
     street_address: Optional[str] = None # Deprecated, kept for backward compatibility if needed, else remove

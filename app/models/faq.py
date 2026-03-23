@@ -4,7 +4,7 @@ from datetime import datetime
 
 class FAQ(SQLModel, table=True):
     __tablename__ = "faqs"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     question: str
     answer: str

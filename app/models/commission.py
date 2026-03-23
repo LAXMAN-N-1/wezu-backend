@@ -2,55 +2,68 @@ from datetime import datetime
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
 
+
 class CommissionConfig(SQLModel, table=True):
     __tablename__ = "commission_configs"
-    __table_args__ = {"schema": "finance"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    
+
     # Target entity
-    dealer_id: Optional[int] = Field(default=None, foreign_key="core.users.id")
-    vendor_id: Optional[int] = Field(default=None, foreign_key="finance.vendors.id")
-    
+    dealer_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id")
+
     # Type of transaction
-    transaction_type: str = Field(index=True) # rental, swap, purchase
-    
-    # Commission Rate
+    transaction_type: str = Field(index=True)  # rental, swap, purchase
+
+    # Default Commission Rate (used when no tier matches)
     percentage: float = Field(default=0.0)
     flat_fee: float = Field(default=0.0)
-    
+
+    # Effective date management
+    effective_from: datetime = Field(default_factory=datetime.utcnow)
+    effective_until: Optional[datetime] = Field(default=None)
+
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-class Commission(SQLModel, table=True):
-    __tablename__ = "commissions"
-    __table_args__ = {"schema": "finance"}
+
+class CommissionTier(SQLModel, table=True):
+    """Volume-based commission tiers linked to a CommissionConfig."""
+    __tablename__ = "commission_tiers"
     id: Optional[int] = Field(default=None, primary_key=True)
-    
-    # Reference to causing event
-    transaction_id: int = Field(foreign_key="finance.transactions.id")
-    
-    # Relationships
-    # transaction: "Transaction" = Relationship()
-    
+
+    config_id: int = Field(foreign_key="commission_configs.id", index=True)
+
+    # Volume range (number of swaps/transactions in the month)
+    min_volume: int = Field(default=0)
+    max_volume: Optional[int] = Field(default=None)  # None = unlimited
+
+    # Tier-specific rate
+    percentage: float = Field(default=0.0)
+    flat_fee: float = Field(default=0.0)
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 class CommissionLog(SQLModel, table=True):
     __tablename__ = "commission_logs"
-    __table_args__ = {"schema": "finance"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    
+
     # Reference to causing event
-    transaction_id: int = Field(foreign_key="finance.transactions.id")
-    
+    transaction_id: int = Field(foreign_key="transactions.id")
+
     # Beneficiary
-    dealer_id: Optional[int] = Field(default=None, foreign_key="core.users.id")
-    vendor_id: Optional[int] = Field(default=None, foreign_key="finance.vendors.id")
-    
+    dealer_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id")
+
     # Earnings
     amount: float
-    status: str = Field(default="pending") # pending, paid, reversed
-    
+    status: str = Field(default="pending")  # pending, paid, reversed
+
     # Settlement linkage
-    settlement_id: Optional[int] = Field(default=None, foreign_key="finance.settlements.id")
-    
+    settlement_id: Optional[int] = Field(default=None, foreign_key="settlements.id")
+
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Relationships

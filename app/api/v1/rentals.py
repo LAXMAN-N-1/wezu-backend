@@ -76,117 +76,15 @@ async def create_rental(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ):
-    return RentalService.initiate_rental(db, current_user.id, rental_in)
-
-@router.post("/calculate-price", response_model=PriceCalculationResponse)
-async def calculate_rental_price(
-    req: PriceCalculationRequest,
-    db: Session = Depends(deps.get_db),
-):
-    return RentalService.calculate_price(db, req.battery_id, req.duration_days, req.promo_code)
-
-@router.post("/initiate", response_model=RentalResponse)
-async def initiate_rental(
-    rental_in: RentalCreate,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db),
-):
-    return RentalService.initiate_rental(db, current_user.id, rental_in)
-
-@router.post("/{rental_id}/confirm", response_model=RentalResponse)
-async def confirm_rental(
-    rental_id: int,
-    req: ConfirmRentalRequest,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db),
-):
-    rental = db.get(Rental, rental_id)
-    if not rental or rental.user_id != current_user.id:
-         raise HTTPException(status_code=404, detail="Rental not found")
+    # Check if user has active rental? Logic in service or here.
+    # Service doesn't check, let's assume multiple rentals allowed or enforced globally.
+    # Enforce station operational hours and maintenance schedules
+    from app.services.dealer_station_service import DealerStationService
+    is_operational, msg = DealerStationService.is_station_operational(db, rental_in.pickup_station_id)
+    if not is_operational:
+         raise HTTPException(status_code=400, detail=msg)
          
-    return RentalService.confirm_rental(db, current_user.id, rental_id, req.payment_reference)
-
-@router.get("/{rental_id}", response_model=RentalResponse)
-async def read_rental(
-    rental_id: int,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db),
-):
-    """Full rental detail for admin or owner."""
-    rental = db.get(Rental, rental_id)
-    if not rental:
-        raise HTTPException(status_code=404, detail="Rental not found")
-        
-    if not current_user.is_superuser and rental.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
-        
-    return rental
-
-@router.post("/{rental_id}/cancel")
-async def cancel_rental(
-    rental_id: int,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db),
-):
-    """Cancel a pending rental before it goes active."""
-    success = RentalService.cancel_rental(db, rental_id, current_user.id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Rental cannot be cancelled")
-    return {"status": "success"}
-
-@router.post("/{rental_id}/return", response_model=ReturnResponse)
-async def return_rental_battery_v2(
-    rental_id: int,
-    station_id: int,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db),
-):
-    """Customer initiates battery return."""
-    rental = db.get(Rental, rental_id)
-    if not rental or rental.user_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Rental not found")
-        
-    return RentalService.initiate_return(db, rental_id, station_id)
-
-@router.post("/{rental_id}/complete", response_model=RentalResponse)
-async def complete_rental(
-    rental_id: int,
-    current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(deps.get_db),
-):
-    """Admin/IoT confirms battery physically returned."""
-    return RentalService.complete_rental(db, rental_id)
-
-@router.post("/{rental_id}/late-fees/pay")
-async def pay_late_fee(
-    rental_id: int,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db),
-):
-    """Pay outstanding late fees immediately from wallet."""
-    success = LateFeeService.pay_late_fee(db, rental_id)
-    if not success:
-        raise HTTPException(status_code=400, detail="Payment failed or no outstanding fees")
-    return {"status": "success"}
-
-@router.get("/active-count")
-async def get_active_rental_count(
-    current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(deps.get_db),
-):
-    """Count of all currently active rentals platform-wide (admin)."""
-    from sqlmodel import func
-    return {"count": db.exec(select(func.count(Rental.id)).where(Rental.status == "active")).one()}
-
-@router.get("/analytics", response_model=RentalAnalyticsResponse)
-async def get_rental_analytics(
-    start_date: datetime,
-    end_date: datetime,
-    current_user: User = Depends(deps.get_current_active_superuser),
-    db: Session = Depends(deps.get_db),
-):
-    """Rental analytics over a period."""
-    return RentalService.get_analytics(db, start_date, end_date)
+    return RentalService.create_rental(db, current_user.id, rental_in)
 
 @router.get("/active", response_model=List[RentalResponse])
 async def read_active_rentals(

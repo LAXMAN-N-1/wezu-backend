@@ -11,16 +11,16 @@ if TYPE_CHECKING:
 
 class SwapSession(SQLModel, table=True):
     __tablename__ = "swap_sessions"
-    __table_args__ = {"schema": "rentals", "extend_existing": True}
+    # __table_args__ = {"schema": "public", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    rental_id: Optional[int] = Field(default=None, foreign_key="rentals.rentals.id", index=True)
-    user_id: int = Field(foreign_key="core.users.id", index=True)
-    station_id: int = Field(foreign_key="stations.stations.id", index=True)
+    rental_id: Optional[int] = Field(default=None, foreign_key="rentals.id", index=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    station_id: int = Field(foreign_key="stations.id", index=True)
     
     # Battery Details
-    old_battery_id: Optional[int] = Field(default=None, foreign_key="inventory.batteries.id")
-    new_battery_id: Optional[int] = Field(default=None, foreign_key="inventory.batteries.id")
+    old_battery_id: Optional[int] = Field(default=None, foreign_key="batteries.id")
+    new_battery_id: Optional[int] = Field(default=None, foreign_key="batteries.id")
     
     old_battery_soc: float = Field(default=0.0)
     new_battery_soc: float = Field(default=0.0)

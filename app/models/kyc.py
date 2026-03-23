@@ -20,10 +20,10 @@ class KYCDocumentStatus(str, Enum):
 
 class KYCRecord(SQLModel, table=True):
     __tablename__ = "kyc_records"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id", index=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
     
     # Encrypted identifiers
     aadhaar_number_enc: Optional[str] = None
@@ -43,7 +43,7 @@ class KYCRecord(SQLModel, table=True):
     rejection_reason: Optional[str] = None
     
     # Audit
-    verified_by: Optional[int] = Field(default=None, foreign_key="core.users.id") # Admin User ID
+    verified_by: Optional[int] = Field(default=None, foreign_key="users.id") # Admin User ID
     submitted_at: datetime = Field(default_factory=datetime.utcnow)
     verified_at: Optional[datetime] = None
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -53,10 +53,10 @@ class KYCRecord(SQLModel, table=True):
 
 class KYCDocument(SQLModel, table=True):
     __tablename__ = "kyc_documents"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id", index=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
     
     document_type: KYCDocumentType
     document_number: Optional[str] = None # Encrypted
@@ -67,7 +67,7 @@ class KYCDocument(SQLModel, table=True):
     verification_response: Optional[str] = None # JSON string
     rejection_reason: Optional[str] = None
     
-    verified_by: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    verified_by: Optional[int] = Field(default=None, foreign_key="users.id")
     uploaded_at: datetime = Field(default_factory=datetime.utcnow)
     verified_at: Optional[datetime] = None
     
@@ -79,10 +79,10 @@ class KYCDocument(SQLModel, table=True):
 
 class KYCRequest(SQLModel, table=True):
     __tablename__ = "kyc_requests"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id")
+    user_id: int = Field(foreign_key="users.id")
     status: str = Field(default="pending")
     request_data: Optional[str] = None # JSON string
     created_at: datetime = Field(default_factory=datetime.utcnow)

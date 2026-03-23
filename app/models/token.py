@@ -6,7 +6,7 @@ class SessionToken(SQLModel, table=True):
     __tablename__ = "session_tokens"
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id", index=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
     access_token: str = Field(index=True)
     refresh_token: str = Field(index=True)
     

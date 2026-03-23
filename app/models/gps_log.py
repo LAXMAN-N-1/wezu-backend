@@ -9,11 +9,11 @@ from datetime import datetime
 class GPSTrackingLog(SQLModel, table=True):
     """GPS location tracking for rentals"""
     __tablename__ = "gps_tracking_log"
-    __table_args__ = {"schema": "inventory", "extend_existing": True}
+    # __table_args__ = {"schema": "public", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    rental_id: int = Field(foreign_key="rentals.rentals.id", index=True)
-    battery_id: int = Field(foreign_key="inventory.batteries.id", index=True)
+    rental_id: int = Field(foreign_key="rentals.id", index=True)
+    battery_id: int = Field(foreign_key="batteries.id", index=True)
     
     # Location data
     latitude: float = Field(index=True)

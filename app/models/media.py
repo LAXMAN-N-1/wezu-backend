@@ -4,7 +4,7 @@ from datetime import datetime
 
 class MediaAsset(SQLModel, table=True):
     __tablename__ = "media_assets"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     file_name: str

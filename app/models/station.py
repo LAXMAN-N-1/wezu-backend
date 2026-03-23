@@ -21,7 +21,7 @@ class StationStatus(str, Enum):
 
 class Station(SQLModel, table=True):
     __tablename__ = "stations"
-    __table_args__ = {"schema": "stations"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     tenant_id: Optional[str] = Field(default="default", index=True)
@@ -31,24 +31,25 @@ class Station(SQLModel, table=True):
     city: Optional[str] = None
     latitude: float = Field(index=True)
     longitude: float = Field(index=True)
-    zone_id: Optional[int] = Field(default=None, foreign_key="core.zones.id")
+    zone_id: Optional[int] = Field(default=None, foreign_key="zones.id")
     
     # Ownership
-    owner_id: Optional[int] = Field(default=None, foreign_key="core.users.id") # Dealer/Owner
-    vendor_id: Optional[int] = Field(default=None, foreign_key="finance.vendors.id") # Assuming vendor is in finance or core? I'll check.
-    dealer_id: Optional[int] = Field(default=None, foreign_key="dealers.dealer_profiles.id")
+    owner_id: Optional[int] = Field(default=None, foreign_key="users.id") # Dealer/Owner
+    vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id") # Assuming vendor is in finance or core? I'll check.
+    dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id")
     
     # Hardware Specs
     station_type: str = Field(default="automated") # automated, manual, hybrid
     total_slots: int = Field(default=0)
     power_rating_kw: Optional[float] = None
+    max_capacity: Optional[int] = Field(default=None)
+    charger_type: Optional[str] = Field(default=None)
+    temperature_control: bool = Field(default=False)
+    safety_features: Optional[str] = None
     
-    # Operational Status
-    status: StationStatus = Field(default=StationStatus.OPERATIONAL, index=True)
-    available_batteries: int = Field(default=0) # Cached count
-    available_slots: int = Field(default=0) # Cached count
-    
-    # Contact & Info
+    # Status
+    status: str = Field(default="active")
+    approval_status: str = Field(default="approved") # pending, approved, rejected
     contact_phone: Optional[str] = None
     operating_hours: Optional[str] = None # JSON string: {"mon": "09:00-18:00", ...}
     is_24x7: bool = Field(default=False)
@@ -58,6 +59,11 @@ class Station(SQLModel, table=True):
     # Ratings
     rating: float = Field(default=0.0, index=True)
     total_reviews: int = Field(default=0)
+    last_maintenance_date: Optional[datetime] = None
+    
+    # Inventory settings
+    low_stock_threshold_pct: float = Field(default=20.0)
+
     
     # Timestamps
     last_heartbeat: Optional[datetime] = None
@@ -79,9 +85,9 @@ class Station(SQLModel, table=True):
 
 class StationImage(SQLModel, table=True):
     __tablename__ = "station_images"
-    __table_args__ = {"schema": "stations"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    station_id: int = Field(foreign_key="stations.stations.id")
+    station_id: int = Field(foreign_key="stations.id")
     url: str
     is_primary: bool = Field(default=False)
     
@@ -89,16 +95,16 @@ class StationImage(SQLModel, table=True):
 
 class StationSlot(SQLModel, table=True):
     __tablename__ = "station_slots"
-    __table_args__ = {"schema": "stations"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    station_id: int = Field(foreign_key="stations.stations.id")
+    station_id: int = Field(foreign_key="stations.id")
     
     slot_number: int
     status: str = Field(default="empty") # empty, charging, ready, maintenance, error
     is_locked: bool = Field(default=True)
     
     # Battery Connection
-    battery_id: Optional[uuid.UUID] = Field(default=None, foreign_key="inventory.batteries.id")
+    battery_id: Optional[int] = Field(default=None, foreign_key="batteries.id")
     
     # Real-time Telemetry
     current_power_w: float = Field(default=0.0)

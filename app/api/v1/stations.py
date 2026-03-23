@@ -1,10 +1,8 @@
-from app.models.station import Station, StationStatus
-from app.models.favorite import Favorite
-from app.models.battery import Battery
-from app.schemas.battery import BatteryResponse
-from sqlmodel import Session, select
-from typing import List, Optional, Any
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlmodel import Session
+from typing import List, Optional
 from app.api import deps
+from app.core.audit import audit_log
 from app.models.user import User
 from app.schemas.station import (
     StationResponse, StationCreate, NearbyStationResponse,
@@ -22,23 +20,29 @@ router = APIRouter()
 
 @router.get("/", response_model=List[StationResponse])
 async def read_stations(
+    request: Request,
     skip: int = 0,
     limit: int = 100,
-    city: Optional[str] = None,
-    status: Optional[str] = None,
-    dealer_id: Optional[int] = None,
+    current_user: User = Depends(deps.require_permission("station:read")),
     db: Session = Depends(deps.get_db),
 ):
-    """Retrieve stations with filters."""
-    statement = select(Station)
-    if city:
-        statement = statement.where(Station.city == city)
-    if status:
-        statement = statement.where(Station.status == status)
-    if dealer_id:
-        statement = statement.where(Station.dealer_id == dealer_id)
-        
-    return db.exec(statement.offset(skip).limit(limit)).all()
+    """
+    Retrieve stations. Dealers see only their own stations.
+    """
+    from sqlmodel import select
+    from app.models.station import Station
+    from app.models.roles import RoleEnum
+    
+    query = select(Station)
+    
+    # Row-level filtering: Dealers only see their own stations using Request Context Role
+    user_role = getattr(request.state, 'user_role', None)
+
+    if user_role == RoleEnum.DEALER and current_user.dealer_profile:
+        query = query.where(Station.dealer_id == current_user.dealer_profile.id)
+    
+    stations = db.exec(query.offset(skip).limit(limit)).all()
+    return stations
 
 @router.get("/nearby", response_model=List[NearbyStationResponse])
 async def search_nearby_stations(
@@ -62,7 +66,9 @@ async def search_nearby_stations(
     return stations
 
 @router.post("/", response_model=StationResponse)
+@audit_log("CREATE_STATION", "STATION")
 async def create_station(
+    request: Request,
     station_in: StationCreate,
     current_user: User = Depends(deps.get_current_active_superuser),
     db: Session = Depends(deps.get_db),

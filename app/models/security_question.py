@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 
 class SecurityQuestion(SQLModel, table=True):
     __tablename__ = "security_questions"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     question_text: str = Field(unique=True)
@@ -16,11 +16,11 @@ class SecurityQuestion(SQLModel, table=True):
 
 class UserSecurityQuestion(SQLModel, table=True):
     __tablename__ = "user_security_questions"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id", index=True)
-    question_id: int = Field(foreign_key="core.security_questions.id")
+    user_id: int = Field(foreign_key="users.id", index=True)
+    question_id: int = Field(foreign_key="security_questions.id")
     hashed_answer: str
     
     created_at: datetime = Field(default_factory=datetime.utcnow)

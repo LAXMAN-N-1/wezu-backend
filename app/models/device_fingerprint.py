@@ -7,10 +7,10 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 class DeviceFingerprint(SQLModel, table=True):
     __tablename__ = "device_fingerprints"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     """Track unique device characteristics for fraud detection"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    user_id: Optional[int] = Field(default=None, foreign_key="users.id")
     
     # Device identifiers
     device_id: str = Field(index=True)  # Unique device identifier
@@ -57,15 +57,15 @@ class DeviceFingerprint(SQLModel, table=True):
 
 class DuplicateAccount(SQLModel, table=True):
     __tablename__ = "duplicate_accounts"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     """Link potentially duplicate accounts"""
     id: Optional[int] = Field(default=None, primary_key=True)
     
-    primary_user_id: int = Field(foreign_key="core.users.id")
-    suspected_duplicate_user_id: int = Field(foreign_key="core.users.id")
+    primary_user_id: int = Field(foreign_key="users.id")
+    suspected_duplicate_user_id: int = Field(foreign_key="users.id")
     
     # Evidence of duplication
-    matching_device_id: Optional[int] = Field(default=None, foreign_key="core.device_fingerprints.id")
+    matching_device_id: Optional[int] = Field(default=None, foreign_key="device_fingerprints.id")
     matching_phone: bool = Field(default=False)
     matching_email: bool = Field(default=False)
     matching_ip: bool = Field(default=False)
@@ -80,7 +80,7 @@ class DuplicateAccount(SQLModel, table=True):
     # Investigation status
     status: str = Field(default="DETECTED")  # DETECTED, INVESTIGATING, CONFIRMED, FALSE_POSITIVE
     
-    investigated_by: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    investigated_by: Optional[int] = Field(default=None, foreign_key="users.id")
     investigated_at: Optional[datetime] = None
     
     action_taken: Optional[str] = None  # MERGED, BLOCKED, FLAGGED, CLEARED

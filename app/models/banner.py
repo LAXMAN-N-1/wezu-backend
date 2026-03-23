@@ -4,7 +4,7 @@ from datetime import datetime
 
 class Banner(SQLModel, table=True):
     __tablename__ = "banners"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     title: str

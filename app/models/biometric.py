@@ -4,10 +4,10 @@ from datetime import datetime
 
 class BiometricCredential(SQLModel, table=True):
     __tablename__ = "biometric_credentials"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id", index=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
     device_id: str = Field(index=True) # Mobile Device ID
     
     credential_id: str = Field(unique=True, index=True)

@@ -1,8 +1,17 @@
 import os
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, select
 from sqlmodel.pool import StaticPool
+import sys
+from unittest.mock import MagicMock
+
+# --- MOCK FIREBASE BEFORE APP IMPORTS ---
+# Prevents "Firebase Init Error" from top-level module code
+mock_firebase = MagicMock()
+sys.modules["firebase_admin"] = mock_firebase
+sys.modules["firebase_admin.credentials"] = MagicMock()
+sys.modules["firebase_admin.messaging"] = MagicMock()
 
 from app.main import app
 from app.api import deps
@@ -51,6 +60,21 @@ SQLModel.metadata.create_all(engine)
 @pytest.fixture(name="session")
 def session_fixture():
     with Session(engine) as session:
+        # Seed basic roles for tests
+        from app.models.rbac import Role
+        if not session.exec(select(Role).where(Role.name == "driver")).first():
+            driver_role = Role(
+                name="driver", 
+                slug="driver",
+                description="Driver role",
+                is_system_role=True
+            )
+            session.add(driver_role)
+            try:
+                session.commit()
+            except Exception:
+                session.rollback()
+            
         yield session
         # Teardown: delete all data
         for table in reversed(SQLModel.metadata.sorted_tables):
@@ -59,6 +83,17 @@ def session_fixture():
 
 from app.db.session import get_session as db_get_session
 
+# --- PATCH FOR HTTPX 0.28+ / STARLETTE COMPATIBILITY ---
+import httpx
+_original_httpx_init = httpx.Client.__init__
+
+def _patched_httpx_init(self, *args, **kwargs):
+    kwargs.pop("app", None)
+    _original_httpx_init(self, *args, **kwargs)
+
+httpx.Client.__init__ = _patched_httpx_init
+# --------------------------------------------------------
+
 @pytest.fixture(name="client")
 def client_fixture(session: Session):
     def get_session_override():
@@ -66,6 +101,39 @@ def client_fixture(session: Session):
 
     app.dependency_overrides[deps.get_db] = get_session_override
     app.dependency_overrides[db_get_session] = get_session_override
-    client = TestClient(app)
-    yield client
+    
+    # Replace lifespan with a no-op to prevent init_db/start_scheduler
+    # from connecting to the real database or starting background jobs
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def _noop_lifespan(app):
+        yield
+
+    original_lifespan = app.router.lifespan_context
+    app.router.lifespan_context = _noop_lifespan
+
+    try:
+        with TestClient(app) as client:
+            yield client
+    finally:
+        app.router.lifespan_context = original_lifespan
+    
     app.dependency_overrides.clear()
+
+@pytest.fixture(name="normal_user")
+def normal_user_fixture(session: Session):
+    from app.models.user import User
+    from app.core.security import get_password_hash
+    user = User(
+        email="normal_user@example.com",
+        hashed_password=get_password_hash("password"),
+        full_name="Normal User",
+        phone_number="5555555555",
+        is_active=True
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+

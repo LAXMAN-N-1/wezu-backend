@@ -22,10 +22,10 @@ class SocialPlatform(str, Enum):
 
 class OrganizationSocialLink(SQLModel, table=True):
     __tablename__ = "organization_social_links"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    organization_id: int = Field(foreign_key="core.organizations.id")
+    organization_id: int = Field(foreign_key="organizations.id")
     platform: SocialPlatform
     url: str
     
@@ -34,7 +34,7 @@ class OrganizationSocialLink(SQLModel, table=True):
 
 class Organization(SQLModel, table=True):
     __tablename__ = "organizations"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)

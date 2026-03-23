@@ -9,10 +9,10 @@ if TYPE_CHECKING:
 
 class UserProfile(SQLModel, table=True):
     __tablename__ = "user_profiles"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
 
-    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
-    user_id: int = Field(foreign_key="core.users.id", unique=True, index=True)
+    id: int = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
+    user_id: int = Field(foreign_key="users.id", unique=True, index=True)
 
     # Address Details
     address_line_1: Optional[str] = None

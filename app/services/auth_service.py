@@ -1,19 +1,8 @@
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from app.core.config import settings
-from fastapi import HTTPException, status
-from sqlmodel import Session, select
-from app.models.user import User
-from app.models.biometric import BiometricCredential
-from app.core.security import generate_totp_secret, verify_totp, generate_backup_codes, generate_qr_uri
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import padding, ec
-from cryptography.hazmat.primitives import serialization
-import pyotp
-import logging
-import base64
-
-logger = logging.getLogger(__name__)
+from fastapi import HTTPException, status, Request
+from sqlmodel import Session
 
 class AuthService:
     @staticmethod
@@ -100,205 +89,219 @@ class AuthService:
             )
 
     @staticmethod
-    def get_permissions_for_role(db: Session, role_id: int) -> list[str]:
-        from app.services.rbac_service import rbac_service
-        permissions = rbac_service.get_user_permissions(db, role_id)
-        if not permissions and role_id:
-             # Development fallback or logging
-             pass
-        return permissions
+    def get_menu_for_role(role_name: str) -> list[dict]:
+        # Avoiding circular import by returning dicts or importing locally if needed
+        # But returning dicts is safer for service layer decoupling if schema isn't strictly needed here 
+        # However, for type safety let's use the schema if possible, but for now dicts are fine as they serialize to JSON
+        if role_name == "customer":
+            return [
+                {"id": "dashboard", "label": "Dashboard", "path": "/dashboard", "route": "/dashboard", "icon": "home"},
+                {"id": "vehicle", "label": "My Vehicle", "path": "/vehicle", "route": "/vehicle", "icon": "car"},
+                {"id": "stations", "label": "Find Stations", "path": "/stations", "route": "/stations", "icon": "map"},
+            ]
+        elif role_name in ["vendor_owner", "dealer"]:
+            return [
+                {"id": "dashboard", "label": "Dashboard", "path": "/dashboard", "route": "/dashboard", "icon": "home"},
+                {"id": "stations", "label": "Stations", "path": "/stations", "route": "/stations", "icon": "fuel"},
+                {"id": "staff", "label": "Staff", "path": "/staff", "route": "/staff", "icon": "users"},
+                {"id": "finance", "label": "Finance", "path": "/finance", "route": "/finance", "icon": "dollar-sign"},
+            ]
+        elif role_name in ["admin", "super_admin"]:
+            return [
+                {"id": "admin_dashboard", "label": "Dashboard", "path": "/admin/dashboard", "route": "/admin/dashboard", "icon": "activity"},
+                {"id": "admin_users", "label": "Users", "path": "/admin/users", "route": "/admin/users", "icon": "users"},
+                {"id": "admin_dealers", "label": "Dealers", "path": "/admin/users", "route": "/admin/users", "icon": "briefcase"},
+                {"id": "admin_settings", "label": "Settings", "path": "/admin/settings", "route": "/admin/settings", "icon": "settings"},
+            ]
+        return []
 
     @staticmethod
-    def get_menu_for_role(db: Session, role_id: int) -> list[dict]:
-        from app.services.rbac_service import rbac_service
-        menu = rbac_service.get_menu_for_role(db, role_id)
-        if not menu and role_id:
-            # Development fallback for customer if data missing
-            from app.models.rbac import Role
-            role = db.get(Role, role_id)
-            if role and role.name == "customer":
-                return [
-                    {"label": "Dashboard", "path": "/dashboard", "icon": "home"},
-                    {"label": "My Vehicle", "path": "/vehicle", "icon": "car"},
-                    {"label": "Find Stations", "path": "/stations", "icon": "map"},
-                ]
-        return menu
-
-    @staticmethod
-    def create_session(
-        db, 
-        user_id: int, 
-        access_token: str, 
-        refresh_token: str, 
-        device_info: str = None, 
-        ip_address: str = None
+    def create_user_session(
+        db: Session,
+        user_id: int,
+        refresh_token: str,
+        request: Request = None,
+        token_jti: str = None,
+        ip_address: str = None,
+        user_agent: str = None
     ):
+        """
+        Create a new UserSession record.
+        Hashes the refresh token for security.
+        """
         from app.models.session import UserSession
         from datetime import datetime, timedelta
+        from app.core.config import settings
+        import hashlib
+
+        # 1. Extract Info if request provided
+        if request:
+            if not user_agent:
+                user_agent = request.headers.get("user-agent", "unknown")
+            if not ip_address:
+                ip_address = request.client.host if request.client else "unknown"
+                forwarded = request.headers.get("x-forwarded-for")
+                if forwarded:
+                    ip_address = forwarded.split(",")[0]
         
-        expires_at = datetime.utcnow() + timedelta(days=7)
+        # Default fallbacks
+        if not user_agent: user_agent = "unknown"
+        if not ip_address: ip_address = "unknown"
+            
+        # 2. Extract Device Info
+        device_type = "mobile" if "mobile" in user_agent.lower() else "web"
+        if "okhttp" in user_agent.lower() or "dart" in user_agent.lower():
+             device_type = "mobile_app"
+
+        device_name = None
+        device_id = None
         
+        if request:
+            # 1. Trust Client Headers
+            device_id = request.headers.get("X-Device-ID")
+            device_name = request.headers.get("X-Device-Name") or request.headers.get("X-Device-Model")
+            
+            # 2. Parse User-Agent if name missing
+            if not device_name and user_agent:
+                ua = user_agent.lower()
+                os_name = "Unknown OS"
+                browser = ""
+
+                # OS Detection
+                if "windows" in ua: os_name = "Windows"
+                elif "macintosh" in ua or "mac os" in ua: os_name = "macOS"
+                elif "linux" in ua and "android" not in ua: os_name = "Linux"
+                elif "android" in ua: os_name = "Android"
+                elif "iphone" in ua or "ipad" in ua: os_name = "iOS"
+                
+                # Browser/Client Detection
+                if "postman" in ua: 
+                    browser = "Postman"
+                elif "okhttp" in ua or "dart" in ua: 
+                    browser = "Mobile App"
+                elif "chrome" in ua and "edg" not in ua: 
+                    browser = "Chrome"
+                elif "firefox" in ua: 
+                    browser = "Firefox"
+                elif "safari" in ua and "chrome" not in ua: 
+                    browser = "Safari"
+                elif "edg" in ua: 
+                    browser = "Edge"
+                
+                if browser:
+                    device_name = f"{browser} on {os_name}"
+                elif os_name != "Unknown OS":
+                    device_name = os_name
+                else:
+                    device_name = "Unknown Device"
+            
+        # 3. Hash Refresh Token
+        refresh_token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+        
+        # Extract JTI if not provided
+        if not token_jti:
+            try:
+                from jose import jwt
+                from app.core.config import settings
+                payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+                token_jti = payload.get("jti")
+            except Exception:
+                token_jti = "unknown"
+
+        # 4. Create Session
         session = UserSession(
             user_id=user_id,
-            access_token=access_token,
-            refresh_token=refresh_token,
-            device_type=device_info,
+            token_id=token_jti or "unknown",
+            refresh_token_hash=refresh_token_hash,
             ip_address=ip_address,
-            expires_at=expires_at
+            user_agent=user_agent,
+            device_type=device_type,
+            device_id=device_id,
+            device_name=device_name,
+            expires_at=datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         )
         db.add(session)
         db.commit()
-        db.refresh(session)
         return session
 
     @staticmethod
-    def revoke_session(db, token: str):
+    def update_user_session(
+        db: Session,
+        old_token_jti: str,
+        new_refresh_token: str,
+        request: Request = None
+    ):
+        """
+        Update existing session with new token info (Rotation).
+        If not found, creates new session.
+        """
         from app.models.session import UserSession
-        from datetime import datetime
-        
-        session = db.query(UserSession).filter(
-            (UserSession.access_token == token) | (UserSession.refresh_token == token)
-        ).first()
-        
-        if session:
-            session.is_revoked = True
-            session.revoked_at = datetime.utcnow()
-            session.is_active = False
-            db.add(session)
-            db.commit()
-            return True
-        return False
+        from sqlmodel import select
+        from datetime import datetime, timedelta
+        from app.core.config import settings
+        import hashlib
+        from jose import jwt
 
-    @staticmethod
-    def validate_session(db, token: str, is_refresh: bool = False):
-        from app.models.session import UserSession
-        from datetime import datetime
+        # 1. Find Session by old JTI
+        session = db.exec(select(UserSession).where(UserSession.token_id == old_token_jti)).first()
         
-        query = db.query(UserSession).filter(
-            UserSession.is_revoked == False,
-            UserSession.is_active == True,
-            UserSession.expires_at > datetime.utcnow()
-        )
-        
-        if is_refresh:
-            session = query.filter(UserSession.refresh_token == token).first()
-        else:
-            session = query.filter(UserSession.access_token == token).first()
+        # 2. Extract new JTI
+        try:
+            payload = jwt.decode(new_refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            new_token_jti = payload.get("jti")
+            user_id = int(payload.get("sub"))
+        except Exception:
+            return None # Cannot update invalid token
             
+        # 3. Hash new refresh token
+        new_hash = hashlib.sha256(new_refresh_token.encode()).hexdigest()
+        
         if session:
+            # Update existing session
+            session.token_id = new_token_jti or "unknown"
+            session.refresh_token_hash = new_hash
             session.last_active_at = datetime.utcnow()
+            session.expires_at = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+            
+            # Update IP/UA if provided
+            if request:
+                 user_agent = request.headers.get("user-agent")
+                 if user_agent: session.user_agent = user_agent
+                 
+                 ip_address = request.client.host if request.client else None
+                 if ip_address: session.ip_address = ip_address
+            
             db.add(session)
             db.commit()
             return session
-        return None
-
-    # --- 2FA Logic ---
-    @staticmethod
-    def initiate_2fa_setup(user: User):
-        """Generates secret and QR URI for 2FA setup"""
-        secret = generate_totp_secret()
-        qr_uri = generate_qr_uri(user.email or user.phone_number, secret)
-        return {"secret": secret, "qr_uri": qr_uri}
-
-    @staticmethod
-    def verify_and_enable_2fa(db: Session, user: User, code: str, secret: str):
-        """Verifies initial 2FA code and enables it for user"""
-        if verify_totp(secret, code):
-            user.two_factor_enabled = True
-            user.two_factor_secret = secret
-            user.backup_codes = generate_backup_codes()
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-            return user.backup_codes
-        return None
-
-    @staticmethod
-    def verify_2fa_login(user: User, code: str) -> bool:
-        """Verify 2FA code during login process"""
-        if not user.two_factor_enabled or not user.two_factor_secret:
-            return True # Not enabled
-        
-        # Check backup codes first
-        if user.backup_codes and code in user.backup_codes:
-            user.backup_codes.remove(code)
-            # db.add(user) # Needs session from caller or internal commit
-            return True
-            
-        return verify_totp(user.two_factor_secret, code)
-
-    # --- Biometric Logic ---
-    @staticmethod
-    def register_biometric(db: Session, user_id: int, device_id: str, credential_id: str, public_key: str):
-        """Register a new biometric public key"""
-        # Deactivate old credentials for this user/device if needed
-        # ...
-        
-        cred = BiometricCredential(
-            user_id=user_id,
-            device_id=device_id,
-            credential_id=credential_id,
-            public_key=public_key
-        )
-        db.add(cred)
-        db.commit()
-        db.refresh(cred)
-        return cred
-
-    @staticmethod
-    def verify_biometric_signature(db: Session, user_id: int, credential_id: str, signature: str, challenge: str):
-        """Verify signed challenge using stored public key (Production Ready)"""
-        statement = select(BiometricCredential).where(
-            BiometricCredential.user_id == user_id,
-            BiometricCredential.credential_id == credential_id
-        )
-        cred = db.exec(statement).first()
-        if not cred:
-            return False
-            
-        try:
-            # 1. Decode public key and signature
-            # Public key is expected to be PEM or DER encoded Base64
-            public_key_bytes = base64.b64decode(cred.public_key)
-            signature_bytes = base64.b64decode(signature)
-            challenge_bytes = challenge.encode('utf-8')
-            
-            # 2. Load public key (assuming ECDSA/P-256 which is standard for WebAuthn)
-            # Try loading as SubjectPublicKeyInfo (DER) first
-            try:
-                public_key = serialization.load_der_public_key(public_key_bytes)
-            except:
-                public_key = serialization.load_pem_public_key(public_key_bytes)
-            
-            # 3. Verify signature
-            if isinstance(public_key, ec.EllipticCurvePublicKey):
-                public_key.verify(signature_bytes, challenge_bytes, ec.ECDSA(hashes.SHA256()))
-                return True
-            
-            # Fallback for RSA if needed
-            public_key.verify(
-                signature_bytes,
-                challenge_bytes,
-                padding.PSS(
-                    mgf=padding.MGF1(hashes.SHA256()),
-                    salt_length=padding.PSS.MAX_LENGTH
-                ),
-                hashes.SHA256()
+        else:
+            # Fallback: Create new session
+            return AuthService.create_user_session(
+                db, user_id, new_refresh_token, request, token_jti=new_token_jti
             )
-            return True
-            
-        except Exception as e:
-            logger.error(f"BIOMETRIC_VERIFICATION_FAILED: {str(e)}")
-            return False
 
     @staticmethod
     def revoke_all_user_sessions(db: Session, user_id: int):
-        """Revoke all active sessions for a user (called on deletion/password change)"""
+        """
+        Revoke all active sessions for a user.
+        Updates user's last_global_logout_at.
+        """
+        from app.models.user import User
         from app.models.session import UserSession
-        statement = select(UserSession).where(UserSession.user_id == user_id, UserSession.is_active == True)
-        sessions = db.exec(statement).all()
-        for session in sessions:
-            session.is_active = False
-            session.is_revoked = True
-            db.add(session)
+        from sqlmodel import select
+        from datetime import datetime
+        
+        # 1. Update Global Logout Timestamp
+        user = db.get(User, user_id)
+        if user:
+            user.last_global_logout_at = datetime.utcnow()
+            db.add(user)
+        
+        # 2. Mark all sessions inactive
+        sessions = db.exec(select(UserSession).where(UserSession.user_id == user_id).where(UserSession.is_active == True)).all()
+        for s in sessions:
+            s.is_active = False
+            db.add(s)
+            
         db.commit()
+        return len(sessions)

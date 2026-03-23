@@ -4,11 +4,11 @@ from datetime import datetime
 
 class SwapSuggestion(SQLModel, table=True):
     __tablename__ = "swap_suggestions"
-    __table_args__ = {"schema": "rentals"}
+    # __table_args__ = {"schema": "public"}
     """ML-based swap station recommendations"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id")
-    rental_id: int = Field(foreign_key="rentals.rentals.id")
+    user_id: int = Field(foreign_key="users.id")
+    rental_id: int = Field(foreign_key="rentals.id")
     
     # Current battery state
     current_battery_soc: float  # State of charge (0-100)
@@ -16,7 +16,7 @@ class SwapSuggestion(SQLModel, table=True):
     current_location_lng: float
     
     # Suggested stations (ordered by priority)
-    suggested_station_id: int = Field(foreign_key="stations.stations.id")
+    suggested_station_id: int = Field(foreign_key="stations.id")
     priority_rank: int = Field(default=1)  # 1 = highest priority
     
     # Scoring factors
@@ -49,10 +49,10 @@ class SwapSuggestion(SQLModel, table=True):
 
 class SwapPreference(SQLModel, table=True):
     __tablename__ = "swap_preferences"
-    __table_args__ = {"schema": "rentals"}
+    # __table_args__ = {"schema": "public"}
     """User preferences for swap stations"""
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id", unique=True)
+    user_id: int = Field(foreign_key="users.id", unique=True)
     
     # Preference weights (0-10, higher = more important)
     prefer_nearby: int = Field(default=8)  # Prioritize closest stations

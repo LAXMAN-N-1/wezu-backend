@@ -23,10 +23,10 @@ class DeliveryStatus(str, Enum):
 
 class BatteryTransfer(SQLModel, table=True):
     __tablename__ = "battery_transfers"
-    __table_args__ = {"schema": "logistics"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    battery_id: uuid.UUID = Field(foreign_key="inventory.batteries.id")
+    battery_id: int = Field(foreign_key="batteries.id")
     
     from_location_type: str # warehouse, station, dealer
     from_location_id: int
@@ -35,7 +35,7 @@ class BatteryTransfer(SQLModel, table=True):
     to_location_id: int
     
     status: str = Field(default="pending") # pending, assigned, in_transit, received, cancelled
-    manifest_id: Optional[int] = Field(default=None, foreign_key="logistics.manifests.id")
+    manifest_id: Optional[int] = Field(default=None, foreign_key="manifests.id")
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -45,12 +45,12 @@ class BatteryTransfer(SQLModel, table=True):
 
 class Manifest(SQLModel, table=True):
     __tablename__ = "manifests"
-    __table_args__ = {"schema": "logistics"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     manifest_number: str = Field(default_factory=lambda: f"MAN-{uuid.uuid4().hex[:8].upper()}", index=True, unique=True)
     
-    driver_id: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    driver_id: Optional[int] = Field(default=None, foreign_key="users.id")
     vehicle_id: Optional[str] = None
     
     status: str = Field(default="draft") # draft, assigned, active, closed
@@ -66,7 +66,7 @@ if TYPE_CHECKING:
     
 class DeliveryOrder(SQLModel, table=True):
     __tablename__ = "delivery_orders"
-    __table_args__ = {"schema": "logistics"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -84,7 +84,7 @@ class DeliveryOrder(SQLModel, table=True):
     destination_lng: Optional[float] = None
     
     # Assignment
-    assigned_driver_id: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    assigned_driver_id: Optional[int] = Field(default=None, foreign_key="users.id")
     
     # Payload
     battery_ids_json: Optional[str] = None # List of battery IDs being moved
@@ -102,7 +102,7 @@ class DeliveryOrder(SQLModel, table=True):
     completion_otp: Optional[str] = None
     
     # Reverse Logistics Link
-    return_request_id: Optional[int] = Field(default=None, foreign_key="logistics.return_requests.id")
+    return_request_id: Optional[int] = Field(default=None, foreign_key="return_requests.id")
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

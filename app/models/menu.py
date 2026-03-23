@@ -4,14 +4,14 @@ from datetime import datetime
 
 class Menu(SQLModel, table=True):
     __tablename__ = "menus"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True, nullable=False)
     display_name: str = Field(nullable=False)
     route: Optional[str] = None
     icon: Optional[str] = None
-    parent_id: Optional[int] = Field(default=None, foreign_key="core.menus.id")
+    parent_id: Optional[int] = Field(default=None, foreign_key="menus.id")
     menu_order: int = Field(default=0)
     is_active: bool = Field(default=True)
     

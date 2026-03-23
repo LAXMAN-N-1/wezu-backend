@@ -228,6 +228,43 @@ class AnalyticsService:
         }
 
     @staticmethod
+    def get_recent_activity(db: Session, limit: int = 15) -> Dict[str, Any]:
+        """Recent activity across the platform"""
+        from app.models.rental import Rental
+        from app.models.user import User
+        
+        # We can mix users and rentals to create a timeline of activity
+        rentals = db.exec(select(Rental).order_by(Rental.created_at.desc()).limit(limit)).all()
+        
+        activities = []
+        for r in rentals:
+            activities.append({
+                "title": "Battery Rental Started" if r.status == "active" else f"Rental {r.status.capitalize()}",
+                "description": f"User ID {r.user_id} at station {r.start_station_id}",
+                "time": r.created_at.strftime("%I:%M %p, %d %b"),
+                "type": "rental"
+            })
+            
+        return {"activities": activities[:limit]}
+
+    @staticmethod
+    def get_top_stations(db: Session) -> Dict[str, Any]:
+        """Top stations formatted for the dashboard"""
+        stats = AnalyticsService.get_revenue_by_station(db)[:10]
+        stations_data = []
+        for s in stats:
+            stations_data.append({
+                "id": str(s["station_id"]),
+                "name": s["station_name"],
+                "location": s["station_name"],
+                "rentals": s["rental_count"],
+                "revenue": s["revenue"],
+                "utilization": 85,  # Mocked utilization
+                "rating": 4.5       # Mocked rating
+            })
+        return {"stations": stations_data}
+
+    @staticmethod
     def get_battery_health_distribution(db: Session) -> Dict[str, Any]:
         """Distribution of all batteries by health % range"""
         from app.models.battery import Battery

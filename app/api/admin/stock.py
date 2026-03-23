@@ -221,11 +221,15 @@ def get_station_stock_detail(station_id: int, db: Session = Depends(get_db)):
     if stats["available"] < projected_demand:
         stockout_days = int(stats["available"] / avg_rentals_per_day) if avg_rentals_per_day > 0 else None
         
+    recommended_date = None
+    if stockout_days is not None:
+        recommended_date = datetime.utcnow() + timedelta(days=stockout_days)
+
     forecast = StockForecastResponse(
         avg_rentals_per_day=avg_rentals_per_day,
         projected_demand_30d=projected_demand,
         recommended_reorder=reorder_qty,
-        recommended_date=datetime.utcnow() + timedelta(days=stockout_days) if stockout_days else None,
+        recommended_date=recommended_date,
         predicted_stockout_days=stockout_days
     )
     

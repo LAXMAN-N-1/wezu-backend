@@ -30,8 +30,14 @@ wheels/
 
 # Virtual Environment
 .venv/
-venv/
-wezu_e/
+wezu_env/
+
+# Uploads
+uploads/
+.gsd/
+.gemini/
+.agent/
+# Logs
 logs/
 *.log
 
@@ -42,9 +48,4 @@ logs/
 # IDE
 .vscode/
 .idea/
-
-# App Specific Ignores
-check_*.py
-token.json
-*.exe
-verify_*.py
+walkthrough.md

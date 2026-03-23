@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session, select, func, text
+from sqlmodel import Session, select, func, text, col
 from typing import List, Optional
 from datetime import datetime, timedelta
 import uuid
@@ -31,8 +31,8 @@ def _compute_bulk_degradation_rates(battery_ids: List[uuid.UUID], db: Session, d
     snapshots = db.exec(
         select(BatteryHealthSnapshot)
         .where(BatteryHealthSnapshot.battery_id.in_(battery_ids))
-        .where(BatteryHealthSnapshot.recorded_at >= cutoff)
-        .order_by(BatteryHealthSnapshot.battery_id, BatteryHealthSnapshot.recorded_at)
+        .where(col(BatteryHealthSnapshot.recorded_at) >= cutoff)
+        .order_by(BatteryHealthSnapshot.battery_id, col(BatteryHealthSnapshot.recorded_at))
     ).all()
 
     grouped = defaultdict(list)
@@ -253,7 +253,7 @@ def get_health_battery_detail(battery_id: str, db: Session = Depends(get_db)):
     snapshots = db.exec(
         select(BatteryHealthSnapshot)
         .where(BatteryHealthSnapshot.battery_id == bid)
-        .order_by(BatteryHealthSnapshot.recorded_at.asc())
+        .order_by(col(BatteryHealthSnapshot.recorded_at).asc())
     ).all()
 
     latest = snapshots[-1] if snapshots else None
@@ -388,8 +388,8 @@ def get_battery_snapshots(
     snapshots = db.exec(
         select(BatteryHealthSnapshot)
         .where(BatteryHealthSnapshot.battery_id == bid)
-        .where(BatteryHealthSnapshot.recorded_at >= cutoff)
-        .order_by(BatteryHealthSnapshot.recorded_at.asc())
+        .where(col(BatteryHealthSnapshot.recorded_at) >= cutoff)
+        .order_by(col(BatteryHealthSnapshot.recorded_at).asc())
     ).all()
 
     return [
@@ -418,11 +418,12 @@ def record_health_snapshot(
         raise HTTPException(404, "Battery not found")
 
     # Get previous reading
-    prev = db.exec(
+    prev_query = (
         select(BatteryHealthSnapshot)
         .where(BatteryHealthSnapshot.battery_id == bid)
-        .order_by(BatteryHealthSnapshot.recorded_at.desc())
-    ).first()
+        .order_by(col(BatteryHealthSnapshot.recorded_at).desc())
+    )
+    prev = db.exec(prev_query).first()
 
     snapshot = BatteryHealthSnapshot(
         battery_id=bid,
@@ -631,8 +632,8 @@ def get_health_analytics(db: Session = Depends(get_db)):
 
         snapshots = db.exec(
             select(BatteryHealthSnapshot)
-            .where(BatteryHealthSnapshot.recorded_at >= week_start)
-            .where(BatteryHealthSnapshot.recorded_at < week_end)
+            .where(col(BatteryHealthSnapshot.recorded_at) >= week_start)
+            .where(col(BatteryHealthSnapshot.recorded_at) < week_end)
         ).all()
 
         if snapshots:

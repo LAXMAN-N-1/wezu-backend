@@ -4,10 +4,10 @@ from datetime import datetime
 
 class InventoryAuditLog(SQLModel, table=True):
     __tablename__ = "inventory_audit_logs"
-    __table_args__ = {"schema": "inventory"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    battery_id: int = Field(foreign_key="inventory.batteries.id", index=True)
+    battery_id: int = Field(foreign_key="batteries.id", index=True)
     
     action_type: str = Field(index=True) # transfer, manual_entry, disposal, status_change
     
@@ -17,7 +17,7 @@ class InventoryAuditLog(SQLModel, table=True):
     to_location_type: Optional[str] = None
     to_location_id: Optional[int] = None
     
-    actor_id: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    actor_id: Optional[int] = Field(default=None, foreign_key="users.id")
     notes: Optional[str] = None
     
     timestamp: datetime = Field(default_factory=datetime.utcnow)

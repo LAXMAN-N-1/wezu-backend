@@ -45,7 +45,7 @@ class KYCStatus(str, Enum):
 class User(SQLModel, table=True):
 
     __tablename__ = "users"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -59,8 +59,7 @@ class User(SQLModel, table=True):
     user_type: UserType = Field(default=UserType.CUSTOMER, index=True)
     status: UserStatus = Field(default=UserStatus.ACTIVE, index=True)
     is_superuser: bool = Field(default=False)
-    is_active: bool = Field(default=True, index=True)
-    role_id: Optional[int] = Field(default=None, foreign_key="core.roles.id")
+    role_id: Optional[int] = Field(default=None, foreign_key="roles.id")
     
     # Profile & Media
     profile_picture: Optional[str] = None
@@ -75,17 +74,22 @@ class User(SQLModel, table=True):
 
     # Security
     two_factor_enabled: bool = Field(default=False)
-    two_factor_secret: Optional[str] = None
-    backup_codes: Optional[List[str]] = Field(default=None, sa_column=sa.Column(sa.JSON))
-    
-    # Email Verification
-    is_email_verified: bool = Field(default=False)
-    email_verification_token: Optional[str] = None
-    email_verification_sent_at: Optional[datetime] = None
-    
+    biometric_login_enabled: bool = Field(default=False)
+    security_question: Optional[str] = None
+    security_answer: Optional[str] = None
+    reset_token: Optional[str] = Field(default=None, index=True)
+    reset_token_expires: Optional[datetime] = None
+    reset_token_expires: Optional[datetime] = None
     last_global_logout_at: Optional[datetime] = None
-    last_login_at: Optional[datetime] = None
-    last_global_logout_at: Optional[datetime] = None
+    last_login: Optional[datetime] = Field(default=None, index=True)
+
+    # Password policy
+    password_changed_at: Optional[datetime] = None
+    force_password_change: bool = Field(default=False)
+
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Soft Delete
     is_deleted: bool = Field(default=False)
@@ -96,11 +100,8 @@ class User(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-    # Relationships
-    user_profile: Optional["UserProfile"] = Relationship(back_populates="user")
-    role: Optional["Role"] = Relationship(back_populates="users")
-    
-    # Legacy Relationships (To be refactored or kept for backward compat initially)
+    # Relationship
+    role: Optional["Role"] = Relationship(sa_relationship_kwargs={"viewonly": True}) # Legacy/Primary role. Viewonly to prevent conflict with roles list
     wallet: Optional["Wallet"] = Relationship(back_populates="user")
     addresses: List["Address"] = Relationship(back_populates="user")
     
@@ -128,14 +129,32 @@ class User(SQLModel, table=True):
     access_paths: List["UserAccessPath"] = Relationship(back_populates="user")
     sessions: List["UserSession"] = Relationship(back_populates="user")
     session_tokens: List["SessionToken"] = Relationship(back_populates="user")
+<<<<<<< HEAD
     two_factor_auth: Optional["TwoFactorAuth"] = Relationship(
         back_populates="user",
         sa_relationship_kwargs={"uselist": False}
     )
+=======
+    two_factor_auth: Optional["TwoFactorAuth"] = Relationship(back_populates="user")
+>>>>>>> origin/main
 
+    # --- Granular RBAC Helpers ---
     @property
-    def is_active(self) -> bool:
-        return self.status == UserStatus.ACTIVE
+    def all_permissions(self) -> set:
+        """Aggregate all permission slugs from all assigned roles."""
+        perms = set()
+        for role in self.roles:
+            for perm in role.permissions:
+                perms.add(perm.slug)
+        return perms
+
+    def has_permission(self, slug: str) -> bool:
+        """Check if user has a specific permission (superusers always pass)."""
+        if self.is_superuser:
+            return True
+        return slug in self.all_permissions
+
+# OTP class removed (moved to app/models/otp.py)
 
     @is_active.setter
     def is_active(self, value: bool):

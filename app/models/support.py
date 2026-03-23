@@ -20,11 +20,11 @@ class TicketPriority(str, Enum):
 
 class SupportTicket(SQLModel, table=True):
     __tablename__ = "support_tickets"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     
-    user_id: int = Field(foreign_key="core.users.id", index=True)
-    assigned_to: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    user_id: int = Field(foreign_key="users.id", index=True)
+    assigned_to: Optional[int] = Field(default=None, foreign_key="users.id")
     
     subject: str
     description: str
@@ -45,10 +45,10 @@ class SupportTicket(SQLModel, table=True):
 
 class TicketMessage(SQLModel, table=True):
     __tablename__ = "ticket_messages"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    ticket_id: int = Field(foreign_key="core.support_tickets.id", index=True)
-    sender_id: int = Field(foreign_key="core.users.id")
+    ticket_id: int = Field(foreign_key="support_tickets.id", index=True)
+    sender_id: int = Field(foreign_key="users.id")
     
     message: str
     is_internal_note: bool = Field(default=False)
@@ -66,10 +66,10 @@ class ChatStatus(str, Enum):
 
 class ChatSession(SQLModel, table=True):
     __tablename__ = "chat_sessions"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id", index=True)
-    assigned_agent_id: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    user_id: int = Field(foreign_key="users.id", index=True)
+    assigned_agent_id: Optional[int] = Field(default=None, foreign_key="users.id")
     
     status: ChatStatus = Field(default=ChatStatus.WAITING)
     
@@ -83,9 +83,9 @@ class ChatSession(SQLModel, table=True):
 
 class ChatMessage(SQLModel, table=True):
     __tablename__ = "chat_messages"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    session_id: int = Field(foreign_key="core.chat_sessions.id", index=True)
+    session_id: int = Field(foreign_key="chat_sessions.id", index=True)
     sender_id: int = Field(default=0) # 0 for system/bot
     
     message: str

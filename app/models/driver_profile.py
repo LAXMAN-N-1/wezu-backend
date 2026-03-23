@@ -5,9 +5,9 @@ from app.models.user import User
 
 class DriverProfile(SQLModel, table=True):
     __tablename__ = "driver_profiles"
-    __table_args__ = {"schema": "logistics"}
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id", unique=True)
+    user_id: int = Field(foreign_key="users.id", unique=True)
     
     license_number: str
     vehicle_type: str # e.g., e-bike, scooter, truck
