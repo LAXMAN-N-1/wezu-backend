@@ -14,6 +14,7 @@ from app.models.station import Station
 from app.models.dealer_inventory import DealerInventory
 from app.models.support import SupportTicket, TicketStatus
 from app.models.notification import Notification
+from app.models.rental import Rental
 
 router = APIRouter()
 
@@ -50,7 +51,6 @@ def get_dashboard_summary(
     # KPI 2: Active rentals today
     active_rentals = 0
     try:
-        from app.models.rental import Rental
         active_rentals = db.exec(
             select(func.count(Rental.id)).where(
                 Rental.start_station_id.in_(station_ids),
@@ -200,4 +200,192 @@ def get_activity_feed(
             "created_at": str(n.created_at),
         })
 
-    return {"activities": activities, "total": len(activities)}
+    return {"data": activities, "total": len(activities)}
+
+
+@router.get("/customers")
+def get_customers_list(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get the list of unique customers who rented from the dealer's stations."""
+    dealer = _get_dealer(db, current_user.id)
+    
+    statement = (
+        select(User)
+        .join(Rental, Rental.user_id == User.id)
+        .join(Station, Rental.start_station_id == Station.id)
+        .where(Station.dealer_id == dealer.id)
+        .distinct()
+    )
+    users = db.exec(statement).all()
+    
+    data = []
+    for u in users:
+        rental_count = db.exec(
+            select(func.count(Rental.id))
+            .join(Station, Rental.start_station_id == Station.id)
+            .where(Station.dealer_id == dealer.id, Rental.user_id == u.id)
+        ).one_or_none()
+        
+        data.append({
+            "id": u.id,
+            "name": u.full_name or (u.email.split('@')[0] if u.email else "Unknown"),
+            "email": u.email,
+            "phone": u.phone_number or "N/A",
+            "total_rentals": rental_count or 0,
+            "status": "Active" if u.is_active else "Inactive",
+            "joined_at": str(u.created_at) if hasattr(u, 'created_at') and u.created_at else None
+        })
+        
+    return {"data": data, "total": len(data)}
+
+
+@router.get("/tickets")
+def get_dealer_tickets(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get support tickets relevant to the dealer (their own and from customers of their stations)."""
+    dealer = _get_dealer(db, current_user.id)
+    
+    # 1. Dealer's own tickets
+    dealer_tickets = db.exec(
+        select(SupportTicket).where(SupportTicket.user_id == current_user.id)
+    ).all()
+    
+    # 2. Customers tickets
+    user_ids_statement = (
+        select(User.id)
+        .join(Rental, Rental.user_id == User.id)
+        .join(Station, Rental.start_station_id == Station.id)
+        .where(Station.dealer_id == dealer.id)
+        .distinct()
+    )
+    customer_ids = db.exec(user_ids_statement).all()
+    
+    customer_tickets = []
+    if customer_ids:
+        customer_tickets = db.exec(
+            select(SupportTicket).where(SupportTicket.user_id.in_(customer_ids))
+        ).all()
+        
+    # Merge and deduplicate
+    all_tickets = {t.id: t for t in dealer_tickets + customer_tickets}.values()
+    
+    # Sort by recent first
+    sorted_tickets = sorted(all_tickets, key=lambda tx: tx.created_at, reverse=True)
+    
+    data = []
+    for t in sorted_tickets:
+        user = db.get(User, t.user_id)
+        customer_name = user.full_name if user and user.full_name else (user.email.split('@')[0] if user and user.email else "Unknown")
+        
+        data.append({
+            "id": f"TKT-{t.id:03d}",
+            "subject": t.subject,
+            "customer": customer_name,
+            "priority": t.priority.value.capitalize(),
+            "status": t.status.value.capitalize(),
+            "created_at": str(t.created_at),
+            "is_critical": t.priority.value == "critical",
+            "is_resolved": t.status.value in ("resolved", "closed")
+        })
+        
+    return {"data": data, "total": len(data)}
+
+@router.get("/campaigns")
+def get_dealer_campaigns(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Mock endpoint for Dealer Campaigns since the DB schema is currently empty."""
+    dealer = _get_dealer(db, current_user.id)
+    
+    mock_campaigns = [
+        {
+            "id": 1,
+            "title": "Summer Swap Fest",
+            "desc": "Flat 20% off on first 3 swaps",
+            "status": "Active",
+            "dates": "Mar 15 – Apr 15, 2026",
+            "redemptions": "1,240",
+            "revenue": "₹18,600",
+        },
+        {
+            "id": 2,
+            "title": "Weekend Warrior",
+            "desc": "₹50 off every weekend swap",
+            "status": "Active",
+            "dates": "Mar 01 – Mar 31, 2026",
+            "redemptions": "890",
+            "revenue": "₹12,350",
+        },
+        {
+            "id": 3,
+            "title": "New User Welcome",
+            "desc": "Free first swap for new users",
+            "status": "Scheduled",
+            "dates": "Apr 01 – Apr 30, 2026",
+            "redemptions": "0",
+            "revenue": "—",
+        },
+        {
+            "id": 4,
+            "title": "Winter Boost",
+            "desc": "10% back on wallet recharges",
+            "status": "Expired",
+            "dates": "Dec 01 – Jan 31, 2026",
+            "redemptions": "3,420",
+            "revenue": "₹45,000",
+        }
+    ]
+    return {"data": mock_campaigns, "total": len(mock_campaigns)}
+
+@router.get("/profile")
+def get_dealer_profile_details(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get the dealer's profile details."""
+    dealer = _get_dealer(db, current_user.id)
+    return {"data": dealer.dict(), "success": True}
+
+@router.get("/users")
+def get_dealer_users(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Mock endpoint for Dealer Staff Users."""
+    dealer = _get_dealer(db, current_user.id)
+    
+    mock_users = [
+        {
+            "id": "USR-101",
+            "name": current_user.full_name or "Dealer Admin",
+            "email": current_user.email,
+            "role": "Owner",
+            "status": "Active",
+            "last_active": "Just now",
+            "avatar": None
+        },
+        {
+            "id": "USR-102",
+            "name": "Station Manager A",
+            "email": "manager_a@wezu.com",
+            "role": "Manager",
+            "status": "Active",
+            "last_active": "2 hours ago",
+            "avatar": None
+        },
+        {
+            "id": "USR-103",
+            "name": "Support Agent",
+            "email": "support1@wezu.com",
+            "role": "Staff",
+            "status": "Inactive",
+            "last_active": "5 days ago",
+            "avatar": None
+        }
+    ]
+    return {"data": mock_users, "total": len(mock_users)}
