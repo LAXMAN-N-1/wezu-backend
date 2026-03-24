@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlmodel import Session
-from typing import List
+from sqlmodel import Session, select
+from typing import List, Optional
 from app.api import deps
 from app.core.audit import audit_log
 from app.models.user import User
@@ -107,7 +107,7 @@ async def transfer_to_user(
         note=request.note
     )
 
-@router.get("/cashback")
+@router.get("/cashback", response_model=dict)
 async def get_cashback_history(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
@@ -117,8 +117,11 @@ async def get_cashback_history(
     total_cashback = sum(t.amount for t in transactions)
     
     return {
-        "total_cashback": total_cashback,
-        "transactions": transactions
+        "success": True,
+        "data": {
+            "total_cashback": total_cashback,
+            "transactions": [TransactionResponse.model_validate(t) for t in transactions]
+        }
     }
 
 class WithdrawRequest(BaseModel):

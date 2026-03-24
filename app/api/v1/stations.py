@@ -1,5 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlmodel import Session
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File
+from sqlmodel import Session, select
 from typing import List, Optional
 from app.api import deps
 from app.core.audit import audit_log
@@ -10,10 +10,13 @@ from app.schemas.station import (
     HeatmapPoint
 )
 from app.schemas.review import ReviewResponse, ReviewCreate, ReviewUpdate
+from app.schemas.battery import BatteryResponse
 from app.services.station_service import StationService
 from app.services.maintenance_service import MaintenanceService
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from app.services.review_service import ReviewService
+from app.models.station import StationStatus, Station, StationImage
+from app.models.battery import Battery
+from app.models.favorite import Favorite
 from datetime import datetime
 
 router = APIRouter()
@@ -29,8 +32,6 @@ async def read_stations(
     """
     Retrieve stations. Dealers see only their own stations.
     """
-    from sqlmodel import select
-    from app.models.station import Station
     from app.models.roles import RoleEnum
     
     query = select(Station)
@@ -163,7 +164,6 @@ async def upload_station_photo(
 ):
     """Upload station photos."""
     # Assuming storage service logic or just direct DB update for mock
-    from app.models.station import StationImage
     image = StationImage(station_id=station_id, url=f"/media/stations/{file.filename}")
     db.add(image)
     db.commit()
@@ -178,7 +178,6 @@ async def delete_station_photo(
     db: Session = Depends(deps.get_db),
 ):
     """Remove a station photo."""
-    from app.models.station import StationImage
     image = db.get(StationImage, photo_id)
     if not image or image.station_id != station_id:
         raise HTTPException(status_code=404, detail="Photo not found")

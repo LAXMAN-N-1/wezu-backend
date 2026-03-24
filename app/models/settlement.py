@@ -1,6 +1,6 @@
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
-from sqlmodel import SQLModel, Field
+from sqlmodel import SQLModel, Field, Relationship
 
 
 class Settlement(SQLModel, table=True):
@@ -8,9 +8,9 @@ class Settlement(SQLModel, table=True):
     # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     
-    dealer_id: int = Field(foreign_key="dealer_profiles.id", index=True)
+    dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id", index=True)
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id")
-    dealer_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    # user_id: Optional[int] = Field(default=None, foreign_key="users.id") # If needed for something else
 
     # Period
     settlement_month: str = Field(index=True)  # "YYYY-MM" for fast lookup
@@ -34,3 +34,8 @@ class Settlement(SQLModel, table=True):
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     paid_at: Optional[datetime] = None
+
+    # Relationship
+    dealer: Optional["DealerProfile"] = Relationship(back_populates="settlements")
+    vendor: Optional["Vendor"] = Relationship(back_populates="settlements")
+    commission_logs: List["CommissionLog"] = Relationship(back_populates="settlement")

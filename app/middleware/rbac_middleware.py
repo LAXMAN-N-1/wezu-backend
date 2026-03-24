@@ -6,7 +6,8 @@ from app.core.database import engine
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 from app.core.config import settings
-from app.models.user import TokenPayload, User
+from app.models.user import User
+from app.schemas.user import TokenPayload
 from sqlmodel import Session
 from sqlalchemy.orm import selectinload
 import logging

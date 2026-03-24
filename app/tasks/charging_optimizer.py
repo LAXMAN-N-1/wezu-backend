@@ -20,7 +20,7 @@ def optimize_charging_queues():
     logger.info("Starting charging queue optimization task...")
     
     with Session(engine) as session:
-        stations = session.exec(select(Station).where(Station.status == "active")).all()
+        stations = session.exec(select(Station).where(Station.status == "OPERATIONAL")).all()
         
         for station in stations:
             try:

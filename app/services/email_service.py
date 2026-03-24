@@ -1,12 +1,15 @@
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from app.core.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 class EmailService:
     @staticmethod
     def send_email(to_email: str, subject: str, content: str):
         if not settings.SENDGRID_API_KEY:
-             print(f"MOCK EMAIL to {to_email}: {subject} \n {content}")
+             logger.info(f"MOCK EMAIL to {to_email}: {subject}")
              return True
 
         message = Mail(
@@ -20,7 +23,7 @@ class EmailService:
             response = sg.send(message)
             return response.status_code == 202
         except Exception as e:
-            print(f"Error sending email: {e}")
+            logger.warning(f"Error sending email: {e}")
             return False
 
     @staticmethod

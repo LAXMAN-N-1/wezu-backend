@@ -2,6 +2,8 @@
 from app.models.user import User, UserType, UserStatus
 from app.models.user_profile import UserProfile
 from app.models.rbac import Role, Permission, RolePermission, UserRole, UserAccessPath
+from app.models.token import SessionToken
+from app.models.two_factor_auth import TwoFactorAuth
 
 # Fleet & Inventory
 from app.models.station import Station, StationImage, StationSlot, StationStatus
@@ -83,7 +85,7 @@ from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
 
 
 # Teammate Operations & IoT
-from app.models.commission import Commission
+from app.models.commission import CommissionConfig, CommissionTier, CommissionLog
 from app.models.settlement import Settlement
 from app.models.iot import DeviceCommand, FirmwareUpdate
 from app.models.fraud import RiskScore, FraudCheckLog, Blacklist
@@ -129,7 +131,6 @@ from app.models.search_history import SearchHistory
 # Phase 1.5 & Phase 1 PowerFill Models
 from app.models.rbac import Role, Permission, RolePermission, AdminUserRole, UserRole, UserAccessPath
 from app.models.location import Continent, Country, Region, City, Zone
-from app.models.telematics import TelemeticsData
 from app.models.vendor import Vendor, VendorDocument
 from app.models.swap import SwapSession
 from app.models.settlement import Settlement

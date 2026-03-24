@@ -47,7 +47,6 @@ class Permission(SQLModel, table=True):
     scope: str = Field(default="global") # global, regional, organizational, own
     constraints: Optional[str] = None # JSON string for action-level rules
     description: Optional[str] = None
-    scope: str = Field(default="all") # e.g., "all", "own", "region"
     
     roles: List["Role"] = Relationship(back_populates="permissions", link_model=RolePermission)
 
@@ -94,6 +93,14 @@ class Role(SQLModel, table=True):
     
     # Merged from app/models/role.py (Legacy/Chandu branch)
     role_rights: List["RoleRight"] = Relationship(back_populates="role", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+
+    @property
+    def parent_role_id(self):
+        return self.parent_id
+    
+    @parent_role_id.setter
+    def parent_role_id(self, value):
+        self.parent_id = value
 
 
 

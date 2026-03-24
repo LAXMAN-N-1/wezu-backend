@@ -8,6 +8,13 @@ from app.services.battery_service import BatteryService
 from app.services.charging_service import ChargingService
 from app.schemas.station_monitoring import OptimizationBattery
 from datetime import datetime, timedelta
+from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
+from sqlalchemy.dialects.postgresql import JSONB
+
+# Allow JSONB when running against SQLite in these unit tests
+def visit_JSONB(self, type_, **kw):
+    return "JSON"
+SQLiteTypeCompiler.visit_JSONB = visit_JSONB
 
 # Setup in-memory SQLite for testing
 engine = create_engine("sqlite://")

@@ -10,7 +10,7 @@ class Address(SQLModel, table=True):
     # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id")
-    address_line1: str
+    address_line1: Optional[str] = None
     address_line2: Optional[str] = None
     street_address: Optional[str] = None # Deprecated, kept for backward compatibility if needed, else remove
     city: str

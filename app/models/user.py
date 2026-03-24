@@ -50,7 +50,7 @@ class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     
     # Core Identity
-    phone_number: str = Field(unique=True, index=True)
+    phone_number: Optional[str] = Field(default=None, unique=True, index=True)
     email: Optional[str] = Field(default=None, unique=True, index=True)
     full_name: Optional[str] = None
     hashed_password: Optional[str] = None
@@ -103,6 +103,7 @@ class User(SQLModel, table=True):
     # Relationship
     role: Optional["Role"] = Relationship(sa_relationship_kwargs={"viewonly": True}) # Legacy/Primary role. Viewonly to prevent conflict with roles list
     wallet: Optional["Wallet"] = Relationship(back_populates="user")
+    user_profile: Optional["UserProfile"] = Relationship(back_populates="user")
     addresses: List["Address"] = Relationship(back_populates="user")
     
     # Fix for ambiguous foreign keys: explicitly specify which FK on KYCDocument to use.
@@ -131,6 +132,11 @@ class User(SQLModel, table=True):
     session_tokens: List["SessionToken"] = Relationship(back_populates="user")
     two_factor_auth: Optional["TwoFactorAuth"] = Relationship(back_populates="user")
 
+    @property
+    def is_active(self) -> bool:
+        """Helper for schema compatibility."""
+        return self.status == UserStatus.ACTIVE
+
     # --- Granular RBAC Helpers ---
     @property
     def all_permissions(self) -> set:
@@ -146,9 +152,3 @@ class User(SQLModel, table=True):
         if self.is_superuser:
             return True
         return slug in self.all_permissions
-
-# OTP class removed (moved to app/models/otp.py)
-
-    @is_active.setter
-    def is_active(self, value: bool):
-        self.status = UserStatus.ACTIVE if value else UserStatus.SUSPENDED

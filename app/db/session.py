@@ -1,4 +1,4 @@
-from sqlmodel import Session, SQLModel
+from sqlmodel import Session, SQLModel, create_engine
 from app.core.config import settings
 from app.core.database import engine
 from app.models import *
@@ -21,7 +21,7 @@ def init_db():
             conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema};"))
         conn.commit()
     
-    # 2. Create Tables within schemas - Only if not using Alembic or for initial dev
+    # 2. Create Tables within schemas - Disabling temporarily to prevent hangs in dev
     # SQLModel.metadata.create_all(engine)
     
     # 3. TimescaleDB initialization

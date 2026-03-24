@@ -2,7 +2,7 @@ from app.services.email_service import EmailService
 from app.services.sms_service import SMSService
 from app.services.fcm_service import FCMService
 from app.models.user import User
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from app.models.notification import Notification
 from sqlmodel import Session, select
@@ -12,13 +12,18 @@ class NotificationService:
     @staticmethod
     def send_notification(
         db: Session,
-        user: User, 
+        user: Union[User, int], 
         title: str, 
         message: str, 
         type: str = "info",
         channel: str = "push",
         payload: Optional[str] = None
     ):
+        # Allow passing user_id for convenience
+        if isinstance(user, int):
+            user = db.get(User, user)
+        if not user:
+            return None
         # 1. Save to DB
         notif = Notification(
             user_id=user.id,

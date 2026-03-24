@@ -23,7 +23,7 @@ def battery_health_checks():
         with Session(engine) as session:
             # Get all batteries with IoT devices
             batteries = session.exec(
-                select(Battery).where(Battery.status.in_(["available", "in_use"]))
+                select(Battery).where(Battery.status.in_(["AVAILABLE", "RENTED"]))
             ).all()
             
             checked_count = 0

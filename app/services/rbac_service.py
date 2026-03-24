@@ -1,5 +1,6 @@
 from typing import List, Optional
 from sqlmodel import Session, select
+import sqlalchemy as sa
 from app.models.rbac import Role, Permission, RolePermission
 from app.models.role_right import RoleRight
 from app.models.menu import Menu

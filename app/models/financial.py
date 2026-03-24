@@ -10,15 +10,18 @@ if TYPE_CHECKING:
     from app.models.refund import Refund
 
 class TransactionType(str, Enum):
-    RENTAL_PAYMENT = "rental_payment"
-    SECURITY_DEPOSIT = "security_deposit"
-    WALLET_TOPUP = "wallet_topup"
-    REFUND = "refund"
-    FINE = "fine"
-    SUBSCRIPTION = "subscription"
-    WITHDRAWAL = "withdrawal"
-    PURCHASE = "purchase"
-    SWAP_FEE = "swap_fee"
+    RENTAL_PAYMENT = "RENTAL_PAYMENT"
+    SECURITY_DEPOSIT = "SECURITY_DEPOSIT"
+    WALLET_TOPUP = "WALLET_TOPUP"
+    REFUND = "REFUND"
+    FINE = "FINE"
+    SUBSCRIPTION = "SUBSCRIPTION"
+    WITHDRAWAL = "WITHDRAWAL"
+    PURCHASE = "PURCHASE"
+    SWAP_FEE = "SWAP_FEE"
+    LATE_FEE = "LATE_FEE"
+    CASHBACK = "CASHBACK"
+    TRANSFER = "TRANSFER"
 
 class TransactionStatus(str, Enum):
     PENDING = "pending"

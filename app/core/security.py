@@ -47,6 +47,24 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
+import pyotp
+import secrets
+
+def generate_totp_secret() -> str:
+    return pyotp.random_base32()
+
+def verify_totp(secret: str, code: str) -> bool:
+    totp = pyotp.TOTP(secret)
+    return totp.verify(code)
+
+def generate_backup_codes(count: int = 10) -> list:
+    return [secrets.token_hex(4).upper() for _ in range(count)]
+
+def generate_qr_uri(secret: str, user_email: str) -> str:
+    return pyotp.totp.TOTP(secret).provisioning_uri(
+        name=user_email, issuer_name="Wezu Energy"
+    )
+
 def verify_permission(user, permission_slug: str) -> bool:
     """
     Check if a user has a specific permission.
@@ -55,3 +73,4 @@ def verify_permission(user, permission_slug: str) -> bool:
     if user.is_superuser:
         return True
     return user.has_permission(permission_slug)
+

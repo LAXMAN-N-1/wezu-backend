@@ -2,7 +2,7 @@
 Enhanced Payment and Invoice API
 Invoice generation, refunds, and payment methods
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Request as FastAPIRequest
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from pydantic import BaseModel
@@ -143,6 +143,46 @@ def get_user_all_payments(
     ).all()
     return DataResponse(success=True, data=txns)
 
+# Moved up to avoid route precedence issues with /{id}
+@router.get("/payment-methods", response_model=DataResponse[dict])
+def get_payment_methods(current_user: User = Depends(deps.get_current_user)):
+    """Get available payment methods"""
+    return DataResponse(
+        success=True,
+        data={
+            "methods": [
+                {
+                    "id": "UPI",
+                    "name": "UPI",
+                    "description": "Google Pay, PhonePe, Paytm, etc.",
+                    "icon": "upi",
+                    "enabled": True
+                },
+                {
+                    "id": "CARD",
+                    "name": "Credit/Debit Card",
+                    "description": "Visa, Mastercard, RuPay",
+                    "icon": "card",
+                    "enabled": True
+                },
+                {
+                    "id": "WALLET",
+                    "name": "Digital Wallet",
+                    "description": "Paytm, Amazon Pay, etc.",
+                    "icon": "wallet",
+                    "enabled": True
+                },
+                {
+                    "id": "NETBANKING",
+                    "name": "Net Banking",
+                    "description": "All major banks",
+                    "icon": "bank",
+                    "enabled": True
+                }
+            ]
+        }
+    )
+
 @router.get("/{id}", response_model=DataResponse[dict])
 def get_payment_detail(
     id: int,
@@ -262,7 +302,7 @@ def get_profit_margins(
 def request_refund(
     order_id: int,
     request: RefundRequest,
-    http_request: FastAPIRequest = None,
+    http_request: Request = None,
     current_user: User = Depends(deps.get_current_user),
     session: Session = Depends(deps.get_db)
 ):
@@ -342,45 +382,7 @@ def get_user_refunds(
         ]
     )
 
-# Payment Methods Info
-@router.get("/payment-methods", response_model=DataResponse[dict])
-def get_payment_methods(current_user: User = Depends(deps.get_current_user)):
-    """Get available payment methods"""
-    return DataResponse(
-        success=True,
-        data={
-            "methods": [
-                {
-                    "id": "UPI",
-                    "name": "UPI",
-                    "description": "Google Pay, PhonePe, Paytm, etc.",
-                    "icon": "upi",
-                    "enabled": True
-                },
-                {
-                    "id": "CARD",
-                    "name": "Credit/Debit Card",
-                    "description": "Visa, Mastercard, RuPay",
-                    "icon": "card",
-                    "enabled": True
-                },
-                {
-                    "id": "WALLET",
-                    "name": "Digital Wallet",
-                    "description": "Paytm, Amazon Pay, etc.",
-                    "icon": "wallet",
-                    "enabled": True
-                },
-                {
-                    "id": "NETBANKING",
-                    "name": "Net Banking",
-                    "description": "All major banks",
-                    "icon": "bank",
-                    "enabled": True
-                }
-            ]
-        }
-    )
+# Razorpay Webhook
 
 @router.post("/webhooks/razorpay")
 async def razorpay_webhook(

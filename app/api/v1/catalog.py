@@ -583,27 +583,129 @@ def get_order_tracking(
     )
 
 # --- CART MANAGEMENT ---
-class CartItemUpdate(BaseModel):
-    quantity: int
+class CartItemAdd(BaseModel):
+    product_id: int
+    variant_id: Optional[int] = None
+    quantity: int = Field(default=1, gt=0)
 
-@router.patch("/cart/{item_id}")
-async def update_cart_item(
+class CartItemUpdate(BaseModel):
+    quantity: int = Field(..., gt=0)
+
+@router.get("/cart", response_model=DataResponse[List[dict]])
+def get_cart(
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
+):
+    """Get items in current user's cart"""
+    from app.services.cart_service import CartService
+    items = CartService.get_cart(db, current_user.id)
+    return DataResponse(success=True, data=items)
+
+@router.post("/cart", response_model=DataResponse[dict])
+def add_to_cart(
+    request: CartItemAdd,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
+):
+    """Add item to cart"""
+    from app.services.cart_service import CartService
+    item = CartService.add_to_cart(
+        db, current_user.id, request.product_id, request.variant_id, request.quantity
+    )
+    return DataResponse(success=True, data={"id": item.id, "message": "Product added to cart"})
+
+@router.patch("/cart/{item_id}", response_model=DataResponse[dict])
+def update_cart_item(
     item_id: int,
     update: CartItemUpdate,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
 ):
     """Update cart item quantity"""
-    return {"message": "Cart item updated", "item_id": item_id, "quantity": update.quantity}
+    from app.services.cart_service import CartService
+    item = CartService.update_quantity(db, current_user.id, item_id, update.quantity)
+    if not item and update.quantity > 0:
+         raise HTTPException(status_code=404, detail="Cart item not found")
+    return DataResponse(success=True, data={"message": "Cart updated"})
 
-@router.delete("/cart/{item_id}")
-async def remove_cart_item(
+@router.delete("/cart/{item_id}", response_model=DataResponse[dict])
+def remove_cart_item(
     item_id: int,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
 ):
     """Remove item from cart"""
-    return {"message": "Item removed from cart", "item_id": item_id}
+    from app.services.cart_service import CartService
+    success = CartService.remove_from_cart(db, current_user.id, item_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Cart item not found")
+    return DataResponse(success=True, data={"message": "Item removed from cart"})
+
+@router.delete("/cart", response_model=DataResponse[dict])
+def clear_cart(
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
+):
+    """Clear entire cart"""
+    from app.services.cart_service import CartService
+    CartService.clear_cart(db, current_user.id)
+    return DataResponse(success=True, data={"message": "Cart cleared"})
+
+@router.post("/orders/checkout", response_model=DataResponse[dict])
+def checkout_cart(
+    shipping_address: ShippingAddressRequest,
+    payment_method: str = "RAZORPAY",
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
+):
+    """Create order from current cart items"""
+    from app.services.cart_service import CartService
+    cart_items = CartService.get_cart(db, current_user.id)
+    if not cart_items:
+        raise HTTPException(status_code=400, detail="Cart is empty")
+        
+    # Convert cart items to order format
+    items = [
+        {
+            'product_id': item['product_id'],
+            'variant_id': item['variant_id'],
+            'quantity': item['quantity']
+        }
+        for item in cart_items
+    ]
+    
+    address_dict = {
+        'address': shipping_address.address,
+        'city': shipping_address.city,
+        'state': shipping_address.state,
+        'pincode': shipping_address.pincode,
+        'phone': shipping_address.phone
+    }
+    
+    order = OrderService.create_order(
+        user_id=current_user.id,
+        items=items,
+        shipping_address=address_dict,
+        payment_method=payment_method,
+        session=db
+    )
+    
+    if not order:
+        raise HTTPException(status_code=400, detail="Failed to create order")
+        
+    # Clear cart after successful order creation
+    CartService.clear_cart(db, current_user.id)
+    
+    return DataResponse(
+        success=True,
+        data={
+            "order_id": order.id,
+            "order_number": order.order_number,
+            "total_amount": order.total_amount,
+            "status": order.status,
+            "message": "Order placed successfully"
+        }
+    )
 
 # --- WARRANTY ---
 class WarrantyClaimRequest(BaseModel):

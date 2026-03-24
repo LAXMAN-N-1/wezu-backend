@@ -1,7 +1,7 @@
 from sqlmodel import Session, select
 from app.models.logistics import BatteryTransfer
 from app.models.inventory_audit import InventoryAuditLog
-from app.models.battery import Battery, BatteryStatus
+from app.models.battery import Battery, BatteryStatus, LocationType
 from app.schemas.inventory import TransferCreate
 from datetime import datetime
 from typing import List, Optional
@@ -85,10 +85,12 @@ class InventoryService:
         # Update battery location
         if transfer.to_location_type == "station":
             battery.station_id = transfer.to_location_id
-            battery.warehouse_id = None
+            battery.location_type = LocationType.STATION
+            battery.location_id = transfer.to_location_id
         elif transfer.to_location_type == "warehouse":
-            battery.warehouse_id = transfer.to_location_id
             battery.station_id = None
+            battery.location_type = LocationType.WAREHOUSE
+            battery.location_id = transfer.to_location_id
             
         battery.status = BatteryStatus.AVAILABLE
         battery.updated_at = datetime.utcnow()
