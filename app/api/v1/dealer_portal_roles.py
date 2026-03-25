@@ -32,7 +32,12 @@ def get_roles(
     dealer = _get_dealer(db, current_user.id)
     
     # Fetch roles: global (dealer_id is null) OR dealer-specific
-    statement = select(Role).where((Role.dealer_id == dealer.id) | (Role.dealer_id == None))
+    # For Dealer Portal, we mainly want to show their own roles.
+    # We might want to hide internal system roles like 'Super Admin'
+    statement = select(Role).where(
+        (Role.dealer_id == dealer.id) | 
+        ((Role.dealer_id == None) & (Role.is_system_role == True) & (Role.name.ilike("%dealer%") | Role.name.ilike("%customer%")))
+    )
     roles = db.exec(statement).all()
     
     results = []
@@ -317,7 +322,10 @@ def get_roles_matrix(
     current_user: User = Depends(deps.get_current_user),
 ):
     dealer = _get_dealer(db, current_user.id)
-    roles = db.exec(select(Role).where((Role.dealer_id == dealer.id) | (Role.dealer_id == None))).all()
+    roles = db.exec(select(Role).where(
+        (Role.dealer_id == dealer.id) | 
+        ((Role.dealer_id == None) & (Role.is_system_role == True) & (Role.name.ilike("%dealer%") | Role.name.ilike("%customer%")))
+    )).all()
     
     perms = db.exec(select(Permission)).all()
     modules = {}

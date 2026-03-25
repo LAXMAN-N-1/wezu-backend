@@ -8,7 +8,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.api import deps
 from app.db.session import get_session
@@ -25,6 +25,9 @@ from app.repositories.user_repository import user_repository
 
 router = APIRouter()
 logger = logging.getLogger("wezu_dealer_auth")
+
+MAX_LOGIN_ATTEMPTS = 5
+LOCKOUT_MINUTES = 15
 
 
 # ── Schemas ──────────────────────────────────────────────
@@ -141,13 +144,13 @@ def _build_dealer_auth_user(user: User, db: Session) -> DealerAuthUser:
 
 # ── Endpoints ────────────────────────────────────────────
 
-@router.post("/login", response_model=DealerAuthResponse)
+@router.post("/login")
 async def dealer_login(
     login_data: DealerLoginRequest,
     request: Request,
     db: Session = Depends(deps.get_db),
 ):
-    """Dealer login with email/phone + password."""
+    """Dealer login with email/phone + password. Supports both dealer owners and dealer staff."""
     identifier = login_data.email.strip()
     logger.info(f"Dealer login attempt: {identifier}")
 
@@ -158,11 +161,38 @@ async def dealer_login(
     if not user or not user.hashed_password:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
+    # Brute-force protection
+    if user.locked_until and user.locked_until > datetime.utcnow():
+        remaining = int((user.locked_until - datetime.utcnow()).total_seconds() / 60) + 1
+        raise HTTPException(
+            status_code=423,
+            detail=f"Account locked due to too many failed attempts. Try again in {remaining} minutes."
+        )
+
     if not verify_password(login_data.password, user.hashed_password):
+        # Increment failed attempts
+        user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+        if user.failed_login_attempts >= MAX_LOGIN_ATTEMPTS:
+            user.locked_until = datetime.utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
+            user.failed_login_attempts = 0
+            db.add(user)
+            db.commit()
+            raise HTTPException(
+                status_code=423,
+                detail=f"Account locked for {LOCKOUT_MINUTES} minutes after {MAX_LOGIN_ATTEMPTS} failed attempts."
+            )
+        db.add(user)
+        db.commit()
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    if user.status != UserStatus.ACTIVE:
+    if user.status not in [UserStatus.ACTIVE, UserStatus.PENDING_VERIFICATION]:
+        if user.status == UserStatus.PENDING:
+            raise HTTPException(status_code=403, detail="Account is pending activation. Check your email for the invite link.")
         raise HTTPException(status_code=403, detail="Account is inactive or suspended")
+
+    # Reset failed attempts on success
+    user.failed_login_attempts = 0
+    user.locked_until = None
 
     # Generate tokens
     token_jti = str(uuid.uuid4())
@@ -180,11 +210,33 @@ async def dealer_login(
     except Exception as e:
         logger.warning(f"Session creation warning: {e}")
 
-    return DealerAuthResponse(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        user=_build_dealer_auth_user(user, db),
-    )
+    # Build user response with role info
+    auth_user = _build_dealer_auth_user(user, db)
+    user_dict = auth_user.dict() if hasattr(auth_user, 'dict') else auth_user.model_dump()
+
+    # Add role info for staff users
+    if user.role_id:
+        role = db.get(Role, user.role_id)
+        if role:
+            user_dict["role_name"] = role.name
+            user_dict["role_icon"] = role.icon
+            user_dict["role_color"] = role.color
+            # Build permissions bitmask
+            perms = {}
+            for p in role.permissions:
+                mod = p.module
+                if mod not in perms:
+                    perms[mod] = []
+                perms[mod].append(p.action)
+            user_dict["permissions"] = perms
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "must_change_password": bool(user.force_password_change),
+        "user": user_dict,
+    }
 
 
 @router.post("/register", response_model=DealerAuthResponse)
@@ -351,3 +403,151 @@ def refresh_token(
         )
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+
+# ── Invite Token Activation ──────────────────────────────
+
+class ActivateAccountRequest(BaseModel):
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+
+@router.get("/validate-invite/{token}")
+def validate_invite_token(
+    token: str,
+    db: Session = Depends(deps.get_db),
+):
+    """Validate an invite token before showing the activation form."""
+    user = db.exec(select(User).where(User.invite_token == token)).first()
+    if not user:
+        return {"valid": False, "expired": False, "message": "Invalid invitation link"}
+
+    if user.invite_token_expires and user.invite_token_expires < datetime.utcnow():
+        return {
+            "valid": False, "expired": True,
+            "email": user.email, "full_name": user.full_name,
+            "message": "This invitation has expired"
+        }
+
+    # Get role and dealer info
+    role_name = role_color = None
+    if user.role_id:
+        role = db.get(Role, user.role_id)
+        if role:
+            role_name = role.name
+            role_color = role.color
+
+    dealer_name = None
+    if user.created_by_dealer_id:
+        dealer = db.get(DealerProfile, user.created_by_dealer_id)
+        if dealer:
+            dealer_name = dealer.business_name
+
+    return {
+        "valid": True, "expired": False,
+        "email": user.email,
+        "full_name": user.full_name,
+        "role_name": role_name,
+        "role_color": role_color,
+        "dealer_name": dealer_name,
+    }
+
+
+@router.post("/activate/{token}")
+def activate_account(
+    token: str,
+    data: ActivateAccountRequest,
+    request: Request,
+    db: Session = Depends(deps.get_db),
+):
+    """Activate a pending account using the invite token — sets password and logs in."""
+    user = db.exec(select(User).where(User.invite_token == token)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Invalid activation link")
+
+    if user.invite_token_expires and user.invite_token_expires < datetime.utcnow():
+        raise HTTPException(status_code=410, detail="Invitation has expired. Please request a new one.")
+
+    # Set password, activate
+    user.hashed_password = get_password_hash(data.password)
+    user.status = UserStatus.ACTIVE
+    user.invite_token = None
+    user.invite_token_expires = None
+    user.force_password_change = False
+    user.last_login = datetime.utcnow()
+    user.updated_at = datetime.utcnow()
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    # Generate tokens
+    token_jti = str(uuid.uuid4())
+    access_token = create_access_token(subject=user.id, extra_claims={"sid": token_jti})
+    refresh_token = create_refresh_token(subject=user.id, jti=token_jti)
+
+    # Create session
+    try:
+        from app.services.auth_service import AuthService
+        AuthService.create_user_session(db, user.id, refresh_token, request, token_jti=token_jti)
+    except Exception as e:
+        logger.warning(f"Session creation warning: {e}")
+
+    # Audit
+    from app.models.audit_log import AuditLog, AuditActionType
+    db.add(AuditLog(
+        user_id=user.id,
+        action=AuditActionType.ACCOUNT_ACTIVATION,
+        resource_type="DEALER_USER",
+        target_id=user.id,
+        details=f"Account activated for {user.email}",
+    ))
+    db.commit()
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "must_change_password": False,
+        "user": _build_dealer_auth_user(user, db).dict() if hasattr(_build_dealer_auth_user(user, db), 'dict') else _build_dealer_auth_user(user, db).model_dump(),
+    }
+
+
+class ForceChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v):
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+
+@router.post("/force-change-password")
+def force_change_password(
+    data: ForceChangePasswordRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    """Force password change on first login after admin-set password."""
+    if not current_user.force_password_change:
+        raise HTTPException(status_code=400, detail="Password change not required")
+
+    if not verify_password(data.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    current_user.hashed_password = get_password_hash(data.new_password)
+    current_user.force_password_change = False
+    current_user.password_changed_at = datetime.utcnow()
+    current_user.updated_at = datetime.utcnow()
+    db.add(current_user)
+    db.commit()
+
+    return {"message": "Password changed successfully", "must_change_password": False}
