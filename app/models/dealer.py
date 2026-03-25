@@ -37,7 +37,10 @@ class DealerProfile(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Relationships
-    user: "User" = Relationship(back_populates="dealer_profile")
+    user: "User" = Relationship(
+        back_populates="dealer_profile",
+        sa_relationship_kwargs={"foreign_keys": "[DealerProfile.user_id]"}
+    )
     stations: List["Station"] = Relationship(back_populates="dealer")
     application: Optional["DealerApplication"] = Relationship(back_populates="dealer")
     # commissions: List["Commission"] = Relationship(back_populates="dealer")

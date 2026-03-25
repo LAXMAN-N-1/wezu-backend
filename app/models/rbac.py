@@ -62,6 +62,16 @@ class Role(SQLModel, table=True):
     is_system_role: bool = Field(default=False)  # If True, cannot be deleted (e.g., Super Admin)
     is_active: bool = Field(default=True)
     
+    # Dealer Scoping (Phases 5/6)
+    dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id", index=True)
+    
+    # UI Attributes
+    icon: Optional[str] = Field(default="shield") # Lucide icon name
+    color: Optional[str] = Field(default="#4CAF50") # HEX color
+    
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
     # Hierarchy relationships
     parent: Optional["Role"] = Relationship(
         sa_relationship_kwargs={

@@ -27,6 +27,7 @@ class UserType(str, Enum):
     CUSTOMER = "customer"
     ADMIN = "admin"
     DEALER = "dealer"
+    DEALER_STAFF = "dealer_staff"
     SUPPORT_AGENT = "support_agent"
     LOGISTICS = "logistics"
 
@@ -34,6 +35,8 @@ class UserStatus(str, Enum):
     ACTIVE = "active"
     SUSPENDED = "suspended"
     PENDING_VERIFICATION = "pending_verification"
+    PENDING = "pending"
+    INACTIVE = "inactive"
     DELETED = "deleted"
 
 class KYCStatus(str, Enum):
@@ -60,6 +63,23 @@ class User(SQLModel, table=True):
     status: UserStatus = Field(default=UserStatus.ACTIVE, index=True)
     is_superuser: bool = Field(default=False)
     role_id: Optional[int] = Field(default=None, foreign_key="roles.id")
+    
+    # Dealer Staff Scoping
+    created_by_dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id", index=True)
+    created_by_user_id: Optional[int] = Field(default=None)  # Which admin created this user
+    
+    # Invite Flow
+    invite_token: Optional[str] = Field(default=None, index=True)
+    invite_token_expires: Optional[datetime] = None
+    invite_sent_at: Optional[datetime] = None
+    
+    # Staff Metadata
+    department: Optional[str] = None
+    notes_internal: Optional[str] = None  # Admin-only notes, never shown to user
+    
+    # Brute Force Protection
+    failed_login_attempts: int = Field(default=0)
+    locked_until: Optional[datetime] = None
     
     # Profile & Media
     profile_picture: Optional[str] = None
@@ -115,7 +135,13 @@ class User(SQLModel, table=True):
     kyc_records: List["KYCRecord"] = Relationship(back_populates="user", sa_relationship_kwargs={"foreign_keys": "[KYCRecord.user_id]"})
     devices: List["Device"] = Relationship(back_populates="user")
     vehicles: List["Vehicle"] = Relationship(back_populates="user")
-    dealer_profile: Optional["DealerProfile"] = Relationship(back_populates="user")
+    
+    # Fix for ambiguous foreign keys: explicitly specify which FK links a user to their OWN dealer profile
+    dealer_profile: Optional["DealerProfile"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"foreign_keys": "[DealerProfile.user_id]"}
+    )
+    
     driver_profile: Optional["DriverProfile"] = Relationship(back_populates="user")
     staff_profile: Optional["StaffProfile"] = Relationship(
         back_populates="user",

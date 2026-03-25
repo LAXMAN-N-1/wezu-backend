@@ -203,8 +203,8 @@ app.include_router(dealers.router, prefix=f"{dealer_api}/profile", tags=["Dealer
 app.include_router(stock.router, prefix=f"{dealer_api}/stock", tags=["Dealer: Stock"], dependencies=dealer_deps)
 app.include_router(settlements.router, prefix=f"{dealer_api}/settlements", tags=["Dealer: Settlements"], dependencies=dealer_deps)
 
-# 3b. Dealer Portal Endpoints (Auth, Dashboard, Tickets, Customers, Settings, Onboarding, Documents)
-from app.api.v1 import dealer_portal_auth, dealer_portal_dashboard, dealer_portal_tickets, dealer_portal_customers, dealer_portal_settings, dealer_onboarding, dealer_documents
+# 3b. Dealer Portal Endpoints (Auth, Dashboard, Tickets, Customers, Settings, Onboarding, Documents, Roles)
+from app.api.v1 import dealer_portal_auth, dealer_portal_dashboard, dealer_portal_tickets, dealer_portal_customers, dealer_portal_settings, dealer_onboarding, dealer_documents, dealer_portal_roles, dealer_portal_users
 app.include_router(dealer_portal_auth.router, prefix=f"{dealer_api}/auth", tags=["Dealer Portal: Auth"])
 app.include_router(dealer_onboarding.router, prefix=f"{dealer_api}/onboarding", tags=["Dealer Portal: Onboarding"], dependencies=dealer_deps)
 app.include_router(dealer_documents.router, prefix=f"{dealer_api}/documents", tags=["Dealer Portal: Documents"], dependencies=dealer_deps)
@@ -212,6 +212,8 @@ app.include_router(dealer_portal_dashboard.router, prefix=f"{dealer_api}/portal"
 app.include_router(dealer_portal_tickets.router, prefix=f"{dealer_api}/portal/tickets", tags=["Dealer Portal: Tickets"], dependencies=dealer_deps)
 app.include_router(dealer_portal_customers.router, prefix=f"{dealer_api}/portal/customers", tags=["Dealer Portal: Customers"], dependencies=dealer_deps)
 app.include_router(dealer_portal_settings.router, prefix=f"{dealer_api}/portal/settings", tags=["Dealer Portal: Settings"], dependencies=dealer_deps)
+app.include_router(dealer_portal_roles.router, prefix=f"{dealer_api}/portal/roles", tags=["Dealer Portal: Roles"], dependencies=dealer_deps)
+app.include_router(dealer_portal_users.router, prefix=f"{dealer_api}/portal/users", tags=["Dealer Portal: Users"], dependencies=dealer_deps)
 
 
 # 4. Logistics Application Endpoints
