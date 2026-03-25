@@ -2,7 +2,7 @@
 Battery Swap Service
 Enhanced battery swap execution and management
 """
-from sqlmodel import Session, select
+from sqlmodel import Session, select, col, desc
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 from app.models.rental import Rental
@@ -48,7 +48,7 @@ class SwapService:
         
         # Find nearby stations with available batteries
         stations = session.exec(
-            select(Station).where(Station.is_active == True)
+            select(Station).where(col(Station.is_active) == True)
         ).all()
         
         suggestions = []
@@ -67,10 +67,10 @@ class SwapService:
             # Count available batteries at station
             available_batteries = session.exec(
                 select(Battery)
-                .where(Battery.station_id == station.id)
-                .where(Battery.status == "available")
-                .where(Battery.current_soc >= 80)  # At least 80% charged
-                .where(Battery.health_percentage >= 85)  # Good health
+                .where(col(Battery.station_id) == station.id)
+                .where(col(Battery.status) == "available")
+                .where(col(Battery.current_soc) >= 80)  # At least 80% charged
+                .where(col(Battery.health_percentage) >= 85)  # Good health
             ).all()
             
             if not available_batteries:
@@ -147,7 +147,7 @@ class SwapService:
             session.add(new_battery)
             
             # 5. Handle Payment
-            fee = self.calculate_swap_fee(rental_id, session)
+            fee = SwapService.calculate_swap_fee(rental_id, session)
             if fee > 0:
                 WalletService.deduct_for_swap(session, rental.user_id, fee, rental_id) # Using rental_id as swap context
             
@@ -183,9 +183,9 @@ class SwapService:
         
         swaps = session.exec(
             select(RentalHistory)
-            .where(RentalHistory.rental_id == rental_id)
-            .where(RentalHistory.event_type == "BATTERY_SWAP")
-            .order_by(RentalHistory.timestamp.desc())
+            .where(col(RentalHistory.rental_id) == rental_id)
+            .where(col(RentalHistory.event_type) == "BATTERY_SWAP")
+            .order_by(desc(RentalHistory.timestamp))
         ).all()
         
         return [

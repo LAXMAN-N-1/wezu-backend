@@ -1,4 +1,4 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, select, col
 from app.models.ecommerce import EcommerceProduct, EcommerceOrder, EcommerceOrderItem
 from app.models.user import User
 from fastapi import HTTPException
@@ -7,10 +7,10 @@ from typing import List, Optional
 class ProductService:
     @staticmethod
     def get_all_products(db: Session, category: Optional[str] = None, skip: int = 0, limit: int = 20) -> List[EcommerceProduct]:
-        query = select(EcommerceProduct).where(EcommerceProduct.is_active == True)
+        query = select(EcommerceProduct).where(col(EcommerceProduct.is_active) == True)
         if category:
-            query = query.where(EcommerceProduct.category == category)
-        return db.exec(query.offset(skip).limit(limit)).all()
+            query = query.where(col(EcommerceProduct.category) == category)
+        return list(db.exec(query.offset(skip).limit(limit)).all())
 
     @staticmethod
     def get_product(db: Session, product_id: int) -> EcommerceProduct:
@@ -30,7 +30,7 @@ class OrderService:
     @staticmethod
     def create_order(db: Session, user_id: int, items_data: List[dict], shipping_address_id: int) -> EcommerceOrder:
         total_amount = 0.0
-        order_items = []
+        prepared_items = []
         
         for item in items_data:
             product = db.get(EcommerceProduct, item["product_id"])
@@ -47,12 +47,13 @@ class OrderService:
             line_total = product.price * item["quantity"]
             total_amount += line_total
             
-            order_items.append(EcommerceOrderItem(
-                product_id=product.id,
-                quantity=item["quantity"],
-                unit_price=product.price,
-                total_price=line_total
-            ))
+            assert product.id is not None
+            prepared_items.append({
+                "product_id": product.id,
+                "quantity": item["quantity"],
+                "unit_price": product.price,
+                "total_price": line_total
+            })
             
         # Create Order
         order = EcommerceOrder(
@@ -62,12 +63,15 @@ class OrderService:
             shipping_address_id=shipping_address_id
         )
         db.add(order)
-        db.commit()
-        db.refresh(order)
+        db.flush()
+        assert order.id is not None
         
         # Add Items
-        for oi in order_items:
-            oi.order_id = order.id
+        for item_info in prepared_items:
+            oi = EcommerceOrderItem(
+                order_id=order.id,
+                **item_info
+            )
             db.add(oi)
             
         db.commit()

@@ -1,4 +1,4 @@
-from sqlmodel import Session, select, func, and_
+from sqlmodel import Session, select, func, and_, col, desc
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from collections import defaultdict, Counter
@@ -67,14 +67,14 @@ class AnalyticsService:
         
         for station in stations:
             # Sum rental payments linked to this station
-            stmt = select(func.sum(Transaction.amount)).join(Rental).where(
-                Rental.start_station_id == station.id,
-                Transaction.status == TransactionStatus.SUCCESS
+            stmt = select(func.sum(col(Transaction.amount))).join(Rental).where(
+                col(Rental.start_station_id) == station.id,
+                col(Transaction.status) == TransactionStatus.SUCCESS
             )
             revenue = db.exec(stmt).one() or 0.0
             
             # Count rentals
-            rental_count = db.exec(select(func.count(Rental.id)).where(Rental.start_station_id == station.id)).one() or 0
+            rental_count = db.exec(select(func.count(col(Rental.id))).where(col(Rental.start_station_id) == station.id)).one() or 0
             
             results.append({
                 "station_id": station.id,
@@ -93,19 +93,19 @@ class AnalyticsService:
         start_date = end_date - timedelta(days=30)
         
         stmt = select(
-            func.date(Transaction.created_at).label("date"),
-            func.sum(Transaction.amount).label("daily_revenue")
+            func.date(col(Transaction.created_at)).label("date"),
+            func.sum(col(Transaction.amount)).label("daily_revenue")
         ).where(
-            Transaction.status == TransactionStatus.SUCCESS,
-            Transaction.created_at >= start_date
-        ).group_by(func.date(Transaction.created_at)).order_by("date")
+            col(Transaction.status) == TransactionStatus.SUCCESS,
+            col(Transaction.created_at) >= start_date
+        ).group_by(func.date(col(Transaction.created_at))).order_by("date")
         
         history = db.exec(stmt).all()
         
         if not history:
             return []
             
-        avg_daily = sum(h.daily_revenue for h in history) / len(history)
+        avg_daily = sum(h[1] for h in history) / len(history)
         
         forecast = []
         for i in range(1, days + 1):
@@ -178,6 +178,18 @@ class AnalyticsService:
         # Estimate fixed monthly costs (all batteries * daily dep * 30)
         total_batteries = db.exec(select(Battery)).all()
         monthly_fixed_cost = sum((b.purchase_cost or 25000.0) / 1000.0 for b in total_batteries) * 30
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        
+        active_users = db.exec(select(func.count(col(User.id))).where(col(User.is_active) == True)).one()
+        total_rentals = db.exec(select(func.count(col(Rental.id)))).one()
+        revenue_today = db.exec(
+            select(func.sum(Transaction.amount)).where(
+                Transaction.status == TransactionStatus.SUCCESS,
+                Transaction.created_at >= today_start
+            )
+        ).one()
+
+        revenue_today = revenue_today or 0.0
         
         for i in range(months):
             # Sum projected revenue for that month (every 30 days)
@@ -810,7 +822,7 @@ class AnalyticsService:
         """Aggregated stats for customer home screen"""
         from app.models.user import User
         from app.models.rental import Rental
-        from app.models.membership import Membership
+        from app.models.membership import UserMembership
         from app.models.financial import Transaction, TransactionStatus
         
         user = db.get(User, user_id)
@@ -827,7 +839,7 @@ class AnalyticsService:
         
         # 3. Membership & Points
         membership = db.exec(
-            select(Membership).where(Membership.user_id == user_id)
+            select(UserMembership).where(col(UserMembership.user_id) == user_id)
         ).first()
         
         points = membership.points_balance if membership else 0
@@ -836,7 +848,7 @@ class AnalyticsService:
         # 4. Recent Transactions (optional but helpful)
         recent_tx = db.exec(
             select(Transaction).where(Transaction.user_id == user_id)
-            .order_by(Transaction.created_at.desc()).limit(5)
+            .order_by(desc(Transaction.created_at)).limit(5)
         ).all()
         
         return {
@@ -1189,12 +1201,12 @@ class AnalyticsService:
     @staticmethod
     def _sum_rental_spending(db: Session, user_id: int, start: datetime, end: datetime) -> float:
         """Sum successful rental_payment transactions for a user in range."""
-        stmt = select(func.coalesce(func.sum(Transaction.amount), 0.0)).where(
-            Transaction.user_id == user_id,
-            Transaction.transaction_type == TransactionType.RENTAL_PAYMENT,
-            Transaction.status == TransactionStatus.SUCCESS,
-            Transaction.created_at >= start,
-            Transaction.created_at <= end,
+        stmt = select(func.coalesce(func.sum(col(Transaction.amount)), 0.0)).where(
+            col(Transaction.user_id) == user_id,
+            col(Transaction.transaction_type) == TransactionType.RENTAL_PAYMENT,
+            col(Transaction.status) == TransactionStatus.SUCCESS,
+            col(Transaction.created_at) >= start,
+            col(Transaction.created_at) <= end,
         )
         return float(db.exec(stmt).one())
 
@@ -1202,10 +1214,10 @@ class AnalyticsService:
     def _sum_purchase_spending(db: Session, user_id: int, start: datetime, end: datetime) -> float:
         """Sum purchase amounts for a user in range (from Purchase model)."""
         from app.models.rental import Purchase
-        stmt = select(func.coalesce(func.sum(Purchase.amount), 0.0)).where(
-            Purchase.user_id == user_id,
-            Purchase.timestamp >= start,
-            Purchase.timestamp <= end,
+        stmt = select(func.coalesce(func.sum(col(Purchase.amount)), 0.0)).where(
+            col(Purchase.user_id) == user_id,
+            col(Purchase.timestamp) >= start,
+            col(Purchase.timestamp) <= end,
         )
         return float(db.exec(stmt).one())
 
@@ -1365,13 +1377,14 @@ class AnalyticsService:
         total_rented = len(rentals)
 
         total_purchased = db.exec(
-            select(func.count(Purchase.id)).where(Purchase.user_id == user_id)
+            select(func.count(col(Purchase.id))).where(col(Purchase.user_id) == user_id)
         ).one() or 0
 
         # ── 2. Duration stats (completed rentals only) ────────────
         completed = [r for r in rentals if r.status == "completed" and r.end_time]
         durations_hours = []
         for r in completed:
+            assert r.end_time is not None
             dur = (r.end_time - r.start_time).total_seconds() / 3600
             durations_hours.append(dur)
 
@@ -1383,7 +1396,7 @@ class AnalyticsService:
         most_rented_type = None
         if battery_ids:
             batteries = db.exec(
-                select(Battery.battery_type).where(Battery.id.in_(battery_ids))
+                select(col(Battery.battery_type)).where(col(Battery.id).in_(battery_ids))
             ).all()
             if batteries:
                 type_counts = Counter(batteries)
@@ -1401,7 +1414,7 @@ class AnalyticsService:
         # Ensure every day is present
         by_day = {d: day_counter.get(d, 0) for d in day_names}
 
-        peak_day = max(by_day, key=by_day.get) if by_day and any(by_day.values()) else None
+        peak_day = max(by_day, key=lambda k: by_day[k]) if by_day and any(by_day.values()) else None
         peak_hour = hour_counter.most_common(1)[0][0] if hour_counter else None
 
         usage_patterns = {

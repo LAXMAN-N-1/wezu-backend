@@ -1,32 +1,17 @@
-"""
-Dealer Campaign Service — Manage promotional campaigns, validate at checkout,
-collect analytics, and handle bulk operations.
-"""
-
 import csv
 import io
 import json
 import logging
 import uuid
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import Dict, Any, List, Optional
+from uuid import UUID
 
-from sqlmodel import Session, select, func, col
+from sqlmodel import Session, select, func, col, desc
 from fastapi import HTTPException
 
 from app.models.dealer_promotion import DealerPromotion, PromotionUsage
 from app.models.station import Station
-# Using a generic "order" table name or whatever represents the transaction
-Campaign Service — Business Logic
-Targeting resolution, frequency capping, scheduling, analytics aggregation
-"""
-from typing import List, Optional, Dict, Any
-from sqlmodel import Session, select, func, col
-from datetime import datetime, timedelta
-from fastapi import HTTPException
-from uuid import UUID
-import logging
-
 from app.models.campaign import (
     Campaign, CampaignTarget, CampaignSend,
     CampaignStatus, CampaignType, CampaignTargetRuleType,
@@ -42,7 +27,7 @@ from app.schemas.campaign import (
 logger = logging.getLogger(__name__)
 
 
-class CampaignService:
+class DealerCampaignService:
 
     # ─── 1. CRUD Operations ───
 
@@ -51,7 +36,7 @@ class CampaignService:
         """Create a new promotional campaign."""
         # Ensure code uniqueness
         code = data.get("promo_code", "").upper().strip()
-        if db.exec(select(DealerPromotion).where(DealerPromotion.promo_code == code)).first():
+        if db.exec(select(DealerPromotion).where(col(DealerPromotion.promo_code) == code)).first():
             raise HTTPException(status_code=400, detail="Promo code already exists")
 
         promo = DealerPromotion(
@@ -85,8 +70,8 @@ class CampaignService:
     def get_campaign(db: Session, promo_id: int, dealer_id: int) -> DealerPromotion:
         promo = db.exec(
             select(DealerPromotion).where(
-                DealerPromotion.id == promo_id,
-                DealerPromotion.dealer_id == dealer_id
+                col(DealerPromotion.id) == promo_id,
+                col(DealerPromotion.dealer_id) == dealer_id
             )
         ).first()
         if not promo:
@@ -95,19 +80,19 @@ class CampaignService:
 
     @staticmethod
     def list_campaigns(db: Session, dealer_id: int, active_only: bool = False) -> List[DealerPromotion]:
-        stmt = select(DealerPromotion).where(DealerPromotion.dealer_id == dealer_id)
+        stmt = select(DealerPromotion).where(col(DealerPromotion.dealer_id) == dealer_id)
         if active_only:
-            stmt = stmt.where(DealerPromotion.is_active == True)
+            stmt = stmt.where(col(DealerPromotion.is_active) == True)
         return list(db.exec(stmt).all())
 
     @staticmethod
     def update_campaign(db: Session, promo_id: int, dealer_id: int, data: dict) -> DealerPromotion:
-        promo = CampaignService.get_campaign(db, promo_id, dealer_id)
+        promo = DealerCampaignService.get_campaign(db, promo_id, dealer_id)
         
         # Don't allow changing the code to an existing one
         new_code = data.get("promo_code")
         if new_code and new_code.upper().strip() != promo.promo_code:
-            existing = db.exec(select(DealerPromotion).where(DealerPromotion.promo_code == new_code.upper().strip())).first()
+            existing = db.exec(select(DealerPromotion).where(col(DealerPromotion.promo_code) == new_code.upper().strip())).first()
             if existing:
                 raise HTTPException(status_code=400, detail="Promo code already exists")
             promo.promo_code = new_code.upper().strip()
@@ -125,7 +110,7 @@ class CampaignService:
 
     @staticmethod
     def toggle_active(db: Session, promo_id: int, dealer_id: int, is_active: bool) -> DealerPromotion:
-        promo = CampaignService.get_campaign(db, promo_id, dealer_id)
+        promo = DealerCampaignService.get_campaign(db, promo_id, dealer_id)
         promo.is_active = is_active
         db.add(promo)
         db.commit()
@@ -134,10 +119,10 @@ class CampaignService:
 
     @staticmethod
     def clone_campaign(db: Session, promo_id: int, dealer_id: int, new_code: str) -> DealerPromotion:
-        original = CampaignService.get_campaign(db, promo_id, dealer_id)
+        original = DealerCampaignService.get_campaign(db, promo_id, dealer_id)
         
         code = new_code.upper().strip()
-        if db.exec(select(DealerPromotion).where(DealerPromotion.promo_code == code)).first():
+        if db.exec(select(DealerPromotion).where(col(DealerPromotion.promo_code) == code)).first():
             raise HTTPException(status_code=400, detail="Promo code already exists")
 
         new_promo = DealerPromotion(
@@ -172,7 +157,7 @@ class CampaignService:
         db: Session, code: str, station_id: Optional[int], order_amount: float, user_id: int
     ) -> dict:
         """Full validation logic on checkout."""
-        promo = db.exec(select(DealerPromotion).where(DealerPromotion.promo_code == code)).first()
+        promo = db.exec(select(DealerPromotion).where(col(DealerPromotion.promo_code) == code)).first()
         if not promo:
             raise HTTPException(status_code=404, detail="Invalid promo code")
 
@@ -219,9 +204,9 @@ class CampaignService:
         if promo.daily_cap:
             today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
             daily_uses = db.exec(
-                select(func.count(PromotionUsage.id)).where(
-                    PromotionUsage.promotion_id == promo.id,
-                    PromotionUsage.used_at >= today_start
+                select(func.count(col(PromotionUsage.id))).where(
+                    col(PromotionUsage.promotion_id) == promo.id,
+                    col(PromotionUsage.used_at) >= today_start
                 )
             ).one() or 0
             if daily_uses >= promo.daily_cap:
@@ -229,9 +214,9 @@ class CampaignService:
 
         # Per-user limit
         user_uses = db.exec(
-            select(func.count(PromotionUsage.id)).where(
-                PromotionUsage.promotion_id == promo.id,
-                PromotionUsage.user_id == user_id
+            select(func.count(col(PromotionUsage.id))).where(
+                col(PromotionUsage.promotion_id) == promo.id,
+                col(PromotionUsage.user_id) == user_id
             )
         ).one() or 0
         if user_uses >= promo.usage_limit_per_user:
@@ -274,6 +259,7 @@ class CampaignService:
         if not promo:
             raise HTTPException(status_code=404, detail="Promo not found")
 
+        assert promo.id is not None
         usage = PromotionUsage(
             promotion_id=promo.id,
             user_id=user_id,
@@ -308,10 +294,10 @@ class CampaignService:
 
     @staticmethod
     def get_analytics(db: Session, promo_id: int, dealer_id: int) -> dict:
-        promo = CampaignService.get_campaign(db, promo_id, dealer_id)
+        promo = DealerCampaignService.get_campaign(db, promo_id, dealer_id)
 
         usages = db.exec(
-            select(PromotionUsage).where(PromotionUsage.promotion_id == promo.id)
+            select(PromotionUsage).where(col(PromotionUsage.promotion_id) == promo.id)
         ).all()
 
         total_orders = len(usages)
@@ -360,7 +346,7 @@ class CampaignService:
                     continue
                     
                 # Skip if exists
-                if db.exec(select(DealerPromotion).where(DealerPromotion.promo_code == code)).first():
+                if db.exec(select(DealerPromotion).where(col(DealerPromotion.promo_code) == code)).first():
                     errors.append(f"Row {idx+1}: Code {code} already exists")
                     continue
 
@@ -404,7 +390,7 @@ class CampaignService:
         """Toggle active status for multiple campaigns. Returns count of updated."""
         promos = db.exec(
             select(DealerPromotion).where(
-                DealerPromotion.dealer_id == dealer_id,
+                col(DealerPromotion.dealer_id) == dealer_id,
                 col(DealerPromotion.id).in_(promo_ids)
             )
         ).all()
@@ -419,6 +405,7 @@ class CampaignService:
             db.commit()
             
         return count
+class AdminCampaignService:
     """Promotional Campaign Engine business logic."""
 
     # ──────────────────── CRUD ────────────────────
@@ -430,7 +417,7 @@ class CampaignService:
         """Create a new campaign in DRAFT status."""
         campaign = Campaign(
             name=payload.name,
-            type=payload.type.value,
+            type=CampaignType(payload.type.value),
             message_title=payload.message_title,
             message_body=payload.message_body,
             promo_code_id=payload.promo_code_id,
@@ -448,7 +435,7 @@ class CampaignService:
         for rule in payload.targets:
             target = CampaignTarget(
                 campaign_id=campaign.id,
-                rule_type=rule.rule_type.value,
+                rule_type=CampaignTargetRuleType(rule.rule_type.value),
                 rule_config=rule.rule_config,
             )
             db.add(target)
@@ -470,9 +457,9 @@ class CampaignService:
         limit: int = 20,
         status_filter: Optional[str] = None,
     ) -> List[Campaign]:
-        statement = select(Campaign).order_by(Campaign.created_at.desc())
+        statement = select(Campaign).order_by(desc(Campaign.created_at))
         if status_filter:
-            statement = statement.where(Campaign.status == status_filter)
+            statement = statement.where(col(Campaign.status) == status_filter)
         statement = statement.offset(skip).limit(limit)
         return list(db.exec(statement).all())
 
@@ -504,7 +491,7 @@ class CampaignService:
             # Delete existing targets
             existing = db.exec(
                 select(CampaignTarget).where(
-                    CampaignTarget.campaign_id == campaign_id
+                    col(CampaignTarget.campaign_id) == campaign_id
                 )
             ).all()
             for t in existing:
@@ -514,7 +501,7 @@ class CampaignService:
                 rule = CampaignTargetRuleCreate(**rule_data)
                 target = CampaignTarget(
                     campaign_id=campaign_id,
-                    rule_type=rule.rule_type.value,
+                    rule_type=CampaignTargetRuleType(rule.rule_type.value),
                     rule_config=rule.rule_config,
                 )
                 db.add(target)
@@ -536,13 +523,13 @@ class CampaignService:
 
         # Delete related targets and sends
         targets = db.exec(
-            select(CampaignTarget).where(CampaignTarget.campaign_id == campaign_id)
+            select(CampaignTarget).where(col(CampaignTarget.campaign_id) == campaign_id)
         ).all()
         for t in targets:
             db.delete(t)
 
         sends = db.exec(
-            select(CampaignSend).where(CampaignSend.campaign_id == campaign_id)
+            select(CampaignSend).where(col(CampaignSend.campaign_id) == campaign_id)
         ).all()
         for s in sends:
             db.delete(s)
@@ -631,20 +618,20 @@ class CampaignService:
         Returns a list of User objects that satisfy every CampaignTarget rule.
         """
         targets = db.exec(
-            select(CampaignTarget).where(CampaignTarget.campaign_id == campaign.id)
+            select(CampaignTarget).where(col(CampaignTarget.campaign_id) == campaign.id)
         ).all()
 
         if not targets:
             # No rules → all active customers
             return list(
-                db.exec(select(User).where(User.status == "active")).all()
+                db.exec(select(User).where(col(User.status) == "active")).all()
             )
 
         # Start with all active users and progressively filter
         candidate_ids: Optional[set] = None
 
         for target in targets:
-            matched_ids = CampaignService._resolve_single_rule(db, target)
+            matched_ids = AdminCampaignService._resolve_single_rule(db, target)
             if candidate_ids is None:
                 candidate_ids = matched_ids
             else:
@@ -671,16 +658,16 @@ class CampaignService:
         if target.rule_type == CampaignTargetRuleType.RENTAL_HISTORY:
             min_rentals = config.get("min_rentals", 1)
             results = db.exec(
-                select(Rental.user_id, func.count(Rental.id).label("cnt"))
-                .group_by(Rental.user_id)
-                .having(func.count(Rental.id) >= min_rentals)
+                select(Rental.user_id, func.count(col(Rental.id)).label("cnt"))
+                .group_by(col(Rental.user_id))
+                .having(func.count(col(Rental.id)) >= min_rentals)
             ).all()
             matched_ids = {row[0] for row in results}
 
         elif target.rule_type == CampaignTargetRuleType.BIRTHDAY:
             today = datetime.utcnow().date()
             profiles = db.exec(
-                select(UserProfile).where(UserProfile.date_of_birth.is_not(None))
+                select(UserProfile).where(col(UserProfile.date_of_birth).is_not(None))
             ).all()
             matched_ids = {
                 p.user_id
@@ -694,7 +681,7 @@ class CampaignService:
             city = config.get("city", "")
             if city:
                 profiles = db.exec(
-                    select(UserProfile).where(UserProfile.city == city)
+                    select(UserProfile).where(col(UserProfile.city) == city)
                 ).all()
                 matched_ids = {p.user_id for p in profiles}
 
@@ -703,8 +690,8 @@ class CampaignService:
             cutoff = datetime.utcnow() - timedelta(days=inactive_days)
             users = db.exec(
                 select(User).where(
-                    User.status == "active",
-                    User.last_login_at <= cutoff,
+                    col(User.status) == "active",
+                    col(User.last_login) <= cutoff,
                 )
             ).all()
             matched_ids = {u.id for u in users}
@@ -717,12 +704,12 @@ class CampaignService:
                 results = db.exec(
                     select(
                         Transaction.user_id,
-                        func.sum(Transaction.amount).label("total"),
+                        func.sum(col(Transaction.amount)).label("total"),
                     )
-                    .where(Transaction.status == "completed")
-                    .group_by(Transaction.user_id)
-                    .having(func.sum(Transaction.amount) >= min_spend)
-                    .having(func.sum(Transaction.amount) <= max_spend)
+                    .where(col(Transaction.status) == "completed")
+                    .group_by(col(Transaction.user_id))
+                    .having(func.sum(col(Transaction.amount)) >= min_spend)
+                    .having(func.sum(col(Transaction.amount)) <= max_spend)
                 ).all()
                 matched_ids = {row[0] for row in results}
             except Exception as e:
@@ -740,9 +727,9 @@ class CampaignService:
         """
         week_ago = datetime.utcnow() - timedelta(days=7)
         count = db.exec(
-            select(func.count(CampaignSend.id)).where(
-                CampaignSend.user_id == user_id,
-                CampaignSend.sent_at >= week_ago,
+            select(func.count(col(CampaignSend.id))).where(
+                col(CampaignSend.user_id) == user_id,
+                col(CampaignSend.sent_at) >= week_ago,
             )
         ).one()
         return count < cap
@@ -757,11 +744,12 @@ class CampaignService:
         """
         from app.services.notification_service import NotificationService
 
-        users = CampaignService.resolve_targets(db, campaign)
+        users = AdminCampaignService.resolve_targets(db, campaign)
         sent = 0
 
         for user in users:
-            if not CampaignService.check_frequency_cap(
+            assert user.id is not None
+            if not AdminCampaignService.check_frequency_cap(
                 db, user.id, campaign.frequency_cap
             ):
                 continue
@@ -830,14 +818,14 @@ class CampaignService:
         """
         campaigns = db.exec(
             select(Campaign).where(
-                Campaign.type == CampaignType.BIRTHDAY,
-                Campaign.status == CampaignStatus.ACTIVE,
+                col(Campaign.type) == CampaignType.BIRTHDAY,
+                col(Campaign.status) == CampaignStatus.ACTIVE,
             )
         ).all()
 
         total_sent = 0
         for campaign in campaigns:
-            sent = CampaignService.send_campaign(db, campaign)
+            sent = AdminCampaignService.send_campaign(db, campaign)
             total_sent += sent
             logger.info(
                 f"Birthday campaign '{campaign.name}' sent to {sent} users"
@@ -857,8 +845,8 @@ class CampaignService:
         now = datetime.utcnow()
         campaigns = db.exec(
             select(Campaign).where(
-                Campaign.status == CampaignStatus.SCHEDULED,
-                Campaign.scheduled_at <= now,
+                col(Campaign.status) == CampaignStatus.SCHEDULED,
+                col(Campaign.scheduled_at) <= now,
             )
         ).all()
 
@@ -868,7 +856,7 @@ class CampaignService:
             db.add(campaign)
             db.commit()
 
-            sent = CampaignService.send_campaign(db, campaign)
+            sent = AdminCampaignService.send_campaign(db, campaign)
             total_sent += sent
 
             campaign.status = CampaignStatus.COMPLETED

@@ -1,4 +1,4 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, select, col, desc
 from app.models.alert import Alert
 from app.models.station import Station
 from app.services.notification_service import NotificationService
@@ -43,12 +43,12 @@ class AlertService:
 
     @staticmethod
     def get_active_alerts(db: Session, skip: int = 0, limit: int = 100) -> List[Alert]:
-        return db.exec(
+        return list(db.exec(
             select(Alert)
-            .where(Alert.acknowledged_at == None)
-            .order_by(Alert.created_at.desc())
+            .where(col(Alert.acknowledged_at).is_(None))
+            .order_by(desc(Alert.created_at))
             .offset(skip).limit(limit)
-        ).all()
+        ).all())
 
     @staticmethod
     def acknowledge_alert(db: Session, alert_id: int, user_id: int) -> Optional[Alert]:

@@ -1,7 +1,7 @@
 import re
 from datetime import datetime
 from typing import List, Optional, Tuple, Dict, Any
-from sqlmodel import Session, select, func, desc, or_
+from sqlmodel import Session, select, func, desc, or_, col
 from sqlalchemy.orm import selectinload
 
 from app.models.article_category import ArticleCategory
@@ -24,7 +24,7 @@ def _generate_slug(title: str, db: Session, model_class: Any) -> str:
 
     slug = base_slug
     counter = 1
-    while db.exec(select(model_class).where(model_class.slug == slug)).first():
+    while db.exec(select(model_class).where(col(getattr(model_class, "slug")) == slug)).first():
         slug = f"{base_slug}-{counter}"
         counter += 1
     return slug
@@ -75,8 +75,8 @@ class KnowledgeBaseService:
             return False
             
         # Cannot delete if it has articles or children
-        has_articles = db.exec(select(KnowledgeArticle).where(KnowledgeArticle.category_id == cat_id)).first()
-        has_children = db.exec(select(ArticleCategory).where(ArticleCategory.parent_id == cat_id)).first()
+        has_articles = db.exec(select(KnowledgeArticle).where(col(KnowledgeArticle.category_id) == cat_id)).first()
+        has_children = db.exec(select(ArticleCategory).where(col(ArticleCategory.parent_id) == cat_id)).first()
         
         if has_articles or has_children:
             raise ValueError("Cannot delete category with active articles or subcategories")
@@ -89,9 +89,9 @@ class KnowledgeBaseService:
     def get_category_tree(db: Session) -> List[ArticleCategory]:
         # Return root categories; selectinload children
         statement = select(ArticleCategory).where(
-            ArticleCategory.parent_id == None,
-            ArticleCategory.is_active == True
-        ).order_by(ArticleCategory.sort_order).options(selectinload(ArticleCategory.children))
+            col(ArticleCategory.parent_id) == None,
+            col(ArticleCategory.is_active) == True
+        ).order_by(col(ArticleCategory.sort_order)).options(selectinload("children"))
         
         return list(db.exec(statement).all())
 
@@ -154,7 +154,7 @@ class KnowledgeBaseService:
             return False
             
         # Optional: Delete associated views first or let cascade handle it if configured
-        views = db.exec(select(ArticleView).where(ArticleView.article_id == article_id)).all()
+        views = db.exec(select(ArticleView).where(col(ArticleView.article_id) == article_id)).all()
         for v in views:
             db.delete(v)
             
@@ -164,11 +164,11 @@ class KnowledgeBaseService:
 
     @staticmethod
     def get_public_articles(db: Session, category_id: Optional[int] = None, skip: int = 0, limit: int = 50) -> List[KnowledgeArticle]:
-        statement = select(KnowledgeArticle).where(KnowledgeArticle.status == ArticleStatus.PUBLISHED)
+        statement = select(KnowledgeArticle).where(col(KnowledgeArticle.status) == ArticleStatus.PUBLISHED)
         if category_id:
-            statement = statement.where(KnowledgeArticle.category_id == category_id)
+            statement = statement.where(col(KnowledgeArticle.category_id) == category_id)
             
-        statement = statement.order_by(desc(KnowledgeArticle.published_at)).offset(skip).limit(limit)
+        statement = statement.order_by(desc(col(KnowledgeArticle.published_at))).offset(skip).limit(limit)
         return list(db.exec(statement).all())
 
 
@@ -221,14 +221,14 @@ class KnowledgeBaseService:
         search_term = f"%{query}%"
         
         statement = select(KnowledgeArticle).where(
-            KnowledgeArticle.status == ArticleStatus.PUBLISHED,
+            col(KnowledgeArticle.status) == ArticleStatus.PUBLISHED,
             or_(
-                KnowledgeArticle.title.ilike(search_term),
-                KnowledgeArticle.content.ilike(search_term)
+                col(KnowledgeArticle.title).ilike(search_term),
+                col(KnowledgeArticle.content).ilike(search_term)
             )
-        ).order_by(desc(KnowledgeArticle.views_count)).limit(limit)
+        ).order_by(desc(col(KnowledgeArticle.views_count))).limit(limit)
         
-        results = db.exec(statement).all()
+        results = list(db.exec(statement).all())
         
         formatted = []
         for r in results:
@@ -263,21 +263,21 @@ class KnowledgeBaseService:
 
     @staticmethod
     def get_analytics(db: Session) -> Dict[str, Any]:
-        total_articles = db.exec(select(func.count(KnowledgeArticle.id))).one()
+        total_articles = db.exec(select(func.count(col(KnowledgeArticle.id)))).one()
         total_published = db.exec(
-            select(func.count(KnowledgeArticle.id)).where(KnowledgeArticle.status == ArticleStatus.PUBLISHED)
+            select(func.count(col(KnowledgeArticle.id))).where(col(KnowledgeArticle.status) == ArticleStatus.PUBLISHED)
         ).one()
         
-        total_views = db.exec(select(func.sum(KnowledgeArticle.views_count))).one() or 0
+        total_views = db.exec(select(func.sum(col(KnowledgeArticle.views_count)))).one() or 0
 
         # Top Viewed
         top_viewed = db.exec(
-            select(KnowledgeArticle).order_by(desc(KnowledgeArticle.views_count)).limit(5)
+            select(KnowledgeArticle).order_by(desc(col(KnowledgeArticle.views_count))).limit(5)
         ).all()
 
         # Helpfulness metrics (at least 5 total votes)
         articles = db.exec(select(KnowledgeArticle).where(
-            (KnowledgeArticle.helpful_count + KnowledgeArticle.not_helpful_count) >= 5
+            (col(KnowledgeArticle.helpful_count) + col(KnowledgeArticle.not_helpful_count)) >= 5
         )).all()
 
         ratios = []

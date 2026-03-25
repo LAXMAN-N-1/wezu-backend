@@ -5,8 +5,8 @@ from app.schemas.battery import BatteryCreate, BatteryUpdate
 from app.services.qr_service import QRCodeService
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
-from sqlmodel import Session, select, func
-from sqlalchemy import desc
+from sqlmodel import Session, select, func, col, desc
+from sqlalchemy import desc as sa_desc
 from app.models.battery_health_log import BatteryHealthLog as BatteryHealthLogModel
 from app.models.battery_catalog import BatterySpec
 from app.schemas.station_monitoring import BatteryHealthStatus, BatteryHealthReport, BatteryHealthLog
@@ -20,8 +20,9 @@ class BatteryService:
 
     @staticmethod
     def get_by_serial(db: Session, serial: str) -> Optional[Battery]:
-        return db.exec(select(Battery).where(Battery.serial_number == serial)).first()
+        return db.exec(select(Battery).where(col(Battery.serial_number) == serial)).first()
 
+    @staticmethod
     def create_battery(db: Session, battery_in: BatteryCreate, current_user_id: Optional[int] = None) -> Battery:
         data = battery_in.model_dump()
         # Map spec_id to sku_id if present
@@ -35,6 +36,7 @@ class BatteryService:
         db.add(battery)
         db.commit()
         db.refresh(battery)
+        assert battery.id is not None
         
         # 1. Generate QR Code Data
         battery.qr_code_data = f"wezu://battery/{battery.id}"
@@ -108,6 +110,7 @@ class BatteryService:
         db.add(audit)
         db.commit()
 
+    @staticmethod
     def update_status(db: Session, battery_id: int, status: BatteryStatus, description: str, current_user_id: Optional[int] = None) -> Optional[Battery]:
         battery = db.get(Battery, battery_id)
         if not battery:
@@ -154,30 +157,31 @@ class BatteryService:
         db.commit()
         return battery
 
+    @staticmethod
     def get_health_history(db: Session, battery_id: int, limit: int = 50) -> List[BatteryHealthHistory]:
-        return db.exec(
+        return list(db.exec(
             select(BatteryHealthHistory)
-            .where(BatteryHealthHistory.battery_id == battery_id)
-            .order_by(BatteryHealthHistory.recorded_at.desc())
+            .where(col(BatteryHealthHistory.battery_id) == battery_id)
+            .order_by(desc(BatteryHealthHistory.recorded_at))
             .limit(limit)
-        ).all()
+        ).all())
 
     @staticmethod
     def get_rental_history(db: Session, battery_id: int, limit: int = 20) -> List[Rental]:
-        return db.exec(
+        return list(db.exec(
             select(Rental)
-            .where(Rental.battery_id == battery_id)
-            .order_by(Rental.start_time.desc())
+            .where(col(Rental.battery_id) == battery_id)
+            .order_by(desc(Rental.start_time))
             .limit(limit)
-        ).all()
+        ).all())
 
     @staticmethod
     def get_utilization_report(db: Session) -> Dict[str, Any]:
-        total = db.exec(select(func.count(Battery.id))).one() or 0
-        rented = db.exec(select(func.count(Battery.id)).where(Battery.status == BatteryStatus.RENTED)).one() or 0
-        available = db.exec(select(func.count(Battery.id)).where(Battery.status == BatteryStatus.AVAILABLE)).one() or 0
-        maintenance = db.exec(select(func.count(Battery.id)).where(Battery.status == BatteryStatus.MAINTENANCE)).one() or 0
-        retired = db.exec(select(func.count(Battery.id)).where(Battery.status == BatteryStatus.RETIRED)).one() or 0
+        total = db.exec(select(func.count(col(Battery.id)))).one() or 0
+        rented = db.exec(select(func.count(col(Battery.id))).where(col(Battery.status) == BatteryStatus.RENTED)).one() or 0
+        available = db.exec(select(func.count(col(Battery.id))).where(col(Battery.status) == BatteryStatus.AVAILABLE)).one() or 0
+        maintenance = db.exec(select(func.count(col(Battery.id))).where(col(Battery.status) == BatteryStatus.MAINTENANCE)).one() or 0
+        retired = db.exec(select(func.count(col(Battery.id))).where(col(Battery.status) == BatteryStatus.RETIRED)).one() or 0
         
         utilization = (rented / total * 100) if total > 0 else 0.0
         

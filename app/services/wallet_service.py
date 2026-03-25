@@ -11,6 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 class WalletService:
+
     @staticmethod
     def get_wallet(db: Session, user_id: int) -> Wallet:
         """Get or create user wallet"""
@@ -18,13 +19,11 @@ class WalletService:
 
     @staticmethod
     def initiate_topup(db: Session, user_id: int, amount: float) -> Transaction:
-        """Create a Razorpay order and a pending transaction record"""
-        # Ensure wallet exists
+        """Create Razorpay order and pending transaction"""
         wallet = wallet_repository.get_or_create(db, user_id)
-        # 1. Create Razorpay order
+
         order = PaymentService.create_order(amount)
-        
-        # 2. Save Transaction
+
         tx = Transaction(
             user_id=user_id,
             wallet_id=wallet.id,
@@ -34,6 +33,7 @@ class WalletService:
             payment_gateway_ref=order["id"],
             description=f"Wallet topup of {amount}"
         )
+
         db.add(tx)
         db.commit()
         db.refresh(tx)
@@ -41,72 +41,112 @@ class WalletService:
 
     @staticmethod
     def confirm_topup(
-        db: Session, 
-        user_id: int, 
-        order_id: str, 
-        payment_id: str, 
+        db: Session,
+        user_id: int,
+        order_id: str,
+        payment_id: str,
         signature: str
     ) -> Transaction:
-        """Verify payment and update user wallet balance"""
+        """Verify payment and credit wallet"""
+
         wallet = wallet_repository.get_or_create(db, user_id)
-        # 1. Verify Signature
+
+        # Verify Razorpay signature
         params = {
             "razorpay_order_id": order_id,
             "razorpay_payment_id": payment_id,
             "razorpay_signature": signature
         }
+
         if not PaymentService.verify_payment_signature(params):
             raise ValueError("Invalid payment signature")
-            
-        # 2. Find Transaction
-        statement = select(Transaction).where(
-            Transaction.payment_gateway_ref == order_id,
-            Transaction.user_id == user_id
-        )
-        tx = db.exec(statement).first()
+
+        # Fetch transaction
+        tx = db.exec(
+            select(Transaction).where(
+                Transaction.payment_gateway_ref == order_id,
+                Transaction.user_id == user_id
+            )
+        ).first()
+
         if not tx:
             raise ValueError("Transaction not found")
-            
+
         if tx.status == TransactionStatus.SUCCESS:
             return tx
-            
-        # 3. Update Transaction and Wallet
+
+        # Update transaction
         tx.status = TransactionStatus.SUCCESS
-        tx.payment_gateway_ref = payment_id # Update with final payment ID
+        tx.payment_gateway_ref = payment_id
         tx.updated_at = datetime.utcnow()
-        
-        # Calculate Taxes for Audit (18% GST inclusive)
+
+        # GST Calculation (IMPORTANT)
         tx.subtotal = round(tx.amount / 1.18, 2)
         tx.tax_amount = round(tx.amount - tx.subtotal, 2)
-        
+
+        # Update wallet (ONLY ONCE)
         wallet.balance += tx.amount
+        wallet.updated_at = datetime.utcnow()
+
         tx.wallet_id = wallet.id
 
         db.add(tx)
         db.add(wallet)
         db.commit()
         db.refresh(tx)
-        
-        # Auto-generate Invoice
+
+        # Generate invoice
         try:
             FinancialService.create_invoice(tx.id, user_id)
         except Exception as e:
             logger.error(f"Failed to auto-generate invoice for topup {tx.id}: {e}")
-            
+
+        return tx
+
+    @staticmethod
+    def deduct_balance(db: Session, user_id: int, amount: float, reason: str) -> Transaction:
+        """Generic deduction from wallet"""
+
+        wallet = wallet_repository.get_or_create(db, user_id)
+
+        if wallet.balance < amount:
+            raise ValueError("Insufficient wallet balance")
+
+        wallet.balance -= amount
+        wallet.updated_at = datetime.utcnow()
+
+        tx = Transaction(
+            user_id=user_id,
+            wallet_id=wallet.id,
+            amount=amount,
+            transaction_type=TransactionType.FINE,
+            status=TransactionStatus.SUCCESS,
+            description=reason
+        )
+
+        db.add(tx)
+        db.add(wallet)
+        db.commit()
+        db.refresh(tx)
+
         return tx
 
     @staticmethod
     def deduct_for_swap(db: Session, user_id: int, amount: float, swap_id: int) -> Transaction:
-        """Deduct funds from wallet for a swap"""
+        """Deduct wallet for swap"""
+
         wallet = wallet_repository.get_or_create(db, user_id)
+
         if wallet.balance < amount:
             raise ValueError("Insufficient wallet balance")
-            
+
         wallet.balance -= amount
-        
+        wallet.updated_at = datetime.utcnow()
+
+        # GST calculation
         subtotal = round(amount / 1.18, 2)
         tax = round(amount - subtotal, 2)
-        
+
         tx = Transaction(
             user_id=user_id,
             wallet_id=wallet.id,
@@ -116,31 +156,33 @@ class WalletService:
             transaction_type=TransactionType.SWAP_FEE,
             status=TransactionStatus.SUCCESS,
             description=f"Swap fee for swap #{swap_id}",
-            metadata={"swap_id": swap_id}
         )
-        
+
         db.add(tx)
         db.add(wallet)
         db.commit()
         db.refresh(tx)
-        
-        # Auto-generate Invoice
+
         try:
             FinancialService.create_invoice(tx.id, user_id)
         except Exception as e:
             logger.error(f"Failed to auto-generate invoice for swap {tx.id}: {e}")
-            
+
         return tx
-        
+
     @staticmethod
     def refund_to_wallet(db: Session, user_id: int, amount: float, reason: str) -> Transaction:
-        """Refund funds back to user wallet"""
+        """Refund to wallet"""
+
         wallet = wallet_repository.get_or_create(db, user_id)
+
         wallet.balance += amount
-        
+        wallet.updated_at = datetime.utcnow()
+
+        # GST calculation
         subtotal = round(amount / 1.18, 2)
         tax = round(amount - subtotal, 2)
-        
+
         tx = Transaction(
             user_id=user_id,
             wallet_id=wallet.id,
@@ -151,18 +193,17 @@ class WalletService:
             status=TransactionStatus.SUCCESS,
             description=f"Refund: {reason}"
         )
-        
+
         db.add(tx)
         db.add(wallet)
         db.commit()
         db.refresh(tx)
-        
-        # Auto-generate Invoice (Refund Receipt)
+
         try:
             FinancialService.create_invoice(tx.id, user_id)
         except Exception as e:
             logger.error(f"Failed to auto-generate invoice for refund {tx.id}: {e}")
-            
+
         return tx
 
     @staticmethod

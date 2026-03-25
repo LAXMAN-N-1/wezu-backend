@@ -4,10 +4,14 @@ from typing import List, Optional
 from app.api import deps
 from app.core.audit import audit_log
 from app.models.user import User
+from app.models.station import Station, StationStatus
+from app.models.favorite import Favorite
+from app.models.battery import Battery
+from app.schemas.battery import BatteryResponse
 from app.schemas.station import (
     StationResponse, StationCreate, NearbyStationResponse,
     StationUpdate, StationPerformanceResponse, StationMapResponse,
-    HeatmapPoint
+    HeatmapPoint, StationLocationLean
 )
 from app.schemas.review import ReviewResponse, ReviewCreate, ReviewUpdate
 from app.schemas.battery import BatteryResponse
@@ -20,6 +24,27 @@ from app.models.favorite import Favorite
 from datetime import datetime
 
 router = APIRouter()
+
+# ────────────────────────────────────────────
+# Lean Locations (for map markers)
+# ────────────────────────────────────────────
+@router.get("/locations", response_model=List[StationLocationLean])
+async def get_station_locations(
+    db: Session = Depends(deps.get_db),
+):
+    """
+    Lightweight list of all station coordinates for rendering 1 000+ map markers.
+    Returns only id, latitude, and longitude per station.
+    """
+    from sqlmodel import select
+    from app.models.station import Station
+
+    rows = db.exec(select(Station.id, Station.latitude, Station.longitude)).all()
+    return [
+        StationLocationLean(id=r[0], latitude=r[1], longitude=r[2])
+        for r in rows
+    ]
+
 
 @router.get("/", response_model=List[StationResponse])
 async def read_stations(
@@ -71,6 +96,21 @@ async def search_nearby_stations(
         battery_type=battery_type, min_capacity=min_capacity, max_price=max_price
     )
     return stations
+
+@router.get("/map", response_model=List[StationMapResponse])
+async def get_stations_map(
+    db: Session = Depends(deps.get_db),
+):
+    """Return all station coordinates and status for map rendering."""
+    stations = db.exec(select(Station)).all()
+    return stations
+
+@router.get("/heatmap", response_model=List[HeatmapPoint])
+async def get_stations_heatmap(
+    db: Session = Depends(deps.get_db),
+):
+    """Demand heatmap data aggregated by geography."""
+    return StationService.get_heatmap_data(db)
 
 @router.post("/", response_model=StationResponse)
 @audit_log("CREATE_STATION", "STATION")
@@ -224,20 +264,7 @@ async def update_station_maintenance_task(
     db.refresh(task)
     return task
 
-@router.get("/map", response_model=List[StationMapResponse])
-async def get_stations_map(
-    db: Session = Depends(deps.get_db),
-):
-    """Return all station coordinates and status for map rendering."""
-    stations = db.exec(select(Station)).all()
-    return stations
 
-@router.get("/heatmap", response_model=List[HeatmapPoint])
-async def get_stations_heatmap(
-    db: Session = Depends(deps.get_db),
-):
-    """Demand heatmap data aggregated by geography."""
-    return StationService.get_heatmap_data(db)
 
 @router.get("/{station_id}/reviews", response_model=List[ReviewResponse])
 async def read_station_reviews(

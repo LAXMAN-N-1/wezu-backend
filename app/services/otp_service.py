@@ -2,7 +2,7 @@ import random
 import string
 from datetime import datetime, timedelta
 from typing import Optional
-from sqlmodel import Session, select
+from sqlmodel import Session, select, col, desc
 from app.models.otp import OTP
 from app.core.config import settings
 from sendgrid import SendGridAPIClient
@@ -23,12 +23,12 @@ class OTPService:
         # 1. Count OTPs in the last 30 minutes
         window_start = datetime.utcnow() - timedelta(minutes=30)
         statement = select(OTP).where(
-            OTP.target == target, 
-            OTP.purpose == purpose, 
-            OTP.created_at > window_start
-        ).order_by(OTP.created_at.desc())
+            col(OTP.target) == target, 
+            col(OTP.purpose) == purpose, 
+            col(OTP.created_at) > window_start
+        ).order_by(desc(OTP.created_at))
         
-        recent_otps = db.exec(statement).all()
+        recent_otps = list(db.exec(statement).all())
         count = len(recent_otps)
         
         # 2. Hard Limit: Max 3 OTPs per 30 mins
@@ -63,8 +63,8 @@ class OTPService:
                 )
 
         # Deactivate previous OTPs for the same target and purpose
-        statement = select(OTP).where(OTP.target == target, OTP.purpose == purpose, OTP.is_active == True)
-        old_otps = db.exec(statement).all()
+        statement = select(OTP).where(col(OTP.target) == target, col(OTP.purpose) == purpose, col(OTP.is_active) == True)
+        old_otps = list(db.exec(statement).all())
         for old_otp in old_otps:
             old_otp.is_active = False # Mark as inactive instead of is_used
             db.add(old_otp)
@@ -165,11 +165,11 @@ class OTPService:
 
         # Find the active OTP for this target in our database
         statement = select(OTP).where(
-            OTP.target == target,
-            OTP.purpose == purpose,
-            OTP.is_active == True,
-            OTP.is_used == False,
-            OTP.expires_at > datetime.utcnow()
+            col(OTP.target) == target,
+            col(OTP.purpose) == purpose,
+            col(OTP.is_active) == True,
+            col(OTP.is_used) == False,
+            col(OTP.expires_at) > datetime.utcnow()
         )
         otp_record = db.exec(statement).first()
         

@@ -40,7 +40,7 @@ class CampaignTargetRuleType(str, Enum):
 
 class Campaign(SQLModel, table=True):
     __tablename__ = "campaigns"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "core"}
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
     name: str = Field(index=True)
@@ -71,7 +71,7 @@ class Campaign(SQLModel, table=True):
     converted_count: int = Field(default=0)
 
     # Audit
-    created_by: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    created_by: Optional[int] = Field(default=None, foreign_key="users.id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -82,10 +82,10 @@ class Campaign(SQLModel, table=True):
 
 class CampaignTarget(SQLModel, table=True):
     __tablename__ = "campaign_targets"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "core"}
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
-    campaign_id: uuid.UUID = Field(foreign_key="core.campaigns.id", index=True)
+    campaign_id: uuid.UUID = Field(foreign_key="campaigns.id", index=True)
 
     rule_type: CampaignTargetRuleType
     rule_config: Dict[str, Any] = Field(default={}, sa_column=Column(JSON))
@@ -98,18 +98,18 @@ class CampaignTarget(SQLModel, table=True):
 
 class CampaignSend(SQLModel, table=True):
     __tablename__ = "campaign_sends"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "core"}
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
-    campaign_id: uuid.UUID = Field(foreign_key="core.campaigns.id", index=True)
-    user_id: int = Field(foreign_key="core.users.id", index=True)
+    campaign_id: uuid.UUID = Field(foreign_key="campaigns.id", index=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
 
     sent_at: datetime = Field(default_factory=datetime.utcnow)
     opened_at: Optional[datetime] = None
     converted_at: Optional[datetime] = None
 
     notification_id: Optional[int] = Field(
-        default=None, foreign_key="core.notifications.id"
+        default=None, foreign_key="notifications.id"
     )
 
     # Relationships

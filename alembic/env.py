@@ -39,13 +39,10 @@ def render_item(type_, obj, autogen_context):
 def include_object(object, name, type_, reflected, compare_to):
     """
     Control which objects are included in the autogeneration process.
+    Only include public schema tables (all models now unified under public).
     """
     if type_ == "table":
-        # Include specific schemas plus public
-        return object.schema in [
-            "core", "inventory", "stations", "rentals", 
-            "finance", "dealers", "logistics", "public", None
-        ]
+        return object.schema in ["public", None]
     return True
 
 
@@ -58,9 +55,8 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        render_item=render_item,   # ✅ Important
-        include_schemas=True,       # ✅ Support multiple schemas
-        include_object=include_object, # ✅ Filter schemas
+        render_item=render_item,
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -84,9 +80,8 @@ def run_migrations_online() -> None:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
-            render_item=render_item,   # ✅ Important
-            include_schemas=True,       # ✅ Support multiple schemas
-            include_object=include_object, # ✅ Filter schemas
+            render_item=render_item,
+            include_object=include_object,
         )
 
         with context.begin_transaction():

@@ -71,9 +71,9 @@ def get_pending_dealers(
     """
     Admin checks manual review required items.
     """
-    # Quick dirty RBAC - you have a proper one now. 
-    # Just checking RoleEnum.ADMIN
-    if RoleEnum.ADMIN.value not in [r.name for r in current_user.roles]:
+    # Admin/Superuser check
+    is_admin = current_user.is_superuser or (current_user.roles and RoleEnum.ADMIN.value in [r.name for r in current_user.roles])
+    if not is_admin:
          raise HTTPException(status_code=403, detail="Admin only")
          
     dealers = db.exec(
@@ -88,7 +88,9 @@ def review_dealer(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_session)
 ):
-    if RoleEnum.ADMIN.value not in [r.name for r in current_user.roles]:
+    # Admin/Superuser check
+    is_admin = current_user.is_superuser or (current_user.roles and RoleEnum.ADMIN.value in [r.name for r in current_user.roles])
+    if not is_admin:
          raise HTTPException(status_code=403, detail="Admin only")
         
     try:

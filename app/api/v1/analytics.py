@@ -160,3 +160,35 @@ async def export_analytics_data(
     }
     
     return DataResponse(success=True, data=data)
+
+
+# ── Heatmap Data ───────────────────────────────────────────────────
+
+from typing import List as TypingList
+from pydantic import BaseModel
+from app.services.station_service import StationService
+
+
+class HeatmapDataPoint(BaseModel):
+    lat: float
+    lng: float
+    weight: float  # 0.0–1.0 normalised demand intensity
+
+
+@router.get("/map/heat", response_model=TypingList[HeatmapDataPoint])
+def get_heatmap_data(
+    db: Session = Depends(deps.get_db),
+):
+    """
+    Bulk (lat, lng, weight) for current & predicted demand hotspots.
+    Weight is normalised 0–1 based on rentals in the last 7 days.
+    """
+    raw = StationService.get_heatmap_data(db)
+    return [
+        HeatmapDataPoint(
+            lat=point["latitude"],
+            lng=point["longitude"],
+            weight=point["intensity"],
+        )
+        for point in raw
+    ]

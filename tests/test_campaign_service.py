@@ -15,7 +15,7 @@ from app.models.user import User, UserStatus
 from app.models.user_profile import UserProfile
 from app.models.rental import Rental, RentalStatus
 from app.schemas.campaign import CampaignCreate, CampaignUpdate, CampaignTargetRuleCreate
-from app.services.campaign_service import CampaignService
+from app.services.campaign_service import AdminCampaignService
 
 
 # ── Fixtures ──
@@ -119,7 +119,7 @@ class TestCreateCampaign:
             message_body="Get 20% off on all rentals",
             frequency_cap=2,
         )
-        campaign = CampaignService.create_campaign(session, payload, admin_user.id)
+        campaign = AdminCampaignService.create_campaign(session, payload, admin_user.id)
 
         assert campaign.name == "Summer Sale"
         assert campaign.status == CampaignStatus.DRAFT
@@ -134,7 +134,7 @@ class TestCreateCampaign:
             message_body="Test body",
             frequency_cap=3,  # max allowed is 3
         )
-        campaign = CampaignService.create_campaign(session, payload, admin_user.id)
+        campaign = AdminCampaignService.create_campaign(session, payload, admin_user.id)
         assert campaign.frequency_cap <= 3
 
     def test_create_campaign_with_targets(self, session: Session, admin_user: User):
@@ -150,7 +150,7 @@ class TestCreateCampaign:
                 ),
             ],
         )
-        campaign = CampaignService.create_campaign(session, payload, admin_user.id)
+        campaign = AdminCampaignService.create_campaign(session, payload, admin_user.id)
         targets = session.query(CampaignTarget).filter(
             CampaignTarget.campaign_id == campaign.id
         ).all()
@@ -164,20 +164,20 @@ class TestCampaignStatusTransitions:
             session, admin_user.id,
             scheduled_at=datetime.utcnow() + timedelta(hours=1),
         )
-        activated = CampaignService.activate_campaign(session, campaign.id)
+        activated = AdminCampaignService.activate_campaign(session, campaign.id)
         assert activated.status == CampaignStatus.SCHEDULED
 
     def test_activate_birthday_goes_active(self, session: Session, admin_user: User):
         campaign = _create_draft_campaign(
             session, admin_user.id, type=CampaignType.BIRTHDAY
         )
-        activated = CampaignService.activate_campaign(session, campaign.id)
+        activated = AdminCampaignService.activate_campaign(session, campaign.id)
         assert activated.status == CampaignStatus.ACTIVE
 
     def test_activate_requires_schedule_for_non_birthday(self, session: Session, admin_user: User):
         campaign = _create_draft_campaign(session, admin_user.id, scheduled_at=None)
         with pytest.raises(Exception) as exc_info:
-            CampaignService.activate_campaign(session, campaign.id)
+            AdminCampaignService.activate_campaign(session, campaign.id)
         assert "scheduled_at" in str(exc_info.value.detail).lower() or "schedule" in str(exc_info.value.detail).lower()
 
     def test_pause_campaign(self, session: Session, admin_user: User):
@@ -185,7 +185,7 @@ class TestCampaignStatusTransitions:
             session, admin_user.id,
             status=CampaignStatus.ACTIVE,
         )
-        paused = CampaignService.pause_campaign(session, campaign.id)
+        paused = AdminCampaignService.pause_campaign(session, campaign.id)
         assert paused.status == CampaignStatus.PAUSED
 
 
@@ -195,12 +195,12 @@ class TestCampaignCRUD:
             session, admin_user.id, status=CampaignStatus.ACTIVE
         )
         with pytest.raises(Exception) as exc_info:
-            CampaignService.delete_campaign(session, campaign.id)
+            AdminCampaignService.delete_campaign(session, campaign.id)
         assert "draft or paused" in str(exc_info.value.detail).lower()
 
     def test_delete_draft_succeeds(self, session: Session, admin_user: User):
         campaign = _create_draft_campaign(session, admin_user.id)
-        result = CampaignService.delete_campaign(session, campaign.id)
+        result = AdminCampaignService.delete_campaign(session, campaign.id)
         assert "deleted" in result["message"].lower()
 
     def test_update_only_draft_or_paused(self, session: Session, admin_user: User):
@@ -209,13 +209,13 @@ class TestCampaignCRUD:
         )
         payload = CampaignUpdate(name="Updated Name")
         with pytest.raises(Exception) as exc_info:
-            CampaignService.update_campaign(session, campaign.id, payload)
+            AdminCampaignService.update_campaign(session, campaign.id, payload)
         assert "draft or paused" in str(exc_info.value.detail).lower()
 
     def test_update_draft_succeeds(self, session: Session, admin_user: User):
         campaign = _create_draft_campaign(session, admin_user.id)
         payload = CampaignUpdate(name="Updated Campaign Name")
-        updated = CampaignService.update_campaign(session, campaign.id, payload)
+        updated = AdminCampaignService.update_campaign(session, campaign.id, payload)
         assert updated.name == "Updated Campaign Name"
 
 
@@ -234,7 +234,7 @@ class TestFrequencyCapping:
         session.commit()
 
         # User should be capped
-        can_send = CampaignService.check_frequency_cap(session, sample_user.id, cap=3)
+        can_send = AdminCampaignService.check_frequency_cap(session, sample_user.id, cap=3)
         assert can_send is False
 
     def test_frequency_cap_allows_under_limit(self, session: Session, sample_user: User, admin_user: User):
@@ -248,7 +248,7 @@ class TestFrequencyCapping:
         session.add(send)
         session.commit()
 
-        can_send = CampaignService.check_frequency_cap(session, sample_user.id, cap=3)
+        can_send = AdminCampaignService.check_frequency_cap(session, sample_user.id, cap=3)
         assert can_send is True
 
 
@@ -265,7 +265,7 @@ class TestTargeting:
         session.add(target)
         session.commit()
 
-        users = CampaignService.resolve_targets(session, campaign)
+        users = AdminCampaignService.resolve_targets(session, campaign)
         user_ids = [u.id for u in users]
         assert user_with_profile.id in user_ids
 
@@ -279,7 +279,7 @@ class TestTargeting:
         session.add(target)
         session.commit()
 
-        users = CampaignService.resolve_targets(session, campaign)
+        users = AdminCampaignService.resolve_targets(session, campaign)
         user_ids = [u.id for u in users]
         assert user_with_profile.id in user_ids
 
@@ -293,7 +293,7 @@ class TestTargeting:
         session.add(target)
         session.commit()
 
-        users = CampaignService.resolve_targets(session, campaign)
+        users = AdminCampaignService.resolve_targets(session, campaign)
         user_ids = [u.id for u in users]
         assert inactive_user.id in user_ids
 
@@ -306,7 +306,7 @@ class TestAnalytics:
             opened_count=40,
             converted_count=10,
         )
-        analytics = CampaignService.get_analytics(session, campaign.id)
+        analytics = AdminCampaignService.get_analytics(session, campaign.id)
 
         assert analytics["sent_count"] == 100
         assert analytics["opened_count"] == 40
@@ -316,7 +316,7 @@ class TestAnalytics:
 
     def test_campaign_analytics_zero_sent(self, session: Session, admin_user: User):
         campaign = _create_draft_campaign(session, admin_user.id)
-        analytics = CampaignService.get_analytics(session, campaign.id)
+        analytics = AdminCampaignService.get_analytics(session, campaign.id)
 
         assert analytics["open_rate"] == 0.0
         assert analytics["conversion_rate"] == 0.0
@@ -325,5 +325,5 @@ class TestAnalytics:
 class TestTestSend:
     def test_send_test_to_admin(self, session: Session, admin_user: User):
         campaign = _create_draft_campaign(session, admin_user.id)
-        result = CampaignService.send_test(session, campaign.id, admin_user)
+        result = AdminCampaignService.send_test(session, campaign.id, admin_user)
         assert "test" in result["message"].lower()

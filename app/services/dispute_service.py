@@ -1,4 +1,4 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, select, col
 from datetime import datetime
 from app.models.settlement_dispute import SettlementDispute
 from app.models.settlement import Settlement
@@ -23,8 +23,8 @@ class DisputeService:
         # Check if an open dispute already exists
         existing = db.exec(
             select(SettlementDispute).where(
-                SettlementDispute.settlement_id == settlement_id,
-                SettlementDispute.status.in_(["open", "under_review"]),
+                col(SettlementDispute.settlement_id) == settlement_id,
+                col(SettlementDispute.status).in_(["open", "under_review"]),
             )
         ).first()
         if existing:
@@ -91,8 +91,8 @@ class DisputeService:
     @staticmethod
     def list_open_disputes(db: Session) -> list:
         """List all open/under_review disputes for admin dashboard."""
-        return db.exec(
+        return list(db.exec(
             select(SettlementDispute).where(
-                SettlementDispute.status.in_(["open", "under_review"])
+                col(SettlementDispute.status).in_(["open", "under_review"])
             )
-        ).all()
+        ).all())

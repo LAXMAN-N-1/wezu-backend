@@ -115,9 +115,16 @@ class User(SQLModel, table=True):
     deletion_reason: Optional[str] = None
     deleted_at: Optional[datetime] = None
     
+    # Preferences (JSON string)
+    notification_preferences: Optional[str] = None
+    
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     # Relationship
     role: Optional["Role"] = Relationship(sa_relationship_kwargs={"viewonly": True}) # Legacy/Primary role. Viewonly to prevent conflict with roles list
+    roles: List["Role"] = Relationship(back_populates="users", link_model=UserRole)
     wallet: Optional["Wallet"] = Relationship(back_populates="user")
     user_profile: Optional["UserProfile"] = Relationship(back_populates="user")
     addresses: List["Address"] = Relationship(back_populates="user")
@@ -174,3 +181,13 @@ class User(SQLModel, table=True):
         if self.is_superuser:
             return True
         return slug in self.all_permissions
+
+# OTP class removed (moved to app/models/otp.py)
+
+    @property
+    def is_active(self) -> bool:
+        return self.status == UserStatus.ACTIVE
+
+    @is_active.setter
+    def is_active(self, value: bool):
+        self.status = UserStatus.ACTIVE if value else UserStatus.SUSPENDED

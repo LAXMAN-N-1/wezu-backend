@@ -20,10 +20,10 @@ def process_birthday_campaigns():
     execution = create_job_execution("birthday_campaign_trigger")
 
     try:
-        from app.services.campaign_service import CampaignService
+        from app.services.campaign_service import AdminCampaignService
 
         with Session(engine) as session:
-            result = CampaignService.process_birthday_campaigns(session)
+            result = AdminCampaignService.process_birthday_campaigns(session)
 
         logger.info(
             f"Birthday campaigns completed: {result['campaigns_processed']} campaigns, "
@@ -45,10 +45,10 @@ def process_scheduled_campaigns():
     execution = create_job_execution("scheduled_campaign_sender")
 
     try:
-        from app.services.campaign_service import CampaignService
+        from app.services.campaign_service import AdminCampaignService
 
         with Session(engine) as session:
-            result = CampaignService.process_scheduled_campaigns(session)
+            result = AdminCampaignService.process_scheduled_campaigns(session)
 
         if result["campaigns_processed"] > 0:
             logger.info(

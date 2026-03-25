@@ -21,6 +21,13 @@ class MapsService:
         return None
 
     @staticmethod
-    async def get_distance(origin, destination):
-        # Calculate distance matrix (Future impl)
-        pass
+    def haversine(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
+        """Calculate the great circle distance between two points in km."""
+        from math import radians, cos, sin, asin, sqrt
+        lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+        dlon = lon2 - lon1 
+        dlat = lat2 - lat1 
+        a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+        c = 2 * asin(sqrt(a)) 
+        r = 6371 # Radius of earth in km
+        return c * r

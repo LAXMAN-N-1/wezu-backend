@@ -2,7 +2,7 @@
 GPS Tracking Service
 Continuous location tracking and history management
 """
-from sqlmodel import Session, select
+from sqlmodel import Session, select, col
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 from app.models.gps_log import GPSTrackingLog
@@ -83,17 +83,17 @@ class GPSTrackingService:
         Returns:
             List of GPS logs
         """
-        query = select(GPSTrackingLog).where(GPSTrackingLog.rental_id == rental_id)
+        query = select(GPSTrackingLog).where(col(GPSTrackingLog.rental_id) == rental_id)
         
         if start_time:
-            query = query.where(GPSTrackingLog.timestamp >= start_time)
+            query = query.where(col(GPSTrackingLog.timestamp) >= start_time)
         
         if end_time:
-            query = query.where(GPSTrackingLog.timestamp <= end_time)
+            query = query.where(col(GPSTrackingLog.timestamp) <= end_time)
         
-        query = query.order_by(GPSTrackingLog.timestamp.desc()).limit(limit)
+        query = query.order_by(col(GPSTrackingLog.timestamp).desc()).limit(limit)
         
-        return session.exec(query).all()
+        return list(session.exec(query).all())
     
     @staticmethod
     def get_current_location(rental_id: int, session: Session) -> Optional[GPSTrackingLog]:
@@ -109,8 +109,8 @@ class GPSTrackingService:
         """
         return session.exec(
             select(GPSTrackingLog)
-            .where(GPSTrackingLog.rental_id == rental_id)
-            .order_by(GPSTrackingLog.timestamp.desc())
+            .where(col(GPSTrackingLog.rental_id) == rental_id)
+            .order_by(col(GPSTrackingLog.timestamp).desc())
         ).first()
     
     @staticmethod
@@ -140,7 +140,7 @@ class GPSTrackingService:
         return R * c
     
     @staticmethod
-    def get_travel_path(rental_id: int, session: Session) -> List[Dict]:
+    def get_travel_path(rental_id: int, session: Session) -> Dict:
         """
         Get complete travel path for rental
         
@@ -151,11 +151,11 @@ class GPSTrackingService:
         Returns:
             List of coordinates with timestamps
         """
-        logs = session.exec(
+        logs = list(session.exec(
             select(GPSTrackingLog)
-            .where(GPSTrackingLog.rental_id == rental_id)
-            .order_by(GPSTrackingLog.timestamp)
-        ).all()
+            .where(col(GPSTrackingLog.rental_id) == rental_id)
+            .order_by(col(GPSTrackingLog.timestamp))
+        ).all())
         
         path = []
         total_distance = 0.0
@@ -202,20 +202,13 @@ class GPSTrackingService:
         """
         from app.models.geofence import Geofence
         
-        # Get all active geofences
-        geofences = session.exec(
-            select(Geofence).where(Geofence.is_active == True)
-        ).all()
+        is_ok, message = GeofenceService.check_boundary(session, latitude, longitude)
         
-        for geofence in geofences:
-            violation = GeofenceService.check_boundary(latitude, longitude, geofence)
-            
-            if violation:
-                # Log violation
-                logger.warning(
-                    f"Geofence violation detected for rental {rental_id}: "
-                    f"{geofence.type} zone '{geofence.name}'"
-                )
+        if not is_ok:
+            # Log violation
+            logger.warning(
+                f"Geofence violation detected for rental {rental_id}: {message}"
+            )
                 
                 # In production, trigger alert/notification
                 # NotificationService.send_geofence_alert(rental_id, geofence)
@@ -232,10 +225,10 @@ class GPSTrackingService:
         Returns:
             Location statistics
         """
-        logs = session.exec(
+        logs = list(session.exec(
             select(GPSTrackingLog)
-            .where(GPSTrackingLog.rental_id == rental_id)
-        ).all()
+            .where(col(GPSTrackingLog.rental_id) == rental_id)
+        ).all())
         
         if not logs:
             return {

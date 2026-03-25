@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from app.models.battery import Battery
     from app.models.location import Zone
     from app.models.review import Review
+    from app.models.geofence import Geofence
 
 class StationStatus(str, Enum):
     OPERATIONAL = "OPERATIONAL"
@@ -51,11 +52,27 @@ class Station(SQLModel, table=True):
     available_batteries: int = Field(default=0)
     available_slots: int = Field(default=0)
     
+
+    # Structured charger configuration  (JSON array)
+    # [{"type": "CCS2", "count": 4, "power_kw": 50, "efficiency": 0.95, "speed": "fast"}]
+    charger_configs: Optional[str] = Field(default=None)
+
+    # Operating temperature range (°C)
+    operating_temp_min: Optional[float] = Field(default=None)
+    operating_temp_max: Optional[float] = Field(default=None)
+
+    # Auto-close rental config
+    auto_close_enabled: bool = Field(default=False)
+    auto_close_grace_minutes: int = Field(default=30)
+
     # Status
     status: str = Field(default="active")
     approval_status: str = Field(default="approved") # pending, approved, rejected
     contact_phone: Optional[str] = None
-    operating_hours: Optional[str] = None # JSON string: {"mon": "09:00-18:00", ...}
+    operating_hours: Optional[str] = None # Legacy plain string
+    # Structured day-by-day hours (JSON)
+    # {"mon": {"open": "09:00", "close": "18:00"}, ..., "holidays": {"open": null, "close": null}}
+    structured_hours: Optional[str] = Field(default=None)
     is_24x7: bool = Field(default=False)
     amenities: Optional[str] = None # JSON string
     image_url: Optional[str] = None
@@ -67,6 +84,9 @@ class Station(SQLModel, table=True):
     
     # Inventory settings
     low_stock_threshold_pct: float = Field(default=20.0)
+
+    # Geofence linkage
+    geofence_id: Optional[int] = Field(default=None, foreign_key="geofence.id")
 
     
     # Timestamps
@@ -81,6 +101,7 @@ class Station(SQLModel, table=True):
     zone: Optional["Zone"] = Relationship(back_populates="stations")
     dealer: Optional["DealerProfile"] = Relationship(back_populates="stations")
     reviews: List["Review"] = Relationship(back_populates="station")
+    geofence: Optional["Geofence"] = Relationship(back_populates="station")
     
     # Foreign Key Relationships
     # Note: Circular imports are handled by string forward references in many cases, 

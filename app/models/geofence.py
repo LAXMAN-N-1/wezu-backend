@@ -1,6 +1,9 @@
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional
+from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
+
+if TYPE_CHECKING:
+    from app.models.station import Station
 
 class Geofence(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -14,3 +17,6 @@ class Geofence(SQLModel, table=True):
     
     is_active: bool = Field(default=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    # Relationship back to Station
+    station: Optional["Station"] = Relationship(back_populates="geofence")

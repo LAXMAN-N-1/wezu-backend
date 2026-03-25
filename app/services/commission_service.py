@@ -1,4 +1,4 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, select, col
 from app.models.commission import CommissionConfig, CommissionLog, CommissionTier
 from app.models.financial import Transaction
 from typing import Optional
@@ -27,12 +27,12 @@ class CommissionService:
         now = as_of_date or datetime.utcnow()
 
         statement = select(CommissionConfig).where(
-            CommissionConfig.transaction_type == transaction_type,
-            CommissionConfig.is_active == True,
-            CommissionConfig.effective_from <= now,
+            col(CommissionConfig.transaction_type) == transaction_type,
+            col(CommissionConfig.is_active) == True,
+            col(CommissionConfig.effective_from) <= now,
         )
         # Filter by effective_until (None means no expiry)
-        configs = db.exec(statement).all()
+        configs = list(db.exec(statement).all())
         configs = [
             c for c in configs
             if c.effective_until is None or c.effective_until >= now
@@ -46,11 +46,11 @@ class CommissionService:
             return {"percentage": 0.0, "flat_fee": 0.0}
 
         # Check for volume-based tier
-        tiers = db.exec(
+        tiers = list(db.exec(
             select(CommissionTier)
-            .where(CommissionTier.config_id == chosen.id)
-            .order_by(CommissionTier.min_volume)
-        ).all()
+            .where(col(CommissionTier.config_id) == (chosen.id or 0))
+            .order_by(col(CommissionTier.min_volume))
+        ).all())
 
         if tiers:
             for tier in tiers:
@@ -70,7 +70,7 @@ class CommissionService:
         """
         rate = CommissionService.get_applicable_rate(
             db,
-            transaction_type=transaction.type,
+            transaction_type=transaction.transaction_type,
         )
 
         amount = 0.0
@@ -82,6 +82,7 @@ class CommissionService:
         amount = round(amount, 2)
 
         if amount > 0:
+            assert transaction.id is not None
             log = CommissionLog(
                 transaction_id=transaction.id,
                 dealer_id=None,  # Determined by config context

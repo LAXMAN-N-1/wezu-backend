@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, col
 from app.models.otp import OTP
 from app.models.fraud import Blacklist
+from app.models.user import User
 from typing import Optional
 import logging
 
@@ -16,11 +17,11 @@ class FraudService:
         """
         if action_type == "otp":
             window_start = datetime.utcnow() - timedelta(minutes=window_minutes)
-            statement = select(func.count(OTP.id)).where(
-                OTP.target == target,
-                OTP.created_at >= window_start
+            statement = select(func.count(col(OTP.id))).where(
+                col(OTP.target) == target,
+                col(OTP.created_at) >= window_start
             )
-            count = db.exec(statement).one()
+            count = db.exec(statement).one() or 0
             if count >= limit:
                 logger.warning(f"Velocity limit exceeded for OTP to {target}: {count} in {window_minutes}m")
                 return False
@@ -34,25 +35,31 @@ class FraudService:
         Check if a user or phone number is in the system blacklist.
         """
         if user_id:
-            block = db.exec(select(Blacklist).where(Blacklist.user_id == user_id, Blacklist.is_active == True)).first()
-            if block: return True
+            user = db.get(User, user_id)
+            if user:
+                if user.email:
+                    if db.exec(select(Blacklist).where(col(Blacklist.type) == "EMAIL", col(Blacklist.value) == user.email)).first():
+                        return True
+                if user.phone_number:
+                    if db.exec(select(Blacklist).where(col(Blacklist.type) == "PHONE", col(Blacklist.value) == user.phone_number)).first():
+                        return True
             
         if phone:
-            block = db.exec(select(Blacklist).where(Blacklist.identifier == phone, Blacklist.is_active == True)).first()
+            block = db.exec(select(Blacklist).where(col(Blacklist.value) == phone)).first()
             if block: return True
             
         return False
 
     @staticmethod
-    def add_to_blacklist(db: Session, identifier: str, reason: str, user_id: Optional[int] = None):
+    def add_to_blacklist(db: Session, block_type: str, value: str, reason: str):
         """
-        Manually add an identifier or user to the blacklist.
+        Manually add an identifier to the blacklist.
+        block_type: PHONE, EMAIL, IP, DEVICE_ID, PAN
         """
         entry = Blacklist(
-            identifier=identifier,
-            user_id=user_id,
-            reason=reason,
-            is_active=True
+            type=block_type,
+            value=value,
+            reason=reason
         )
         db.add(entry)
         db.commit()

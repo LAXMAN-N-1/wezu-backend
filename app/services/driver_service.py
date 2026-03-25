@@ -1,15 +1,15 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, select, col
 from app.core.database import engine
 from app.models.driver_profile import DriverProfile
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 class DriverService:
     
     @staticmethod
-    def get_profile(user_id: int) -> DriverProfile:
+    def get_profile(user_id: int) -> Optional[DriverProfile]:
         with Session(engine) as session:
-            return session.exec(select(DriverProfile).where(DriverProfile.user_id == user_id)).first()
+            return session.exec(select(DriverProfile).where(col(DriverProfile.user_id) == user_id)).first()
 
     @staticmethod
     def create_profile(user_id: int, data: dict) -> DriverProfile:

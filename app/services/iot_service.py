@@ -1,16 +1,23 @@
 import json
 import logging
 from datetime import datetime
+from typing import Optional
 import random
 import paho.mqtt.client as mqtt
-from sqlmodel import Session, select
+from sqlmodel import Session, select, col
 from app.core.database import engine
 from app.core.config import settings
 from app.models.gps_log import GPSTrackingLog
 from app.models.battery_health_log import BatteryHealthLog
 from app.models.iot import IoTDevice, DeviceCommand
 from app.models.battery import Battery
-# from app.services.geofence_service import GeofenceService
+from app.models.telemetry import Telemetry
+
+try:
+    from paho.mqtt.enums import CallbackAPIVersion
+    CALLBACK_API_VERSION = CallbackAPIVersion.VERSION2
+except (ImportError, AttributeError):
+    CALLBACK_API_VERSION = None
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +48,7 @@ class IoTService:
             msg_type = topic_parts[3]
 
             with Session(engine) as session:
-                device = session.exec(select(IoTDevice).where(IoTDevice.device_id == device_id)).first()
+                device = session.exec(select(IoTDevice).where(col(IoTDevice.device_id) == device_id)).first()
                 if not device:
                     logger.warning(f"Received message from unknown device: {device_id}")
                     return
@@ -70,8 +77,8 @@ class IoTService:
             return
 
         # 1. Save Telemetry (TimescaleDB Hypertable)
-        from app.models.iot import Telemetry
         telemetry = Telemetry(
+            device_id=device.device_id,
             battery_id=device.battery_id,
             timestamp=datetime.utcnow(),
             soc=data.get("soc", 0.0),
@@ -81,17 +88,17 @@ class IoTService:
             temperature=data.get("temp", 0.0),
             latitude=data.get("lat"),
             longitude=data.get("lng"),
-            speed=data.get("speed"),
-            status_flags=json.dumps(data.get("flags", {}))
+            speed_kmph=data.get("speed"),
+            metadata_json=json.dumps(data.get("flags", {}))
         )
         session.add(telemetry)
 
         # 2. Update Battery Current State
         battery = session.get(Battery, device.battery_id)
         if battery:
-            battery.current_charge = telemetry.soc
-            battery.health_percentage = telemetry.soh
-            battery.temperature_c = telemetry.temperature
+            battery.current_charge = telemetry.soc or 0.0
+            battery.health_percentage = telemetry.soh or 100.0
+            battery.temperature_c = telemetry.temperature or 25.0
             battery.last_telemetry_at = telemetry.timestamp
             session.add(battery)
 
@@ -99,21 +106,22 @@ class IoTService:
             from app.models.rental import Rental
             active_rental = session.exec(
                 select(Rental).where(
-                    Rental.battery_id == battery.id,
-                    Rental.status == "active"
+                    col(Rental.battery_id) == battery.id,
+                    col(Rental.status) == "active"
                 )
             ).first()
             
             if active_rental:
-                if not active_rental.metadata:
-                    active_rental.metadata = "{}"
+                if not active_rental.meta_data:
+                    active_rental.meta_data = "{}"
                 
                 try:
-                    meta = json.loads(active_rental.metadata)
+                    assert active_rental.meta_data is not None
+                    meta = json.loads(active_rental.meta_data)
                     meta["last_soc"] = telemetry.soc
                     meta["last_lat"] = telemetry.latitude
                     meta["last_lng"] = telemetry.longitude
-                    active_rental.metadata = json.dumps(meta)
+                    active_rental.meta_data = json.dumps(meta)
                 except:
                     pass
                 
@@ -136,11 +144,12 @@ class IoTService:
     @staticmethod
     def send_command(device_id: str, command_type: str, payload: dict) -> DeviceCommand:
         with Session(engine) as session:
-            device = session.exec(select(IoTDevice).where(IoTDevice.device_id == device_id)).first()
+            device = session.exec(select(IoTDevice).where(col(IoTDevice.device_id) == device_id)).first()
             if not device:
                 raise ValueError("Device not found")
 
             # create command record
+            assert device.id is not None
             cmd = DeviceCommand(
                 device_id=device.id,
                 command_type=command_type,
@@ -152,6 +161,7 @@ class IoTService:
             session.refresh(cmd)
             
             # Publish to MQTT
+            assert cmd.id is not None
             topic = f"wezu/devices/{device_id}/command"
             msg_payload = {
                 "command_id": cmd.id,
@@ -168,7 +178,7 @@ class IoTService:
             return cmd
 
     @staticmethod
-    def register_device(device_id: str, device_type: str, battery_id: int = None) -> IoTDevice:
+    def register_device(device_id: str, device_type: str, battery_id: Optional[int] = None) -> IoTDevice:
         with Session(engine) as session:
             device = IoTDevice(
                 device_id=device_id, 
@@ -201,7 +211,11 @@ class IoTService:
         # Fallback to DB or Mock
         with Session(engine) as session:
              # Try to get latest health log
-             log = session.exec(select(BatteryHealthLog).where(BatteryHealthLog.battery_id == battery_id).order_by(BatteryHealthLog.timestamp.desc())).first()
+             log = session.exec(
+                 select(BatteryHealthLog)
+                 .where(col(BatteryHealthLog.battery_id) == battery_id)
+                 .order_by(col(BatteryHealthLog.timestamp).desc())
+             ).first()
              if log:
                  return {
                      "battery_id": battery_id,

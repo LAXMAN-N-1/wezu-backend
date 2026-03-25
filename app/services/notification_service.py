@@ -19,11 +19,48 @@ class NotificationService:
         channel: str = "push",
         payload: Optional[str] = None
     ):
-        # Allow passing user_id for convenience
-        if isinstance(user, int):
-            user = db.get(User, user)
-        if not user:
-            return None
+        # --- Dealer Notification Preferences Check ---
+        from app.models.dealer import DealerProfile
+        from app.models.dealer_notification_pref import DealerNotificationPreference
+        from datetime import datetime
+        
+        dealer = db.exec(select(DealerProfile).where(DealerProfile.user_id == user.id)).first()
+        if dealer:
+            pref = db.exec(select(DealerNotificationPreference).where(DealerNotificationPreference.dealer_id == dealer.id)).first()
+            if pref:
+                # 1. Check channel toggles
+                if channel == "push" and not pref.push_notifications:
+                    return
+                if channel == "sms" and not pref.sms_notifications:
+                    return
+                
+                # 2. Quiet Hours check
+                if pref.quiet_hours_enabled and pref.quiet_hours and type != "critical":
+                    try:
+                        start_str = pref.quiet_hours.get("start", "22:00")
+                        end_str = pref.quiet_hours.get("end", "07:00")
+                        
+                        now = datetime.now() # Local server time
+                        current_minutes = now.hour * 60 + now.minute
+                        
+                        sh, sm = map(int, start_str.split(":"))
+                        start_minutes = sh * 60 + sm
+                        
+                        eh, em = map(int, end_str.split(":"))
+                        end_minutes = eh * 60 + em
+                        
+                        in_quiet_hours = False
+                        if start_minutes < end_minutes:
+                            in_quiet_hours = start_minutes <= current_minutes <= end_minutes
+                        else: # Crosses midnight
+                            in_quiet_hours = current_minutes >= start_minutes or current_minutes <= end_minutes
+                            
+                        if in_quiet_hours:
+                            print(f"[Notifications] Suppressed '{title}' for dealer {dealer.id} due to quiet hours.")
+                            return # Suppress notification
+                    except Exception as e:
+                        print(f"Quiet hours parsing error: {e}")
+        # ---------------------------------------------
         # 1. Save to DB
         notif = Notification(
             user_id=user.id,

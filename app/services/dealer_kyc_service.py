@@ -25,8 +25,9 @@ class DealerKYCService:
         allowed_types = ["application/pdf", "image/jpeg", "image/jpg"]
         
         # We need to correctly read the content type
-        if file.content_type not in allowed_types and not file.filename.lower().endswith(('.pdf', '.jpg', '.jpeg')):
-            raise ValueError(f"Invalid file type for {file.filename}. Only PDF and JPG are allowed.")
+        filename = file.filename or ""
+        if file.content_type not in allowed_types and not filename.lower().endswith(('.pdf', '.jpg', '.jpeg')):
+            raise ValueError(f"Invalid file type for {filename}. Only PDF and JPG are allowed.")
             
         return f"s3://encrypted-bucket/kyc/{prefix}_{file.filename}"
 
@@ -67,6 +68,7 @@ class DealerKYCService:
             db.add(existing)
             db.commit()
             db.refresh(existing)
+            assert existing.id is not None
             
             DealerKYCService._log_transition(db, existing.id, from_state, KYCStateConfig.DOC_SUBMITTED.value, user_id, "Documents re-submitted")
             return existing
@@ -86,6 +88,7 @@ class DealerKYCService:
         db.add(app)
         db.commit()
         db.refresh(app)
+        assert app.id is not None
         
         DealerKYCService._log_transition(db, app.id, KYCStateConfig.REGISTRATION.value, KYCStateConfig.DOC_SUBMITTED.value, user_id, "Initial form sumbitted")
         
@@ -105,6 +108,7 @@ class DealerKYCService:
         db.add(app)
         db.commit()
         db.refresh(app)
+        assert app.id is not None
         DealerKYCService._log_transition(db, app.id, KYCStateConfig.DOC_SUBMITTED.value, KYCStateConfig.AUTO_CHECKS.value, user_id, "Started auto checks")
         
         # MOCK API CHECKS (< 30 seconds)
@@ -115,6 +119,7 @@ class DealerKYCService:
             db.add(app)
             db.commit()
             db.refresh(app)
+            assert app.id is not None
             DealerKYCService._log_transition(db, app.id, KYCStateConfig.AUTO_CHECKS.value, KYCStateConfig.REJECTED.value, user_id, "Automated checks failed")
             return app
 
@@ -123,6 +128,7 @@ class DealerKYCService:
         db.add(app)
         db.commit()
         db.refresh(app)
+        assert app.id is not None
         DealerKYCService._log_transition(db, app.id, KYCStateConfig.AUTO_CHECKS.value, KYCStateConfig.MANUAL_REVIEW.value, user_id, "Automated checks passed")
         
         return app
@@ -148,6 +154,7 @@ class DealerKYCService:
         db.add(app)
         db.commit()
         db.refresh(app)
+        assert app.id is not None
         
         DealerKYCService._log_transition(db, app.id, from_state, app.application_state.value, admin_user_id, f"Admin Review: {'Approved' if approve else 'Rejected'}")
         return app
@@ -166,6 +173,7 @@ class DealerKYCService:
         db.add(app)
         db.commit()
         db.refresh(app)
+        assert app.id is not None
         
         DealerKYCService._log_transition(db, app.id, KYCStateConfig.APPROVED.value, KYCStateConfig.ACTIVE.value, admin_user_id, "Dealer Activated")
         return app

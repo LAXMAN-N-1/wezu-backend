@@ -2,7 +2,7 @@ from typing import Dict, Any, Optional, Protocol, List
 from app.models.kyc import KYCDocumentType, KYCDocumentStatus
 from app.models.user import User, KYCStatus
 from app.core.config import settings
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, col
 from datetime import datetime, timedelta
 import logging
 
@@ -49,7 +49,7 @@ class KYCService:
         result = await self.provider.verify_pan(pan_number)
         
         if result.get("success"):
-            user.kyc_status = KYCStatus.VERIFIED
+            user.kyc_status = KYCStatus.APPROVED
             db.add(user)
             db.commit()
             
@@ -79,7 +79,7 @@ class KYCService:
         logger.info(f"Processing utility bill for user {user_id}: {file_path}")
         
         from app.models.kyc import KYCRecord
-        record = db.exec(select(KYCRecord).where(KYCRecord.user_id == user_id)).first()
+        record = db.exec(select(KYCRecord).where(col(KYCRecord.user_id) == user_id)).first()
         if not record:
             record = KYCRecord(user_id=user_id)
         
@@ -105,18 +105,18 @@ class KYCService:
         db.add(user)
         
         # Clear KYCRecord urls
-        record = db.exec(select(KYCRecord).where(KYCRecord.user_id == user_id)).first()
+        record = db.exec(select(KYCRecord).where(col(KYCRecord.user_id) == user_id)).first()
         if record:
             record.aadhaar_front_url = None
             record.aadhaar_back_url = None
             record.pan_card_url = None
             record.video_kyc_url = None
             record.utility_bill_url = None
-            record.status = KYCStatus.PENDING
+            record.status = "pending"
             db.add(record)
             
         # Optional: Delete granular docs or mark as removed
-        docs = db.exec(select(KYCDocument).where(KYCDocument.user_id == user_id)).all()
+        docs = list(db.exec(select(KYCDocument).where(col(KYCDocument.user_id) == user_id)).all())
         for doc in docs:
             db.delete(doc)
             
@@ -131,18 +131,18 @@ class KYCService:
         
         today = datetime.utcnow().date()
         
-        pending_count = db.exec(select(func.count(User.id)).where(User.kyc_status == KYCStatus.PENDING)).one()
+        pending_count = db.exec(select(func.count(col(User.id))).where(col(User.kyc_status) == KYCStatus.PENDING)).one()
         
         # Approved/Rejected today (Simplified: check updated_at for users in that status)
         # Note: In a real DB we'd use a KycVerificationLog table for precision
-        approved_today = db.exec(select(func.count(User.id)).where(
-            User.kyc_status == KYCStatus.APPROVED, 
-            cast(User.updated_at, Date) == today
+        approved_today = db.exec(select(func.count(col(User.id))).where(
+            col(User.kyc_status) == KYCStatus.APPROVED, 
+            cast(col(User.updated_at), Date) == today
         )).one()
         
-        rejected_today = db.exec(select(func.count(User.id)).where(
-            User.kyc_status == KYCStatus.REJECTED,
-            cast(User.updated_at, Date) == today
+        rejected_today = db.exec(select(func.count(col(User.id))).where(
+            col(User.kyc_status) == KYCStatus.REJECTED,
+            cast(col(User.updated_at), Date) == today
         )).one()
         
         return {

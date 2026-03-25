@@ -5,6 +5,7 @@ from datetime import datetime
 from app.api import deps
 from app.api.deps import get_current_user, get_db
 from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
+from app.db.session import get_session
 from app.models.user import User
 from app.services.dealer_service import DealerService
 from app.schemas.common import DataResponse
@@ -13,6 +14,22 @@ from app.schemas.dealer import (
     DealerApplicationUpdate, FieldVisitSchedule
 )
 from pydantic import BaseModel
+
+class StageUpdate(BaseModel):
+    stage: str
+    note: Optional[str] = None
+
+class VisitSchedule(BaseModel):
+    application_id: int
+    officer_id: int
+    date: datetime
+
+class FieldVisit(BaseModel):
+    id: int
+    application_id: int
+    officer_id: int
+    date: datetime
+    status: str
 
 router = APIRouter()
 

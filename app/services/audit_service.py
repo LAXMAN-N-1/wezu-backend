@@ -4,7 +4,7 @@ import json
 import logging
 from typing import Optional, Dict, Any
 
-from sqlmodel import Session, select
+from sqlmodel import Session, select, col, desc
 from app.core.database import engine
 from app.models.audit_log import AuditLog, SecurityEvent
 from datetime import datetime
@@ -18,14 +18,14 @@ class AuditService:
         db: Session,
         action: str,
         resource_type: str,
-        user_id: int = None,
-        resource_id: str = None,
-        target_id: int = None,
-        details: str = None,
-        ip_address: str = None,
-        user_agent: str = None,
-        old_value: Dict[str, Any] = None,
-        new_value: Dict[str, Any] = None,
+        user_id: Optional[int] = None,
+        resource_id: Optional[str] = None,
+        target_id: Optional[int] = None,
+        details: Optional[str] = None,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+        old_value: Optional[Dict[str, Any]] = None,
+        new_value: Optional[Dict[str, Any]] = None,
     ):
         """Create an audit log entry with full change tracking."""
         try:
@@ -89,9 +89,9 @@ class AuditService:
         db: Session,
         event_type: str,
         severity: str,
-        details: str = None,
-        source_ip: str = None,
-        user_id: int = None,
+        details: Optional[str] = None,
+        source_ip: Optional[str] = None,
+        user_id: Optional[int] = None,
     ):
         try:
             event = SecurityEvent(
@@ -128,28 +128,28 @@ class AuditService:
     @staticmethod
     def _build_query(
         db: Session,
-        user_id: int = None,
-        action: str = None,
-        resource_type: str = None,
-        target_id: int = None,
-        date_from: datetime = None,
-        date_to: datetime = None,
+        user_id: Optional[int] = None,
+        action: Optional[str] = None,
+        resource_type: Optional[str] = None,
+        target_id: Optional[int] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
     ):
         """Build a filtered query for audit logs (shared by list/export)."""
         query = select(AuditLog)
         if user_id is not None:
-            query = query.where(AuditLog.user_id == user_id)
+            query = query.where(col(AuditLog.user_id) == user_id)
         if action is not None:
-            query = query.where(AuditLog.action == action)
+            query = query.where(col(AuditLog.action) == action)
         if resource_type is not None:
-            query = query.where(AuditLog.resource_type == resource_type)
+            query = query.where(col(AuditLog.resource_type) == resource_type)
         if target_id is not None:
-            query = query.where(AuditLog.target_id == target_id)
+            query = query.where(col(AuditLog.target_id) == target_id)
         if date_from is not None:
-            query = query.where(AuditLog.timestamp >= date_from)
+            query = query.where(col(AuditLog.timestamp) >= date_from)
         if date_to is not None:
-            query = query.where(AuditLog.timestamp <= date_to)
-        return query.order_by(AuditLog.timestamp.desc())
+            query = query.where(col(AuditLog.timestamp) <= date_to)
+        return query.order_by(desc(AuditLog.timestamp))
 
     @staticmethod
     def export_logs_csv(

@@ -1,4 +1,3 @@
-from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, func
 from typing import Any, List, Optional
 from datetime import datetime
@@ -7,9 +6,99 @@ from app.api import deps
 from app.models.station import Station, StationStatus, StationSlot
 from app.models.maintenance import MaintenanceRecord, StationDowntime
 from app.core.database import get_db
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from app.schemas.station import StationSpecsResponse, StationSpecsUpdate, StationResponse
+from app.schemas.common import DataResponse
 
 router = APIRouter()
 
+# ────────────────────────────────────────────
+# Search / Filter stations
+# ────────────────────────────────────────────
+@router.get("/", response_model=List[StationResponse])
+async def search_stations(
+    search: Optional[str] = Query(None, description="Search by name or address (partial match)"),
+    city: Optional[str] = Query(None, description="Filter by city"),
+    station_type: Optional[str] = Query(None, description="Filter by station_type (automated, manual, hybrid)"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(deps.get_db),
+    current_user=Depends(deps.get_current_active_superuser),
+):
+    """
+    List / search stations for the admin panel.
+    Supports free-text `search` across name and address, plus
+    optional exact filters on `city` and `station_type`.
+    """
+    query = select(Station)
+
+    if search:
+        search_term = f"%{search}%"
+        query = query.where(
+            (Station.name.ilike(search_term))
+            | (Station.address.ilike(search_term))
+        )
+    if city:
+        query = query.where(Station.city.ilike(f"%{city}%"))
+    if station_type:
+        query = query.where(Station.station_type == station_type)
+
+    stations = db.exec(query.offset(skip).limit(limit)).all()
+    return stations
+
+
+# ────────────────────────────────────────────
+# Station name uniqueness check
+# ────────────────────────────────────────────
+@router.get("/check-name")
+async def check_station_name(
+    name: str = Query(..., description="Station name to validate uniqueness"),
+    db: Session = Depends(deps.get_db),
+    current_user=Depends(deps.get_current_active_superuser),
+):
+    """
+    Pre-submission validation: checks whether a station name is already taken.
+    Returns `{"is_available": true/false}`.
+    Raises 409 Conflict when the name already exists (useful for form validators).
+    """
+    existing = db.exec(
+        select(Station).where(Station.name == name)
+    ).first()
+
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A station with this name already exists.",
+        )
+    return {"is_available": True}
+
+
+@router.get("/{station_id}/specs", response_model=StationSpecsResponse)
+async def get_station_specs(
+    station_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user = Depends(deps.get_current_active_superuser),
+):
+    """
+    SRS Requirement: Detailed station specifications display.
+    """
+    station = db.get(Station, station_id)
+    if not station:
+        raise HTTPException(status_code=404, detail="Station not found")
+    
+    return StationSpecsResponse(
+        station_id=station.id,
+        total_slots=station.total_slots,
+        station_type=station.station_type,
+        power_rating_kw=station.power_rating_kw,
+        max_capacity=station.max_capacity,
+        charger_type=station.charger_type,
+        temperature_control=station.temperature_control,
+        safety_features=station.safety_features,
+        charger_configs=station.charger_configs,
+        operating_temp_min=station.operating_temp_min,
+        operating_temp_max=station.operating_temp_max,
+    )
 
 class StationCreateRequest(BaseModel):
     name: str
@@ -177,7 +266,20 @@ def create_station(
     db.add(station)
     db.commit()
     db.refresh(station)
-    return {"status": "success", "station_id": station.id, "message": f"Station '{station.name}' created"}
+    
+    return StationSpecsResponse(
+        station_id=station.id,
+        total_slots=station.total_slots,
+        station_type=station.station_type,
+        power_rating_kw=station.power_rating_kw,
+        max_capacity=station.max_capacity,
+        charger_type=station.charger_type,
+        temperature_control=station.temperature_control,
+        safety_features=station.safety_features,
+        charger_configs=station.charger_configs,
+        operating_temp_min=station.operating_temp_min,
+        operating_temp_max=station.operating_temp_max,
+    )
 
 
 @router.get("/{station_id}")

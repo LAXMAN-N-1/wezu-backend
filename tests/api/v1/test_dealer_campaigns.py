@@ -262,11 +262,11 @@ class TestCampaignValidation:
         headers = get_token(dealer_promo_env["customer"])
         
         # We need to test the budget directly through the service since Validation endpoint doesn't APPLY
-        from app.services.campaign_service import CampaignService
+        from app.services.campaign_service import DealerCampaignService
         
         # Apply twice (budget is 20, discount is 10)
-        CampaignService.apply_promo(session, self.promo_id, dealer_promo_env["customer"].id, 100, 10, 90)
-        CampaignService.apply_promo(session, self.promo_id, dealer_promo_env["admin_user"].id, 100, 10, 90)
+        DealerCampaignService.apply_promo(session, self.promo_id, dealer_promo_env["customer"].id, 100, 10, 90)
+        DealerCampaignService.apply_promo(session, self.promo_id, dealer_promo_env["admin_user"].id, 100, 10, 90)
         
         # Third validation should fail because total_discount_given is now 20 (budget_limit)
         resp = client.post(
@@ -293,9 +293,9 @@ class TestCampaignValidation:
         resp = client.post("/api/v1/dealer-campaigns", headers=dealer_headers, json=payload)
         limit_promo_id = resp.json()["id"]
 
-        from app.services.campaign_service import CampaignService
+        from app.services.campaign_service import DealerCampaignService
         # Use it once
-        CampaignService.apply_promo(session, limit_promo_id, dealer_promo_env["customer"].id, 100, 1, 99)
+        DealerCampaignService.apply_promo(session, limit_promo_id, dealer_promo_env["customer"].id, 100, 1, 99)
         
         # Validate second time should fail
         resp = client.post(
@@ -322,11 +322,11 @@ class TestAnalyticsAndBulk:
         create_resp = client.post("/api/v1/dealer-campaigns", headers=headers, json=payload)
         c_id = create_resp.json()["id"]
 
-        from app.services.campaign_service import CampaignService
+        from app.services.campaign_service import DealerCampaignService
         # Record impression
-        CampaignService.record_impression(session, c_id)
+        DealerCampaignService.record_impression(session, c_id)
         # Apply
-        CampaignService.apply_promo(session, c_id, dealer_promo_env["customer"].id, 100, 10, 90)
+        DealerCampaignService.apply_promo(session, c_id, dealer_promo_env["customer"].id, 100, 10, 90)
 
         resp = client.get(f"/api/v1/dealer-campaigns/{c_id}/analytics", headers=headers)
         assert resp.status_code == 200

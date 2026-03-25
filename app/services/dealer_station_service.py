@@ -2,10 +2,10 @@
 Dealer Station Service — Handles dealer operations for stations, inventory, alerts and maintenance.
 """
 
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, col, desc
 from fastapi import HTTPException
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from app.models.station import Station, StationSlot
 from app.models.dealer_inventory import DealerInventory
@@ -37,8 +37,8 @@ class DealerStationService:
         """Fetch a specific station, ensuring it belongs to the dealer."""
         station = db.exec(
             select(Station).where(
-                Station.id == station_id,
-                Station.dealer_id == dealer_id
+                col(Station.id) == station_id,
+                col(Station.dealer_id) == dealer_id
             )
         ).first()
         if not station:
@@ -58,10 +58,10 @@ class DealerStationService:
         return station
 
     @staticmethod
-    def update_opening_hours(db: Session, station_id: int, dealer_id: int, hours: str) -> Station:
-        """Update opening hours for a station."""
+    def update_operating_hours(db: Session, station_id: int, dealer_id: int, hours: str) -> Station:
+        """Update operating hours for a station."""
         station = DealerStationService.get_dealer_station(db, station_id, dealer_id)
-        station.opening_hours = hours # Format expected: "09:00-18:00" etc
+        station.operating_hours = hours # Format expected: "09:00-18:00" etc
         db.add(station)
         db.commit()
         db.refresh(station)
@@ -70,7 +70,7 @@ class DealerStationService:
     # ─── Battery Monitoring ───
 
     @staticmethod
-    def get_station_batteries(db: Session, station_id: int, dealer_id: int, health_status: str = None) -> List[dict]:
+    def get_station_batteries(db: Session, station_id: int, dealer_id: int, health_status: Optional[str] = None) -> List[dict]:
         """View all batteries currently slotted at a specific station."""
         # Ensure station belongs to dealer
         DealerStationService.get_dealer_station(db, station_id, dealer_id)
@@ -79,11 +79,11 @@ class DealerStationService:
         
         query = (
             select(Battery, StationSlot.slot_number)
-            .join(StationSlot, StationSlot.battery_id == Battery.id)
-            .where(StationSlot.station_id == station_id)
+            .join(StationSlot, col(StationSlot.battery_id) == col(Battery.id))
+            .where(col(StationSlot.station_id) == station_id)
         )
              
-        results = db.exec(query).all()
+        results = list(db.exec(query).all())
         
         batteries = []
         for battery, slot_num in results:
@@ -107,9 +107,9 @@ class DealerStationService:
     @staticmethod
     def get_low_inventory_alerts(db: Session, dealer_id: int) -> List[dict]:
         """Generate alerts for stations where total available batteries drop below threshold."""
-        stations = db.exec(
-            select(Station).where(Station.dealer_id == dealer_id)
-        ).all()
+        stations = list(db.exec(
+            select(Station).where(col(Station.dealer_id) == dealer_id)
+        ).all())
         
         alerts = []
         
@@ -118,14 +118,14 @@ class DealerStationService:
         for station in stations:
              # Calculate total slotted batteries with sufficient SOC and health
              ready_batteries_count = db.exec(
-                 select(func.count(StationSlot.id))
-                 .join(Battery, StationSlot.battery_id == Battery.id)
+                 select(func.count(col(StationSlot.id)))
+                 .join(Battery, col(StationSlot.battery_id) == col(Battery.id))
                  .where(
-                     StationSlot.station_id == station.id,
-                     Battery.current_charge > 20, # arbitrary definition of "available"
-                     Battery.health_percentage > 80 # "good" health
+                     col(StationSlot.station_id) == station.id,
+                     col(Battery.current_charge) > 20, # arbitrary definition of "available"
+                     col(Battery.health_percentage) > 80 # "good" health
                  )
-             ).one()
+             ).one() or 0
              
              total_slots = getattr(station, "total_slots", 0)
              if total_slots == 0:
@@ -160,9 +160,9 @@ class DealerStationService:
         
         # Prevent overlapping downtimes
         overlap_query = select(StationDowntime).where(
-             StationDowntime.station_id == station_id,
-             StationDowntime.start_time < (end_time if end_time else datetime.max),
-             (StationDowntime.end_time > start_time) if end_time else True
+             col(StationDowntime.station_id) == station_id,
+             col(StationDowntime.start_time) < (end_time if end_time else datetime.max),
+             (col(StationDowntime.end_time) > start_time) if end_time else True
         )
         if db.exec(overlap_query).first():
              raise HTTPException(status_code=400, detail="Maintenance schedule overlaps with existing downtime")
@@ -190,20 +190,20 @@ class DealerStationService:
         # 1. Check Maintenance
         downtime = db.exec(
             select(StationDowntime).where(
-                StationDowntime.station_id == station_id,
-                StationDowntime.start_time <= now,
-                (StationDowntime.end_time >= now) | (StationDowntime.end_time == None)
+                col(StationDowntime.station_id) == station_id,
+                col(StationDowntime.start_time) <= now,
+                (col(StationDowntime.end_time) >= now) | (col(StationDowntime.end_time) == None)
             )
         ).first()
         
         if downtime:
              return False, f"Station under maintenance: {downtime.reason}"
              
-        # 2. Check Opening Hours
-        if station.opening_hours:
+        # 2. Check Operating Hours
+        if station.operating_hours:
              try:
                  # Format: "09:00-18:00"
-                 start_str, end_str = station.opening_hours.split("-")
+                 start_str, end_str = station.operating_hours.split("-")
                  start_hour, start_min = map(int, start_str.split(":"))
                  end_hour, end_min = map(int, end_str.split(":"))
                  

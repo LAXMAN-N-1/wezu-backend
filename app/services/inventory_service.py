@@ -99,6 +99,7 @@ class InventoryService:
         db.add(battery)
         
         # Log the confirmation
+        assert battery.id is not None
         InventoryService.log_inventory_change(
             db=db,
             battery_id=battery.id,

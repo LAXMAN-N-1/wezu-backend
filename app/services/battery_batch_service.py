@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from sqlmodel import Session, select
+from sqlmodel import Session, select, col
 from datetime import datetime
 from io import StringIO
 import csv
@@ -16,17 +16,21 @@ class BatteryBatchService:
         
         parsed_data = []
         for row in reader:
+            sku_id_raw = row.get("sku_id")
+            station_id_raw = row.get("station_id")
+            manufacture_date_raw = row.get("manufacture_date")
+            
             parsed_data.append({
                 "serial_number": row.get("serial_number", "").strip(),
-                "sku_id": int(row.get("sku_id", 0)) if row.get("sku_id") else None,
+                "sku_id": int(sku_id_raw) if sku_id_raw else None,
                 "status": row.get("status", BatteryStatus.AVAILABLE).strip(),
                 "health_status": row.get("health_status", BatteryHealth.GOOD).strip(),
                 "health_percentage": float(row.get("health_percentage", 100.0)),
-                "station_id": int(row.get("station_id")) if row.get("station_id") else None,
+                "station_id": int(station_id_raw) if station_id_raw else None,
                 "manufacturer": row.get("manufacturer", "").strip(),
                 "location_type": row.get("location_type", "warehouse").strip(),
                 "notes": row.get("notes", "").strip(),
-                "manufacture_date": datetime.fromisoformat(row.get("manufacture_date")) if row.get("manufacture_date") else None
+                "manufacture_date": datetime.fromisoformat(manufacture_date_raw) if manufacture_date_raw else None
             })
             
         return parsed_data
@@ -47,7 +51,7 @@ class BatteryBatchService:
                 
                 # Check if exists
                 existing = session.exec(
-                    select(Battery).where(Battery.serial_number == item["serial_number"])
+                    select(Battery).where(col(Battery.serial_number) == item["serial_number"])
                 ).first()
                 
                 if existing:
@@ -55,7 +59,7 @@ class BatteryBatchService:
 
                 # Verify SKU if provided
                 if item.get("sku_id"):
-                    sku = session.exec(select(BatteryCatalog).where(BatteryCatalog.id == item["sku_id"])).first()
+                    sku = session.exec(select(BatteryCatalog).where(col(BatteryCatalog.id) == item["sku_id"])).first()
                     if not sku:
                         raise ValueError(f"SKU ID '{item['sku_id']}' not found")
                 
@@ -120,7 +124,7 @@ class BatteryBatchService:
                     raise ValueError("serial_number is required for update")
                 
                 battery = session.exec(
-                    select(Battery).where(Battery.serial_number == serial_num)
+                    select(Battery).where(col(Battery.serial_number) == serial_num)
                 ).first()
                 
                 if not battery:

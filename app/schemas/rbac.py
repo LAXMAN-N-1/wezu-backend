@@ -1,5 +1,9 @@
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, ConfigDict, Field
+from datetime import datetime
+
+
+# ── Permission Schemas ──────────────────────────────────────────────
 
 # ----- Permission Schemas -----
 
@@ -8,32 +12,44 @@ class PermissionBase(BaseModel):
     module: str
     action: str
     description: Optional[str] = None
-    scope: str = "all"
-
-class PermissionCreate(PermissionBase):
-    pass
-
-class PermissionRead(PermissionBase):
-    id: int
     model_config = ConfigDict(from_attributes=True)
+
+PermissionRead = PermissionResponse
+
+
+class PermissionCreate(BaseModel):
+    slug: str
+    module: str
+    action: str
+    description: Optional[str] = None
+
 
 class PermissionItem(BaseModel):
     id: str
     label: str
-    description: Optional[str] = None
+    description: str
     resource: str
     action: str
-    scope: str = "all"
+    scope: Optional[str] = "all"
+
 
 class PermissionModule(BaseModel):
     module: str
     label: str
     permissions: List[PermissionItem] = []
 
+
 class PermissionListResponse(BaseModel):
     modules: List[PermissionModule] = []
 
-# ----- Role Schemas -----
+
+class PermissionCheckResponse(BaseModel):
+    has_permission: bool
+    granted_by_role: Optional[str] = None
+    scope: Optional[str] = None
+
+
+# ── Role Schemas ────────────────────────────────────────────────────
 
 class RoleBase(BaseModel):
     name: str
@@ -42,10 +58,14 @@ class RoleBase(BaseModel):
     level: int = 0
     is_active: bool = True
 
+
 class RoleCreate(RoleBase):
     permissions: List[str] = []
     permission_ids: List[int] = []
     parent_role_id: Optional[int] = Field(default=None, alias="parent_id")
+    permissions: List[str] = []
+    parent_id: Optional[int] = None
+
 
 class RoleUpdate(BaseModel):
     name: Optional[str] = None
@@ -53,8 +73,12 @@ class RoleUpdate(BaseModel):
     category: Optional[str] = None
     level: Optional[int] = None
     is_active: Optional[bool] = None
+    permission_ids: Optional[List[int]] = None
     permissions: Optional[List[str]] = None
-    parent_role_id: Optional[int] = Field(default=None, alias="parent_id")
+    category: Optional[str] = None
+    level: Optional[int] = None
+    parent_role_id: Optional[int] = None
+
 
 class PermissionResponse(BaseModel):
     id: int
@@ -62,6 +86,8 @@ class PermissionResponse(BaseModel):
     module: str
     action: str
     description: Optional[str] = None
+    permissions: Optional[List[PermissionResponse]] = []
+    permission_count: int = 0
     model_config = ConfigDict(from_attributes=True)
 
 class RoleRead(RoleBase):
@@ -71,42 +97,49 @@ class RoleRead(RoleBase):
     permission_count: Optional[int] = 0
     model_config = ConfigDict(from_attributes=True)
 
-RoleResponse = RoleRead
 
-class RoleDetail(RoleRead):
-    user_count: Optional[int] = 0
+class RoleDetail(RoleResponse):
+    user_count: int = 0
     permission_tree: Dict[str, List[str]] = {}
-    parent_role: Optional["RoleRead"] = None
-    child_roles: List["RoleRead"] = []
+    parent_role: Optional[RoleResponse] = None
+    child_roles: List[RoleResponse] = []
 
 
-class RoleHierarchy(RoleRead):
+class RoleHierarchy(RoleResponse):
     children: List["RoleHierarchy"] = []
-    permission_count: int = 0
-    model_config = ConfigDict(from_attributes=True)
 
-# ----- Role Permissions -----
+RoleHierarchy.model_rebuild()
+
+
+class RoleDuplicate(BaseModel):
+    new_name: str
+    description: Optional[str] = None
+
+
+# ── Role <-> Permission Assignment ──────────────────────────────────
 
 class InheritedPermissions(BaseModel):
     source_role_id: int
     source_role_name: str
-    permissions: List[PermissionItem]
+    permissions: List[PermissionItem] = []
+
 
 class RolePermissionsResponse(BaseModel):
-    direct_permissions: List[PermissionItem]
+    direct_permissions: List[PermissionItem] = []
     inherited_permissions: List[InheritedPermissions] = []
     all_permissions_grouped: List[PermissionModule] = []
 
+
 class RolePermissionAssign(BaseModel):
-    permissions: List[str]
-    mode: str = "overwrite"  # overwrite | append
+    permissions: List[str] = []
+    mode: str = "overwrite"
+
 
 class RolePermissionUpdateResponse(BaseModel):
     role_id: int
     users_affected: int = 0
     active_permissions: List[str] = []
 
-# ----- User Role assignment -----
 
 class UserRoleDetail(BaseModel):
     role_id: int
@@ -135,6 +168,27 @@ class UserRoleAssignmentResponse(BaseModel):
     message: Optional[str] = None
 
 # ----- Bulk assign -----
+    assigned_at: Optional[datetime] = None
+    assigned_by: Optional[int] = None
+    assigned_by_name: Optional[str] = None
+    effective_from: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    notes: Optional[str] = None
+    is_active: bool = True
+
+
+class UserRoleAssignmentResponse(BaseModel):
+    success: bool
+    active_permissions: List[str] = []
+    menu_config: Optional[List[Any]] = []
+
+
+# ── Bulk Assignment ─────────────────────────────────────────────────
+
+class BulkRoleAssignRequest(BaseModel):
+    role_id: int
+    user_ids: List[int] = []
+
 
 class BulkAssignmentResult(BaseModel):
     user_id: int
@@ -198,6 +252,18 @@ class AccessPathUpdate(BaseModel):
 class AccessPathRead(AccessPathBase):
     id: int
     user_id: int
+# ── Access Path Schemas ─────────────────────────────────────────────
+
+class AccessPathCreate(BaseModel):
+    path_pattern: str
+    access_level: str = "view"
+
+
+class AccessPathRead(BaseModel):
+    id: int
+    user_id: int
+    path_pattern: str
+    access_level: str
     created_by: Optional[int] = None
     created_by_name: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
@@ -206,3 +272,5 @@ class AccessPathRead(AccessPathBase):
 # Resolve forward references for self-referential models
 RoleDetail.model_rebuild()
 RoleHierarchy.model_rebuild()
+class AccessPathUpdate(BaseModel):
+    access_level: str

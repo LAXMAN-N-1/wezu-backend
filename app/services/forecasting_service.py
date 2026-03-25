@@ -1,4 +1,4 @@
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, col
 from app.models.analytics import DemandForecast
 from app.models.swap import SwapSession
 from app.models.station import Station
@@ -13,15 +13,15 @@ class ForecastingService:
         """
         Generate a 7-day demand forecast for all stations based on historical averages.
         """
-        stations = db.exec(select(Station)).all()
+        stations = list(db.exec(select(Station)).all())
         today = date.today()
         
         for station in stations:
             # Look at last 7 days of actual swaps
             history_start = datetime.utcnow() - timedelta(days=7)
-            stmt = select(func.count(SwapSession.id)).where(
-                SwapSession.station_id == station.id,
-                SwapSession.created_at >= history_start
+            stmt = select(func.count(col(SwapSession.id))).where(
+                col(SwapSession.station_id) == station.id,
+                col(SwapSession.created_at) >= history_start
             )
             total_past_swaps = db.exec(stmt).one() or 0
             daily_avg = total_past_swaps / 7.0
@@ -32,9 +32,9 @@ class ForecastingService:
                 
                 # Check if forecast already exists
                 existing = db.exec(select(DemandForecast).where(
-                    DemandForecast.entity_id == station.id,
-                    DemandForecast.forecast_type == "STATION",
-                    DemandForecast.forecast_date == forecast_date
+                    col(DemandForecast.entity_id) == station.id,
+                    col(DemandForecast.forecast_type) == "STATION",
+                    col(DemandForecast.forecast_date) == forecast_date
                 )).first()
                 
                 if not existing:

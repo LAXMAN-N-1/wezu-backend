@@ -1,6 +1,6 @@
 from typing import List, Optional, Tuple, Dict
 from datetime import datetime
-from sqlmodel import Session, select, func, and_
+from sqlmodel import Session, select, func, and_, col, desc
 from app.models.user import User, UserStatus
 from app.models.user_history import UserStatusLog
 from app.models.address import Address
@@ -15,7 +15,7 @@ class UserService:
 
     @staticmethod
     def get_by_email(db: Session, email: str) -> Optional[User]:
-        statement = select(User).where(User.email == email)
+        statement = select(User).where(col(User.email) == email)
         return db.exec(statement).first()
 
     @staticmethod
@@ -51,10 +51,10 @@ class UserService:
         """Fetch user login sessions from UserSession table"""
         from app.models.session import UserSession
         
-        statement = select(UserSession).where(UserSession.user_id == user_id).order_by(UserSession.created_at.desc())
+        statement = select(UserSession).where(col(UserSession.user_id) == user_id).order_by(desc(UserSession.created_at))
         
         # Paginate
-        total_count = db.exec(select(func.count()).select_from(statement.subquery())).one()
+        total_count = db.exec(select(func.count(col(UserSession.id))).where(col(UserSession.user_id) == user_id)).one()
         offset = (page - 1) * limit
         sessions = db.exec(statement.offset(offset).limit(limit)).all()
         
@@ -129,17 +129,17 @@ class UserService:
 
     @staticmethod
     def get_status_history(db: Session, user_id: int) -> List[UserStatusLog]:
-        return db.exec(
+        return list(db.exec(
             select(UserStatusLog)
-            .where(UserStatusLog.user_id == user_id)
-            .order_by(UserStatusLog.created_at.desc())
-        ).all()
+            .where(col(UserStatusLog.user_id) == user_id)
+            .order_by(desc(UserStatusLog.created_at))
+        ).all())
 
     @staticmethod
     def create_address(db: Session, user_id: int, address_in: AddressCreate) -> Address:
         # If this is default, unsettle other defaults
         if address_in.is_default:
-            statement = select(Address).where(Address.user_id == user_id, Address.is_default == True)
+            statement = select(Address).where(col(Address.user_id) == user_id, col(Address.is_default) == True)
             existing_defaults = db.exec(statement).all()
             for addr in existing_defaults:
                 addr.is_default = False
@@ -163,5 +163,5 @@ class UserService:
 
     @staticmethod
     def get_addresses(db: Session, user_id: int) -> List[Address]:
-        statement = select(Address).where(Address.user_id == user_id)
-        return db.exec(statement).all()
+        statement = select(Address).where(col(Address.user_id) == user_id)
+        return list(db.exec(statement).all())

@@ -1,4 +1,4 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, select, col
 from app.core.database import engine
 from app.models.invoice import Invoice
 from app.models.financial import Transaction
@@ -68,12 +68,12 @@ class FinancialService:
         """
         # 1. Find unpaid commissions
         statement = select(CommissionLog).where(
-            CommissionLog.dealer_id == dealer_id,
-            CommissionLog.status == "pending",
-            CommissionLog.created_at >= start_date,
-            CommissionLog.created_at <= end_date
+            col(CommissionLog.dealer_id) == dealer_id,
+            col(CommissionLog.status) == "pending",
+            col(CommissionLog.created_at) >= start_date,
+            col(CommissionLog.created_at) <= end_date
         )
-        commissions = db.exec(statement).all()
+        commissions = list(db.exec(statement).all())
         
         if not commissions:
             raise ValueError("No pending commissions found for this period")
@@ -84,17 +84,19 @@ class FinancialService:
         
         settlement = Settlement(
             dealer_id=dealer_id,
+            settlement_month=start_date.strftime("%Y-%m"),
             start_date=start_date,
             end_date=end_date,
-            total_revenue=total_comm, # Total commission pool
+            total_commission=total_comm,
             platform_fee=deductions,
-            payable_amount=net_payable,
+            net_payable=net_payable,
             status="generated",
             created_at=datetime.utcnow()
         )
         db.add(settlement)
         db.commit()
         db.refresh(settlement)
+        assert settlement.id is not None
         
         # 2. Update Commissions to link to this settlement
         for c in commissions:
@@ -119,8 +121,8 @@ class FinancialService:
         settlement.transaction_reference = payment_ref
         
         # Batch update commissions to 'paid'
-        statement = select(CommissionLog).where(CommissionLog.settlement_id == settlement_id)
-        commissions = db.exec(statement).all()
+        statement = select(CommissionLog).where(col(CommissionLog.settlement_id) == settlement_id)
+        commissions = list(db.exec(statement).all())
         for c in commissions:
             c.status = "paid"
             db.add(c)

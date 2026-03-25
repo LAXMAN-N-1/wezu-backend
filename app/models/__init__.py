@@ -69,6 +69,21 @@ from app.models.media import MediaAsset
 # Location & Org
 from app.models.location import Zone, City, Region, Country, Continent
 from app.models.address import Address
+from app.models.payment import PaymentTransaction
+from app.models.refund import Refund
+from app.models.gps_log import GPSTrackingLog
+from app.models.video_kyc import VideoKYCSession
+from app.models.audit_log import AuditLog, SecurityEvent
+from app.models.iot import IoTDevice, DeviceCommand, FirmwareUpdate
+from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
+
+
+# Teammate Operations & IoT
+from app.models.commission import CommissionConfig, CommissionLog, CommissionTier
+from app.models.settlement import Settlement
+from app.models.fraud import RiskScore, FraudCheckLog, Blacklist
+from app.models.maintenance import MaintenanceSchedule, MaintenanceRecord, StationDowntime
+from app.models.i18n import Translation
 from app.models.branch import Branch
 from app.models.organization import Organization, OrganizationSocialLink
 from app.models.warehouse import Warehouse
@@ -96,15 +111,12 @@ from app.models.dealer_inventory import DealerInventory, InventoryTransaction
 from app.models.dealer_promotion import DealerPromotion, PromotionUsage
 from app.models.search_history import SearchHistory
 # Phase 1.5 & Phase 1 PowerFill Models
-from app.models.rbac import Role, Permission, RolePermission, AdminUserRole, UserRole, UserAccessPath
-from app.models.location import Continent, Country, Region, City, Zone
-from app.models.telematics import TelemeticsData
+from app.models.telemetry import Telemetry
 from app.models.vendor import Vendor, VendorDocument
 from app.models.swap import SwapSession
 from app.models.settlement import Settlement
 
 # E-commerce & Catalog
-from app.models.ecommerce import EcommerceProduct, EcommerceOrder, EcommerceOrderItem
 from app.models.catalog import (
     CatalogProduct, CatalogProductImage, CatalogProductVariant, 
     CatalogOrder, CatalogOrderItem, DeliveryTracking, DeliveryEvent
@@ -122,16 +134,12 @@ from app.models.feedback import Feedback
 from app.models.logistics import BatteryTransfer, DeliveryOrder, DeliveryType, DeliveryStatus
 from app.models.delivery_assignment import DeliveryAssignment
 from app.models.oauth import BlacklistedToken
-from app.models.commission import CommissionConfig, CommissionLog, CommissionTier
 from app.models.dealer_kyc import DealerKYCApplication, KYCStateTransition
 from app.models.chargeback import Chargeback
 from app.models.settlement_dispute import SettlementDispute
 from app.models.password_history import PasswordHistory
 from app.models.revenue_report import RevenueReport
 from app.models.delivery_route import DeliveryRoute, RouteStop
-from app.models.swap import SwapSession
-from app.models.swap_suggestion import SwapSuggestion, SwapPreference
-from app.models.telemetry import Telemetry
 from app.models.battery_reservation import BatteryReservation
 from app.models.batch_job import BatchJob, JobExecution
 
@@ -168,6 +176,9 @@ from app.models.vendor import Vendor
 from app.models.campaign import Campaign, CampaignTarget, CampaignSend
 
 # Knowledge Base (Task 9)
-from app.models.knowledge_article import KnowledgeArticle
 from app.models.article_category import ArticleCategory
+from app.models.knowledge_article import KnowledgeArticle
 from app.models.article_view import ArticleView
+
+# Dealer Notifications
+from app.models.dealer_notification_pref import DealerNotificationPreference

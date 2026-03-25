@@ -41,33 +41,33 @@ class DealerAnalyticsService:
         revenue_month = 0.0
         if station_ids:
             swaps_today = db.exec(
-                select(func.count(SwapSession.id)).where(
+                select(func.count(col(SwapSession.id))).where(
                     col(SwapSession.station_id).in_(station_ids),
-                    SwapSession.status == "completed",
-                    SwapSession.created_at >= today_start,
+                    col(SwapSession.status) == "completed",
+                    col(SwapSession.created_at) >= today_start,
                 )
             ).one() or 0
 
             swaps_month = db.exec(
-                select(func.count(SwapSession.id)).where(
+                select(func.count(col(SwapSession.id))).where(
                     col(SwapSession.station_id).in_(station_ids),
-                    SwapSession.status == "completed",
-                    SwapSession.created_at >= month_start,
+                    col(SwapSession.status) == "completed",
+                    col(SwapSession.created_at) >= month_start,
                 )
             ).one() or 0
 
             revenue_month = db.exec(
                 select(func.coalesce(func.sum(SwapSession.swap_amount), 0.0)).where(
                     col(SwapSession.station_id).in_(station_ids),
-                    SwapSession.status == "completed",
-                    SwapSession.created_at >= month_start,
+                    col(SwapSession.status) == "completed",
+                    col(SwapSession.created_at) >= month_start,
                 )
             ).one() or 0.0
 
         # Average station rating
         avg_rating = db.exec(
-            select(func.coalesce(func.avg(Station.rating), 0.0)).where(
-                Station.dealer_id == dealer_id,
+            select(func.coalesce(func.avg(col(Station.rating)), 0.0)).where(
+                col(Station.dealer_id) == dealer_id,
             )
         ).one() or 0.0
 
@@ -76,10 +76,10 @@ class DealerAnalyticsService:
         if station_ids:
             from app.models.review import Review
             ratings = db.exec(
-                select(Review.rating, func.count()).where(
+                select(col(Review.rating), func.count(col(Review.id))).where(
                     col(Review.station_id).in_(station_ids),
-                    Review.rating.isnot(None)
-                ).group_by(Review.rating)
+                    col(Review.rating).isnot(None)
+                ).group_by(col(Review.rating))
             ).all()
             for r_val, count in ratings:
                 # Assuming ratings are 1 to 5
@@ -91,9 +91,9 @@ class DealerAnalyticsService:
         active_batteries = 0
         if station_ids:
             active_batteries = db.exec(
-                select(func.count(StationSlot.id)).where(
+                select(func.count(col(StationSlot.id))).where(
                     col(StationSlot.station_id).in_(station_ids),
-                    StationSlot.battery_id.isnot(None),
+                    col(StationSlot.battery_id).isnot(None),
                 )
             ).one() or 0
 
@@ -149,20 +149,20 @@ class DealerAnalyticsService:
                 label = start.strftime("%Y-%m")
 
             swaps = db.exec(
-                select(func.count(SwapSession.id)).where(
+                select(func.count(col(SwapSession.id))).where(
                     col(SwapSession.station_id).in_(station_ids),
-                    SwapSession.status == "completed",
-                    SwapSession.created_at >= start,
-                    SwapSession.created_at < end,
+                    col(SwapSession.status) == "completed",
+                    col(SwapSession.created_at) >= start,
+                    col(SwapSession.created_at) < end,
                 )
             ).one() or 0
 
             revenue = db.exec(
-                select(func.coalesce(func.sum(SwapSession.amount), 0.0)).where(
+                select(func.coalesce(func.sum(col(SwapSession.swap_amount)), 0.0)).where(
                     col(SwapSession.station_id).in_(station_ids),
-                    SwapSession.status == "completed",
-                    SwapSession.created_at >= start,
-                    SwapSession.created_at < end,
+                    col(SwapSession.status) == "completed",
+                    col(SwapSession.created_at) >= start,
+                    col(SwapSession.created_at) < end,
                 )
             ).one() or 0.0
 
@@ -180,7 +180,7 @@ class DealerAnalyticsService:
     def get_station_metrics(db: Session, dealer_id: int) -> List[dict]:
         """Per-station: swaps, revenue, utilization %, rating."""
         stations = db.exec(
-            select(Station).where(Station.dealer_id == dealer_id)
+            select(Station).where(col(Station.dealer_id) == dealer_id)
         ).all()
 
         now = datetime.utcnow()
@@ -189,26 +189,26 @@ class DealerAnalyticsService:
 
         for s in stations:
             swaps = db.exec(
-                select(func.count(SwapSession.id)).where(
-                    SwapSession.station_id == s.id,
-                    SwapSession.status == "completed",
-                    SwapSession.created_at >= month_start,
+                select(func.count(col(SwapSession.id))).where(
+                    col(SwapSession.station_id) == s.id,
+                    col(SwapSession.status) == "completed",
+                    col(SwapSession.created_at) >= month_start,
                 )
             ).one() or 0
 
             revenue = db.exec(
-                select(func.coalesce(func.sum(SwapSession.amount), 0.0)).where(
-                    SwapSession.station_id == s.id,
-                    SwapSession.status == "completed",
-                    SwapSession.created_at >= month_start,
+                select(func.coalesce(func.sum(col(SwapSession.amount)), 0.0)).where(
+                    col(SwapSession.station_id) == s.id,
+                    col(SwapSession.status) == "completed",
+                    col(SwapSession.created_at) >= month_start,
                 )
             ).one() or 0.0
 
             # Utilization: slots with batteries / total slots
             occupied = db.exec(
-                select(func.count(StationSlot.id)).where(
-                    StationSlot.station_id == s.id,
-                    StationSlot.battery_id.isnot(None),
+                select(func.count(col(StationSlot.id))).where(
+                    col(StationSlot.station_id) == s.id,
+                    col(StationSlot.battery_id).isnot(None),
                 )
             ).one() or 0
 
@@ -217,10 +217,10 @@ class DealerAnalyticsService:
             # Battery Health Score (average health of batteries present)
             from app.models.battery import Battery
             avg_health = db.exec(
-                select(func.coalesce(func.avg(Battery.health_percentage), 0.0)).join(
-                    StationSlot, StationSlot.battery_id == Battery.id
+                select(func.coalesce(func.avg(col(Battery.health_percentage)), 0.0)).join(
+                    StationSlot, col(StationSlot.battery_id) == col(Battery.id)
                 ).where(
-                    StationSlot.station_id == s.id
+                    col(StationSlot.station_id) == s.id
                 )
             ).one() or 0.0
 
@@ -258,23 +258,23 @@ class DealerAnalyticsService:
         prev_month_start = (month_start - timedelta(days=1)).replace(day=1)
 
         # All unique customers
-        all_customers = db.exec(
-            select(SwapSession.user_id).where(
+        all_customers = list(db.exec(
+            select(col(SwapSession.user_id)).where(
                 col(SwapSession.station_id).in_(station_ids),
-                SwapSession.status == "completed",
+                col(SwapSession.status) == "completed",
             ).distinct()
-        ).all()
+        ).all())
         total = len(all_customers)
 
         # Repeat: customers with > 1 swap
         from sqlalchemy import literal_column
         repeat_subq = (
-            select(SwapSession.user_id).where(
+            select(col(SwapSession.user_id)).where(
                 col(SwapSession.station_id).in_(station_ids),
-                SwapSession.status == "completed",
+                col(SwapSession.status) == "completed",
             )
-            .group_by(SwapSession.user_id)
-            .having(func.count(SwapSession.id) > 1)
+            .group_by(col(SwapSession.user_id))
+            .having(func.count(col(SwapSession.id)) > 1)
         )
         repeat_users = db.exec(select(func.count()).select_from(repeat_subq.subquery())).one() or 0
         repeat_pct = (repeat_users / total * 100) if total > 0 else 0.0
@@ -300,9 +300,9 @@ class DealerAnalyticsService:
 
         # Avg CLV (total revenue / unique customers)
         total_revenue = db.exec(
-            select(func.coalesce(func.sum(SwapSession.amount), 0.0)).where(
+            select(func.coalesce(func.sum(col(SwapSession.swap_amount)), 0.0)).where(
                 col(SwapSession.station_id).in_(station_ids),
-                SwapSession.status == "completed",
+                col(SwapSession.status) == "completed",
             )
         ).one() or 0.0
         avg_clv = (float(total_revenue) / total) if total > 0 else 0.0
@@ -315,25 +315,25 @@ class DealerAnalyticsService:
         # NPS Calculation: % Promoters (4-5) - % Detractors (1-2)
         from app.models.review import Review
         total_ratings = db.exec(
-            select(func.count(Review.id)).where(
+            select(func.count(col(Review.id))).where(
                 col(Review.station_id).in_(station_ids),
-                Review.rating.isnot(None),
+                col(Review.rating).isnot(None),
             )
         ).one() or 0
 
         nps_score = 0.0
         if total_ratings > 0:
             promoters = db.exec(
-                select(func.count(Review.id)).where(
+                select(func.count(col(Review.id))).where(
                     col(Review.station_id).in_(station_ids),
-                    Review.rating >= 4,
+                    col(Review.rating) >= 4,
                 )
             ).one() or 0
             
             detractors = db.exec(
-                select(func.count(Review.id)).where(
+                select(func.count(col(Review.id))).where(
                     col(Review.station_id).in_(station_ids),
-                    Review.rating <= 2,
+                    col(Review.rating) <= 2,
                 )
             ).one() or 0
             
@@ -419,15 +419,15 @@ class DealerAnalyticsService:
             pdf = FPDF()
             pdf.add_page()
             pdf.set_font("Arial", size=15)
-            pdf.cell(200, 10, txt="Dealer Performance Report", ln=1, align="C")
+            pdf.cell(200, 10, text="Dealer Performance Report", ln=1, align="C")
             pdf.set_font("Arial", size=10)
             for k, v in data.items():
                 if isinstance(v, dict):
-                    pdf.cell(200, 10, txt=f"{k}:", ln=1, align="L")
+                    pdf.cell(200, 10, text=f"{k}:", ln=1, align="L")
                     for k2, v2 in v.items():
-                        pdf.cell(200, 10, txt=f"    {k2}: {v2}", ln=1, align="L")
+                        pdf.cell(200, 10, text=f"    {k2}: {v2}", ln=1, align="L")
                 else:
-                    pdf.cell(200, 10, txt=f"{k}: {v}", ln=1, align="L")
+                    pdf.cell(200, 10, text=f"{k}: {v}", ln=1, align="L")
             pdf.output(filepath)
             return filepath
         except Exception as e:
@@ -440,7 +440,7 @@ class DealerAnalyticsService:
         from app.models.dealer import DealerProfile
         from app.services.email_service import EmailService
 
-        dealer = db.exec(select(DealerProfile).where(DealerProfile.id == dealer_id)).first()
+        dealer = db.exec(select(DealerProfile).where(col(DealerProfile.id) == dealer_id)).first()
         if not dealer or not dealer.contact_email:
             raise Exception("Dealer email not found.")
 
@@ -530,6 +530,7 @@ class DealerAnalyticsService:
     # ─── Helpers ───
     @staticmethod
     def _get_station_ids(db: Session, dealer_id: int) -> List[int]:
-        return list(db.exec(
-            select(Station.id).where(Station.dealer_id == dealer_id)
+        ids = list(db.exec(
+            select(col(Station.id)).where(col(Station.dealer_id) == dealer_id)
         ).all())
+        return [i for i in ids if i is not None]

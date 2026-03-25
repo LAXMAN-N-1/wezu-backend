@@ -3,6 +3,7 @@ Apple Sign-In Authentication Service
 Handles Apple OAuth authentication for customer app
 """
 import jwt
+from jwt.algorithms import RSAAlgorithm
 import httpx
 from datetime import datetime, timedelta
 from typing import Optional, Dict
@@ -45,7 +46,7 @@ class AppleAuthService:
             public_key = None
             for key in apple_keys['keys']:
                 if key['kid'] == key_id:
-                    public_key = jwt.algorithms.RSAAlgorithm.from_jwk(key)
+                    public_key = RSAAlgorithm.from_jwk(key)
                     break
             
             if not public_key:
@@ -55,7 +56,7 @@ class AppleAuthService:
             # Verify and decode token
             decoded = jwt.decode(
                 identity_token,
-                public_key,
+                public_key, # type: ignore
                 algorithms=['RS256'],
                 audience=settings.APPLE_CLIENT_ID,
                 issuer=AppleAuthService.APPLE_ISSUER
@@ -84,6 +85,7 @@ class AppleAuthService:
         """
         try:
             # Load private key
+            assert settings.APPLE_PRIVATE_KEY_PATH is not None, "APPLE_PRIVATE_KEY_PATH is not set"
             with open(settings.APPLE_PRIVATE_KEY_PATH, 'rb') as key_file:
                 private_key = serialization.load_pem_private_key(
                     key_file.read(),
@@ -105,9 +107,10 @@ class AppleAuthService:
                 'sub': settings.APPLE_CLIENT_ID
             }
             
+            from typing import Any
             client_secret = jwt.encode(
                 payload,
-                private_key,
+                private_key, # type: ignore
                 algorithm='ES256',
                 headers=headers
             )

@@ -10,7 +10,9 @@ from app.models.station import Station, StationSlot
 from app.models.battery import Battery, LocationType, BatteryStatus
 from app.services.notification_service import NotificationService
 from datetime import datetime
-from typing import List, Optional, Any
+from app.core.database import engine
+from app.models.logistics import BatteryTransfer, Manifest, DeliveryStatus
+from app.models.battery import BatteryStatus
 
 class LogisticsService:
     @staticmethod
@@ -39,12 +41,12 @@ class LogisticsService:
 
     @staticmethod
     def update_order_status(db: Session, order_id: int, status: str) -> Any:
-        from app.models.logistics import DeliveryOrder
+        from app.models.logistics import DeliveryOrder, DeliveryStatus
         order = db.get(DeliveryOrder, order_id)
         if not order:
             raise ValueError("Order not found")
             
-        order.status = status
+        order.status = DeliveryStatus(status)
         if status == "in_transit" and not order.started_at:
             order.started_at = datetime.utcnow()
         elif status == "delivered":
@@ -52,7 +54,7 @@ class LogisticsService:
             # Update driver stats
             if order.assigned_driver_id:
                 from app.models.driver_profile import DriverProfile
-                driver = db.exec(select(DriverProfile).where(DriverProfile.user_id == order.assigned_driver_id)).first()
+                driver = db.exec(select(DriverProfile).where(col(DriverProfile.user_id) == order.assigned_driver_id)).first()
                 if driver:
                     driver.total_deliveries += 1
                     # Simple on-time logic: if completed - started < 30 mins
@@ -67,9 +69,9 @@ class LogisticsService:
         db.commit()
         db.refresh(order)
         return order
-
+        
     @staticmethod
-    def upload_pod(db: Session, order_id: int, pod_url: str, signature_url: str = None, otp: str = None) -> Any:
+    def upload_pod(db: Session, order_id: int, pod_url: str, signature_url: Optional[str] = None, otp: Optional[str] = None) -> Any:
         from app.models.logistics import DeliveryOrder
         order = db.get(DeliveryOrder, order_id)
         if not order:
@@ -111,8 +113,8 @@ class LogisticsService:
     def get_platform_performance(db: Session) -> dict:
         """Global logistics metrics"""
         from app.models.logistics import DeliveryOrder
-        total = db.exec(select(func.count(DeliveryOrder.id))).one()
-        delivered = db.exec(select(func.count(DeliveryOrder.id)).where(DeliveryOrder.status == "delivered")).one()
+        total = db.exec(select(func.count(col(DeliveryOrder.id)))).one()
+        delivered = db.exec(select(func.count(col(DeliveryOrder.id))).where(col(DeliveryOrder.status) == DeliveryStatus.DELIVERED)).one()
         
         return {
             "total_orders": total,
@@ -165,16 +167,16 @@ class LogisticsService:
         """
         # Count 'ready' batteries at this station
         from app.models.station import StationSlot
-        statement = select(func.count(StationSlot.id)).where(
-            StationSlot.station_id == station_id,
-            StationSlot.status == "ready"
+        statement = select(func.count(col(StationSlot.id))).where(
+            col(StationSlot.station_id) == station_id,
+            col(StationSlot.status) == "ready"
         )
         ready_count = db.exec(statement).one()
         
         if ready_count < threshold:
             # Need restock. Find nearest warehouse with stock.
             from app.models.warehouse import Warehouse
-            warehouse = db.exec(select(Warehouse).where(Warehouse.is_active == True)).first()
+            warehouse = db.exec(select(Warehouse).where(col(Warehouse.is_active) == True)).first()
             if not warehouse:
                 return None
             
@@ -187,6 +189,8 @@ class LogisticsService:
             )).first()
             
             if battery:
+                assert battery.id is not None
+                assert warehouse.id is not None
                 transfer = BatteryTransfer(
                     battery_id=battery.id,
                     from_location_type="warehouse",

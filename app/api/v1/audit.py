@@ -11,7 +11,7 @@ from datetime import datetime
 
 router = APIRouter()
 
-from app.services.audit_service import audit_service
+router = APIRouter()
 
 class AuditLogEntry(BaseModel):
     id: int
@@ -25,28 +25,7 @@ class AuditLogEntry(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-class AuditLogResponse(BaseModel):
-    logs: List[AuditLogEntry]
-    total_count: int
-    page: int
-    limit: int
 
-class MongoAuditEntry(BaseModel):
-    id: str = Field(alias="_id")
-    user_id: Optional[int] = None
-    event_type: str
-    action: Optional[str] = None
-    resource: Optional[str] = None
-    status: str
-    timestamp: datetime
-    metadata: Dict[str, Any] = {}
-    ip_address: Optional[str] = None
-
-class MongoAuditResponse(BaseModel):
-    logs: List[MongoAuditEntry]
-    total_count: int
-    page: int
-    limit: int
 
 class AuditLogResponse(BaseModel):
     logs: List[AuditLog]
@@ -54,28 +33,35 @@ class AuditLogResponse(BaseModel):
     page: int
     limit: int
 
-@router.get("/users/{user_id}", response_model=MongoAuditResponse)
+@router.get("/users/{user_id}", response_model=AuditLogResponse)
 async def get_user_audit_log(
     user_id: int,
     page: int = 1,
     limit: int = 20,
     current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
 ):
     """
-    Get audit activity history for a user from MongoDB.
+    Get audit activity history for a user from SQL.
     """
-    # 1. Authorization (Simplified for now, keep existing logic if critical)
+    # 1. Authorization
     if current_user.id != user_id and not current_user.is_superuser:
         raise HTTPException(status_code=403, detail="Not authorized")
         
-    # 2. Query MongoDB
-    result = await audit_service.get_logs(
-        user_id=user_id,
+    # 2. Query SQL
+    query = select(AuditLog).where(AuditLog.user_id == user_id)
+    count_query = select(func.count()).select_from(query.subquery())
+    total_count = db.exec(count_query).one()
+    
+    offset = (page - 1) * limit
+    logs = db.exec(query.order_by(AuditLog.timestamp.desc()).offset(offset).limit(limit)).all()
+    
+    return AuditLogResponse(
+        logs=logs,
+        total_count=total_count,
         page=page,
         limit=limit
     )
-    
-    return result
 
 
 @router.get("/roles/{role_id}/changes", response_model=AuditLogResponse)

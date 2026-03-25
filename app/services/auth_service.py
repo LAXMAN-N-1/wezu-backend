@@ -2,7 +2,8 @@ from google.oauth2 import id_token
 from google.auth.transport import requests
 from app.core.config import settings
 from fastapi import HTTPException, status, Request
-from sqlmodel import Session
+from typing import Optional, List, Dict, Any
+from sqlmodel import Session, select, col, desc
 
 class AuthService:
     @staticmethod
@@ -66,7 +67,6 @@ class AuthService:
             )
 
     @staticmethod
-    @staticmethod
     async def verify_facebook_token(token: str):
         try:
             import httpx
@@ -120,10 +120,10 @@ class AuthService:
         db: Session,
         user_id: int,
         refresh_token: str,
-        request: Request = None,
-        token_jti: str = None,
-        ip_address: str = None,
-        user_agent: str = None
+        request: Optional[Request] = None,
+        token_jti: Optional[str] = None,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None
     ):
         """
         Create a new UserSession record.
@@ -139,7 +139,7 @@ class AuthService:
             if not user_agent:
                 user_agent = request.headers.get("user-agent", "unknown")
             if not ip_address:
-                ip_address = request.client.host if request.client else "unknown"
+                ip_address = request.client.host if (request and request.client) else "unknown"
                 forwarded = request.headers.get("x-forwarded-for")
                 if forwarded:
                     ip_address = forwarded.split(",")[0]
@@ -229,7 +229,7 @@ class AuthService:
         db: Session,
         old_token_jti: str,
         new_refresh_token: str,
-        request: Request = None
+        request: Optional[Request] = None
     ):
         """
         Update existing session with new token info (Rotation).
@@ -243,13 +243,16 @@ class AuthService:
         from jose import jwt
 
         # 1. Find Session by old JTI
-        session = db.exec(select(UserSession).where(UserSession.token_id == old_token_jti)).first()
+        session = db.exec(select(UserSession).where(col(UserSession.token_id) == old_token_jti)).first()
         
         # 2. Extract new JTI
         try:
             payload = jwt.decode(new_refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
             new_token_jti = payload.get("jti")
-            user_id = int(payload.get("sub"))
+            sub = payload.get("sub")
+            user_id = int(sub) if sub is not None else 0
+            if not user_id:
+                return None
         except Exception:
             return None # Cannot update invalid token
             
@@ -268,7 +271,7 @@ class AuthService:
                  user_agent = request.headers.get("user-agent")
                  if user_agent: session.user_agent = user_agent
                  
-                 ip_address = request.client.host if request.client else None
+                 ip_address = request.client.host if (request and request.client) else None
                  if ip_address: session.ip_address = ip_address
             
             db.add(session)
@@ -298,7 +301,7 @@ class AuthService:
             db.add(user)
         
         # 2. Mark all sessions inactive
-        sessions = db.exec(select(UserSession).where(UserSession.user_id == user_id).where(UserSession.is_active == True)).all()
+        sessions = db.exec(select(UserSession).where(col(UserSession.user_id) == user_id).where(col(UserSession.is_active) == True)).all()
         for s in sessions:
             s.is_active = False
             db.add(s)

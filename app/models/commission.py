@@ -67,5 +67,5 @@ class CommissionLog(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Relationships
-    settlement: Optional["Settlement"] = Relationship(back_populates="commission_logs")
+    settlement: Optional["Settlement"] = Relationship()
 

@@ -386,7 +386,7 @@ def get_user_refunds(
 
 @router.post("/webhooks/razorpay")
 async def razorpay_webhook(
-    request: Request,
+    request: FastAPIRequest,
     session: Session = Depends(deps.get_db)
 ):
     """

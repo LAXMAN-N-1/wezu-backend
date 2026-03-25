@@ -23,13 +23,13 @@ from app.schemas.user import (
     AccountDeletionRequest, MembershipResponse, DashboardSummaryResponse, LoginHistoryResponse
 )
 from app.schemas.dashboard import DashboardConfigResponse
-from app.services.audit_service import audit_service
+from app.services.audit_service import AuditService
 from app.services.analytics_service import AnalyticsService
 from app.services.membership_service import MembershipService
 import os
 import shutil
 import json
-from app.core.security import generate_totp_secret, verify_totp, generate_backup_codes, generate_qr_uri
+
 
 router = APIRouter()
 
@@ -555,12 +555,38 @@ async def get_my_activity_log(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
 ):
-    """Get activity logs from MongoDB audit service"""
-    result = await audit_service.get_logs(user_id=current_user.id, page=page, limit=limit)
+    """Get activity logs from SQL audit service"""
+    from sqlmodel import select, col, desc
+    from sqlalchemy import func
+    from app.models.audit_log import AuditLog
+    
+    offset = (page - 1) * limit
+    
+    query = select(AuditLog).where(col(AuditLog.user_id) == current_user.id).order_by(desc(AuditLog.timestamp))
+    logs = db.exec(query.offset(offset).limit(limit)).all()
+    
+    total_query = select(func.count(AuditLog.id)).where(col(AuditLog.user_id) == current_user.id)
+    total_count = db.exec(total_query).one()
+    
     return ActivityLogResponse(
-        logs=result["logs"],
-        total_count=result["total_count"],
+        logs=[
+            {
+                "id": log.id,
+                "user_id": log.user_id,
+                "action": log.action,
+                "resource_type": log.resource_type,
+                "resource_id": log.resource_id,
+                "target_id": log.target_id,
+                "old_value": log.old_value,
+                "new_value": log.new_value,
+                "ip_address": log.ip_address,
+                "user_agent": log.user_agent,
+                "timestamp": log.timestamp
+            } for log in logs
+        ],
+        total_count=total_count,
         page=page,
         limit=limit
     )

@@ -1,4 +1,4 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, select, col
 from app.models.geofence import Geofence
 from app.services.maps_service import MapsService
 from typing import List
@@ -10,7 +10,7 @@ class GeofenceService:
         Check if location is inside any active geofence.
         Returns (True, "OK") if valid, (False, "Violation Message") if invalid.
         """
-        geofences = db.exec(select(Geofence).where(Geofence.is_active == True)).all()
+        geofences = list(db.exec(select(Geofence).where(col(Geofence.is_active) == True)).all())
         if not geofences:
             return True, "OK"
 

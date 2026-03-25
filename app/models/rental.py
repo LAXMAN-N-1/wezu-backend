@@ -2,6 +2,8 @@ import uuid
 from datetime import datetime
 from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
+from sqlalchemy import JSON, Column, String
+import sqlalchemy as sa
 from enum import Enum
 
 
@@ -55,6 +57,7 @@ class Rental(SQLModel, table=True):
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
+    meta_data: Optional[str] = Field(default="{}", sa_column=Column("metadata", sa.String, nullable=True))
 
     # Relationships
     user: "User" = Relationship(back_populates="rentals")

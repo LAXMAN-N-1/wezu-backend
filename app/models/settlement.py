@@ -12,6 +12,7 @@ class Settlement(SQLModel, table=True):
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id")
     # user_id: Optional[int] = Field(default=None, foreign_key="users.id") # If needed for something else
 
+    dealer: "DealerProfile" = Relationship(back_populates="settlements")
     # Period
     settlement_month: str = Field(index=True)  # "YYYY-MM" for fast lookup
     start_date: datetime

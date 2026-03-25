@@ -1,5 +1,8 @@
 import traceback
 import sys
+from fastapi import FastAPI, Depends, status
+from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -146,7 +149,7 @@ async def health_check():
 async def custom_swagger_ui_html():
     """Override Swagger UI CDN to use cdnjs instead of jsdelivr/unpkg (which might be blocked)"""
     return get_swagger_ui_html(
-        openapi_url=app.openapi_url,
+        openapi_url=app.openapi_url or f"{settings.API_V1_STR}/openapi.json",
         title=app.title + " - Swagger UI",
         oauth2_redirect_url=app.swagger_ui_oauth2_redirect_url,
         swagger_js_url="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-bundle.min.js",
@@ -157,7 +160,7 @@ async def custom_swagger_ui_html():
 # Rate Limiting
 # ----------------------------
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore
 
 # RBAC Middleware
 from app.middleware.rbac_middleware import RBACMiddleware
@@ -275,9 +278,11 @@ app.include_router(station_monitoring.router, prefix=f"{monitoring_api}/stations
 # 3. Dealer Application Endpoints
 dealer_api = f"{settings.API_V1_STR}/dealer"
 dealer_deps = [Depends(deps.get_current_user)] # Granular checks inside routers for now, or check_permission("dealer_dashboard")
+from app.api.v1 import dealer_notifications
 app.include_router(dealers.router, prefix=f"{dealer_api}/profile", tags=["Dealer: Profile"], dependencies=dealer_deps)
 app.include_router(stock.router, prefix=f"{dealer_api}/stock", tags=["Dealer: Stock"], dependencies=dealer_deps)
 app.include_router(settlements.router, prefix=f"{dealer_api}/settlements", tags=["Dealer: Settlements"], dependencies=dealer_deps)
+app.include_router(dealer_notifications.router, prefix=f"{dealer_api}/notifications", tags=["Dealer: Notifications"], dependencies=dealer_deps)
 
 # 3b. Dealer Portal Endpoints (Auth, Dashboard, Tickets, Customers, Settings, Onboarding, Documents, Roles)
 from app.api.v1 import dealer_portal_auth, dealer_portal_dashboard, dealer_portal_tickets, dealer_portal_customers, dealer_portal_settings, dealer_onboarding, dealer_documents, dealer_portal_roles, dealer_portal_users
@@ -334,6 +339,10 @@ from app.api.v1 import admin_audit
 app.include_router(admin_audit.router, prefix=f"{settings.API_V1_STR}/admin/audit-logs", tags=["Admin Audit Logs"])
 from app.api.v1 import admin_invoices
 app.include_router(admin_invoices.router, prefix=f"{settings.API_V1_STR}/admin/invoices", tags=["Admin: Invoices"])
+# app.include_router(support_enhanced.router, prefix=f"{settings.API_V1_STR}/support", tags=["Support Enhanced"])
+# app.include_router(rentals_enhanced.router, prefix=f"{settings.API_V1_STR}/rentals", tags=["Rentals Enhanced"])
+# app.include_router(purchases_enhanced.router, prefix=f"{settings.API_V1_STR}/purchases", tags=["Purchases Enhanced"])
+# app.include_router(analytics_enhanced.router, prefix=f"{settings.API_V1_STR}/analytics", tags=["Analytics Enhanced"])
 
 # Dealer Analytics & Management
 from app.api.v1 import dealer_analytics, dealer_campaigns, dealer_stations
@@ -363,7 +372,7 @@ app.include_router(razorpay_webhook.router, prefix="/api/webhooks", tags=["Webho
 
 # Battery Catalog (Specs)
 from app.api.v1 import catalog
-app.include_router(catalog.router, prefix=f"{settings.API_V1_STR}/catalog", tags=["Battery Catalog"])
+app.include_router(catalog.router, prefix=f"{settings.API_V1_STR}/battery-catalog", tags=["Battery Catalog"])
 
 # Logistics already included above
 

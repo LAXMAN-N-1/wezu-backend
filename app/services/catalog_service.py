@@ -2,8 +2,8 @@
 Catalog Service
 CatalogProduct catalog management with search and filtering
 """
-from sqlmodel import Session, select, or_, and_
-from typing import List, Optional, Dict, Any
+from sqlmodel import Session, select, or_, and_, col, desc
+from typing import List, Optional, Dict, Any, cast
 from app.models.catalog import CatalogProduct, CatalogProductImage, CatalogProductVariant
 from app.schemas.catalog import ProductCreate, ProductUpdate
 from datetime import datetime
@@ -37,71 +37,71 @@ class CatalogService:
             Tuple of (products, total_count)
         """
         # Base query
-        query_stmt = select(CatalogProduct).where(CatalogProduct.status == "ACTIVE")
+        query_stmt = select(CatalogProduct).where(col(CatalogProduct.status) == "ACTIVE")
         
         # Text search
         if query:
             query_stmt = query_stmt.where(
                 or_(
-                    CatalogProduct.name.ilike(f"%{query}%"),
-                    CatalogProduct.description.ilike(f"%{query}%"),
-                    CatalogProduct.brand.ilike(f"%{query}%"),
-                    CatalogProduct.tags.ilike(f"%{query}%")
+                    col(CatalogProduct.name).ilike(f"%{query}%"),
+                    col(CatalogProduct.description).ilike(f"%{query}%"),
+                    col(CatalogProduct.brand).ilike(f"%{query}%"),
+                    col(CatalogProduct.tags).ilike(f"%{query}%")
                 )
             )
         
         # Category filter
         if category:
-            query_stmt = query_stmt.where(CatalogProduct.category == category)
+            query_stmt = query_stmt.where(col(CatalogProduct.category) == category)
         
         # Brand filter
         if brand:
-            query_stmt = query_stmt.where(CatalogProduct.brand == brand)
+            query_stmt = query_stmt.where(col(CatalogProduct.brand) == brand)
         
         # Price range
         if min_price is not None:
-            query_stmt = query_stmt.where(CatalogProduct.price >= min_price)
+            query_stmt = query_stmt.where(cast(Any, col(CatalogProduct.price)) >= min_price)
         if max_price is not None:
-            query_stmt = query_stmt.where(CatalogProduct.price <= max_price)
+            query_stmt = query_stmt.where(cast(Any, col(CatalogProduct.price)) <= max_price)
         
         # Capacity range (for batteries)
         if min_capacity is not None:
-            query_stmt = query_stmt.where(CatalogProduct.capacity_mah >= min_capacity)
+            query_stmt = query_stmt.where(cast(Any, col(CatalogProduct.capacity_mah)) >= min_capacity)
         if max_capacity is not None:
-            query_stmt = query_stmt.where(CatalogProduct.capacity_mah <= max_capacity)
+            query_stmt = query_stmt.where(cast(Any, col(CatalogProduct.capacity_mah)) <= max_capacity)
         
         # Rating filter
         if min_rating is not None:
-            query_stmt = query_stmt.where(CatalogProduct.average_rating >= min_rating)
+            query_stmt = query_stmt.where(cast(Any, col(CatalogProduct.average_rating)) >= min_rating)
         
         # Stock filter
         if in_stock_only:
-            query_stmt = query_stmt.where(CatalogProduct.stock_quantity > 0)
+            query_stmt = query_stmt.where(cast(Any, col(CatalogProduct.stock_quantity)) > 0)
         
         # Get total count
-        total_count = len(session.exec(query_stmt).all())
+        total_count = len(list(session.exec(query_stmt).all()))
         
         # Sorting
         if sort_by == "price_asc":
-            query_stmt = query_stmt.order_by(CatalogProduct.price.asc())
+            query_stmt = query_stmt.order_by(col(CatalogProduct.price).asc())
         elif sort_by == "price_desc":
-            query_stmt = query_stmt.order_by(CatalogProduct.price.desc())
+            query_stmt = query_stmt.order_by(desc(col(CatalogProduct.price)))
         elif sort_by == "rating":
-            query_stmt = query_stmt.order_by(CatalogProduct.average_rating.desc())
+            query_stmt = query_stmt.order_by(desc(col(CatalogProduct.average_rating)))
         elif sort_by == "popularity":
-            query_stmt = query_stmt.order_by(CatalogProduct.review_count.desc())
+            query_stmt = query_stmt.order_by(desc(col(CatalogProduct.review_count)))
         elif sort_by == "newest":
-            query_stmt = query_stmt.order_by(CatalogProduct.created_at.desc())
+            query_stmt = query_stmt.order_by(desc(col(CatalogProduct.created_at)))
         else:  # Default: featured first, then newest
             query_stmt = query_stmt.order_by(
-                CatalogProduct.is_featured.desc(),
-                CatalogProduct.created_at.desc()
+                desc(col(CatalogProduct.is_featured)),
+                desc(col(CatalogProduct.created_at))
             )
         
         # Pagination
         query_stmt = query_stmt.offset(offset).limit(limit)
         
-        products = session.exec(query_stmt).all()
+        products = list(session.exec(query_stmt).all())
         
         return products, total_count
     
@@ -113,18 +113,18 @@ class CatalogService:
             return None
         
         # Get images
-        images = session.exec(
+        images = list(session.exec(
             select(CatalogProductImage)
-            .where(CatalogProductImage.product_id == product_id)
-            .order_by(CatalogProductImage.display_order)
-        ).all()
+            .where(col(CatalogProductImage.product_id) == product_id)
+            .order_by(col(CatalogProductImage.display_order))
+        ).all())
         
         # Get variants
-        variants = session.exec(
+        variants = list(session.exec(
             select(CatalogProductVariant)
-            .where(CatalogProductVariant.product_id == product_id)
-            .where(CatalogProductVariant.is_active == True)
-        ).all()
+            .where(col(CatalogProductVariant.product_id) == product_id)
+            .where(col(CatalogProductVariant.is_active) == True)
+        ).all())
         
         return {
             "product": product,
@@ -136,24 +136,24 @@ class CatalogService:
     @staticmethod
     def get_featured_products(limit: int, session: Session) -> List[CatalogProduct]:
         """Get featured products"""
-        return session.exec(
+        return list(session.exec(
             select(CatalogProduct)
-            .where(CatalogProduct.is_featured == True)
-            .where(CatalogProduct.status == "ACTIVE")
-            .order_by(CatalogProduct.created_at.desc())
+            .where(col(CatalogProduct.is_featured) == True)
+            .where(col(CatalogProduct.status) == "ACTIVE")
+            .order_by(desc(col(CatalogProduct.created_at)))
             .limit(limit)
-        ).all()
+        ).all())
     
     @staticmethod
     def get_bestsellers(limit: int, session: Session) -> List[CatalogProduct]:
         """Get bestseller products"""
-        return session.exec(
+        return list(session.exec(
             select(CatalogProduct)
-            .where(CatalogProduct.is_bestseller == True)
-            .where(CatalogProduct.status == "ACTIVE")
-            .order_by(CatalogProduct.review_count.desc())
+            .where(col(CatalogProduct.is_bestseller) == True)
+            .where(col(CatalogProduct.status) == "ACTIVE")
+            .order_by(desc(col(CatalogProduct.review_count)))
             .limit(limit)
-        ).all()
+        ).all())
     
     @staticmethod
     def check_stock_availability(
@@ -165,10 +165,10 @@ class CatalogService:
         """Check if product/variant has sufficient stock"""
         if variant_id:
             variant = session.get(CatalogProductVariant, variant_id)
-            return variant and variant.stock_quantity >= quantity
+            return bool(variant and variant.stock_quantity >= quantity)
         else:
             product = session.get(CatalogProduct, product_id)
-            return product and product.stock_quantity >= quantity
+            return bool(product and product.stock_quantity >= quantity)
     
     @staticmethod
     def reserve_stock(
@@ -230,19 +230,19 @@ class CatalogService:
         """Get available categories, brands, and price ranges for filtering"""
         from sqlmodel import func
         
-        categories = session.exec(select(CatalogProduct.category).distinct()).all()
-        brands = session.exec(select(CatalogProduct.brand).distinct()).all()
+        categories = list(session.exec(select(col(CatalogProduct.category)).distinct()).all())
+        brands = list(session.exec(select(col(CatalogProduct.brand)).distinct()).all())
         
         # Price range
-        min_price = session.exec(select(func.min(CatalogProduct.price))).one() or 0
-        max_price = session.exec(select(func.max(CatalogProduct.price))).one() or 0
+        min_price = session.exec(select(func.min(col(CatalogProduct.price)))).one() or 0
+        max_price = session.exec(select(func.max(col(CatalogProduct.price)))).one() or 0
         
         # Capacities (for battery filtering)
-        capacities = session.exec(
-            select(CatalogProduct.capacity_mah)
-            .where(CatalogProduct.category == "BATTERY")
+        capacities = list(session.exec(
+            select(col(CatalogProduct.capacity_mah))
+            .where(col(CatalogProduct.category) == "BATTERY")
             .distinct()
-        ).all()
+        ).all())
         
         return {
             "categories": [c for c in categories if c],
@@ -258,6 +258,7 @@ class CatalogService:
         product = CatalogProduct(**data)
         session.add(product)
         session.flush()
+        assert product.id is not None
         
         # Add images
         for img_in in product_in.images:

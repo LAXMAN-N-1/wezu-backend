@@ -9,9 +9,9 @@ import logging
 from datetime import datetime, timedelta, date
 from typing import Optional, Dict, Any, List
 
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, col
 
-from app.models.financial import Transaction
+from app.models.financial import Transaction, TransactionStatus, TransactionType
 from app.models.revenue_report import RevenueReport
 
 logger = logging.getLogger(__name__)
@@ -35,14 +35,14 @@ class FinancialReportService:
 
         # Core aggregation
         base = select(Transaction).where(
-            Transaction.created_at >= datetime.combine(period_start, datetime.min.time()),
-            Transaction.created_at < datetime.combine(period_end + timedelta(days=1), datetime.min.time()),
-            Transaction.status == "success",
+            col(Transaction.created_at) >= datetime.combine(period_start, datetime.min.time()),
+            col(Transaction.created_at) < datetime.combine(period_end + timedelta(days=1), datetime.min.time()),
+            col(Transaction.status) == TransactionStatus.SUCCESS,
         )
-        transactions = db.exec(base).all()
+        transactions = list(db.exec(base).all())
 
-        total_revenue = sum(t.amount for t in transactions if t.type == "credit")
-        total_refunds = sum(abs(t.amount) for t in transactions if t.category == "refund")
+        total_revenue = sum(t.amount for t in transactions if t.transaction_type != TransactionType.REFUND)
+        total_refunds = sum(abs(t.amount) for t in transactions if t.transaction_type == TransactionType.REFUND)
         total_count = len(transactions)
         avg_value = (total_revenue / total_count) if total_count > 0 else 0.0
         net_revenue = total_revenue - total_refunds
@@ -97,12 +97,12 @@ class FinancialReportService:
     @staticmethod
     def get_trends(db: Session, period_type: str, num_periods: int = 6) -> List[dict]:
         """Return the last N generated reports as trend data."""
-        reports = db.exec(
+        reports = list(db.exec(
             select(RevenueReport)
-            .where(RevenueReport.report_type == period_type)
-            .order_by(RevenueReport.period_start.desc())
+            .where(col(RevenueReport.report_type) == period_type)
+            .order_by(col(RevenueReport.period_start).desc())
             .limit(num_periods)
-        ).all()
+        ).all())
 
         return [
             {
@@ -134,39 +134,39 @@ class FinancialReportService:
 
         # Internal totals
         internal_total = db.exec(
-            select(func.coalesce(func.sum(Transaction.amount), 0.0)).where(
-                Transaction.created_at >= start,
-                Transaction.created_at < end,
-                Transaction.status == "success",
-                Transaction.type == "credit",
+            select(func.coalesce(func.sum(col(Transaction.amount)), 0.0)).where(
+                col(Transaction.created_at) >= start,
+                col(Transaction.created_at) < end,
+                col(Transaction.status) == TransactionStatus.SUCCESS,
+                col(Transaction.transaction_type) != TransactionType.REFUND,
             )
         ).one()
 
         internal_count = db.exec(
-            select(func.count(Transaction.id)).where(
-                Transaction.created_at >= start,
-                Transaction.created_at < end,
-                Transaction.status == "success",
-                Transaction.type == "credit",
+            select(func.count(col(Transaction.id))).where(
+                col(Transaction.created_at) >= start,
+                col(Transaction.created_at) < end,
+                col(Transaction.status) == TransactionStatus.SUCCESS,
+                col(Transaction.transaction_type) != TransactionType.REFUND,
             )
         ).one()
 
-        # Gateway totals (from razorpay_payment_id presence)
+        # Gateway totals (from payment_gateway_ref presence)
         gateway_total = db.exec(
-            select(func.coalesce(func.sum(Transaction.amount), 0.0)).where(
-                Transaction.created_at >= start,
-                Transaction.created_at < end,
-                Transaction.status == "success",
-                Transaction.razorpay_payment_id.isnot(None),
+            select(func.coalesce(func.sum(col(Transaction.amount)), 0.0)).where(
+                col(Transaction.created_at) >= start,
+                col(Transaction.created_at) < end,
+                col(Transaction.status) == TransactionStatus.SUCCESS,
+                col(Transaction.payment_gateway_ref).isnot(None),
             )
         ).one()
 
         gateway_count = db.exec(
-            select(func.count(Transaction.id)).where(
-                Transaction.created_at >= start,
-                Transaction.created_at < end,
-                Transaction.status == "success",
-                Transaction.razorpay_payment_id.isnot(None),
+            select(func.count(col(Transaction.id))).where(
+                col(Transaction.created_at) >= start,
+                col(Transaction.created_at) < end,
+                col(Transaction.status) == TransactionStatus.SUCCESS,
+                col(Transaction.payment_gateway_ref).isnot(None),
             )
         ).one()
 
@@ -356,8 +356,8 @@ class FinancialReportService:
         prev = db.exec(
             select(RevenueReport)
             .where(
-                RevenueReport.report_type == period_type,
-                RevenueReport.period_start == prev_start,
+                col(RevenueReport.report_type) == period_type,
+                col(RevenueReport.period_start) == prev_start,
             )
         ).first()
 

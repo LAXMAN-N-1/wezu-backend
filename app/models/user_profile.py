@@ -35,4 +35,4 @@ class UserProfile(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     # Relationship
-    user: "User" = Relationship(back_populates="user_profile")
+    user: "User" = Relationship()

@@ -19,19 +19,19 @@ class KnowledgeArticle(SQLModel, table=True):
     """Full knowledge-base article that replaces the legacy FAQ entry."""
 
     __tablename__ = "knowledge_articles"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "core"}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     title: str = Field(max_length=200)
     slug: str = Field(max_length=220, unique=True, index=True)
     content: str = Field(sa_column=sa.Column(sa.Text, nullable=False))
     category_id: Optional[int] = Field(
-        default=None, foreign_key="core.article_categories.id"
+        default=None, foreign_key="article_categories.id"
     )
     tags: Optional[List[str]] = Field(default=None, sa_column=sa.Column(sa.JSON))
     status: ArticleStatus = Field(default=ArticleStatus.DRAFT, index=True)
     author_id: Optional[int] = Field(
-        default=None, foreign_key="core.users.id"
+        default=None, foreign_key="users.id"
     )
 
     views_count: int = Field(default=0)

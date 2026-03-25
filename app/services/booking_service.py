@@ -1,4 +1,4 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, select, col, desc
 from typing import List, Optional, Dict
 from datetime import datetime, timedelta
 from app.models.station import Station, StationStatus
@@ -20,7 +20,7 @@ class BookingService:
         limit: int = 10
     ) -> List[Dict]:
         """Find stations within radius with real-time availability"""
-        statement = select(Station).where(Station.status == StationStatus.OPERATIONAL)
+        statement = select(Station).where(col(Station.status) == StationStatus.OPERATIONAL)
         stations = db.exec(statement).all()
         
         results = []
@@ -30,9 +30,9 @@ class BookingService:
                 # Get available batteries count
                 available_count = db.exec(
                     select(Battery).where(
-                        Battery.station_id == station.id,
-                        Battery.status == BatteryStatus.AVAILABLE,
-                        Battery.current_charge >= 80
+                        col(Battery.station_id) == station.id,
+                        col(Battery.status) == BatteryStatus.AVAILABLE,
+                        col(Battery.current_charge) >= 80
                     )
                 ).all()
                 
@@ -62,9 +62,9 @@ class BookingService:
         # 1. Check if station has available batteries
         battery = db.exec(
             select(Battery).where(
-                Battery.station_id == station_id,
-                Battery.status == BatteryStatus.AVAILABLE
-            ).order_by(Battery.current_charge.desc())
+                col(Battery.station_id) == station_id,
+                col(Battery.status) == BatteryStatus.AVAILABLE
+            ).order_by(desc(col(Battery.current_charge)))
         ).first()
         
         if not battery:
@@ -73,8 +73,8 @@ class BookingService:
         # 2. Check if user already has an active reservation
         existing = db.exec(
             select(BatteryReservation).where(
-                BatteryReservation.user_id == user_id,
-                BatteryReservation.status == "PENDING"
+                col(BatteryReservation.user_id) == user_id,
+                col(BatteryReservation.status) == "PENDING"
             )
         ).first()
         if existing:
@@ -110,7 +110,7 @@ class BookingService:
                 db=db,
                 user_id=user_id,
                 title="Reservation Reminder",
-                message="Your battery reservation at " + battery.station_id + " expires in 10 minutes.", # Station name would be better
+                message=f"Your battery reservation at {battery.station_id} expires in 10 minutes.", # Station name would be better
                 scheduled_at=reminder_time
             )
 
@@ -121,8 +121,8 @@ class BookingService:
         """Release reservations older than 30 minutes"""
         now = datetime.utcnow()
         statement = select(BatteryReservation).where(
-            BatteryReservation.status == "PENDING",
-            BatteryReservation.end_time < now
+            col(BatteryReservation.status) == "PENDING",
+            col(BatteryReservation.end_time) < now
         )
         expired = db.exec(statement).all()
         for res in expired:

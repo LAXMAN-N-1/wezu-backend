@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Form
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlmodel import Session, select
+from sqlmodel import Session, select, col, desc
 from app.db.session import get_session
 from app.models.user import User, UserStatus, KYCStatus
 from app.schemas.user import Token
@@ -17,6 +17,7 @@ from app.api import deps
 from app.core.audit import AuditLogger, audit_log
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from fastapi.security import OAuth2PasswordRequestForm
+from app.services.user_service import UserService
 import logging
 import re
 from typing import Any, List, Optional
@@ -81,7 +82,7 @@ async def register(
             )
             
     if user_in.phone_number:
-         existing_user = user_repository.get_by_phone(db, user_in.phone_number)
+         existing_user = db.exec(select(User).where(col(User.phone_number) == user_in.phone_number)).first()
          if existing_user:
             raise HTTPException(
                 status_code=400,
@@ -89,7 +90,7 @@ async def register(
             )
     
     # Check phone number uniqueness
-    user_by_phone = db.exec(select(User).where(User.phone_number == user_in.phone_number)).first()
+    user_by_phone = db.exec(select(User).where(col(User.phone_number) == user_in.phone_number)).first()
     if user_by_phone:
         raise HTTPException(
             status_code=400,
@@ -107,7 +108,7 @@ async def register(
     # Assign default role
     from app.models.rbac import Role
     from sqlalchemy.orm import selectinload
-    customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
+    customer_role = db.exec(select(Role).where(col(Role.name) == "customer")).first()
     if customer_role:
         if customer_role not in user.roles:
             user.roles.append(customer_role)
@@ -121,6 +122,22 @@ async def register(
     return user
 
 
+@router.post("/login", response_model=Token)
+@router.post("/token", response_model=Token)
+async def login_access_token(
+    request: Request,
+    db: Session = Depends(get_session),
+    form_data: OAuth2PasswordRequestForm = Depends()
+) -> Any:
+    """
+    JSON based login for cleaner UI (uses 'email' field)
+    """
+    return await _process_login(
+        username=form_data.username,
+        password=form_data.password,
+        db=db,
+        request=request
+    )
 
 class EmailPasswordRequestForm:
     """
@@ -162,11 +179,11 @@ async def login_access_token(
 async def _process_login(username: str, password: str, db: Session, request: Request) -> Any:
     logger.info(f"Authenticating: {username}")
     
-    user = user_repository.get_by_email(db, username)
+    user = UserService.get_by_email(db, username)
     
     if not user:
         # Try by phone number if email fails
-        user = user_repository.get_by_phone(db, username)
+        user = db.exec(select(User).where(col(User.phone_number) == username)).first()
 
     if not user or not verify_password(password, user.hashed_password):
         # Extract IP and User-Agent
@@ -263,9 +280,9 @@ async def request_registration_otp(
 ):
     # Check if user already exists
     if "@" in otp_data.target:
-        statement = select(User).where(User.email == otp_data.target)
+        statement = select(User).where(col(User.email) == otp_data.target)
     else:
-        statement = select(User).where(User.phone_number == otp_data.target)
+        statement = select(User).where(col(User.phone_number) == otp_data.target)
     
     user = db.exec(statement).first()
     is_new_user = user is None
@@ -329,7 +346,7 @@ async def verify_registration_otp(
         db.refresh(user)
         
         # Assign Default Role: Customer
-        customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
+        customer_role = db.exec(select(Role).where(col(Role.name) == "customer")).first()
         if customer_role:
             # Single role assignment
             user.role = customer_role
@@ -396,7 +413,7 @@ async def verify_otp_alias(
     """
     return await verify_registration_otp(verify_data, request, db)
 
-from app.schemas.auth import SocialLoginRequest, LoginResponse, MenuConfig, ForgotPasswordRequest
+from app.schemas.auth import SocialLoginRequest, LoginResponse, MenuConfig, ForgotPasswordRequest, ChangePasswordRequest, ResetPasswordRequest
 
 @router.post("/social-login", response_model=LoginResponse)
 async def social_login(
@@ -569,9 +586,9 @@ async def register_with_password(
     
     # Check if user already exists
     if register_data.email:
-        statement = select(User).where(User.email == register_data.email)
+        statement = select(User).where(col(User.email) == register_data.email)
     else:
-        statement = select(User).where(User.phone_number == register_data.phone_number)
+        statement = select(User).where(col(User.phone_number) == register_data.phone_number)
     
     user = db.exec(statement).first()
     if user:
@@ -594,7 +611,7 @@ async def register_with_password(
     db.refresh(new_user)
     
     # Assign default role (added missing logic)
-    customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
+    customer_role = db.exec(select(Role).where(col(Role.name) == "customer")).first()
     if customer_role:
         new_user.role = customer_role
         db.add(new_user)
@@ -620,9 +637,9 @@ async def login_with_password(
 ):
     # Check if user exists by email or phone
     if "@" in form_data.username:
-        statement = select(User).where(User.email == form_data.username)
+        statement = select(User).where(col(User.email) == form_data.username)
     else:
-        statement = select(User).where(User.phone_number == form_data.username)
+        statement = select(User).where(col(User.phone_number) == form_data.username)
     
     user = db.exec(statement).first()
     if not user or not user.hashed_password:
@@ -744,9 +761,9 @@ async def login(
     
     # 1. Find User (by email or phone)
     if "@" in login_data.username:
-        statement = select(User).where(User.email == login_data.username).options(selectinload(User.roles))
+        statement = select(User).where(col(User.email) == login_data.username).options(selectinload(User.roles))
     else:
-        statement = select(User).where(User.phone_number == login_data.username).options(selectinload(User.roles))
+        statement = select(User).where(col(User.phone_number) == login_data.username).options(selectinload(User.roles))
     
     user = db.exec(statement).first()
     
@@ -854,7 +871,7 @@ async def select_role(
     
     # 3. Get Permissions & Menu
     from app.models.rbac import Role
-    selected_role = db.exec(select(Role).where(Role.name == role_data.role)).first()
+    selected_role = db.exec(select(Role).where(col(Role.name) == role_data.role)).first()
     if not selected_role:
          raise HTTPException(status_code=404, detail="Role not found")
 
@@ -924,12 +941,12 @@ async def forgot_password(
     
     # 1. Look up user
     if forgot_in.email:
-        user = db.exec(select(User).where(User.email == forgot_in.email)).first()
+        user = db.exec(select(User).where(col(User.email) == forgot_in.email)).first()
         target = forgot_in.email
         channel = "email"
     elif forgot_in.phone_number:
         # Normalize phone if needed, but for now strict match
-        user = db.exec(select(User).where(User.phone_number == forgot_in.phone_number)).first()
+        user = db.exec(select(User).where(col(User.phone_number) == forgot_in.phone_number)).first()
         target = forgot_in.phone_number
         channel = "sms"
         
@@ -1044,7 +1061,7 @@ async def verify_email(
     db: Session = Depends(deps.get_db)
 ):
     """Verify email verification token with 24h expiration"""
-    statement = select(User).where(User.email_verification_token == data.token)
+    statement = select(User).where(col(User.email_verification_token) == data.token)
     user = db.exec(statement).first()
     
     if not user:
@@ -1091,6 +1108,12 @@ async def change_password(
     logger.info(f"Password changed for user {current_user.id}")
     return {"message": "Password changed successfully"}
 
+
+from app.schemas.auth import (
+    TwoFASetupResponse, TwoFAVerifyRequest, TwoFADisableRequest,
+    VerifyEmailRequest, BiometricRegisterRequest, BiometricLoginRequest,
+    SecurityQuestionResponse, SetSecurityQuestionRequest, VerifySecurityQuestionRequest
+)
 
 class Verify2FARequest(BaseModel):
     code: str
@@ -1161,7 +1184,7 @@ async def biometric_login(
     # This usually requires user_id to find the public key if not in the credential_id
     # We'll assume the client sends the user context or we lookup by credential_id
     from app.models.biometric import BiometricCredential
-    cred = db.exec(select(BiometricCredential).where(BiometricCredential.credential_id == data.credential_id)).first()
+    cred = db.exec(select(BiometricCredential).where(col(BiometricCredential.credential_id) == data.credential_id)).first()
     if not cred:
         raise HTTPException(status_code=401, detail="Biometric credential not found")
     
@@ -1215,6 +1238,11 @@ async def verify_security_question_route(
 class AdminLoginRequest(BaseModel):
     username: str  # email
     password: str
+from fastapi import APIRouter, Depends, HTTPException
+from sqlmodel import Session, select
+from sqlalchemy import func
+
+router = APIRouter()
 
 @router.post("/admin/login")
 async def admin_login(
@@ -1225,41 +1253,51 @@ async def admin_login(
     Admin login endpoint (JSON body).
     Validates credentials and ensures the user has an admin-level role.
     """
-    # Look up user by email (case-insensitive & stripped)
+
+    # Log attempt
+    logger.info(f"Admin login attempt for: {login_data.username}")
+
+    # Normalize input (trim + lowercase)
     username_clean = login_data.username.strip().lower()
-    from sqlalchemy import func
-    user = db.exec(select(User).where(func.lower(User.email) == username_clean)).first()
+
+    # Fetch user (case-insensitive email match)
+    user = db.exec(
+        select(User).where(func.lower(User.email) == username_clean)
+    ).first()
 
     if not user:
         logger.warning(f"Admin login - user not found: {login_data.username}")
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
+    # Validate password
     password_clean = login_data.password.strip()
-    logger.warning(f"Admin login debug - Password received length: {len(login_data.password)}, Exact match to 'Admin@123': {login_data.password == 'Admin@123'}")
-    
+
     if not verify_password(password_clean, user.hashed_password):
         logger.warning(f"Admin login - invalid password for: {login_data.username}")
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
+    # Check user status
     if user.status != UserStatus.ACTIVE:
         raise HTTPException(status_code=400, detail="Inactive user")
 
-    # Verify user has admin-level role
+    # ────────────────────────────────────────────
+    # Verify admin privileges
+    # ────────────────────────────────────────────
     from app.models.user import UserType
-    admin_types = [UserType.ADMIN] if hasattr(UserType, 'ADMIN') else []
+    from app.models.rbac import Role
+
     is_admin = False
 
-    # Check user_type field
-    if hasattr(user, 'user_type') and user.user_type in admin_types:
+    # Check user_type
+    if hasattr(UserType, "ADMIN") and getattr(user, "user_type", None) == UserType.ADMIN:
         is_admin = True
 
-    # Check role name
-    if hasattr(user, 'role') and user.role and user.role.name in ("admin", "super_admin", "superadmin"):
+    # Check role relation
+    if getattr(user, "role", None) and user.role.name in ("admin", "super_admin", "superadmin"):
         is_admin = True
 
-    # Fallback: also allow if role_id exists (seeded admin may have role set)
-    if hasattr(user, 'role_id') and user.role_id is not None:
-        from app.models.rbac import Role
+    # Fallback via role_id
+    if getattr(user, "role_id", None):
         role = db.get(Role, user.role_id)
         if role and role.name in ("admin", "super_admin", "superadmin"):
             is_admin = True
@@ -1268,19 +1306,22 @@ async def admin_login(
         logger.warning(f"Admin login - non-admin user attempted: {login_data.username}")
         raise HTTPException(status_code=403, detail="User does not have admin privileges")
 
+    # ────────────────────────────────────────────
     # Generate tokens
+    # ────────────────────────────────────────────
     access_token = create_access_token(subject=user.id)
     refresh_tok = create_refresh_token(subject=user.id)
 
-    # Create session
+    # Store session
     AuthService.create_user_session(
-        db, 
-        user.id, 
-        refresh_tok, 
+        db=db,
+        user_id=user.id,
+        refresh_token=refresh_tok,
         user_agent="Admin Web"
     )
 
     logger.info(f"Admin login successful for user ID: {user.id}")
+
     return {
         "access_token": access_token,
         "token_type": "bearer",

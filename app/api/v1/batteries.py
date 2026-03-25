@@ -1,5 +1,5 @@
 from typing import Any, List, Optional, Dict
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, WebSocketDisconnect, File, UploadFile, Response
 from sqlmodel import Session, select
 from pydantic import BaseModel
 from sqlalchemy.orm import selectinload
@@ -30,6 +30,7 @@ from app.core.audit import audit_log
 from app.models.station import Station
 
 router = APIRouter()
+
 class QRGenerateRequest(BaseModel):
     battery_id: int
 

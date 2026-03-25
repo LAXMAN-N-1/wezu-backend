@@ -1,4 +1,4 @@
-from sqlmodel import Session, select
+from sqlmodel import Session, select, col, desc
 from app.models.rental import Rental
 from app.models.rental_event import RentalEvent
 from app.models.battery import Battery
@@ -41,8 +41,8 @@ class RentalService:
         # 1. Enforce single active rental constraint
         active_rental = db.exec(
             select(Rental).where(
-                Rental.user_id == user_id, 
-                Rental.status.in_(["active", "pending_payment"])
+                col(Rental.user_id) == user_id, 
+                col(Rental.status).in_(["active", "pending_payment"])
             )
         ).first()
         if active_rental:
@@ -126,30 +126,30 @@ class RentalService:
     @staticmethod
     def get_active_rentals(db: Session, user_id: int) -> List[Rental]:
         from sqlalchemy.orm import selectinload
-        return db.exec(
+        return list(db.exec(
             select(Rental)
-            .where(Rental.user_id == user_id, Rental.status == "active")
+            .where(col(Rental.user_id) == user_id, col(Rental.status) == "active")
             .options(selectinload(Rental.battery))
-        ).all()
+        ).all())
 
     @staticmethod
     def get_current_rental(db: Session, user_id: int) -> Optional[Rental]:
         from sqlalchemy.orm import selectinload
         return db.exec(
             select(Rental)
-            .where(Rental.user_id == user_id, Rental.status.in_(["active", "pending_payment"]))
+            .where(col(Rental.user_id) == user_id, col(Rental.status).in_(["active", "pending_payment"]))
             .options(selectinload(Rental.battery))
         ).first()
 
     @staticmethod
     def get_history(db: Session, user_id: int) -> List[Rental]:
         from sqlalchemy.orm import selectinload
-        return db.exec(
+        return list(db.exec(
             select(Rental)
-            .where(Rental.user_id == user_id)
+            .where(col(Rental.user_id) == user_id)
             .options(selectinload(Rental.battery))
-            .order_by(Rental.start_time.desc())
-        ).all()
+            .order_by(desc(Rental.start_time))
+        ).all())
 
     @staticmethod
     def return_battery(db: Session, rental_id: int, station_id: int) -> Rental:
@@ -234,8 +234,8 @@ class RentalService:
 
     @staticmethod
     def get_analytics(db: Session, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
-        stmt = select(Rental).where(Rental.start_time >= start_date, Rental.start_time <= end_date)
-        rentals = db.exec(stmt).all()
+        stmt = select(Rental).where(col(Rental.start_time) >= start_date, col(Rental.start_time) <= end_date)
+        rentals = list(db.exec(stmt).all())
         
         total = len(rentals)
         active = len([r for r in rentals if r.status == "active"])

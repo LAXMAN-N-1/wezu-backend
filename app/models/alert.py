@@ -17,6 +17,10 @@ class Alert(SQLModel, table=True):
     # LOW | MEDIUM | HIGH | CRITICAL
     severity: str = Field(default="MEDIUM") 
     message: str
+
+    # Structured troubleshooting steps (JSON array)
+    # [{"step_number": 1, "title": "Check Power", "description": "...", "action": "inspect"}]
+    troubleshooting_steps: Optional[str] = Field(default=None)
     
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
     acknowledged_at: Optional[datetime] = None

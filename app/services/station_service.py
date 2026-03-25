@@ -8,19 +8,17 @@ from app.models.station_heartbeat import StationHeartbeat
 from app.models.battery import Battery
 from app.models.rental import Rental
 from app.schemas.station import StationCreate, StationUpdate
-from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
-from sqlmodel import Session, select, func
+from fastapi import HTTPException
 
 class StationService:
     @staticmethod
     def get_stations(db: Session, skip: int = 0, limit: int = 100) -> List[Station]:
         from sqlalchemy.orm import selectinload
-        return db.exec(
+        return list(db.exec(
             select(Station)
             .options(selectinload(Station.images))
             .offset(skip).limit(limit)
-        ).all()
+        ).all())
 
     @staticmethod
     def get_nearby(
@@ -42,32 +40,32 @@ class StationService:
         # 1. Base Query
         query = select(Station)
         if status:
-            query = query.where(Station.status == status)
+            query = query.where(col(Station.status) == status)
         if min_rating:
-            query = query.where(Station.rating >= min_rating)
+            query = query.where(col(Station.rating) >= min_rating)
         if is_24x7:
-             query = query.where(Station.is_24x7 == True)
+             query = query.where(col(Station.is_24x7) == True)
              
         stations = db.execute(query).scalars().all()
         
         # 2. Get Availability Map (Filtered by battery specs)
         # We join StationSlot -> Battery -> BatteryCatalog to evaluate specs
         availability_query = (
-            select(StationSlot.station_id, func.count(StationSlot.id))
-            .join(Battery, StationSlot.battery_id == Battery.id)
-            .join(BatteryCatalog, Battery.sku_id == BatteryCatalog.id)
-            .where(StationSlot.status == "ready")
+            select(col(StationSlot.station_id), func.count(col(StationSlot.id)))
+            .join(Battery, col(StationSlot.battery_id) == col(Battery.id))
+            .join(BatteryCatalog, col(Battery.sku_id) == col(BatteryCatalog.id))
+            .where(col(StationSlot.status) == "ready")
         )
         
         # Apply filters to availability count
         if battery_type:
-            availability_query = availability_query.where(BatteryCatalog.battery_type == battery_type)
+            availability_query = availability_query.where(col(BatteryCatalog.battery_type) == battery_type)
         if min_capacity:
-            availability_query = availability_query.where(BatteryCatalog.capacity_mah >= min_capacity)
+            availability_query = availability_query.where(col(BatteryCatalog.capacity_mah) >= min_capacity)
         if max_price:
-            availability_query = availability_query.where(BatteryCatalog.price_per_day <= max_price)
+            availability_query = availability_query.where(col(BatteryCatalog.price_per_day) <= max_price)
             
-        availability_query = availability_query.group_by(StationSlot.station_id)
+        availability_query = availability_query.group_by(col(StationSlot.station_id))
         
         availability_results = db.execute(availability_query).all()
         availability_map = {r[0]: r[1] for r in availability_results}
@@ -131,12 +129,12 @@ class StationService:
 
     @staticmethod
     def get_available_slots(db: Session, station_id: int) -> List[StationSlot]:
-        return db.execute(
+        return list(db.execute(
             select(StationSlot).where(
-                StationSlot.station_id == station_id, 
-                StationSlot.status == "empty"
+                col(StationSlot.station_id) == station_id, 
+                col(StationSlot.status) == "empty"
             )
-        ).scalars().all()
+        ).scalars().all())
 
     @staticmethod
     def assign_battery_to_slot(db: Session, slot_id: int, battery_id: int):
@@ -207,8 +205,8 @@ class StationService:
     def get_performance_metrics(db: Session, station_id: int) -> Dict[str, Any]:
         # Last 24 hours stats
         day_ago = datetime.utcnow() - timedelta(days=1)
-        rentals_stmt = select(Rental).where(Rental.start_station_id == station_id, Rental.start_time >= day_ago)
-        rentals = db.exec(rentals_stmt).all()
+        rentals_stmt = select(Rental).where(col(Rental.start_station_id) == station_id, col(Rental.start_time) >= day_ago)
+        rentals = list(db.exec(rentals_stmt).all())
         
         total_rentals = len(rentals)
         total_revenue = sum(r.total_amount for r in rentals if r.total_amount)
@@ -223,8 +221,16 @@ class StationService:
         station = db.get(Station, station_id)
         utilization = 0.0
         if station and station.total_slots > 0:
+            from app.models.battery import Battery
+            from sqlmodel import func, col
+            # Count batteries linked to the station
+            available_batteries = db.exec(
+                select(func.count(col(Battery.id)))
+                .where(col(Battery.station_id) == station_id, col(Battery.status) == "available")
+            ).first() or 0
+            
             # Let's define utilization as (available_batteries / total_slots) for capacity check
-            utilization = (station.available_batteries / station.total_slots * 100)
+            utilization = (available_batteries / station.total_slots * 100)
             
         return {
             "daily_rentals": total_rentals,
@@ -236,12 +242,12 @@ class StationService:
 
     @staticmethod
     def get_rental_history(db: Session, station_id: int, limit: int = 50) -> List[Rental]:
-        return db.exec(
+        return list(db.exec(
             select(Rental)
-            .where(Rental.start_station_id == station_id)
-            .order_by(Rental.start_time.desc())
+            .where(col(Rental.start_station_id) == station_id)
+            .order_by(desc(Rental.start_time))
             .limit(limit)
-        ).all()
+        ).all())
 
     @staticmethod
     def record_heartbeat(db: Session, station_id: int, status: str, metrics: dict):
@@ -275,12 +281,12 @@ class StationService:
         # Aggregate demand by recent rentals per station
         week_ago = datetime.utcnow() - timedelta(days=7)
         demand_stmt = (
-            select(Station.latitude, Station.longitude, func.count(Rental.id))
-            .join(Rental, Rental.start_station_id == Station.id)
-            .where(Rental.start_time >= week_ago)
-            .group_by(Station.id)
+            select(col(Station.latitude), col(Station.longitude), func.count(col(Rental.id)))
+            .join(Rental, col(Rental.start_station_id) == col(Station.id))
+            .where(col(Rental.start_time) >= week_ago)
+            .group_by(col(Station.id))
         )
-        results = db.exec(demand_stmt).all()
+        results = list(db.exec(demand_stmt).all())
         
         if not results:
             return []

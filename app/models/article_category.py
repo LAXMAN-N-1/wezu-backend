@@ -10,14 +10,14 @@ class ArticleCategory(SQLModel, table=True):
     """Hierarchical category for knowledge-base articles."""
 
     __tablename__ = "article_categories"
-    __table_args__ = {"schema": "core"}
+    # __table_args__ = {"schema": "core"}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(max_length=100, index=True)
     slug: str = Field(max_length=120, unique=True, index=True)
     description: Optional[str] = Field(default=None, max_length=500)
     parent_id: Optional[int] = Field(
-        default=None, foreign_key="core.article_categories.id"
+        default=None, foreign_key="article_categories.id"
     )
     sort_order: int = Field(default=0)
     is_active: bool = Field(default=True)

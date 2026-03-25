@@ -11,10 +11,11 @@ from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from io import BytesIO
 from datetime import datetime
 from typing import Optional
-from sqlmodel import Session
+from sqlmodel import Session, select, col
 from app.models.catalog import CatalogOrder, CatalogOrderItem
 from app.models.rental import Rental
 from app.models.user import User
+from app.models.battery import Battery
 import logging
 
 logger = logging.getLogger(__name__)
@@ -44,10 +45,9 @@ class InvoiceService:
             user = session.get(User, order.user_id)
             
             # Get order items
-            from sqlmodel import select
-            items = session.exec(
-                select(CatalogOrderItem).where(CatalogOrderItem.order_id == order_id)
-            ).all()
+            items = list(session.exec(
+                select(CatalogOrderItem).where(col(CatalogOrderItem.order_id) == order_id)
+            ).all())
             
             # Create PDF buffer
             buffer = BytesIO()
@@ -91,8 +91,8 @@ class InvoiceService:
             # Customer details
             elements.append(Paragraph("<b>Bill To:</b>", styles['Heading3']))
             customer_data = [
-                [user.full_name if user else 'N/A'],
-                [user.email if user else 'N/A'],
+                [user.full_name or 'N/A' if user else 'N/A'],
+                [user.email or 'N/A' if user else 'N/A'],
                 [order.shipping_address],
                 [f"{order.shipping_city}, {order.shipping_state} - {order.shipping_pincode}"],
                 [f"Phone: {order.shipping_phone}"]
@@ -194,6 +194,11 @@ class InvoiceService:
             elements.append(Paragraph("Battery Rental Invoice", styles['Heading2']))
             elements.append(Spacer(1, 0.3*inch))
             
+            # Get battery for pricing
+            battery = session.get(Battery, rental.battery_id)
+            daily_rate = battery.rental_price_per_day if battery else 0.0
+            duration_hours = (rental.end_time - rental.start_time).total_seconds() / 3600 if rental.end_time else 0
+            
             # Rental details
             rental_data = [
                 ['Rental ID:', str(rental.id)],
@@ -216,8 +221,8 @@ class InvoiceService:
             
             # Customer details
             elements.append(Paragraph("<b>Customer Details:</b>", styles['Heading3']))
-            elements.append(Paragraph(user.full_name if user else 'N/A', styles['Normal']))
-            elements.append(Paragraph(user.email if user else 'N/A', styles['Normal']))
+            elements.append(Paragraph(user.full_name or 'N/A' if user else 'N/A', styles['Normal']))
+            elements.append(Paragraph(user.email or 'N/A' if user else 'N/A', styles['Normal']))
             
             doc.build(elements)
             buffer.seek(0)

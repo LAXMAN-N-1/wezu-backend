@@ -74,6 +74,7 @@ class Settings(BaseSettings):
     # IoT/MQTT (for customer battery tracking)
     MQTT_ENABLED: bool = True
     MQTT_BROKER_URL: str = "mqtt://127.0.0.1:1883"
+    MQTT_PORT: int = 1883
     MQTT_USERNAME: Optional[str] = None
     MQTT_PASSWORD: Optional[str] = None
     MQTT_CLIENT_ID_PREFIX: str = "wezu_backend"
