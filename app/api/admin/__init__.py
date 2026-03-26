@@ -1,10 +1,11 @@
 from fastapi import APIRouter
 
-from . import main, fraud, jobs, monitoring, users, rentals, finance, iot, batteries, stock, health, stations, kyc_admin, rbac_admin, dealers
+from . import main, fraud, jobs, monitoring, users, rentals, finance, iot, batteries, stock, health, stations, kyc_admin, rbac_admin, dealers, cms
 
 router = APIRouter()
 router.include_router(main.router)
 router.include_router(stations.router, prefix="/stations", tags=["Admin Stations"])
+router.include_router(cms.router, prefix="/cms", tags=["Admin CMS"])
 router.include_router(users.router, prefix="/users", tags=["Admin Users"])
 router.include_router(batteries.router, prefix="/batteries", tags=["Admin Batteries"])
 router.include_router(stock.router, prefix="/stock", tags=["Admin Stock Levels"])

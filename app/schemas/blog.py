@@ -1,5 +1,5 @@
-from typing import Optional, List
 from datetime import datetime
+from typing import Optional
 from pydantic import BaseModel
 
 class BlogBase(BaseModel):
@@ -8,8 +8,10 @@ class BlogBase(BaseModel):
     content: str
     summary: Optional[str] = None
     featured_image_url: Optional[str] = None
-    category: str = "news"
+    category: str
+    author_id: int
     status: str = "draft"
+    published_at: Optional[datetime] = None
 
 class BlogCreate(BlogBase):
     pass
@@ -24,11 +26,9 @@ class BlogUpdate(BaseModel):
     status: Optional[str] = None
     published_at: Optional[datetime] = None
 
-class BlogRead(BlogBase):
+class BlogPublic(BlogBase):
     id: int
-    author_id: int
     views_count: int
-    published_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

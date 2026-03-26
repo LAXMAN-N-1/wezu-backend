@@ -1,10 +1,13 @@
-from fastapi import FastAPI, Depends, status
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZipMiddleware
-from contextlib import asynccontextmanager
+import traceback
+import sys
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 import ssl
+from contextlib import asynccontextmanager
+
+print("DEBUG: main.py - Imports started")
 
 # Fix for macOS local dev SSL certificate verification errors with urlopen
 if settings.ENVIRONMENT != "production":
@@ -225,7 +228,6 @@ app.include_router(warehouses.router, prefix=f"{logistics_api}/warehouses", tags
 # Customer Vehicles
 from app.api.v1 import vehicles
 app.include_router(vehicles.router, prefix=f"{settings.API_V1_STR}/vehicles", tags=["Customer Vehicles"])
-
 # Swap Operations
 from app.api.v1 import swaps
 app.include_router(swaps.router, prefix=f"{settings.API_V1_STR}/swaps", tags=["Swap Operations"])
@@ -243,40 +245,44 @@ from app.api.v1 import support
 app.include_router(support.router, prefix=f"{settings.API_V1_STR}/support", tags=["Support & Ticketing"])
 
 # Admin / RBAC
-from app.api.v1 import admin_rbac, security, admin_audit
+from app.api.v1 import admin_rbac, security
 app.include_router(admin_rbac.router, prefix=f"{settings.API_V1_STR}/admin/rbac", tags=["Admin RBAC"])
 app.include_router(security.router, prefix=f"{settings.API_V1_STR}/admin/security", tags=["Admin Security"])
+
+# Analytics & Enhanced Endpoints
+from app.api.v1 import admin_analytics
+app.include_router(admin_analytics.router, prefix=f"{settings.API_V1_STR}/admin/analytics", tags=["Admin Analytics"])
+
+# Swap Operations
+from app.api.v1 import swaps
+app.include_router(swaps.router, prefix=f"{settings.API_V1_STR}/swaps", tags=["Swap Operations"])
+
+from app.api.v1 import admin_audit
 app.include_router(admin_audit.router, prefix=f"{settings.API_V1_STR}/admin/audit-logs", tags=["Admin Audit Logs"])
 from app.api.v1 import admin_invoices
 app.include_router(admin_invoices.router, prefix=f"{settings.API_V1_STR}/admin/invoices", tags=["Admin: Invoices"])
-# app.include_router(support_enhanced.router, prefix=f"{settings.API_V1_STR}/support", tags=["Support Enhanced"])
-# app.include_router(rentals_enhanced.router, prefix=f"{settings.API_V1_STR}/rentals", tags=["Rentals Enhanced"])
-# app.include_router(purchases_enhanced.router, prefix=f"{settings.API_V1_STR}/purchases", tags=["Purchases Enhanced"])
-# app.include_router(analytics_enhanced.router, prefix=f"{settings.API_V1_STR}/analytics", tags=["Analytics Enhanced"])
 
-# Dealer Analytics
-from app.api.v1 import dealer_analytics
+# Dealer Analytics & Management
+from app.api.v1 import dealer_analytics, dealer_campaigns, dealer_stations
 app.include_router(dealer_analytics.router, prefix=f"{settings.API_V1_STR}/dealer-analytics", tags=["Dealer Analytics"])
-
-# Dealer Campaigns
-from app.api.v1 import dealer_campaigns
 app.include_router(dealer_campaigns.router, prefix=f"{settings.API_V1_STR}/dealer-campaigns", tags=["Dealer Campaigns"])
-
-# Dealer Stations (Inventory & Management)
-from app.api.v1 import dealer_stations
 app.include_router(dealer_stations.router, prefix=f"{settings.API_V1_STR}/dealer-stations", tags=["Dealer Stations"])
-
 # RBAC API Routes
 app.include_router(roles.router, prefix=f"{settings.API_V1_STR}/roles", tags=["Roles"])
 app.include_router(menus.router, prefix=f"{settings.API_V1_STR}/menus", tags=["Menus"])
 app.include_router(role_rights.router, prefix=f"{settings.API_V1_STR}/role-rights", tags=["Role Rights"])
 
 # ML & Dynamics (Phase 5)
-from app.api.v1 import ml, admin_roles, admin_kyc, admin_financial_reports
+from app.api.v1 import ml, admin_roles, admin_kyc, admin_financial_reports, admin_users
 app.include_router(ml.router, prefix=f"{settings.API_V1_STR}/ml", tags=["Machine Learning"])
 app.include_router(admin_roles.router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin Role Management"])
 app.include_router(admin_kyc.router, prefix=f"{settings.API_V1_STR}/admin/kyc", tags=["Admin KYC Management"])
 app.include_router(admin_financial_reports.router, prefix=f"{settings.API_V1_STR}/admin/reports", tags=["Admin Financial Reports"])
+app.include_router(admin_users.router, prefix=f"{settings.API_V1_STR}/admin/users", tags=["Admin User Analytics"])
+
+# Audit Logs
+from app.api.v1 import audit
+app.include_router(audit.router, prefix=f"{settings.API_V1_STR}/audit", tags=["Audit Logs"])
 
 
 # Webhooks
