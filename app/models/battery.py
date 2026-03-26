@@ -67,6 +67,7 @@ class Battery(SQLModel, table=True):
     # New Battery Management Fields
     manufacturer: Optional[str] = Field(default=None)
     battery_type: Optional[str] = Field(default="48V/30Ah")
+    purchase_cost: float = Field(default=0.0)
     notes: Optional[str] = Field(default=None)
     location_type: LocationType = Field(default=LocationType.WAREHOUSE)
     

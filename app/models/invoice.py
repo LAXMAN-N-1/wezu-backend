@@ -10,7 +10,9 @@ class Invoice(SQLModel, table=True):
     transaction_id: int = Field(foreign_key="transactions.id")
     invoice_number: str = Field(unique=True)
     amount: float
-    tax_amount: float
+    subtotal: float = Field(default=0.0)
+    tax_amount: float = Field(default=0.0)
+    total: float = Field(default=0.0)
     gstin: Optional[str] = None
     hsn_code: Optional[str] = None
     is_late_fee: bool = Field(default=False)

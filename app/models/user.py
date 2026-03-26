@@ -99,7 +99,6 @@ class User(SQLModel, table=True):
     security_answer: Optional[str] = None
     reset_token: Optional[str] = Field(default=None, index=True)
     reset_token_expires: Optional[datetime] = None
-    reset_token_expires: Optional[datetime] = None
     last_global_logout_at: Optional[datetime] = None
     last_login: Optional[datetime] = Field(default=None, index=True)
 
@@ -116,9 +115,6 @@ class User(SQLModel, table=True):
     deletion_reason: Optional[str] = None
     deleted_at: Optional[datetime] = None
     
-    # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     # Relationship
     role: Optional["Role"] = Relationship(sa_relationship_kwargs={"viewonly": True}) # Legacy/Primary role. Viewonly to prevent conflict with roles list

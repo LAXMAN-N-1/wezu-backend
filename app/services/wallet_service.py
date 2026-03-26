@@ -2,6 +2,7 @@ from sqlmodel import Session, select
 from app.models.user import User
 from app.models.financial import Transaction, TransactionType, TransactionStatus, Wallet
 from app.services.payment_service import PaymentService
+from app.services.financial_service import FinancialService
 from app.repositories.wallet_repository import wallet_repository
 from typing import Optional, List
 from datetime import datetime
@@ -74,6 +75,10 @@ class WalletService:
         tx.payment_gateway_ref = payment_id # Update with final payment ID
         tx.updated_at = datetime.utcnow()
         
+        # Calculate Taxes for Audit (18% GST inclusive)
+        tx.subtotal = round(tx.amount / 1.18, 2)
+        tx.tax_amount = round(tx.amount - tx.subtotal, 2)
+        
         wallet.balance += tx.amount
         tx.wallet_id = wallet.id
 
@@ -81,6 +86,13 @@ class WalletService:
         db.add(wallet)
         db.commit()
         db.refresh(tx)
+        
+        # Auto-generate Invoice
+        try:
+            FinancialService.create_invoice(tx.id, user_id)
+        except Exception as e:
+            logger.error(f"Failed to auto-generate invoice for topup {tx.id}: {e}")
+            
         return tx
 
     @staticmethod
@@ -92,10 +104,15 @@ class WalletService:
             
         wallet.balance -= amount
         
+        subtotal = round(amount / 1.18, 2)
+        tax = round(amount - subtotal, 2)
+        
         tx = Transaction(
             user_id=user_id,
             wallet_id=wallet.id,
             amount=amount,
+            subtotal=subtotal,
+            tax_amount=tax,
             transaction_type=TransactionType.SWAP_FEE,
             status=TransactionStatus.SUCCESS,
             description=f"Swap fee for swap #{swap_id}",
@@ -106,6 +123,13 @@ class WalletService:
         db.add(wallet)
         db.commit()
         db.refresh(tx)
+        
+        # Auto-generate Invoice
+        try:
+            FinancialService.create_invoice(tx.id, user_id)
+        except Exception as e:
+            logger.error(f"Failed to auto-generate invoice for swap {tx.id}: {e}")
+            
         return tx
         
     @staticmethod
@@ -114,10 +138,15 @@ class WalletService:
         wallet = wallet_repository.get_or_create(db, user_id)
         wallet.balance += amount
         
+        subtotal = round(amount / 1.18, 2)
+        tax = round(amount - subtotal, 2)
+        
         tx = Transaction(
             user_id=user_id,
             wallet_id=wallet.id,
             amount=amount,
+            subtotal=subtotal,
+            tax_amount=tax,
             transaction_type=TransactionType.REFUND,
             status=TransactionStatus.SUCCESS,
             description=f"Refund: {reason}"
@@ -127,6 +156,13 @@ class WalletService:
         db.add(wallet)
         db.commit()
         db.refresh(tx)
+        
+        # Auto-generate Invoice (Refund Receipt)
+        try:
+            FinancialService.create_invoice(tx.id, user_id)
+        except Exception as e:
+            logger.error(f"Failed to auto-generate invoice for refund {tx.id}: {e}")
+            
         return tx
 
     @staticmethod
@@ -135,10 +171,15 @@ class WalletService:
         wallet = WalletService.get_wallet(db, user_id)
         wallet.balance += amount
         
+        subtotal = round(amount / 1.18, 2)
+        tax = round(amount - subtotal, 2)
+        
         tx = Transaction(
             user_id=user_id,
             wallet_id=wallet.id,
             amount=amount,
+            subtotal=subtotal,
+            tax_amount=tax,
             transaction_type=TransactionType.WALLET_TOPUP,
             status=TransactionStatus.SUCCESS,
             description=description
@@ -148,6 +189,13 @@ class WalletService:
         db.add(wallet)
         db.commit()
         db.refresh(tx)
+        
+        # Auto-generate Invoice
+        try:
+            FinancialService.create_invoice(tx.id, user_id)
+        except Exception as e:
+            logger.error(f"Failed to auto-generate invoice for manual credit {tx.id}: {e}")
+            
         return tx
 
     @staticmethod
@@ -180,10 +228,15 @@ class WalletService:
         
         # Deduct from sender
         sender_wallet.balance -= amount
+        subtotal = round(abs(amount) / 1.18, 2)
+        tax = round(abs(amount) - subtotal, 2)
+        
         sender_tx = Transaction(
             user_id=sender_id,
             wallet_id=sender_wallet.id,
             amount=-amount,
+            subtotal=subtotal,
+            tax_amount=tax,
             transaction_type=TransactionType.TRANSFER,
             status=TransactionStatus.SUCCESS,
             description=f"Transfer to {recipient_phone}: {note or ''}"
@@ -195,6 +248,8 @@ class WalletService:
             user_id=recipient.id,
             wallet_id=recipient_wallet.id,
             amount=amount,
+            subtotal=subtotal,
+            tax_amount=tax,
             transaction_type=TransactionType.TRANSFER,
             status=TransactionStatus.SUCCESS,
             description=f"Received from {sender_id}: {note or ''}"
@@ -206,6 +261,14 @@ class WalletService:
         db.add(recipient_tx)
         db.commit()
         db.refresh(sender_tx)
+        
+        # Auto-generate Invoices for both parties
+        try:
+            FinancialService.create_invoice(sender_tx.id, sender_id)
+            FinancialService.create_invoice(recipient_tx.id, recipient.id)
+        except Exception as e:
+            logger.error(f"Failed to auto-generate invoices for transfer {sender_tx.id}: {e}")
+            
         return sender_tx
 
     @staticmethod
@@ -227,10 +290,15 @@ class WalletService:
             bank_details=json.dumps(bank_details)
         )
         
+        subtotal = round(abs(amount) / 1.18, 2)
+        tax = round(abs(amount) - subtotal, 2)
+        
         tx = Transaction(
             user_id=user_id,
             wallet_id=wallet.id,
             amount=-amount,
+            subtotal=subtotal,
+            tax_amount=tax,
             transaction_type=TransactionType.WITHDRAWAL,
             status=TransactionStatus.SUCCESS,
             description=f"Withdrawal request: {amount}"

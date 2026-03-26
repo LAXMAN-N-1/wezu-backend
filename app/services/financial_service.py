@@ -10,25 +10,50 @@ import uuid
 class FinancialService:
     
     @staticmethod
+    def _get_next_invoice_number(session: Session) -> str:
+        """Sequential invoice numbering: INV-YYYY-NNNN"""
+        year = datetime.utcnow().year
+        prefix = f"INV-{year}-"
+        
+        # Find last invoice for this year
+        last_invoice = session.exec(
+            select(Invoice)
+            .where(Invoice.invoice_number.like(f"{prefix}%"))
+            .order_by(Invoice.invoice_number.desc())
+        ).first()
+        
+        if not last_invoice:
+            return f"{prefix}0001"
+        
+        try:
+            last_num_str = last_invoice.invoice_number.split("-")[-1]
+            next_num = int(last_num_str) + 1
+            return f"{prefix}{next_num:04d}"
+        except (ValueError, IndexError):
+            return f"{prefix}{uuid.uuid4().hex[:4].upper()}"
+
+    @staticmethod
     def create_invoice(transaction_id: int, user_id: int) -> Invoice:
         with Session(engine) as session:
             txn = session.get(Transaction, transaction_id)
             if not txn:
                 raise ValueError("Transaction not found")
             
-            # Simple Logic: Invoice Amount = Txn Amount
-            # Tax = 18% GST included
-            amount = txn.amount
-            tax = amount * 0.18 # simple assumption
+            # GST Calculation: 18% included in total
+            total = txn.amount
+            subtotal = round(total / 1.18, 2)
+            tax = round(total - subtotal, 2)
             
             invoice = Invoice(
                 user_id=user_id,
                 transaction_id=transaction_id,
-                invoice_number=f"INV-{datetime.utcnow().year}-{uuid.uuid4().hex[:6].upper()}",
-                amount=amount,
+                invoice_number=FinancialService._get_next_invoice_number(session),
+                amount=total,
+                subtotal=subtotal,
                 tax_amount=tax,
-                gstin="GSTINSC123456",
-                pdf_url=f"https://s3.wezu.com/invoices/INV-{txn.id}.pdf", # Mock
+                total=total,
+                gstin="27AAACW1234X1ZX",
+                pdf_url=f"/api/v1/invoices/{transaction_id}/pdf", # Updated to local API
                 created_at=datetime.utcnow()
             )
             session.add(invoice)

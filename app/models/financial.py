@@ -40,6 +40,8 @@ class Transaction(SQLModel, table=True):
     wallet_id: Optional[int] = Field(default=None, foreign_key="wallets.id")
     
     amount: float
+    tax_amount: float = Field(default=0.0)
+    subtotal: float = Field(default=0.0)
     currency: str = Field(default="INR")
     
     transaction_type: TransactionType = Field(index=True)
