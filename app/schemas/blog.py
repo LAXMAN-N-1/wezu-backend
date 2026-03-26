@@ -34,3 +34,5 @@ class BlogPublic(BlogBase):
 
     class Config:
         from_attributes = True
+
+BlogRead = BlogPublic

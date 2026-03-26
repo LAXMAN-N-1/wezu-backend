@@ -1,7 +1,7 @@
 from sqlmodel import Session, SQLModel, create_engine
 from app.core.config import settings
 from app.core.database import engine
-from app.models import *
+# Removed bulk import to prevent circularities
 
 print(f"DEBUG: app/db/session.py - DATABASE_URL: {settings.DATABASE_URL}")
 try:
