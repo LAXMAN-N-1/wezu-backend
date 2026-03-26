@@ -26,7 +26,7 @@ def generate_settlement(
     
     total_revenue = 0.0
     platform_fee = 0.0
-    payable_amount = 0.0
+    net_payable = 0.0
     
     # query filters
     filters = [
@@ -48,7 +48,7 @@ def generate_settlement(
     if not logs:
         raise HTTPException(status_code=400, detail="No pending commissions found for this period")
         
-    payable_amount = sum(log.amount for log in logs)
+    net_payable = sum(log.amount for log in logs)
     
     # 3. Create Settlement Record
     settlement = Settlement(
@@ -58,7 +58,7 @@ def generate_settlement(
         end_date=request.end_date,
         total_revenue=0, # This can be aggregated from source transactions if needed
         platform_fee=0, # Already deducted in CommissionLog.amount logic (net payable)
-        payable_amount=payable_amount,
+        net_payable=net_payable,
         status="generated"
     )
     

@@ -697,7 +697,13 @@ class SeedRuntime:
             stmt = pg_insert(table).values(prepared)
             if key_columns and use_conflict_target:
                 stmt = stmt.on_conflict_do_nothing(index_elements=list(key_columns))
-            conn.execute(stmt)
+            try:
+                conn.execute(stmt)
+            except Exception as e:
+                print(f"ERROR inserting into {schema}.{table_name}")
+                print(f"Row: {prepared}")
+                print(f"Error: {e}")
+                raise
 
     def empty_tables(self, conn: Connection, schemas: list[str]) -> list[str]:
         remaining: list[str] = []
@@ -1395,6 +1401,7 @@ def seed_stations_inventory(runtime: SeedRuntime, conn: Connection, resolver: Re
                 "updated_at": dt(days=-1),
             }
         )
+    print(f"   [stations] seeding {len(station_rows)} rows...")
     runtime.ensure_rows(conn, stations_schema, "stations", ("name",), station_rows)
     station_ids = runtime.fetch_map(conn, stations_schema, "stations", "name") if stations_schema else {}
 
@@ -1402,6 +1409,7 @@ def seed_stations_inventory(runtime: SeedRuntime, conn: Connection, resolver: Re
         {"station_id": station_ids.get(row["name"]), "url": f"https://seed.wezu.energy/stations/{idx}.jpg", "is_primary": True, "created_at": dt(days=-15)}
         for idx, row in enumerate(station_rows, start=1)
     ]
+    print(f"   [station_images] seeding {len(station_image_rows)} rows...")
     runtime.ensure_rows(conn, images_schema, "station_images", ("station_id", "url"), station_image_rows)
 
     slot_rows = []
@@ -1417,6 +1425,7 @@ def seed_stations_inventory(runtime: SeedRuntime, conn: Connection, resolver: Re
                     "last_heartbeat": dt(hours=-1),
                 }
             )
+    print(f"   [station_slots] seeding {len(slot_rows)} rows...")
     runtime.ensure_rows(conn, slots_schema, "station_slots", ("station_id", "slot_number"), slot_rows)
 
     heartbeat_rows = [
@@ -1431,6 +1440,7 @@ def seed_stations_inventory(runtime: SeedRuntime, conn: Connection, resolver: Re
         }
         for idx, row in enumerate(station_rows, start=1)
     ]
+    print(f"   [station_heartbeats] seeding {len(heartbeat_rows)} rows...")
     runtime.ensure_rows(conn, heartbeats_schema, "station_heartbeats", ("station_id",), heartbeat_rows)
 
     stock_config_rows = [
@@ -1446,6 +1456,7 @@ def seed_stations_inventory(runtime: SeedRuntime, conn: Connection, resolver: Re
         }
         for idx, row in enumerate(station_rows, start=1)
     ]
+    print(f"   [station_stock_configs] seeding {len(stock_config_rows)} rows...")
     runtime.ensure_rows(conn, stock_config_schema, "station_stock_configs", ("station_id",), stock_config_rows)
 
     downtime_rows = [
@@ -1462,6 +1473,7 @@ def seed_stations_inventory(runtime: SeedRuntime, conn: Connection, resolver: Re
             "reason": "Cooling system inspection",
         },
     ]
+    print(f"   [station_downtimes] seeding {len(downtime_rows)} rows...")
     runtime.ensure_rows(conn, downtime_schema, "station_downtimes", ("station_id", "start_time"), downtime_rows)
 
     catalog_rows = []
@@ -1472,6 +1484,7 @@ def seed_stations_inventory(runtime: SeedRuntime, conn: Connection, resolver: Re
         row["created_at"] = dt(days=-120 + index)
         row["updated_at"] = dt(days=-2)
         catalog_rows.append(row)
+    print(f"   [battery_catalog] seeding {len(catalog_rows)} rows...")
     runtime.ensure_rows(conn, catalog_schema, "battery_catalog", ("model",), catalog_rows)
     catalog_ids = runtime.fetch_map(conn, catalog_schema, "battery_catalog", "model") if catalog_schema else {}
 
@@ -1484,6 +1497,7 @@ def seed_stations_inventory(runtime: SeedRuntime, conn: Connection, resolver: Re
                 "production_date": dt(days=-150 + (index * 10)),
             }
         )
+    print(f"   [battery_batches] seeding {len(batch_rows)} rows...")
     runtime.ensure_rows(conn, batches_schema, "battery_batches", ("batch_number",), batch_rows)
 
     customer_ids = [ctx["user_ids"][email] for email in ctx["customer_emails"]]
@@ -1533,6 +1547,7 @@ def seed_stations_inventory(runtime: SeedRuntime, conn: Connection, resolver: Re
                 "updated_at": dt(days=-1),
             }
         )
+    print(f"   [batteries] seeding {len(battery_rows)} rows...")
     runtime.ensure_rows(conn, batteries_schema, "batteries", ("serial_number",), battery_rows)
     battery_ids = runtime.fetch_map(conn, batteries_schema, "batteries", "serial_number") if batteries_schema else {}
 

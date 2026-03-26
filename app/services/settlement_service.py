@@ -86,19 +86,25 @@ class SettlementService:
         chargeback_amount = round(sum(cb.amount for cb in chargebacks), 2)
 
         # 4. Calculate net payable
+        # GST (18%) on commission
+        tax_amount = round(total_commission * 0.18, 2)
         net_payable = round(total_commission - chargeback_amount, 2)
         if net_payable < 0:
             net_payable = 0.0
 
         # 5. Create settlement record
+        due_date = (end_date + timedelta(days=1)).replace(day=10, hour=0, minute=0, second=0)
+        
         settlement = Settlement(
             dealer_id=dealer_id,
             settlement_month=month,
             start_date=start_date,
             end_date=end_date,
+            due_date=due_date,
             total_revenue=total_revenue,
             total_commission=total_commission,
             chargeback_amount=chargeback_amount,
+            tax_amount=tax_amount,
             net_payable=net_payable,
             status="generated",
         )
@@ -168,6 +174,7 @@ class SettlementService:
                 processed += 1
             except Exception as e:
                 settlement.status = "failed"
+                settlement.failure_reason = str(e)
                 db.add(settlement)
                 failed += 1
                 logger.error(f"Payment failed for settlement {settlement.id}: {e}")
@@ -180,6 +187,50 @@ class SettlementService:
             "processed": processed,
             "failed": failed,
         }
+
+    @staticmethod
+    def process_single_payment(db: Session, settlement_id: int) -> Settlement:
+        """Process a single settlement payment (used for retries)."""
+        settlement = db.get(Settlement, settlement_id)
+        if not settlement:
+            raise ValueError("Settlement not found")
+        
+        # Only allow retrying if failed or generated
+        if settlement.status not in ("failed", "generated"):
+            raise ValueError(f"Cannot process settlement with status {settlement.status}")
+        
+        try:
+            # Mock payment gateway call
+            txn_ref = f"PAY-RETRY-{uuid.uuid4().hex[:8].upper()}"
+            proof_url = f"https://s3.wezu.com/settlements/{settlement.id}/receipt.pdf"
+
+            settlement.status = "paid"
+            settlement.transaction_reference = txn_ref
+            settlement.payment_proof_url = proof_url
+            settlement.paid_at = datetime.utcnow()
+            settlement.failure_reason = None # Clear failure reason on success
+            db.add(settlement)
+
+            # Mark linked commissions as paid
+            linked_commissions = db.exec(
+                select(CommissionLog).where(
+                    CommissionLog.settlement_id == settlement.id
+                )
+            ).all()
+            for cl in linked_commissions:
+                cl.status = "paid"
+                db.add(cl)
+            
+            db.commit()
+            db.refresh(settlement)
+            return settlement
+        except Exception as e:
+            settlement.status = "failed"
+            settlement.failure_reason = str(e)
+            db.add(settlement)
+            db.commit()
+            logger.error(f"Payment retry failed for settlement {settlement.id}: {e}")
+            raise ValueError(f"Payment processing failed: {e}")
 
     @staticmethod
     def get_dealer_dashboard(db: Session, dealer_id: int) -> dict:

@@ -119,23 +119,84 @@ class AnalyticsService:
         return forecast
 
     @staticmethod
-    def get_profit_margins(db: Session) -> List[Dict[str, Any]]:
-        """Margin analysis (simplified revenue vs estimated operational cost)"""
-        # This usually requires a Expense model. Mocking costs as % of revenue for demo.
-        revenue_by_station = AnalyticsService.get_revenue_by_station(db)
+    def get_profit_margins(db: Session, period: str = "30d") -> List[Dict[str, Any]]:
+        """
+        Margin analysis (Revenue vs REAL COGS: Battery depreciation + OpEx).
+        """
+        start, end, _, _, days = AnalyticsService._period_to_range(period)
         
-        margins = []
-        for s in revenue_by_station:
-            # Assume 60% operational efficiency (40% cost)
-            est_cost = s["revenue"] * 0.4
-            margins.append({
-                "category": s["station_name"],
-                "revenue": s["revenue"],
-                "estimated_cost": round(est_cost, 2),
-                "margin_percentage": 60.0
+        # 1. Revenue by station in period
+        stations = db.exec(select(Station)).all()
+        results = []
+        
+        for station in stations:
+            # Sum rental revenue
+            stmt = select(func.coalesce(func.sum(Transaction.amount), 0.0)).join(Rental, Rental.id == Transaction.rental_id).where(
+                Rental.start_station_id == station.id,
+                Transaction.status == TransactionStatus.SUCCESS,
+                Transaction.created_at >= start,
+                Transaction.created_at <= end
+            )
+            revenue = db.exec(stmt).one() or 0.0
+            
+            # 2. Calculate COGS (Depreciation)
+            # Find batteries currently at this station or assigned to it
+            # For simplicity, we calculate depreciation for all batteries associated with the station
+            batteries = db.exec(select(Battery).where(Battery.station_id == station.id)).all()
+            total_depreciation = 0.0
+            for b in batteries:
+                # Daily depreciation = Purchase Cost / 1000 days (approx 3 years)
+                daily_dep = (b.purchase_cost or 25000.0) / 1000.0
+                total_depreciation += daily_dep * days
+                
+            # 3. OpEx (Electricity, Maintenance) - Estimating 10% of revenue
+            opex = revenue * 0.10
+            
+            total_cost = total_depreciation + opex
+            margin_percent = round(((revenue - total_cost) / revenue * 100), 2) if revenue > 0 else 0.0
+            
+            results.append({
+                "station_name": station.name,
+                "revenue": round(revenue, 2),
+                "cogs_depreciation": round(total_depreciation, 2),
+                "opex": round(opex, 2),
+                "total_cost": round(total_cost, 2),
+                "margin_percentage": margin_percent
             })
             
-        return margins
+        return results
+
+    @staticmethod
+    def get_profitability_forecast(db: Session, months: int = 6) -> List[Dict[str, Any]]:
+        """
+        Profitability forecast: Projected Revenue - Projected Costs.
+        """
+        # Get current monthly average
+        revenue_history = AnalyticsService.calculate_revenue_forecast(db, months * 30)
+        
+        forecast = []
+        # Estimate fixed monthly costs (all batteries * daily dep * 30)
+        total_batteries = db.exec(select(Battery)).all()
+        monthly_fixed_cost = sum((b.purchase_cost or 25000.0) / 1000.0 for b in total_batteries) * 30
+        
+        for i in range(months):
+            # Sum projected revenue for that month (every 30 days)
+            projected_rev = sum(item["projected_revenue"] for item in revenue_history[i*30 : (i+1)*30])
+            # Projected OpEx (variable) = 15%
+            projected_opex = projected_rev * 0.15
+            
+            proj_cost = monthly_fixed_cost + projected_opex
+            proj_profit = projected_rev - proj_cost
+            
+            forecast.append({
+                "month": (datetime.utcnow() + timedelta(days=(i+1)*30)).strftime("%Y-%m"),
+                "projected_revenue": round(projected_rev, 2),
+                "projected_cost": round(proj_cost, 2),
+                "projected_profit": round(proj_profit, 2),
+                "margin": round((proj_profit / projected_rev * 100), 2) if projected_rev > 0 else 0.0
+            })
+            
+        return forecast
 
     @staticmethod
     def get_platform_overview(db: Session, period: str = "30d") -> Dict[str, Any]:

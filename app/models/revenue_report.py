@@ -33,5 +33,8 @@ class RevenueReport(SQLModel, table=True):
     breakdown_by_category: Optional[Dict[str, Any]] = Field(
         default=None, sa_column=Column("breakdown_by_category", JSON, nullable=True)
     )
+    breakdown_by_source: Optional[Dict[str, Any]] = Field(
+        default=None, sa_column=Column("breakdown_by_source", JSON, nullable=True)
+    )
 
     created_at: datetime = Field(default_factory=datetime.utcnow)

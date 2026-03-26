@@ -35,6 +35,12 @@ class CommissionRateCreate(BaseModel):
     effective_until: Optional[datetime] = None
     tiers: List[TierCreate] = []
 
+class CommissionRateUpdate(BaseModel):
+    percentage: Optional[float] = None
+    flat_fee: Optional[float] = None
+    effective_from: Optional[datetime] = None
+    effective_until: Optional[datetime] = None
+    is_active: Optional[bool] = None
 
 class CommissionRateResponse(BaseModel):
     id: int
@@ -134,6 +140,29 @@ def list_commission_rates(
     return db.exec(select(CommissionConfig)).all()
 
 
+@router.patch("/commission/rates/{config_id}", response_model=CommissionRateResponse)
+def update_commission_rate(
+    *,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_admin),
+    config_id: int,
+    request: CommissionRateUpdate,
+) -> Any:
+    """Admin: Update an existing commission rate config."""
+    config = db.get(CommissionConfig, config_id)
+    if not config:
+        raise HTTPException(status_code=404, detail="Config not found")
+    
+    update_data = request.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(config, key, value)
+    
+    db.add(config)
+    db.commit()
+    db.refresh(config)
+    return config
+
+
 @router.post("/admin/settlements/generate")
 def admin_generate_settlements(
     *,
@@ -174,6 +203,20 @@ def admin_batch_pay(
 ) -> Any:
     """Admin: Trigger batch payment processing for a month."""
     return SettlementService.process_batch_payments(db, request.month)
+
+
+@router.post("/admin/settlements/retry/{settlement_id}")
+def admin_retry_settlement(
+    *,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_admin),
+    settlement_id: int,
+) -> Any:
+    """Admin: Retry a failed settlement payment."""
+    try:
+        return SettlementService.process_single_payment(db, settlement_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/admin/disputes", response_model=List[DisputeResponse])

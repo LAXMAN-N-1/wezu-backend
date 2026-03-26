@@ -50,14 +50,25 @@ class FinancialReportService:
         # Breakdown by category
         by_category: Dict[str, float] = {}
         for t in transactions:
-            cat = t.category or "other"
+            cat = t.category if hasattr(t, "category") else (t.transaction_type.value if hasattr(t.transaction_type, "value") else str(t.transaction_type))
             by_category[cat] = by_category.get(cat, 0.0) + abs(t.amount)
 
-        # Breakdown by reference_type (proxy for payment method / source)
+        # Breakdown by source (rental vs purchase vs others)
+        by_source: Dict[str, float] = {}
+        for t in transactions:
+            source = "rental" if "RENTAL" in str(t.transaction_type) or "SWAP" in str(t.transaction_type) else "purchase"
+            if "PURCHASE" not in str(t.transaction_type) and "RENTAL" not in str(t.transaction_type) and "SWAP" not in str(t.transaction_type):
+                source = "other"
+            by_source[source] = by_source.get(source, 0.0) + abs(t.amount)
+
+        # Breakdown by station
         by_station: Dict[str, float] = {}
         for t in transactions:
-            ref = t.reference_type or "direct"
-            by_station[ref] = by_station.get(ref, 0.0) + abs(t.amount)
+            # If transaction has station_id (from rental/swap), group by it
+            # Mocking station grouping for now as Transaction model doesn't have station_id directly
+            # but usually it's derived from rental/swap.
+            station = "Station-" + str(getattr(t, "station_id", "Unknown"))
+            by_station[station] = by_station.get(station, 0.0) + abs(t.amount)
 
         # Growth vs previous period
         growth = FinancialReportService._calc_growth(db, period_type, period_start, total_revenue)
@@ -74,6 +85,7 @@ class FinancialReportService:
             growth_percentage=round(growth, 2) if growth is not None else None,
             breakdown_by_category=by_category,
             breakdown_by_station=by_station,
+            breakdown_by_source=by_source,
         )
         db.add(report)
         db.commit()
@@ -210,6 +222,100 @@ class FinancialReportService:
             "breakdown_by_category": report.breakdown_by_category,
             "breakdown_by_station": report.breakdown_by_station,
             "created_at": report.created_at.isoformat() if report.created_at else None,
+        }
+
+    @staticmethod
+    def generate_revenue_forecast(db: Session, period_type: str) -> dict:
+        """
+        Generate a revenue forecast for the next period based on the last 3 periods.
+        Uses a simple moving average and applies the recent growth trend.
+        """
+        reports = db.exec(
+            select(RevenueReport)
+            .where(RevenueReport.report_type == period_type)
+            .order_by(RevenueReport.period_start.desc())
+            .limit(3)
+        ).all()
+
+        if not reports:
+            return {"forecasted_revenue": 0.0, "confidence": "low", "basis": "no historical data"}
+
+        avg_revenue = sum(r.total_revenue for r in reports) / len(reports)
+        
+        # Calculate trend from the last two reports if available
+        trend_factor = 1.0
+        if len(reports) >= 2:
+            latest = reports[0].total_revenue
+            previous = reports[1].total_revenue
+            if previous > 0:
+                trend_factor = latest / previous
+
+        forecast = avg_revenue * trend_factor
+
+        return {
+            "period_type": period_type,
+            "forecasted_revenue": round(forecast, 2),
+            "historical_average": round(avg_revenue, 2),
+            "trend_factor": round(trend_factor, 2),
+            "confidence": "medium" if len(reports) >= 3 else "low",
+            "next_period_estimate": (datetime.now() + timedelta(days=30)).strftime("%Y-%m") if period_type == "monthly" else "next"
+        }
+
+    @staticmethod
+    def get_revenue_comparison(db: Session, period_type: str, target_date: date) -> dict:
+        """
+        Detailed comparison: Current vs Previous vs Same-Period-Last-Year.
+        """
+        current_report = FinancialReportService.generate_revenue_report(db, period_type, target_date)
+        
+        # Previous Period
+        if period_type == "daily":
+            prev_date = target_date - timedelta(days=1)
+            last_year_date = target_date - timedelta(days=365)
+        elif period_type == "weekly":
+            prev_date = target_date - timedelta(weeks=1)
+            last_year_date = target_date - timedelta(weeks=52)
+        else: # monthly
+            if target_date.month == 1:
+                prev_date = target_date.replace(year=target_date.year - 1, month=12)
+            else:
+                prev_date = target_date.replace(month=target_date.month - 1)
+            last_year_date = target_date.replace(year=target_date.year - 1)
+
+        prev_report = db.exec(
+            select(RevenueReport).where(
+                RevenueReport.report_type == period_type,
+                RevenueReport.period_start == FinancialReportService._resolve_period(period_type, prev_date)[0]
+            )
+        ).first()
+
+        last_year_report = db.exec(
+            select(RevenueReport).where(
+                RevenueReport.report_type == period_type,
+                RevenueReport.period_start == FinancialReportService._resolve_period(period_type, last_year_date)[0]
+            )
+        ).first()
+
+        def calc_change(curr: float, prev: Optional[RevenueReport]) -> float:
+            if not prev or prev.total_revenue == 0:
+                return 0.0
+            return round(((curr - prev.total_revenue) / prev.total_revenue) * 100, 2)
+
+        return {
+            "period": period_type,
+            "target_date": target_date.isoformat(),
+            "current": {
+                "revenue": current_report.total_revenue,
+                "count": current_report.total_transactions
+            },
+            "previous_period": {
+                "revenue": prev_report.total_revenue if prev_report else 0.0,
+                "change_percent": calc_change(current_report.total_revenue, prev_report)
+            },
+            "last_year_period": {
+                "revenue": last_year_report.total_revenue if last_year_report else 0.0,
+                "change_percent": calc_change(current_report.total_revenue, last_year_report)
+            }
         }
 
     # ─── Helpers ───

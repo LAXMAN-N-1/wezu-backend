@@ -215,7 +215,8 @@ async def _process_login(username: str, password: str, db: Session, request: Req
         db.add(login_record)
         db.commit()
     except Exception as e:
-        logger.error(f"SESSION_CREATION_FAILED: {str(e)}")
+        db.rollback()
+        logger.error(f"SESSION_HISTORY_RECORD_FAILED: {str(e)}")
         # Some systems might still log in but token usage might fail later if session is strict
     
     return Token(

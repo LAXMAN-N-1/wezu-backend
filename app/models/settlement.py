@@ -16,6 +16,7 @@ class Settlement(SQLModel, table=True):
     settlement_month: str = Field(index=True)  # "YYYY-MM" for fast lookup
     start_date: datetime
     end_date: datetime
+    due_date: Optional[datetime] = None
 
     # Financials (all rounded to 2 decimal places)
     total_revenue: float = Field(default=0.0)       # Total collected from swaps
@@ -27,6 +28,7 @@ class Settlement(SQLModel, table=True):
 
     currency: str = Field(default="INR")
     status: str = Field(default="pending")  # pending, generated, approved, processing, paid, failed
+    failure_reason: Optional[str] = None
 
     # Payment details
     transaction_reference: Optional[str] = None  # Bank transfer ref
