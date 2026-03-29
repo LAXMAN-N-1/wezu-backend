@@ -242,8 +242,6 @@ multivolumefile==0.2.3
 murmurhash==1.0.12
 my-awesome-package-laxman-2025==0.1.0
 mypy-extensions==1.0.0
-mysql-connector-python==8.4.0
-mysqlclient==2.2.4
 namex==0.0.8
 nbformat==5.10.4
 neo4j==6.1.0
