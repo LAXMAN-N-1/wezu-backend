@@ -2,6 +2,8 @@ services:
   # The WEZU Frontend Load Balancer
   nginx:
     image: nginx:alpine
+    # Keep nginx opt-in on shared VPS hosts where system nginx owns :80/:443.
+    profiles: ["edge"]
     restart: "on-failure:5"
     init: true
     cpus: "0.25"
