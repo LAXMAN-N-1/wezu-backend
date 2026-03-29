@@ -30,6 +30,12 @@ High-performance FastAPI backend powering the WEZU battery swapping ecosystem, i
 3. **API Documentation**:
    Access interactive docs at `http://localhost:8000/docs`.
 
+## 🌐 Hostinger VPS (Multi-Project)
+
+For shared VPS deployment with multiple subdomains/projects, follow:
+
+- [DEPLOY_HOSTINGER_MULTIPROJECT.md](DEPLOY_HOSTINGER_MULTIPROJECT.md)
+
 ## 📂 Repository Structure
 - `app/api/v1`: Route handlers grouped by domain.
 - `app/models`: SQLModel definitions.
