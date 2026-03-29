@@ -8,6 +8,11 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "postgresql://user:password@localhost:5432/wezy_db"
     SQLALCHEMY_ECHO: bool = False
+    DB_POOL_SIZE: int = 3
+    DB_MAX_OVERFLOW: int = 3
+    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_RECYCLE: int = 1800
+    DB_POOL_PRE_PING: bool = True
     
     # Redis (Sessions & Caching)
     REDIS_URL: str = "redis://127.0.0.1:6379/0"
@@ -67,6 +72,7 @@ class Settings(BaseSettings):
     VIDEO_KYC_SESSION_TIMEOUT_MINUTES: int = 30
     
     # IoT/MQTT (for customer battery tracking)
+    MQTT_ENABLED: bool = True
     MQTT_BROKER_URL: str = "mqtt://127.0.0.1:1883"
     MQTT_USERNAME: Optional[str] = None
     MQTT_PASSWORD: Optional[str] = None
@@ -105,6 +111,8 @@ class Settings(BaseSettings):
     RATE_LIMIT_PER_HOUR: int = 1000
     
     # Background Jobs
+    RUN_BACKGROUND_TASKS: bool = True
+    DB_INIT_ON_STARTUP: bool = True
     SCHEDULER_ENABLED: bool = True
     SCHEDULER_TIMEZONE: str = "Asia/Kolkata"
     
@@ -131,4 +139,3 @@ class Settings(BaseSettings):
     )
 
 settings = Settings()
-print(f"DEBUG: Loaded DATABASE_URL: {settings.DATABASE_URL}")

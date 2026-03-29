@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 from app.api import deps
-from app.services.ml_service import MLService
 from typing import Any
 
 router = APIRouter()
@@ -15,6 +14,8 @@ def predict_battery_health(
     """
     Predict SoH and failure risk for a specific battery using ML.
     """
+    from app.services.ml_service import MLService
+
     prediction = MLService.get_battery_health_prediction(db, battery_id)
     if "error" in prediction:
         raise HTTPException(status_code=404, detail=prediction["error"])
@@ -29,4 +30,6 @@ def forecast_demand(
     """
     Generate a 7-day demand forecast for a station.
     """
+    from app.services.ml_service import MLService
+
     return MLService.get_demand_forecast(db, station_id)

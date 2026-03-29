@@ -4,6 +4,8 @@ FROM python:3.11-slim as builder
 WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+ENV PIP_DEFAULT_TIMEOUT=120
 
 # Install build dependencies
 RUN apt-get update && \
@@ -12,7 +14,7 @@ RUN apt-get update && \
 
 # Install python dependencies
 COPY requirements.txt .
-RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
+RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
 
 # ---- Final Stage ----
 FROM python:3.11-slim
@@ -22,6 +24,8 @@ RUN adduser --disabled-password --gecos '' wezu_user
 
 WORKDIR /app
 ENV PYTHONPATH=/app
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+ENV PIP_DEFAULT_TIMEOUT=120
 
 # Install runtime dependencies (like postgres libs)
 RUN apt-get update && \
@@ -31,7 +35,7 @@ RUN apt-get update && \
 COPY --from=builder /app/wheels /wheels
 COPY --from=builder /app/requirements.txt .
 
-RUN pip install --no-cache /wheels/*
+RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.txt
 
 COPY . .
 
@@ -42,5 +46,5 @@ USER wezu_user
 
 EXPOSE 8000
 
-# Use Gunicorn with Uvicorn workers for production load handling
-CMD ["gunicorn", "app.main:app", "--workers", "4", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--log-level", "info"]
+# Use conservative defaults for small VPS instances.
+CMD ["sh", "-c", "exec gunicorn app.main:app --workers ${GUNICORN_WORKERS:-1} --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --log-level ${GUNICORN_LOG_LEVEL:-info} --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-30} --max-requests ${GUNICORN_MAX_REQUESTS:-1000} --max-requests-jitter ${GUNICORN_MAX_REQUESTS_JITTER:-100}"]

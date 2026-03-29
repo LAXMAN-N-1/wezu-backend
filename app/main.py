@@ -1,13 +1,12 @@
 import traceback
 import sys
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 import ssl
 from contextlib import asynccontextmanager
-
-print("DEBUG: main.py - Imports started")
+import logging
 
 # Fix for macOS local dev SSL certificate verification errors with urlopen
 if settings.ENVIRONMENT != "production":
@@ -64,43 +63,66 @@ from app.services.websocket_service import heartbeat_task
 from app.services.mqtt_service import start_mqtt_service, stop_mqtt_service
 import asyncio
 
+logger = logging.getLogger(__name__)
+
 # ----------------------------
 # Lifespan
 # ----------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start background scheduler on app startup and init DB"""
+    scheduler_started = False
+    mqtt_started = False
+
     # During tests we skip heavy startup work (DB schema seeds, schedulers, MQTT).
     if settings.ENVIRONMENT == "test":
         yield
         return
 
-    # 1. DB Init
-    from app.db.session import init_db
-    init_db()
-    
-    # 2. Scheduler
-    start_scheduler()
-    
-    # 3. MQTT and WebSocket
-    try:
-        start_mqtt_service()
-    except Exception as e:
-        print(f"MQTT Service Startup Error: {e}")
-        
-    asyncio.create_task(heartbeat_task())
+    if settings.DB_INIT_ON_STARTUP:
+        try:
+            from app.db.session import init_db
+            init_db()
+        except Exception:
+            logger.exception("DB init on startup failed; continuing without bootstrap")
+    else:
+        logger.info("DB bootstrap on startup disabled by configuration")
+
+    if settings.RUN_BACKGROUND_TASKS:
+        if settings.SCHEDULER_ENABLED:
+            try:
+                start_scheduler()
+                scheduler_started = True
+            except Exception:
+                logger.exception("Scheduler startup failed; continuing without scheduler")
+        else:
+            logger.info("Scheduler disabled by configuration")
+
+        if settings.MQTT_ENABLED:
+            try:
+                start_mqtt_service()
+                mqtt_started = True
+            except Exception:
+                logger.exception("MQTT startup failed; continuing without MQTT")
+        else:
+            logger.info("MQTT service disabled by configuration")
+
+        asyncio.create_task(heartbeat_task())
+    else:
+        logger.info("Background tasks disabled by configuration")
     
     yield
     
-    # 4. Cleanup
-    try:
-        stop_scheduler()
-    except:
-        pass
-    try:
-        stop_mqtt_service()
-    except:
-        pass
+    if scheduler_started:
+        try:
+            stop_scheduler()
+        except Exception:
+            logger.exception("Scheduler shutdown failed")
+    if mqtt_started:
+        try:
+            stop_mqtt_service()
+        except Exception:
+            logger.exception("MQTT shutdown failed")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
