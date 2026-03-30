@@ -11,4 +11,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, clas
 def init_db():
     # Only use for initial bootstrap or small local devs
     # In production, Alembic handles migrations
+    # Ensure all SQLModel tables are registered before create_all.
+    import app.models  # noqa: F401
     SQLModel.metadata.create_all(engine)
