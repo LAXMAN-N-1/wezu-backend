@@ -66,6 +66,16 @@ def get_station_metrics(
     dealer_id = _get_dealer_id(db, current_user.id)
     return DealerAnalyticsService.get_station_metrics(db, dealer_id)
 
+@router.get("/revenue-breakdown")
+def get_revenue_breakdown(
+    period: str = "month",
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    """Breakdown of revenue for Stacked Bar Charts."""
+    dealer_id = _get_dealer_id(db, current_user.id)
+    return DealerAnalyticsService.get_revenue_breakdown(db, dealer_id, period)
+
 
 @router.get("/customers")
 def get_customer_insights(

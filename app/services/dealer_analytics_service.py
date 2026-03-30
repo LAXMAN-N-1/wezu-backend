@@ -64,6 +64,18 @@ class DealerAnalyticsService:
                 )
             ).one() or 0.0
 
+            # Previous month for deltas
+            prev_month_start = (month_start - timedelta(days=1)).replace(day=1)
+            revenue_prev_month = db.exec(
+                select(func.coalesce(func.sum(SwapSession.swap_amount), 0.0)).where(
+                    col(SwapSession.station_id).in_(station_ids),
+                    SwapSession.status == "completed",
+                    SwapSession.created_at >= prev_month_start,
+                    SwapSession.created_at < month_start,
+                )
+            ).one() or 0.0
+
+
         # Average station rating
         avg_rating = db.exec(
             select(func.coalesce(func.avg(Station.rating), 0.0)).where(
@@ -104,11 +116,48 @@ class DealerAnalyticsService:
             "swaps_today": swaps_today,
             "swaps_month": swaps_month,
             "revenue_month": round(float(revenue_month), 2),
+            "revenue_prev_month": round(float(revenue_prev_month) if station_ids else 0.0, 2),
             "avg_rating": round(float(avg_rating), 2),
             "rating_distribution": rating_dist,
             "active_batteries": active_batteries,
             "station_count": station_count,
             "timestamp": now.isoformat(),
+        }
+
+    @staticmethod
+    def get_revenue_breakdown(db: Session, dealer_id: int, period: str = "month") -> dict:
+        """Returns revenue split by type (Rentals, Commissions, Refunds) for Stacked Bar Charts."""
+        now = datetime.utcnow()
+        if period == "today":
+            start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        elif period == "week":
+            start_date = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+        else: # month
+            start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            
+        station_ids = DealerAnalyticsService._get_station_ids(db, dealer_id)
+        
+        rental_income = 0.0
+        if station_ids:
+            # Using SwapSession amount as proxy for rental income here, or use Rental table
+            from app.models.rental import Rental
+            rental_income = db.exec(
+                select(func.coalesce(func.sum(Rental.total_amount), 0.0))
+                .where(col(Rental.start_station_id).in_(station_ids))
+                .where(Rental.created_at >= start_date)
+            ).one() or 0.0
+            
+        commission = db.exec(
+            select(func.coalesce(func.sum(CommissionLog.amount), 0.0))
+            .where(CommissionLog.dealer_id == dealer_id)
+            .where(CommissionLog.created_at >= start_date)
+        ).one() or 0.0
+        
+        return {
+            "rental_income": round(float(rental_income), 2),
+            "commission": round(float(commission), 2),
+            "refunds": 0.0, # Placeholder for future refund table
+            "bonuses": 0.0  # Placeholder for future bonuses
         }
 
     # ─── 2. Trends ───
