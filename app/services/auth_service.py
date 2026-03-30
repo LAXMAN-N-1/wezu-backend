@@ -89,6 +89,51 @@ class AuthService:
             )
 
     @staticmethod
+    def get_permissions_for_role(role_name: str) -> list[str]:
+        """
+        Return default permission slugs for the given role.
+        Kept lightweight to avoid login hard-failing if RBAC seed data is incomplete.
+        """
+        role_permissions = {
+            "customer": [
+                "profile:read:own",
+                "profile:update:own",
+                "stations:view:all",
+                "rentals:create:own",
+                "rentals:view:own",
+                "wallet:view:own",
+            ],
+            "vendor_owner": [
+                "dashboard:view:own",
+                "stations:manage:own",
+                "staff:manage:own",
+                "finance:view:own",
+            ],
+            "dealer": [
+                "dashboard:view:own",
+                "stations:manage:own",
+                "staff:manage:own",
+                "finance:view:own",
+            ],
+            "admin": [
+                "dashboard:view:all",
+                "users:manage:all",
+                "dealers:manage:all",
+                "settings:manage:all",
+                "audit:read:all",
+            ],
+            "super_admin": [
+                "dashboard:view:all",
+                "users:manage:all",
+                "dealers:manage:all",
+                "settings:manage:all",
+                "audit:read:all",
+                "rbac:manage:all",
+            ],
+        }
+        return role_permissions.get(role_name, [])
+
+    @staticmethod
     def get_menu_for_role(role_name: str) -> list[dict]:
         # Avoiding circular import by returning dicts or importing locally if needed
         # But returning dicts is safer for service layer decoupling if schema isn't strictly needed here 
