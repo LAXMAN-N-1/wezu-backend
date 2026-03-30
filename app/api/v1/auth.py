@@ -15,7 +15,7 @@ from app.schemas.user import TokenPayload
 from app.core.config import settings
 from app.api import deps
 from app.core.audit import AuditLogger, audit_log
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 from fastapi.security import OAuth2PasswordRequestForm
 import logging
 import re
@@ -1226,6 +1226,26 @@ async def verify_security_question_route(
 class AdminLoginRequest(BaseModel):
     username: str  # email
     password: str
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_username_aliases(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+        username = values.get("username") or values.get("email") or values.get("credential")
+        if isinstance(username, str):
+            username = username.strip()
+        if username:
+            values["username"] = username
+        return values
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str) -> str:
+        username = value.strip()
+        if not username:
+            raise ValueError("Username is required")
+        return username
 
 @router.post("/admin/login")
 async def admin_login(
