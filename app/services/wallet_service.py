@@ -5,7 +5,7 @@ from app.services.payment_service import PaymentService
 from app.services.financial_service import FinancialService
 from app.repositories.wallet_repository import wallet_repository
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 import logging
 
 logger = logging.getLogger(__name__)
@@ -73,7 +73,7 @@ class WalletService:
         # 3. Update Transaction and Wallet
         tx.status = TransactionStatus.SUCCESS
         tx.payment_gateway_ref = payment_id # Update with final payment ID
-        tx.updated_at = datetime.utcnow()
+        tx.updated_at = datetime.now(UTC)
         
         # Calculate Taxes for Audit (18% GST inclusive)
         tx.subtotal = round(tx.amount / 1.18, 2)

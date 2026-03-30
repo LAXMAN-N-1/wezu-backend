@@ -38,7 +38,7 @@ def test_bulk_role_assign(client: TestClient, session: Session):
     session.commit()
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Action: Assign to u1, u2 and a non-existent u999
     payload = {

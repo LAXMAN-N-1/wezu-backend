@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class DealerInventory(SQLModel, table=True):
     __tablename__ = "dealer_inventories"
@@ -18,8 +18,8 @@ class DealerInventory(SQLModel, table=True):
     max_capacity: int = Field(default=100)
     
     last_restocked_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     dealer: "DealerProfile" = Relationship()
@@ -40,7 +40,7 @@ class InventoryTransaction(SQLModel, table=True):
     notes: Optional[str] = None
     performed_by: Optional[int] = Field(default=None, foreign_key="users.id")
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     inventory: DealerInventory = Relationship(back_populates="transactions")

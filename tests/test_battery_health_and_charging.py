@@ -7,7 +7,7 @@ from app.models.battery_reservation import BatteryReservation
 from app.services.battery_service import BatteryService
 from app.services.charging_service import ChargingService
 from app.schemas.station_monitoring import OptimizationBattery
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -96,8 +96,8 @@ def test_prioritize_charging(session: Session):
         user_id=1,
         station_id=1,
         battery_id=2,
-        start_time=datetime.utcnow() + timedelta(minutes=30),
-        end_time=datetime.utcnow() + timedelta(hours=1),
+        start_time=datetime.now(UTC) + timedelta(minutes=30),
+        end_time=datetime.now(UTC) + timedelta(hours=1),
         status="PENDING"
     )
     session.add(res)

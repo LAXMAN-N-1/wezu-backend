@@ -6,6 +6,7 @@ import firebase_admin
 from firebase_admin import credentials, messaging
 from typing import List, Dict, Any, Optional
 from app.core.config import settings
+from app.core.firebase import firebase_app
 import logging
 import json
 
@@ -16,26 +17,10 @@ class FirebaseIntegration:
     """Firebase Cloud Messaging wrapper"""
     
     def __init__(self):
-        try:
-            # Initialize Firebase Admin SDK
-            if not firebase_admin._apps:
-                if not settings.FIREBASE_CREDENTIALS_PATH:
-                    logger.warning("FIREBASE_CREDENTIALS_PATH not set. Push notifications will be disabled.")
-                    return
-                
-                import os
-                if not os.path.exists(settings.FIREBASE_CREDENTIALS_PATH):
-                    logger.warning(f"Firebase credentials file not found at {settings.FIREBASE_CREDENTIALS_PATH}. Push notifications will be disabled.")
-                    return
-
-                try:
-                    cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
-                    firebase_admin.initialize_app(cred)
-                    logger.info("Firebase initialized successfully")
-                except Exception as e:
-                    logger.warning(f"Firebase initialization failed (likely invalid service account JSON): {str(e)}")
-        except Exception as e:
-            logger.error(f"Unexpected error during Firebase setup: {str(e)}")
+        # Initialization handled by app.core.firebase
+        self._app = firebase_app
+        if not self._app:
+            logger.warning("FirebaseIntegration initialized without active Firebase app.")
     
     def send_notification(
         self,

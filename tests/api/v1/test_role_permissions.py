@@ -50,7 +50,7 @@ def test_get_role_permissions_inheritance(client: TestClient, session: Session):
     parent_role, child_role = setup_role_hierarchy(session)
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     resp = client.get(f"/api/v1/admin/rbac/roles/{child_role.id}/permissions")
     assert resp.status_code == 200
@@ -88,7 +88,7 @@ def test_get_role_permissions_orphan(client: TestClient, session: Session):
     session.commit()
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     resp = client.get(f"/api/v1/admin/rbac/roles/{role.id}/permissions")
     data = resp.json()

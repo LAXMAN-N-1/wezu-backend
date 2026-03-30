@@ -7,7 +7,7 @@ from typing import Dict, Set
 import json
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +127,7 @@ class ConnectionManager:
             "type": "battery_update",
             "battery_id": battery_id,
             "data": data,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         }
         
         for user_id in self.battery_subscriptions[battery_id]:
@@ -148,7 +148,7 @@ class ConnectionManager:
             "type": "alert",
             "battery_id": battery_id,
             "alert": alert,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         }
         
         for user_id in self.battery_subscriptions[battery_id]:
@@ -158,7 +158,7 @@ class ConnectionManager:
         """Send heartbeat to all connected clients"""
         message = {
             "type": "heartbeat",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         }
         
         for user_id in list(self.active_connections.keys()):

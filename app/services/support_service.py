@@ -116,8 +116,8 @@ class SupportService:
     @staticmethod
     def get_queue_stats(db: Session) -> dict:
         """Overview of the support queue"""
-        from datetime import datetime, timedelta
-        now = datetime.utcnow()
+        from datetime import datetime, UTC, timedelta
+        now = datetime.now(UTC)
         overdue_threshold = now - timedelta(hours=24)
         
         open_count = db.exec(select(func.count(SupportTicket.id)).where(SupportTicket.status == "open")).one()

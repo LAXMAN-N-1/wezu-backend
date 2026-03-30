@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -25,8 +25,8 @@ class Stock(SQLModel, table=True):
     
     reorder_level: int = Field(default=10, ge=0)
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     warehouse: "Warehouse" = Relationship(back_populates="stocks")

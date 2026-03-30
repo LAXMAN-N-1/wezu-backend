@@ -25,7 +25,7 @@ def create_superuser(session):
 def test_delete_role_lifecycle(client: TestClient, session: Session):
     admin = create_superuser(session)
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # 1. Create Role
     role = Role(name="Temp Role", is_active=True)
@@ -52,7 +52,7 @@ def test_delete_role_lifecycle(client: TestClient, session: Session):
 def test_delete_role_prevention_active_users(client: TestClient, session: Session):
     admin = create_superuser(session)
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Role with User
     role = Role(name="Busy Role", is_active=True)
@@ -69,12 +69,12 @@ def test_delete_role_prevention_active_users(client: TestClient, session: Sessio
     # Try Delete
     resp = client.delete(f"/api/v1/admin/rbac/roles/{role.id}")
     assert resp.status_code == 400
-    assert "active users" in resp.json()["detail"]
+    assert "active users" in resp.json()["error"]
 
 def test_delete_system_role_prevention(client: TestClient, session: Session):
     admin = create_superuser(session)
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     role = Role(name="Core Sys", is_active=True, is_system_role=True)
     session.add(role)
@@ -82,4 +82,4 @@ def test_delete_system_role_prevention(client: TestClient, session: Session):
     
     resp = client.delete(f"/api/v1/admin/rbac/roles/{role.id}")
     assert resp.status_code == 400
-    assert "system roles" in resp.json()["detail"]
+    assert "system roles" in resp.json()["error"]

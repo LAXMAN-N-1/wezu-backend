@@ -40,7 +40,7 @@ def test_list_roles_all(client: TestClient, session: Session):
     seed_roles(session)
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     resp = client.get("/api/v1/admin/rbac/roles")
     assert resp.status_code == 200
@@ -54,7 +54,7 @@ def test_list_roles_filter_category(client: TestClient, session: Session):
     seed_roles(session)
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     resp = client.get("/api/v1/admin/rbac/roles?category=vendor_staff")
     assert resp.status_code == 200
@@ -68,7 +68,7 @@ def test_list_roles_exclude_permissions(client: TestClient, session: Session):
     seed_roles(session)
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Check default (include=True)
     resp = client.get("/api/v1/admin/rbac/roles")

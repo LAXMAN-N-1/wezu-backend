@@ -3,7 +3,7 @@ Rental Repository
 Data access layer for Rental model
 """
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 from sqlmodel import Session, select
 from app.models.rental import Rental
 from app.repositories.base_repository import BaseRepository
@@ -63,7 +63,7 @@ class RentalRepository(BaseRepository[Rental, RentalCreate, RentalUpdate]):
     
     def get_overdue_rentals(self, db: Session) -> List[Rental]:
         """Get all overdue rentals"""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         query = select(Rental).where(
             (Rental.status == "active") &
             (Rental.end_time < now)

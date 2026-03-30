@@ -4,7 +4,7 @@ Dealer Portal Customers — Customer list, detail, and active rentals.
 from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
-from datetime import datetime
+from datetime import datetime, UTC
 
 from app.db.session import get_session
 from app.api.deps import get_current_user
@@ -64,7 +64,7 @@ def get_active_rentals(
                 "battery_health": battery.health_percentage if battery else 0,
                 "station_name": station.name if station else "N/A",
                 "start_time": str(r.created_at),
-                "duration_hours": round((datetime.utcnow() - r.created_at).total_seconds() / 3600, 1) if r.created_at else 0,
+                "duration_hours": round((datetime.now(UTC) - r.created_at).total_seconds() / 3600, 1) if r.created_at else 0,
                 "status": r.status,
             })
 

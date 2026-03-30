@@ -6,7 +6,7 @@ from app.api.deps import get_db
 from app.models.user import User
 from app.models.faq import FAQ
 from app.schemas.faq import FAQCreate, FAQUpdate, FAQResponse
-from datetime import datetime
+from datetime import datetime, UTC
 
 router = APIRouter()
 
@@ -41,7 +41,7 @@ def update_faq(
     for field, value in update_data.items():
         setattr(faq, field, value)
     
-    faq.updated_at = datetime.utcnow()
+    faq.updated_at = datetime.now(UTC)
     session.add(faq)
     session.commit()
     session.refresh(faq)

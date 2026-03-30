@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlmodel import Session, select, func
 from typing import Dict
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from app.api import deps
 from app.models.user import User
 from app.core.database import get_db
@@ -12,7 +12,7 @@ router = APIRouter()
 
 @router.get("/health")
 def system_health(
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     """Comprehensive system health check"""
@@ -23,7 +23,7 @@ def system_health(
     try:
         health_status = {
             "status": "healthy",
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(UTC),
             "checks": {}
         }
         
@@ -49,7 +49,7 @@ def system_health(
 
 @router.get("/metrics")
 def performance_metrics(
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     """Get performance KPIs"""
@@ -59,7 +59,7 @@ def performance_metrics(
     from app.models.financial import Transaction
     
     # Calculate various metrics
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = now - timedelta(days=7)
     month_start = now - timedelta(days=30)
@@ -127,14 +127,14 @@ def performance_metrics(
 
 @router.get("/uptime")
 def uptime_tracking(
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     """Get uptime and SLA metrics"""
     # In production, this would query from monitoring service
     # For now, return mock data
     
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     
     return {
         "current_status": "operational",
@@ -159,7 +159,7 @@ def uptime_tracking(
 def error_logs(
     limit: int = 100,
     severity: str = None,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     """Get recent error logs"""
@@ -191,7 +191,7 @@ def error_logs(
 
 @router.get("/performance/api")
 def api_performance(
-    current_user: User = Depends(deps.get_current_active_superuser)
+    current_user: User = Depends(deps.get_current_active_admin)
 ):
     """Get API performance metrics"""
     # In production, integrate with APM tool
@@ -211,7 +211,7 @@ def api_performance(
 
 @router.get("/database/stats")
 def database_stats(
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     """Get database statistics"""

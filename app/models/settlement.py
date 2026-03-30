@@ -1,5 +1,5 @@
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 from sqlmodel import SQLModel, Field, Relationship
 
 
@@ -34,7 +34,7 @@ class Settlement(SQLModel, table=True):
     transaction_reference: Optional[str] = None  # Bank transfer ref
     payment_proof_url: Optional[str] = None      # Receipt/proof URL
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     paid_at: Optional[datetime] = None
 
     # Relationship

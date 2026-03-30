@@ -3,7 +3,7 @@ from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select, func, or_, and_
 from typing import List, Optional
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 import csv
 import io
 
@@ -34,7 +34,11 @@ def list_batteries(
     limit: int = 20,
     current_user: User = Depends(get_current_active_admin)
 ):
-    query = select(Battery)
+    from sqlalchemy.orm import selectinload
+    query = select(Battery).options(
+        selectinload(Battery.sku),
+        selectinload(Battery.iot_device)
+    )
     count_query = select(func.count(Battery.id))
 
     # Apply filters to both queries
@@ -143,7 +147,7 @@ def export_batteries(
         ])
 
     output.seek(0)
-    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
@@ -163,7 +167,7 @@ def bulk_update_batteries(
         if battery:
             old_status = battery.status
             battery.status = req.status
-            battery.updated_at = datetime.utcnow()
+            battery.updated_at = datetime.now(UTC)
             session.add(battery)
 
             audit = BatteryAuditLog(
@@ -210,7 +214,7 @@ def get_battery_health_history(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_admin)
 ):
-    since = datetime.utcnow() - timedelta(days=days)
+    since = datetime.now(UTC) - timedelta(days=days)
     return session.exec(
         select(BatteryHealthHistory)
         .where(BatteryHealthHistory.battery_id == battery_id)
@@ -273,7 +277,7 @@ def update_battery(
             session.add(audit_log)
             setattr(db_battery, key, value)
 
-    db_battery.updated_at = datetime.utcnow()
+    db_battery.updated_at = datetime.now(UTC)
     session.add(db_battery)
     session.commit()
     session.refresh(db_battery)
@@ -287,7 +291,7 @@ async def import_batteries(
     current_user: User = Depends(get_current_active_admin)
 ):
     content = await file.read()
-    decoded = content.decode('utf-8')
+    decoded = content.decode('utf-8-sig')
     reader = csv.DictReader(io.StringIO(decoded))
 
     items = []

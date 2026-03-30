@@ -1,5 +1,5 @@
 from sqlmodel import Session, select
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from typing import Optional, List
 from app.models.settlement import Settlement
 from app.models.commission import CommissionLog
@@ -158,7 +158,7 @@ class SettlementService:
                 settlement.status = "paid"
                 settlement.transaction_reference = txn_ref
                 settlement.payment_proof_url = proof_url
-                settlement.paid_at = datetime.utcnow()
+                settlement.paid_at = datetime.now(UTC)
                 db.add(settlement)
 
                 # Mark linked commissions as paid
@@ -207,7 +207,7 @@ class SettlementService:
             settlement.status = "paid"
             settlement.transaction_reference = txn_ref
             settlement.payment_proof_url = proof_url
-            settlement.paid_at = datetime.utcnow()
+            settlement.paid_at = datetime.now(UTC)
             settlement.failure_reason = None # Clear failure reason on success
             db.add(settlement)
 
@@ -241,7 +241,7 @@ class SettlementService:
         - pending_settlements count & amount
         - paid_settlements count & amount
         """
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         current_month = now.strftime("%Y-%m")
 
         # Current month pending commissions (not yet settled)

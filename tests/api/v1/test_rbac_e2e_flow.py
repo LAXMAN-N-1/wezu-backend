@@ -2,7 +2,7 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from app.api import deps
 from app.models.admin_user import AdminUser
 from app.models.rbac import Role, Permission, UserRole
@@ -27,7 +27,7 @@ def create_superuser(session):
 def test_rbac_full_lifecycle(client: TestClient, session: Session):
     admin = create_superuser(session)
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # 1. Setup Data: Create Permissions
     p1 = Permission(slug="e2e:create", module="e2e", action="create")
@@ -66,7 +66,7 @@ def test_rbac_full_lifecycle(client: TestClient, session: Session):
     payload_role = {
         "role_id": role.id,
         "notes": "E2E Assignment",
-        "effective_from": datetime.utcnow().isoformat()
+        "effective_from": datetime.now(UTC).isoformat()
     }
     resp = client.post(f"/api/v1/admin/rbac/users/{user.id}/roles", json=payload_role)
     assert resp.status_code == 200

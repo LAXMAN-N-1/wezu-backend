@@ -1,6 +1,5 @@
-from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, desc, extract
-from datetime import datetime, timedelta
+from sqlmodel import Session, select, func, and_, desc, extract
+from datetime import datetime, UTC, timedelta
 from typing import Dict, List, Any
 
 from app.schemas.analytics.customer import CustomerOverviewResponse
@@ -17,15 +16,15 @@ class AnalyticsCustomerService(BaseAnalyticsService):
     @staticmethod
     async def get_overview(db: Session, period: str = "30d", customer_id: int = None) -> CustomerOverviewResponse:
         days = BaseAnalyticsService.parse_period(period)
-        target_date = datetime.utcnow() - timedelta(days=days)
+        target_date = datetime.now(UTC) - timedelta(days=days)
         
         c_id = customer_id or 1 # Fallback for now
 
         # 1. Personal Overview
-        user = db.query(User).filter(User.id == c_id).first()
-        wallet = db.query(Wallet).filter(Wallet.user_id == c_id).first()
-        total_rentals = db.query(func.count(Rental.id)).filter(Rental.user_id == c_id).scalar() or 0
-        active_rental = db.query(Rental).filter(Rental.user_id == c_id, Rental.status == RentalStatus.ACTIVE).first()
+        user = db.exec(select(User).where(User.id == c_id)).first()
+        wallet = db.exec(select(Wallet).where(Wallet.user_id == c_id)).first()
+        total_rentals = db.exec(select(func.count(Rental.id)).where(Rental.user_id == c_id)).one() or 0
+        active_rental = db.exec(select(Rental).where(Rental.user_id == c_id, Rental.status == RentalStatus.ACTIVE)).first()
         
         personal_overview = {
             "active_rentals": 1 if active_rental else 0,
@@ -35,34 +34,34 @@ class AnalyticsCustomerService(BaseAnalyticsService):
         }
 
         # 2. Spending Analytics
-        transactions = db.query(Transaction).join(Wallet).filter(
+        transactions = db.exec(select(Transaction).join(Wallet).where(
             Wallet.user_id == c_id,
             Transaction.created_at >= target_date
-        ).all() or 0.0
+        )).all() or 0.0
         
-        total_spent = db.query(func.sum(Transaction.amount)).join(Wallet).filter(
+        total_spent = db.exec(select(func.sum(Transaction.amount)).join(Wallet).where(
             Wallet.user_id == c_id,
-            Transaction.type == "payment",
+            Transaction.transaction_type == "RENTAL_PAYMENT",
             Transaction.created_at >= target_date
-        ).scalar() or 0.0
+        )).one() or 0.0
         
-        monthly_spent = db.query(func.sum(Transaction.amount)).join(Wallet).filter(
+        monthly_spent = db.exec(select(func.sum(Transaction.amount)).join(Wallet).where(
             Wallet.user_id == c_id,
             Transaction.status == "success",
-            Transaction.created_at >= datetime.utcnow().replace(day=1)
-        ).scalar() or 0.0
+            Transaction.created_at >= datetime.now(UTC).replace(day=1)
+        )).one() or 0.0
 
-        rental_spending = db.query(func.sum(Transaction.amount)).join(Wallet).filter(
+        rental_spending = db.exec(select(func.sum(Transaction.amount)).join(Wallet).where(
             Wallet.user_id == c_id,
-            Transaction.category == "rental_payment",
+            Transaction.transaction_type == "RENTAL_PAYMENT",
             Transaction.status == "success"
-        ).scalar() or 0.0
+        )).one() or 0.0
         
-        purchase_spending = db.query(func.sum(Transaction.amount)).join(Wallet).filter(
+        purchase_spending = db.exec(select(func.sum(Transaction.amount)).join(Wallet).where(
             Wallet.user_id == c_id,
-            Transaction.category == "subscription_payment",
+            Transaction.transaction_type == "SUBSCRIPTION",
             Transaction.status == "success"
-        ).scalar() or 0.0
+        )).one() or 0.0
 
         spending_analytics = {
             "total_amount_spent": float(total_spent),
@@ -74,11 +73,11 @@ class AnalyticsCustomerService(BaseAnalyticsService):
         }
 
         # 3. Usage Analytics
-        batteries_used = db.query(func.count(func.distinct(Rental.battery_id))).filter(Rental.user_id == c_id).scalar() or 0
-        avg_dur = db.query(func.avg(extract('epoch', Rental.end_time - Rental.start_time) / 3600)).filter(
+        batteries_used = db.exec(select(func.count(func.distinct(Rental.battery_id))).where(Rental.user_id == c_id)).one() or 0
+        avg_dur = db.exec(select(func.avg(extract('epoch', Rental.end_time - Rental.start_time) / 3600)).where(
             Rental.user_id == c_id, 
             Rental.status == RentalStatus.COMPLETED
-        ).scalar() or 0
+        )).one() or 0
         
         usage_analytics = {
             "total_batteries_used": batteries_used,
@@ -89,7 +88,7 @@ class AnalyticsCustomerService(BaseAnalyticsService):
         # 4. Battery & Energy
         current_battery = None
         if active_rental:
-            current_battery = db.query(Battery).filter(Battery.id == active_rental.battery_id).first()
+            current_battery = db.exec(select(Battery).where(Battery.id == active_rental.battery_id)).first()
             
         battery_analytics = {
             "health": current_battery.health_status.value if current_battery else "N/A",
@@ -107,10 +106,10 @@ class AnalyticsCustomerService(BaseAnalyticsService):
         }
 
         # 6. Rental History
-        history = db.query(Rental).filter(Rental.user_id == c_id).order_by(desc(Rental.start_time)).limit(10).all()
+        history = db.exec(select(Rental).where(Rental.user_id == c_id).order_by(desc(Rental.start_time)).limit(10)).all()
         rental_history = [{
             "id": r.id,
-            "cost": float(r.total_price),
+            "cost": float(r.total_amount),
             "duration": "2h 30m", # Mocked formatting
             "timestamp": r.start_time.isoformat()
         } for r in history]

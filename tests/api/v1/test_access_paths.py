@@ -31,7 +31,7 @@ def test_assign_access_path(client: TestClient, session: Session):
     session.commit()
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Action
     payload = {
@@ -60,7 +60,7 @@ def test_assign_access_path_invalid_level(client: TestClient, session: Session):
     session.commit()
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     payload = {
         "path_pattern": "Global/%",
@@ -87,7 +87,7 @@ def test_get_user_access_paths(client: TestClient, session: Session):
     session.commit()
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     resp = client.get(f"/api/v1/admin/rbac/users/{user.id}/access-paths")
     assert resp.status_code == 200
@@ -114,7 +114,7 @@ def test_update_access_path(client: TestClient, session: Session):
     session.commit()
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     payload = {"access_level": "admin"}
     resp = client.put(f"/api/v1/admin/rbac/users/{user.id}/access-paths/{path.id}", json=payload)
@@ -142,7 +142,7 @@ def test_remove_access_path(client: TestClient, session: Session):
     session.commit()
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     resp = client.delete(f"/api/v1/admin/rbac/users/{user.id}/access-paths/{path.id}")
     assert resp.status_code == 200

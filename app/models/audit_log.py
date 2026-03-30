@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, UTC
 from sqlalchemy import Column, JSON
 from enum import Enum
 
@@ -45,7 +45,7 @@ class AuditLog(SQLModel, table=True):
 
     ip_address: Optional[str] = None
     user_agent: Optional[str] = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class SecurityEvent(SQLModel, table=True):
@@ -57,5 +57,5 @@ class SecurityEvent(SQLModel, table=True):
     details: Optional[str] = None
     source_ip: Optional[str] = None
     user_id: Optional[int] = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     is_resolved: bool = Field(default=False)

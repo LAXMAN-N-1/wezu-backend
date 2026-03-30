@@ -3,7 +3,7 @@ from app.models.battery import Battery
 from app.models.battery_reservation import BatteryReservation
 from app.schemas.station_monitoring import OptimizedQueueItem, OptimizationBattery
 from app.services.demand_predictor import MockDemandPredictor
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from typing import List, Optional
 
 class ChargingService:
@@ -15,7 +15,7 @@ class ChargingService:
         Peak (6 PM - 10 PM): 1.5
         Standard: 1.0
         """
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         hour = now.hour
         if 23 <= hour or hour <= 6:
             return 0.5
@@ -30,7 +30,7 @@ class ChargingService:
         Factor in Demand, Health, Cycles, and Energy Costs.
         """
         predictor = MockDemandPredictor()
-        demand_score = predictor.predict_demand(db, station_id, datetime.utcnow(), datetime.utcnow() + timedelta(hours=2))
+        demand_score = predictor.predict_demand(db, station_id, datetime.now(UTC), datetime.now(UTC) + timedelta(hours=2))
         energy_multiplier = ChargingService.get_energy_cost_multiplier()
         
         items = []
@@ -46,7 +46,7 @@ class ChargingService:
             stmt = select(BatteryReservation).where(
                 BatteryReservation.battery_id == b.battery_id,
                 BatteryReservation.status == "PENDING",
-                BatteryReservation.start_time <= datetime.utcnow() + timedelta(hours=2)
+                BatteryReservation.start_time <= datetime.now(UTC) + timedelta(hours=2)
             )
             reservation = db.exec(stmt).first()
             reservation_boost = 1000 if reservation else 0
@@ -71,7 +71,7 @@ class ChargingService:
             # Estimate completion: 1.5 mins per 1% needed, factored by position
             # (In reality, slot power would be used)
             est_minutes = 45 # mock
-            est_time = datetime.utcnow() + timedelta(minutes=est_minutes * (i + 1))
+            est_time = datetime.now(UTC) + timedelta(minutes=est_minutes * (i + 1))
             
             result.append(OptimizedQueueItem(
                 battery_id=item['battery_id'],

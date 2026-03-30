@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from sqlmodel import Session, select
 from app.models.rental import Rental
 from typing import List
@@ -13,7 +13,7 @@ class RentalAlertService:
         Identify rentals that will expire exactly (or within a window) around 
         the specified hours_remaining.
         """
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         # window of 10 minutes to avoid missing due to cron timing
         target_time = now + timedelta(hours=hours_remaining)
         window_start = target_time - timedelta(minutes=5)

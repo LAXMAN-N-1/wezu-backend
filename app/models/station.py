@@ -1,5 +1,5 @@
 from typing import Optional, List, TYPE_CHECKING
-from datetime import datetime
+from datetime import datetime, UTC
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
 
@@ -71,8 +71,8 @@ class Station(SQLModel, table=True):
     
     # Timestamps
     last_heartbeat: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationships
     slots: List["StationSlot"] = Relationship(back_populates="station")

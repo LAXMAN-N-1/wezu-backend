@@ -9,7 +9,7 @@ router = APIRouter()
 # --- Global Stats (Aggregated across modules) ---
 @router.get("/stats")
 async def get_admin_stats(
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(deps.get_db),
 ):
     from app.models.station import Station

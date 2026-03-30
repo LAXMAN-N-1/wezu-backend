@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
 from typing import Any, List, Optional
-from datetime import datetime
+from datetime import datetime, UTC
 from pydantic import BaseModel
 from app.api import deps
 from app.models.station import Station, StationStatus, StationSlot
 from app.models.maintenance import MaintenanceRecord, StationDowntime
+from app.models.user import User
 from app.core.database import get_db
 
 router = APIRouter()
@@ -61,7 +62,7 @@ def list_stations(
     city: Optional[str] = None,
     station_type: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """List all stations with pagination, search, and filters."""
     statement = select(Station)
@@ -124,7 +125,7 @@ def list_stations(
 @router.get("/stats")
 def get_station_stats(
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Get station network statistics."""
     total = db.exec(select(func.count()).select_from(Station)).one()
@@ -156,7 +157,7 @@ def get_station_stats(
 def create_station(
     request: StationCreateRequest,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Create a new station."""
     station = Station(
@@ -184,7 +185,7 @@ def create_station(
 def get_station_detail(
     station_id: int,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Get detailed station info."""
     station = db.get(Station, station_id)
@@ -232,7 +233,7 @@ def update_station(
     station_id: int,
     request: StationUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Update a station."""
     station = db.get(Station, station_id)
@@ -246,7 +247,7 @@ def update_station(
         else:
             setattr(station, key, value)
 
-    station.updated_at = datetime.utcnow()
+    station.updated_at = datetime.now(UTC)
     db.add(station)
     db.commit()
     db.refresh(station)
@@ -257,7 +258,7 @@ def update_station(
 def delete_station(
     station_id: int,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Delete a station."""
     station = db.get(Station, station_id)
@@ -275,7 +276,7 @@ def delete_station(
 def get_station_performance(
     station_id: int,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Get performance metrics for a station."""
     station = db.get(Station, station_id)
@@ -304,7 +305,7 @@ def get_station_performance(
 @router.get("/performance/all")
 def get_all_station_performance(
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Get performance overview for all stations."""
     stations = db.exec(select(Station).order_by(Station.rating.desc())).all()
@@ -354,7 +355,7 @@ def list_all_maintenance(
     status: Optional[str] = None,
     entity_type: str = "station",
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """List all maintenance records with filters."""
     statement = select(MaintenanceRecord).where(MaintenanceRecord.entity_type == entity_type)
@@ -368,13 +369,15 @@ def list_all_maintenance(
     statement = statement.order_by(MaintenanceRecord.performed_at.desc()).offset(skip).limit(limit)
     records = db.exec(statement).all()
 
+    station_ids = {r.entity_id for r in records if r.entity_type == "station"}
+    station_map = {s.id: s.name for s in db.exec(select(Station).where(Station.id.in_(station_ids))).all()} if station_ids else {}
+
     result = []
     for r in records:
         # Get station name
         station_name = None
         if r.entity_type == "station":
-            station = db.get(Station, r.entity_id)
-            station_name = station.name if station else f"Station #{r.entity_id}"
+            station_name = station_map.get(r.entity_id, f"Station #{r.entity_id}")
 
         result.append({
             "id": r.id,
@@ -400,8 +403,9 @@ def list_all_maintenance(
 
 @router.get("/maintenance/stats")
 def get_maintenance_stats(
-    db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    period: str = Query("30d"),
+    current_user: User = Depends(deps.get_current_active_admin),
+    db: Session = Depends(deps.get_db)
 ):
     """Get maintenance statistics."""
     total = db.exec(
@@ -450,7 +454,7 @@ def get_maintenance_stats(
 def create_maintenance_record(
     request: MaintenanceCreateRequest,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Create a new maintenance record."""
     # Verify station exists
@@ -481,7 +485,7 @@ def update_maintenance_status(
     record_id: int,
     new_status: str,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Update maintenance record status."""
     record = db.get(MaintenanceRecord, record_id)
@@ -502,7 +506,7 @@ def update_maintenance_status(
 def get_station_specs(
     station_id: int,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Get station hardware specs."""
     station = db.get(Station, station_id)
@@ -525,7 +529,7 @@ def get_station_specs(
 def get_station_maintenance(
     station_id: int,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Get maintenance records for a specific station."""
     records = db.exec(

@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class OTP(SQLModel, table=True):
     __tablename__ = "otps"
@@ -13,4 +13,4 @@ class OTP(SQLModel, table=True):
     is_used: bool = Field(default=False)
     attempts: int = Field(default=0)
     expires_at: datetime
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

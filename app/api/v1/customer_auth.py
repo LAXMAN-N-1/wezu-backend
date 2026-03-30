@@ -4,12 +4,12 @@ JSON-based login/register for the Flutter customer app.
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session, select
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
 from typing import Optional
 import logging
 import uuid
 import re
-from datetime import datetime
+from datetime import datetime, UTC
 
 from app.api import deps
 from app.db.session import get_session
@@ -58,8 +58,7 @@ class CustomerAuthUser(BaseModel):
     kyc_status: Optional[str] = None
     profile_picture: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CustomerAuthResponse(BaseModel):
@@ -103,7 +102,7 @@ async def customer_login(
     refresh_token = create_refresh_token(subject=user.id, jti=token_jti)
 
     # Update last login
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(UTC)
     db.add(user)
     db.commit()
 

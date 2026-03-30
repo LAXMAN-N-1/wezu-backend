@@ -8,7 +8,7 @@ from jose import jwt, JWTError
 from app.core.config import settings
 from app.models.user import User
 from app.schemas.user import TokenPayload
-from sqlmodel import Session
+from sqlmodel import func, Session
 from sqlalchemy.orm import selectinload
 import logging
 
@@ -45,7 +45,7 @@ class RBACMiddleware(BaseHTTPMiddleware):
                 if token_data.sub:
                     # Provide a fresh DB session for middleware 
                     with Session(engine) as db:
-                        user = db.query(User).filter(User.id == int(token_data.sub)).options(selectinload(User.roles)).first()
+                        user = db.exec(select(User).where(User.id == int(token_data.sub)).options(selectinload(User.role))).first()
                         if user and user.is_active:
                             request.state.user = user
                             # Find the highest priority role or the primary role

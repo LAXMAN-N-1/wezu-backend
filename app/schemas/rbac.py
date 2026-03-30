@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -67,8 +68,14 @@ class PermissionResponse(BaseModel):
 class RoleRead(RoleBase):
     id: int
     parent_role_id: Optional[int] = None
+    is_system_role: bool = False
+    icon: Optional[str] = None
+    color: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     permissions: Optional[List[PermissionResponse]] = []
     permission_count: Optional[int] = 0
+    user_count: Optional[int] = 0
     model_config = ConfigDict(from_attributes=True)
 
 RoleResponse = RoleRead
@@ -112,18 +119,18 @@ class UserRoleDetail(BaseModel):
     role_id: int
     role_name: str
     role_description: Optional[str] = None
-    assigned_at: Optional[str] = None
+    assigned_at: Optional[datetime] = None
     assigned_by: Optional[int] = None
     assigned_by_name: Optional[str] = None
-    effective_from: Optional[str] = None
-    expires_at: Optional[str] = None
+    effective_from: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
     notes: Optional[str] = None
     is_active: bool = True
 
 class UserRoleAssign(BaseModel):
     role_id: int
-    effective_from: Optional[str] = None
-    expires_at: Optional[str] = None
+    effective_from: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
     notes: Optional[str] = None
 
 class UserRoleAssignmentResponse(BaseModel):

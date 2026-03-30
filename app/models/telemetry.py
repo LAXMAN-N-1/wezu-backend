@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class Telemetry(SQLModel, table=True):
     __tablename__ = "telemetry"
@@ -27,7 +27,7 @@ class Telemetry(SQLModel, table=True):
     range_remaining_km: Optional[float] = None
     
     # Timestamp (Indexed for time-series queries)
-    timestamp: datetime = Field(default_factory=datetime.utcnow, index=True)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), index=True)
     
     # Metadata
     metadata_json: Optional[str] = None

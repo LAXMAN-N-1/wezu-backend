@@ -79,6 +79,7 @@ from app.models.notification import Notification
 from app.models.notification_preference import NotificationPreference
 from app.models.audit_log import AuditLog, SecurityEvent
 from app.models.admin_user import AdminUser
+from app.models.admin_group import AdminGroup
 from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
 from app.models.driver_profile import DriverProfile
 from app.models.staff import StaffProfile
@@ -93,5 +94,15 @@ from app.models.membership import UserMembership
 from app.models.oauth import BlacklistedToken
 from app.models.dealer_kyc import DealerKYCApplication, KYCStateTransition
 from app.models.dealer_inventory import DealerInventory, InventoryTransaction
+from app.models.stock import Stock
+from app.models.stock_movement import StockMovement
 from app.models.dealer_promotion import DealerPromotion, PromotionUsage
 from app.models.search_history import SearchHistory
+
+# New modules
+from app.models.system import SystemConfig, FeatureFlag
+from app.models.bess import BessUnit, BessEnergyLog, BessGridEvent, BessReport
+from app.models.notification_admin import PushCampaign, AutomatedTrigger, NotificationLog, NotificationConfig
+from app.models.api_key import ApiKeyConfig
+
+

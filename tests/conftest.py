@@ -1,7 +1,7 @@
 import os
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session, SQLModel, create_engine, select
+from sqlmodel import Session, SQLModel, create_engine, select, and_
 from sqlmodel.pool import StaticPool
 import sys
 from unittest.mock import MagicMock
@@ -33,42 +33,27 @@ def visit_JSONB(self, type_, **kw):
 SQLiteTypeCompiler.visit_JSONB = visit_JSONB
 # --------------------------------------------
 
-# Use in-memory SQLite for tests - ensure no database URL is passed
-DATABASE_URL = "sqlite://"  # Force in-memory database for tests
+# Use PostgreSQL for tests (dedicated test database is required)
+# Read from environment variable if available, otherwise fallback to a default
+DATABASE_URL = os.getenv("TEST_DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/wezu_test")
 
 # Create engine with proper configuration
-engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-
-from sqlalchemy import event
-from sqlalchemy.engine import Engine
-import sqlite3
-
-@event.listens_for(Engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
-    if type(dbapi_connection) is sqlite3.Connection:
-        cursor = dbapi_connection.cursor()
-        cursor.execute("ATTACH DATABASE ':memory:' AS core")
-        cursor.execute("ATTACH DATABASE ':memory:' AS dealers")
-        cursor.execute("ATTACH DATABASE ':memory:' AS finance")
-        cursor.execute("ATTACH DATABASE ':memory:' AS rentals")
-        cursor.execute("ATTACH DATABASE ':memory:' AS inventory")
-        cursor.execute("ATTACH DATABASE ':memory:' AS stations")
-        cursor.execute("ATTACH DATABASE ':memory:' AS logistics")
-        cursor.close()
+# Removed StaticPool as it is primarily for SQLite in-memory and causes TypeErrors with PostgreSQL
+engine = create_engine(DATABASE_URL)
 
 # Initialize all tables before any test session
 SQLModel.metadata.create_all(engine)
 
 @pytest.fixture(name="session")
 def session_fixture():
+    from sqlmodel import Session
+    from sqlalchemy import text
+    
     with Session(engine) as session:
-        # Seed basic roles for tests
+        # Seed basic driver role if missing
         from app.models.rbac import Role
-        if not session.exec(select(Role).where(Role.name == "driver")).first():
+        driver_role = session.exec(select(Role).where(Role.name == "driver")).first()
+        if not driver_role:
             driver_role = Role(
                 name="driver", 
                 slug="driver",
@@ -76,17 +61,17 @@ def session_fixture():
                 is_system_role=True
             )
             session.add(driver_role)
-            try:
-                session.commit()
-            except Exception:
-                session.rollback()
+            session.commit()
             
         yield session
-        # Teardown: delete all data
-        for table in reversed(SQLModel.metadata.sorted_tables):
-            session.execute(table.delete())
-        session.commit()
-
+        
+        # Teardown logic: Use TRUNCATE CASCADE to handle circular foreign keys
+        # We need a list of all tables in the correct order or just truncate all
+        tables = SQLModel.metadata.tables.keys()
+        if tables:
+            truncate_stmt = f"TRUNCATE TABLE {', '.join(tables)} CASCADE;"
+            session.execute(text(truncate_stmt))
+            session.commit()
 
 @pytest.fixture(autouse=True)
 def seed_basics(session: Session):
@@ -94,42 +79,58 @@ def seed_basics(session: Session):
     Seed minimal roles, menus, permissions and a superuser so RBAC/user tests have baseline data.
     Data is cleared after each test by session_fixture teardown.
     """
-    # Role
-    admin_role = Role(name="admin", description="Super Admin", category="system", level=100)
-    session.add(admin_role)
-    session.commit()
-    session.refresh(admin_role)
+    from app.models.rbac import Role, Permission
+    from app.models.menu import Menu
+    from app.models.role_right import RoleRight
+    from app.models.user import User, UserStatus, UserType
+    from app.core.security import get_password_hash
+
+    # Check if admin role already exists (to avoid duplicate seed errors in same session)
+    admin_role = session.exec(select(Role).where(Role.name == "admin")).first()
+    if not admin_role:
+        admin_role = Role(name="admin", description="Super Admin", category="system", level=100)
+        session.add(admin_role)
+        session.commit()
+        session.refresh(admin_role)
 
     # Menu
-    menu = Menu(name="dashboard", display_name="Dashboard", route="/dashboard", icon="home")
-    session.add(menu)
-    session.commit()
-    session.refresh(menu)
+    menu = session.exec(select(Menu).where(Menu.name == "dashboard")).first()
+    if not menu:
+        menu = Menu(name="dashboard", display_name="Dashboard", route="/dashboard", icon="home")
+        session.add(menu)
+        session.commit()
+        session.refresh(menu)
 
     # Permission
-    perm = Permission(slug="dashboard:view", module="dashboard", action="view", scope="all")
-    session.add(perm)
-    session.commit()
-    session.refresh(perm)
+    perm = session.exec(select(Permission).where(Permission.slug == "dashboard:view")).first()
+    if not perm:
+        perm = Permission(slug="dashboard:view", module="dashboard", action="view", scope="all")
+        session.add(perm)
+        session.commit()
+        session.refresh(perm)
 
     # RoleRight and RolePermission association
-    rr = RoleRight(role_id=admin_role.id, menu_id=menu.id, can_view=True, can_create=True, can_edit=True, can_delete=True)
-    session.add(rr)
-    session.commit()
+    rr = session.exec(select(RoleRight).where(and_(RoleRight.role_id == admin_role.id, RoleRight.menu_id == menu.id))).first()
+    if not rr:
+        rr = RoleRight(role_id=admin_role.id, menu_id=menu.id, can_view=True, can_create=True, can_edit=True, can_delete=True)
+        session.add(rr)
+        session.commit()
 
     # Superuser
-    admin_user = User(
-        phone_number="9999999999",
-        email="admin@test.com",
-        full_name="Admin",
-        hashed_password=get_password_hash("password"),
-        is_superuser=True,
-        status=UserStatus.ACTIVE,
-        user_type=UserType.ADMIN,
-        role_id=admin_role.id,
-    )
-    session.add(admin_user)
-    session.commit()
+    admin_user = session.exec(select(User).where(User.email == "admin@test.com")).first()
+    if not admin_user:
+        admin_user = User(
+            phone_number="9999999999",
+            email="admin@test.com",
+            full_name="Admin",
+            hashed_password=get_password_hash("password"),
+            is_superuser=True,
+            status=UserStatus.ACTIVE,
+            user_type=UserType.ADMIN,
+            role_id=admin_role.id,
+        )
+        session.add(admin_user)
+        session.commit()
 
 from app.db.session import get_session as db_get_session
 

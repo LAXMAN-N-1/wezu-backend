@@ -4,7 +4,7 @@ E-commerce product catalog for battery purchase
 """
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 from enum import Enum
 
 class ProductCategory(str, Enum):
@@ -66,8 +66,8 @@ class CatalogProduct(SQLModel, table=True):
     review_count: int = Field(default=0, ge=0)
     
     # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     images: List["CatalogProductImage"] = Relationship(back_populates="product")
@@ -84,7 +84,7 @@ class CatalogProductImage(SQLModel, table=True):
     alt_text: Optional[str] = None
     display_order: int = Field(default=0)
     is_primary: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationship
     product: Optional[CatalogProduct] = Relationship(back_populates="images")
@@ -114,7 +114,7 @@ class CatalogProductVariant(SQLModel, table=True):
     
     # Status
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationship
     product: Optional[CatalogProduct] = Relationship(back_populates="variants")
@@ -151,7 +151,7 @@ class CatalogOrder(SQLModel, table=True):
     status: str = Field(default="PENDING", index=True)  # PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED
     
     # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), index=True)
     confirmed_at: Optional[datetime] = None
     shipped_at: Optional[datetime] = None
     delivered_at: Optional[datetime] = None
@@ -215,8 +215,8 @@ class DeliveryTracking(SQLModel, table=True):
     recipient_signature: Optional[str] = None
     
     # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class DeliveryEvent(SQLModel, table=True):
     """Delivery status history"""
@@ -230,7 +230,7 @@ class DeliveryEvent(SQLModel, table=True):
     status: str
     location: Optional[str] = None
     description: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow, index=True)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), index=True)
     
     # Additional info
     event_metadata: Optional[str] = None  # JSON string

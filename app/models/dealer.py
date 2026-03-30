@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List, Dict
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from app.models.station import Station
@@ -34,7 +34,7 @@ class DealerProfile(SQLModel, table=True):
     bank_details: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
     is_active: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     user: "User" = Relationship(
@@ -61,7 +61,7 @@ class DealerDocument(SQLModel, table=True):
     status: str = Field(default="PENDING") # PENDING, VERIFIED, REJECTED, EXPIRED, ARCHIVED
     
     valid_until: Optional[datetime] = None
-    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+    uploaded_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     is_verified: bool = Field(default=False)
     
     dealer: "DealerProfile" = Relationship(back_populates="documents")
@@ -81,15 +81,15 @@ class DealerApplication(SQLModel, table=True):
     # Using JSON for history log: [{"stage": "SUBMITTED", "timestamp": "...", "notes": ""}]
     status_history: List[Dict] = Field(default_factory=list, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     dealer: "DealerProfile" = Relationship(back_populates="application")
     field_visits: List["FieldVisit"] = Relationship(back_populates="application")
     
     def log_stage(self, new_stage: str, notes: str = ""):
         self.current_stage = new_stage
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
         # Create a new list if it's None or empty, then append the new entry
         history = list(self.status_history) if self.status_history else []
         history.append({
@@ -114,6 +114,6 @@ class FieldVisit(SQLModel, table=True):
     report_data: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     images: Optional[List[str]] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     application: DealerApplication = Relationship(back_populates="field_visits")

@@ -1,5 +1,5 @@
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 import json
 from sqlmodel import Session, select
 
@@ -119,8 +119,8 @@ class TestCampaignCRUD:
             "usage_limit_total": 500,
             "usage_limit_per_user": 2,
             "applicable_station_ids": [dealer_promo_env["station1"].id],
-            "start_date": (datetime.utcnow() - timedelta(days=1)).isoformat(),
-            "end_date": (datetime.utcnow() + timedelta(days=30)).isoformat(),
+            "start_date": (datetime.now(UTC) - timedelta(days=1)).isoformat(),
+            "end_date": (datetime.now(UTC) + timedelta(days=30)).isoformat(),
         }
         resp = client.post("/api/v1/dealer-campaigns", headers=headers, json=payload)
         assert resp.status_code == 200
@@ -146,8 +146,8 @@ class TestCampaignCRUD:
             "promo_code": "GETME",
             "discount_type": "FIXED_AMOUNT",
             "discount_value": 5.0,
-            "start_date": datetime.utcnow().isoformat(),
-            "end_date": (datetime.utcnow() + timedelta(days=5)).isoformat(),
+            "start_date": datetime.now(UTC).isoformat(),
+            "end_date": (datetime.now(UTC) + timedelta(days=5)).isoformat(),
         }
         create_resp = client.post("/api/v1/dealer-campaigns", headers=headers, json=payload)
         c_id = create_resp.json()["id"]
@@ -164,8 +164,8 @@ class TestCampaignCRUD:
             "promo_code": "UPDATE",
             "discount_type": "FIXED_AMOUNT",
             "discount_value": 5.0,
-            "start_date": datetime.utcnow().isoformat(),
-            "end_date": (datetime.utcnow() + timedelta(days=5)).isoformat(),
+            "start_date": datetime.now(UTC).isoformat(),
+            "end_date": (datetime.now(UTC) + timedelta(days=5)).isoformat(),
         }
         create_resp = client.post("/api/v1/dealer-campaigns", headers=headers, json=payload)
         c_id = create_resp.json()["id"]
@@ -182,8 +182,8 @@ class TestCampaignCRUD:
             "promo_code": "DEACT",
             "discount_type": "FIXED_AMOUNT",
             "discount_value": 5.0,
-            "start_date": datetime.utcnow().isoformat(),
-            "end_date": (datetime.utcnow() + timedelta(days=5)).isoformat(),
+            "start_date": datetime.now(UTC).isoformat(),
+            "end_date": (datetime.now(UTC) + timedelta(days=5)).isoformat(),
         }
         create_resp = client.post("/api/v1/dealer-campaigns", headers=headers, json=payload)
         c_id = create_resp.json()["id"]
@@ -209,8 +209,8 @@ class TestCampaignValidation:
             "budget_limit": 20.0, # Enough for 2 uses
             "usage_limit_per_user": 2,
             "applicable_station_ids": [dealer_promo_env["station1"].id],
-            "start_date": (datetime.utcnow() - timedelta(days=1)).isoformat(),
-            "end_date": (datetime.utcnow() + timedelta(days=30)).isoformat(),
+            "start_date": (datetime.now(UTC) - timedelta(days=1)).isoformat(),
+            "end_date": (datetime.now(UTC) + timedelta(days=30)).isoformat(),
         }
         resp = client.post("/api/v1/dealer-campaigns", headers=headers, json=payload)
         self.promo_id = resp.json()["id"]
@@ -218,8 +218,8 @@ class TestCampaignValidation:
         # Expired promo
         payload_exp = payload.copy()
         payload_exp["promo_code"] = "EXPIRED"
-        payload_exp["start_date"] = (datetime.utcnow() - timedelta(days=10)).isoformat()
-        payload_exp["end_date"] = (datetime.utcnow() - timedelta(days=1)).isoformat()
+        payload_exp["start_date"] = (datetime.now(UTC) - timedelta(days=10)).isoformat()
+        payload_exp["end_date"] = (datetime.now(UTC) - timedelta(days=1)).isoformat()
         client.post("/api/v1/dealer-campaigns", headers=headers, json=payload_exp)
 
     def test_validate_valid_code(self, client, session, dealer_promo_env):
@@ -244,7 +244,7 @@ class TestCampaignValidation:
             json={"code": "EXPIRED", "order_amount": 100.0}
         )
         assert resp.status_code == 400
-        assert "expired" in resp.json()["detail"].lower()
+        assert "expired" in resp.json()["error"].lower()
 
     def test_validate_min_order(self, client, session, dealer_promo_env):
         """#9: Below minimum rejected."""
@@ -255,7 +255,7 @@ class TestCampaignValidation:
             json={"code": "VALID10", "order_amount": 30.0, "station_id": dealer_promo_env["station1"].id}
         )
         assert resp.status_code == 400
-        assert "Minimum order" in resp.json()["detail"]
+        assert "Minimum order" in resp.json()["error"]
 
     def test_validate_budget_exceeded(self, client, session, dealer_promo_env):
         """#10: Budget cap enforced."""
@@ -275,7 +275,7 @@ class TestCampaignValidation:
             json={"code": "VALID10", "order_amount": 100.0, "station_id": dealer_promo_env["station1"].id}
         )
         assert resp.status_code == 400
-        assert "budget exhausted" in resp.json()["detail"].lower()
+        assert "budget exhausted" in resp.json()["error"].lower()
 
     def test_validate_usage_limit(self, client, session, dealer_promo_env):
         """#8: Over-limit per user rejected."""
@@ -287,8 +287,8 @@ class TestCampaignValidation:
             "name": "Limit Promo", "promo_code": "LIMIT2",
             "discount_type": "FIXED_AMOUNT", "discount_value": 1.0,
             "usage_limit_per_user": 1,
-            "start_date": (datetime.utcnow() - timedelta(days=1)).isoformat(),
-            "end_date": (datetime.utcnow() + timedelta(days=30)).isoformat(),
+            "start_date": (datetime.now(UTC) - timedelta(days=1)).isoformat(),
+            "end_date": (datetime.now(UTC) + timedelta(days=30)).isoformat(),
         }
         resp = client.post("/api/v1/dealer-campaigns", headers=dealer_headers, json=payload)
         limit_promo_id = resp.json()["id"]
@@ -304,7 +304,7 @@ class TestCampaignValidation:
             json={"code": "LIMIT2", "order_amount": 100.0}
         )
         assert resp.status_code == 400
-        assert "usage limit" in resp.json()["detail"].lower()
+        assert "usage limit" in resp.json()["error"].lower()
 
 
 # ─── Analytics & Bulk Operations ───
@@ -316,8 +316,8 @@ class TestAnalyticsAndBulk:
         payload = {
             "name": "Analytics Promo", "promo_code": "ANALYTICS",
             "discount_type": "PERCENTAGE", "discount_value": 10.0,
-            "start_date": (datetime.utcnow() - timedelta(days=1)).isoformat(),
-            "end_date": (datetime.utcnow() + timedelta(days=30)).isoformat(),
+            "start_date": (datetime.now(UTC) - timedelta(days=1)).isoformat(),
+            "end_date": (datetime.now(UTC) + timedelta(days=30)).isoformat(),
         }
         create_resp = client.post("/api/v1/dealer-campaigns", headers=headers, json=payload)
         c_id = create_resp.json()["id"]
@@ -354,12 +354,12 @@ class TestAnalyticsAndBulk:
         payload1 = {
             "name": "Tog 1", "promo_code": "TOG1",
             "discount_type": "PERCENTAGE", "discount_value": 10.0,
-            "start_date": datetime.utcnow().isoformat(), "end_date": (datetime.utcnow() + timedelta(days=30)).isoformat()
+            "start_date": datetime.now(UTC).isoformat(), "end_date": (datetime.now(UTC) + timedelta(days=30)).isoformat()
         }
         payload2 = {
             "name": "Tog 2", "promo_code": "TOG2",
             "discount_type": "PERCENTAGE", "discount_value": 10.0,
-            "start_date": datetime.utcnow().isoformat(), "end_date": (datetime.utcnow() + timedelta(days=30)).isoformat()
+            "start_date": datetime.now(UTC).isoformat(), "end_date": (datetime.now(UTC) + timedelta(days=30)).isoformat()
         }
         id1 = client.post("/api/v1/dealer-campaigns", headers=headers, json=payload1).json()["id"]
         id2 = client.post("/api/v1/dealer-campaigns", headers=headers, json=payload2).json()["id"]
@@ -378,7 +378,7 @@ class TestAnalyticsAndBulk:
         payload = {
             "name": "Original for Clone", "promo_code": "OCLONE",
             "discount_type": "PERCENTAGE", "discount_value": 10.0,
-            "start_date": datetime.utcnow().isoformat(), "end_date": (datetime.utcnow() + timedelta(days=30)).isoformat()
+            "start_date": datetime.now(UTC).isoformat(), "end_date": (datetime.now(UTC) + timedelta(days=30)).isoformat()
         }
         c_id = client.post("/api/v1/dealer-campaigns", headers=headers, json=payload).json()["id"]
 

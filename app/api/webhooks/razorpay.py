@@ -77,7 +77,7 @@ async def razorpay_webhook_event(
         gateway_refund_id = refund_entity.get('id')
         
         from app.models.refund import Refund
-        from datetime import datetime
+        from datetime import datetime, UTC
         
         # Find pending refund by gateway payment ID or similar logic
         # Usually we link by payment_id and amount
@@ -91,7 +91,7 @@ async def razorpay_webhook_event(
 
         if refund:
             refund.status = "processed"
-            refund.processed_at = datetime.utcnow()
+            refund.processed_at = datetime.now(UTC)
             refund.gateway_refund_id = gateway_refund_id
             db.add(refund)
             db.commit()

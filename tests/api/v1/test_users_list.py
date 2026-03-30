@@ -8,7 +8,7 @@ from app.models.rbac import Role
 from app.models.address import Address
 from app.models.rbac import UserRole
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 
 def create_user(session, email, name, last_login_offset=0):
     user = session.exec(select(User).where(User.email == email)).first()
@@ -20,7 +20,7 @@ def create_user(session, email, name, last_login_offset=0):
             hashed_password="hashed_password",
             is_active=True,
             kyc_status="approved",
-            last_login=datetime.utcnow() - timedelta(minutes=last_login_offset) if last_login_offset >= 0 else None
+            last_login=datetime.now(UTC) - timedelta(minutes=last_login_offset) if last_login_offset >= 0 else None
         )
         session.add(user)
         session.commit()

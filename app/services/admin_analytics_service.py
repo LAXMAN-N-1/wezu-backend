@@ -1,5 +1,5 @@
 from sqlmodel import Session, select, func, and_, or_
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from typing import Dict, Any, List
 from app.models.rental import Rental
 from app.models.user import User
@@ -13,13 +13,13 @@ class AdminAnalyticsService:
 
     @staticmethod
     def get_overview(db: Session) -> Dict[str, Any]:
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         month_ago = now - timedelta(days=30)
         two_months_ago = now - timedelta(days=60)
 
         # 1. Rental & Revenue Metrics (Current vs Last Month)
-        cm = db.execute(select(func.sum(Rental.total_price), func.count(Rental.id)).where(Rental.start_time >= month_ago)).first()
-        lm = db.execute(select(func.sum(Rental.total_price), func.count(Rental.id)).where(and_(Rental.start_time >= two_months_ago, Rental.start_time < month_ago))).first()
+        cm = db.execute(select(func.sum(Rental.total_amount), func.count(Rental.id)).where(Rental.start_time >= month_ago)).first()
+        lm = db.execute(select(func.sum(Rental.total_amount), func.count(Rental.id)).where(and_(Rental.start_time >= two_months_ago, Rental.start_time < month_ago))).first()
 
         rev_current = float(cm[0] or 0)
         rev_last = float(lm[0] or 0)
@@ -80,13 +80,13 @@ class AdminAnalyticsService:
     @staticmethod
     def get_trends(db: Session, period: str = 'daily') -> Dict[str, Any]:
         days = 30 if period == 'daily' else 90
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         start_date = (now - timedelta(days=days)).replace(hour=0, minute=0, second=0, microsecond=0)
         
         from sqlalchemy import cast, Date
         # Use single grouped queries to avoid 120+ database roundtrips
         rental_rows = db.execute(
-            select(cast(Rental.start_time, Date), func.sum(Rental.total_price), func.count(Rental.id))
+            select(cast(Rental.start_time, Date), func.sum(Rental.total_amount), func.count(Rental.id))
             .where(Rental.start_time >= start_date)
             .group_by(cast(Rental.start_time, Date))
         ).all()
@@ -146,15 +146,15 @@ class AdminAnalyticsService:
     def get_revenue_by_region(db: Session, period: str = '30d') -> Dict[str, Any]:
         """Revenue aggregated per station city from real rentals."""
         days = 90 if period == '90d' else 30
-        since = datetime.utcnow() - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
 
         # select returns Result of tuples
         rows = db.execute(
-            select(Station.name, func.sum(Rental.total_price).label("revenue"), func.count(Rental.id).label("rentals"))
-            .join(Rental, Rental.pickup_station_id == Station.id)
+            select(Station.name, func.sum(Rental.total_amount).label("revenue"), func.count(Rental.id).label("rentals"))
+            .join(Rental, Rental.start_station_id == Station.id)
             .where(Rental.start_time >= since)
             .group_by(Station.name)
-            .order_by(func.sum(Rental.total_price).desc())
+            .order_by(func.sum(Rental.total_amount).desc())
         ).all()
 
         total_rev = sum(float(r[1] or 0) for r in rows) or 1.0
@@ -173,20 +173,20 @@ class AdminAnalyticsService:
     def get_revenue_by_station(db: Session, period: str = '30d') -> Dict[str, Any]:
         """Revenue aggregated per station from real rentals."""
         days = 90 if period == '90d' else 30
-        since = datetime.utcnow() - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
 
         rows = db.execute(
             select(
                 Station.id,
                 Station.name,
                 Station.address,
-                func.sum(Rental.total_price).label("revenue"),
+                func.sum(Rental.total_amount).label("revenue"),
                 func.count(Rental.id).label("rentals")
             )
-            .join(Rental, Rental.pickup_station_id == Station.id)
+            .join(Rental, Rental.start_station_id == Station.id)
             .where(Rental.start_time >= since)
             .group_by(Station.id, Station.name, Station.address)
-            .order_by(func.sum(Rental.total_price).desc())
+            .order_by(func.sum(Rental.total_amount).desc())
         ).all()
 
         total_rev = sum(float(r[3] or 0) for r in rows) or 1.0
@@ -195,7 +195,7 @@ class AdminAnalyticsService:
             sid, name, address, revenue, rentals = r
             batteries_here = db.exec(select(func.count(Battery.id)).where(and_(Battery.location_id == sid, Battery.location_type == "station"))).one() or 1
             active_here = db.exec(
-                select(func.count(Rental.id)).where(and_(Rental.pickup_station_id == sid, Rental.status == "active"))
+                select(func.count(Rental.id)).where(and_(Rental.start_station_id == sid, Rental.status == "active"))
             ).one()
             utilization = round(min((active_here / batteries_here) * 100, 100.0), 1)
             stations.append({
@@ -211,14 +211,14 @@ class AdminAnalyticsService:
     def get_revenue_by_battery_type(db: Session, period: str = '30d') -> Dict[str, Any]:
         """Revenue aggregated by battery model from real rentals."""
         days = 90 if period == '90d' else 30
-        since = datetime.utcnow() - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
 
         rows = db.execute(
-            select(Battery.model_number, func.sum(Rental.total_price), func.count(Rental.id))
+            select(Battery.model_number, func.sum(Rental.total_amount), func.count(Rental.id))
             .join(Rental, Rental.battery_id == Battery.id)
             .where(Rental.start_time >= since)
             .group_by(Battery.model_number)
-            .order_by(func.sum(Rental.total_price).desc())
+            .order_by(func.sum(Rental.total_amount).desc())
         ).all()
 
         total_rev = sum(float(r[1] or 0) for r in rows) or 1.0
@@ -260,7 +260,7 @@ class AdminAnalyticsService:
     @staticmethod
     def get_recent_activity(db: Session) -> Dict[str, Any]:
         """Latest events from the database (new users + rentals)."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         activities = []
 
         new_users = db.exec(select(User).order_by(User.created_at.desc()).limit(3)).all()
@@ -278,7 +278,7 @@ class AdminAnalyticsService:
         recent_rentals_rows = db.execute(
             select(Rental, Battery, Station)
             .join(Battery, Rental.battery_id == Battery.id)
-            .join(Station, Rental.pickup_station_id == Station.id)
+            .join(Station, Rental.start_station_id == Station.id)
             .order_by(Rental.start_time.desc())
             .limit(5)
         ).all()
@@ -301,17 +301,17 @@ class AdminAnalyticsService:
     @staticmethod
     def get_top_stations(db: Session) -> Dict[str, Any]:
         """Top performing stations by total rental revenue (last 30 days)."""
-        since = datetime.utcnow() - timedelta(days=30)
+        since = datetime.now(UTC) - timedelta(days=30)
         rows = db.execute(
             select(
                 Station.id, Station.name, Station.address,
-                func.sum(Rental.total_price),
+                func.sum(Rental.total_amount),
                 func.count(Rental.id)
             )
-            .join(Rental, Rental.pickup_station_id == Station.id)
+            .join(Rental, Rental.start_station_id == Station.id)
             .where(Rental.start_time >= since)
             .group_by(Station.id, Station.name, Station.address)
-            .order_by(func.sum(Rental.total_price).desc())
+            .order_by(func.sum(Rental.total_amount).desc())
             .limit(10)
         ).all()
 
@@ -319,7 +319,7 @@ class AdminAnalyticsService:
         for idx, r in enumerate(rows):
             sid, sname, saddress, revenue, rentals = r
             batteries_here = db.exec(select(func.count(Battery.id)).where(and_(Battery.location_id == sid, Battery.location_type == "station"))).one() or 1
-            active_here = db.exec(select(func.count(Rental.id)).where(and_(Rental.pickup_station_id == sid, Rental.status == "active"))).one()
+            active_here = db.exec(select(func.count(Rental.id)).where(and_(Rental.start_station_id == sid, Rental.status == "active"))).one()
             utilization = round(min((active_here / batteries_here) * 100, 100.0), 1)
             stations.append({
                 "id": f"STN-{sid:02d}",
@@ -376,7 +376,7 @@ class AdminAnalyticsService:
 
     @staticmethod
     def get_user_growth(db: Session, period: str = 'monthly') -> Dict[str, Any]:
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         growth = []
         from sqlalchemy import cast, Date
         
@@ -434,7 +434,7 @@ class AdminAnalyticsService:
     @staticmethod
     def get_demand_forecast(db: Session) -> Dict[str, Any]:
         """7-day demand forecast using historical weekday averages."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         weekday_avgs: Dict[int, float] = {}
         for wd in range(7):
             counts = []

@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class MaintenanceSchedule(SQLModel, table=True):
     __tablename__ = "maintenance_schedules"
@@ -17,7 +17,7 @@ class MaintenanceSchedule(SQLModel, table=True):
     next_maintenance_date: Optional[datetime] = None # For batteries
     
     checklist: str # JSON list of items
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class MaintenanceRecord(SQLModel, table=True):
     __tablename__ = "maintenance_records"
@@ -34,7 +34,7 @@ class MaintenanceRecord(SQLModel, table=True):
     parts_replaced: Optional[str] = None # JSON
     
     status: str = Field(default="completed")
-    performed_at: datetime = Field(default_factory=datetime.utcnow)
+    performed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     technician: "User" = Relationship()
 

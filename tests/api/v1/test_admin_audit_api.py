@@ -5,7 +5,7 @@ Tests GET /api/v1/admin/audit-logs and GET /api/v1/admin/audit-logs/stats
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 
 from app.models.user import User
 from app.models.audit_log import AuditLog
@@ -53,7 +53,7 @@ def _seed_audit_logs(session: Session, count: int = 5, user_id: int = 1, action:
             action=action,
             resource_type="TEST",
             resource_id=str(i),
-            timestamp=datetime.utcnow() - timedelta(hours=i),
+            timestamp=datetime.now(UTC) - timedelta(hours=i),
         )
         session.add(log)
     session.commit()

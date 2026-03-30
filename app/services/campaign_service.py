@@ -8,7 +8,7 @@ import io
 import json
 import logging
 import uuid
-from datetime import datetime, date
+from datetime import datetime, UTC, date
 from typing import Dict, Any, List, Optional
 
 from sqlmodel import Session, select, func, col
@@ -53,7 +53,7 @@ class CampaignService:
             is_active=data.get("is_active", True),
             # Default to auto-approve for dealers if policy allows, else False
             requires_approval=False, 
-            approved_at=datetime.utcnow()
+            approved_at=datetime.now(UTC)
         )
         db.add(promo)
         db.commit()
@@ -162,7 +162,7 @@ class CampaignService:
             raise HTTPException(status_code=400, detail="Promo code is inactive")
 
         # Dates
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         # Convert start/end to datetime if they are date objects
         start = datetime.combine(promo.start_date, datetime.min.time()) if isinstance(promo.start_date, date) and not isinstance(promo.start_date, datetime) else promo.start_date
         end = datetime.combine(promo.end_date, datetime.max.time()) if isinstance(promo.end_date, date) and not isinstance(promo.end_date, datetime) else promo.end_date
@@ -259,7 +259,7 @@ class CampaignService:
             discount_applied=discount_applied,
             original_amount=order_amount,
             final_amount=final_amount,
-            used_at=datetime.utcnow()
+            used_at=datetime.now(UTC)
         )
         db.add(usage)
 
@@ -328,7 +328,7 @@ class CampaignService:
         created = 0
         errors = []
 
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         DEFAULT_END = now + __import__("datetime").timedelta(days=30)
         
         for idx, row in enumerate(reader):

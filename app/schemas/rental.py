@@ -6,7 +6,7 @@ from app.schemas.station import StationResponse
 
 class RentalBase(BaseModel):
     battery_id: int
-    pickup_station_id: int
+    start_station_id: int
     duration_days: int = 1
 
 class RentalCreate(RentalBase):
@@ -21,7 +21,7 @@ class RentalResponse(BaseModel):
     id: int
     user_id: int
     battery: BatteryResponse
-    pickup_station_id: int
+    start_station_id: int
     status: str
     start_time: datetime
     end_time: Optional[datetime]
@@ -30,7 +30,7 @@ class RentalResponse(BaseModel):
     daily_rate: float = 0.0
     damage_deposit: float = 0.0
     discount_amount: float = 0.0
-    total_price: float
+    total_amount: float
     
     late_fee_amount: float = 0.0
     is_overdue: bool = False

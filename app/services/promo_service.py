@@ -1,7 +1,7 @@
 from typing import List
 from sqlmodel import Session, select
 from app.models.promo_code import PromoCode
-from datetime import datetime
+from datetime import datetime, UTC
 from fastapi import HTTPException
 from typing import List
 
@@ -17,7 +17,7 @@ class PromoService:
             raise HTTPException(status_code=400, detail="Promo code is inactive")
             
         # Check validity dates
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         if promo.valid_until and now > promo.valid_until:
             raise HTTPException(status_code=400, detail="Promo code expired")
         if now < promo.valid_from:

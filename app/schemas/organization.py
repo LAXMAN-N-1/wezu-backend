@@ -1,5 +1,5 @@
 from typing import Optional, List
-from pydantic import BaseModel, HttpUrl, field_validator
+from pydantic import BaseModel, HttpUrl, field_validator, ConfigDict
 from datetime import datetime
 from app.models.organization import SocialPlatform
 
@@ -25,8 +25,7 @@ class OrganizationSocialLinkRead(OrganizationSocialLinkBase):
     id: int
     organization_id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class OrganizationBase(BaseModel):
     name: str
@@ -52,5 +51,4 @@ class OrganizationRead(OrganizationBase):
     updated_at: datetime
     social_links: List[OrganizationSocialLinkRead] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 import uuid
 
 from app.api.deps import get_db, get_current_active_admin
@@ -58,20 +58,32 @@ def get_stock_overview(db: Session = Depends(get_db)):
     warehouse_count = db.exec(select(func.count(Battery.id)).where(Battery.location_type == LocationType.WAREHOUSE)).first() or 0
     service_count = db.exec(select(func.count(Battery.id)).where(Battery.location_type == LocationType.SERVICE_CENTER)).first() or 0
     
-    # Calculate low stock alerts accurately
+    # Grouped battery stats by station ID
+    b_stats = db.exec(
+        select(Battery.station_id, Battery.status, func.count(Battery.id))
+        .where(Battery.station_id.is_not(None)).group_by(Battery.station_id, Battery.status)
+    ).all()
+    
+    station_avail = {}
+    for s_id, status, count in b_stats:
+        if s_id not in station_avail: station_avail[s_id] = 0
+        if status == BatteryStatus.AVAILABLE:
+            station_avail[s_id] += count
+
+    configs = db.exec(select(StationStockConfig)).all()
+    config_map = {c.station_id: c.reorder_point if c.reorder_point else int(c.max_capacity * 0.1) for c in configs}
+
+    active_dismissals = {d.station_id for d in db.exec(select(StockAlertDismissal).where(StockAlertDismissal.is_active == True)).all()}
+
     low_stock_alerts = 0
     stations = db.exec(select(Station)).all()
     for station in stations:
         if station.id:
-            stats = get_station_stock_stats(db, station.id)
-            if stats["is_low_stock"]:
-                # Check if not dismissed
-                dismissal = db.exec(select(StockAlertDismissal).where(
-                    StockAlertDismissal.station_id == station.id,
-                    StockAlertDismissal.is_active == True
-                )).first()
-                if not dismissal:
-                    low_stock_alerts += 1
+            avail = station_avail.get(station.id, 0)
+            reorder = config_map.get(station.id, 5) # Default 5 (50 * 0.1)
+            
+            if avail < reorder and station.id not in active_dismissals:
+                low_stock_alerts += 1
 
     return StockOverviewResponse(
         total_batteries=total_batteries,
@@ -96,25 +108,29 @@ def get_stations_stock(
     stations = db.exec(select(Station)).all()
     results = []
     
+    configs = {c.station_id: c for c in db.exec(select(StationStockConfig)).all()}
+    counts = db.exec(
+        select(Battery.station_id, Battery.status, func.count(Battery.id))
+        .where(Battery.station_id.is_not(None))
+        .group_by(Battery.station_id, Battery.status)
+    ).all()
+    
+    count_map = {}
+    for s_id, status, count in counts:
+        if s_id not in count_map: count_map[s_id] = {"AVAILABLE": 0, "RENTED": 0, "MAINTENANCE": 0}
+        if status == BatteryStatus.AVAILABLE: count_map[s_id]["AVAILABLE"] = count
+        elif status == BatteryStatus.RENTED: count_map[s_id]["RENTED"] = count
+        elif status == BatteryStatus.MAINTENANCE: count_map[s_id]["MAINTENANCE"] = count
+    
     for station in stations:
         if not station.id: continue
-        # To strictly follow the "Fix the JOIN" requirement while preserving ORM schema parsing:
-        # We fetch the config and explicitly run a lightweight count query
-        config = db.exec(select(StationStockConfig).where(StationStockConfig.station_id == station.id)).first()
         
-        counts = db.exec(
-            select(Battery.status, func.count(Battery.id))
-            .where(Battery.station_id == station.id)
-            .group_by(Battery.status)
-        ).all()
+        config = configs.get(station.id)
+        stat = count_map.get(station.id, {"AVAILABLE": 0, "RENTED": 0, "MAINTENANCE": 0})
         
-        available = 0
-        rented = 0
-        maintenance = 0
-        for status, count in counts:
-            if status == BatteryStatus.AVAILABLE: available = count
-            elif status == BatteryStatus.RENTED: rented = count
-            elif status == BatteryStatus.MAINTENANCE: maintenance = count
+        available = stat["AVAILABLE"]
+        rented = stat["RENTED"]
+        maintenance = stat["MAINTENANCE"]
             
         total = available + rented + maintenance
         utilization = (rented / total * 100) if total > 0 else 0.0
@@ -156,20 +172,25 @@ def get_locations_stock(db: Session = Depends(get_db)):
     # Identify non-station types in use
     location_types = [LocationType.WAREHOUSE, LocationType.SERVICE_CENTER]
     
+    counts = db.exec(
+        select(Battery.location_type, Battery.status, func.count(Battery.id))
+        .where(Battery.location_type.in_(location_types))
+        .group_by(Battery.location_type, Battery.status)
+    ).all()
+    
+    count_map = {}
+    for l_type, status, count in counts:
+        if l_type not in count_map: count_map[l_type] = {"AVAILABLE": 0, "RENTED": 0, "MAINTENANCE": 0}
+        if status == BatteryStatus.AVAILABLE: count_map[l_type]["AVAILABLE"] = count
+        elif status == BatteryStatus.RENTED: count_map[l_type]["RENTED"] = count
+        elif status == BatteryStatus.MAINTENANCE: count_map[l_type]["MAINTENANCE"] = count
+    
     for loc_type in location_types:
-        counts = db.exec(
-            select(Battery.status, func.count(Battery.id))
-            .where(Battery.location_type == loc_type)
-            .group_by(Battery.status)
-        ).all()
+        stat = count_map.get(loc_type, {"AVAILABLE": 0, "RENTED": 0, "MAINTENANCE": 0})
         
-        available = 0
-        rented = 0
-        maintenance = 0
-        for status, count in counts:
-            if status == BatteryStatus.AVAILABLE: available = count
-            elif status == BatteryStatus.RENTED: rented = count
-            elif status == BatteryStatus.MAINTENANCE: maintenance = count
+        available = stat["AVAILABLE"]
+        rented = stat["RENTED"]
+        maintenance = stat["MAINTENANCE"]
             
         total = available + rented + maintenance
         if total > 0:
@@ -223,7 +244,7 @@ def get_station_stock_detail(station_id: int, db: Session = Depends(get_db)):
         
     recommended_date = None
     if stockout_days is not None:
-        recommended_date = datetime.utcnow() + timedelta(days=stockout_days)
+        recommended_date = datetime.now(UTC) + timedelta(days=stockout_days)
 
     forecast = StockForecastResponse(
         avg_rentals_per_day=avg_rentals_per_day,
@@ -278,7 +299,7 @@ def update_station_stock_config(
         setattr(config, key, value)
         
     config.updated_by = admin_user.id
-    config.updated_at = datetime.utcnow()
+    config.updated_at = datetime.now(UTC)
     
     # Check if this resolves an existing alert
     if config.reorder_point and update_data.reorder_point:
@@ -319,29 +340,40 @@ def create_reorder_request(
 @router.get("/alerts", response_model=List[StockAlertResponse])
 def get_active_stock_alerts(db: Session = Depends(get_db)):
     """Return all active low-stock alerts"""
+    b_stats = db.exec(select(Battery.station_id, Battery.status, func.count(Battery.id)).where(Battery.station_id.is_not(None)).group_by(Battery.station_id, Battery.status)).all()
+    
+    s_stats_map = {}
+    for s_id, status, count in b_stats:
+        if s_id not in s_stats_map: s_stats_map[s_id] = {"total": 0, "available": 0, "rented": 0, "maintenance": 0}
+        s_stats_map[s_id]["total"] += count
+        if status == BatteryStatus.AVAILABLE: s_stats_map[s_id]["available"] += count
+        elif status == BatteryStatus.RENTED: s_stats_map[s_id]["rented"] += count
+        elif status == BatteryStatus.MAINTENANCE: s_stats_map[s_id]["maintenance"] += count
+            
+    configs = db.exec(select(StationStockConfig)).all()
+    config_map = {c.station_id: c for c in configs}
+    active_dismissals = {d.station_id for d in db.exec(select(StockAlertDismissal).where(StockAlertDismissal.is_active == True)).all()}
+
     stations = db.exec(select(Station)).all()
     alerts = []
     
     for station in stations:
         if not station.id: continue
-        stats = get_station_stock_stats(db, station.id)
         
-        if stats["is_low_stock"]:
-            # Check if dismissed
-            dismissal = db.exec(select(StockAlertDismissal).where(
-                StockAlertDismissal.station_id == station.id,
-                StockAlertDismissal.is_active == True
-            )).first()
-            
-            if not dismissal:
-                alerts.append(StockAlertResponse(
-                    station_id=station.id,
-                    station_name=station.name,
-                    current_count=stats["available"],
-                    capacity=stats["config"].max_capacity if stats["config"] else 50,
-                    threshold=stats["config"].reorder_point if stats["config"] else 10,
-                    utilization_percentage=stats["utilization"]
-                ))
+        stat = s_stats_map.get(station.id, {"total": 0, "available": 0, "rented": 0})
+        utilization = (stat["rented"] / max(stat["total"], 1)) * 100
+        config = config_map.get(station.id)
+        reorder_point = config.reorder_point if config else int((config.max_capacity if config else 50) * 0.1)
+        
+        if stat["available"] < reorder_point and station.id not in active_dismissals:
+            alerts.append(StockAlertResponse(
+                station_id=station.id,
+                station_name=station.name,
+                current_count=stat["available"],
+                capacity=config.max_capacity if config else 50,
+                threshold=reorder_point,
+                utilization_percentage=utilization
+            ))
     return alerts
 
 @router.post("/alerts/{station_id}/dismiss")

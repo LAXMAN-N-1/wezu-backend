@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class Referral(SQLModel, table=True):
     __tablename__ = "referrals"
@@ -13,7 +13,7 @@ class Referral(SQLModel, table=True):
     status: str = Field(default="pending") # pending, completed, expired
     reward_amount: float = Field(default=0.0) # Reward for referrer
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     completed_at: Optional[datetime] = None
     
     # Relationships

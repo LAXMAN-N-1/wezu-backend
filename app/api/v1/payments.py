@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from pydantic import BaseModel
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 
 from app.api import deps
 from app.core.audit import audit_log
@@ -257,7 +257,7 @@ def get_revenue_dashboard(
 ):
     """Revenue summary with comparison"""
     # Define time range
-    end = datetime.utcnow()
+    end = datetime.now(UTC)
     if period == "weekly":
         start = end - timedelta(days=7)
     elif period == "monthly":
@@ -325,7 +325,7 @@ def request_refund(
     
     # Create refund transaction
     from app.models.financial import Transaction
-    from datetime import datetime
+    from datetime import datetime, UTC
     
     refund_amount = request.amount or order.total_amount
     
@@ -336,7 +336,7 @@ def request_refund(
         amount=refund_amount,
         status="PENDING",
         description=f"Refund request: {request.reason}",
-        created_at=datetime.utcnow()
+        created_at=datetime.now(UTC)
     )
     session.add(transaction)
     session.commit()
@@ -419,7 +419,7 @@ async def razorpay_webhook(
         txn = session.exec(select(Transaction).where(Transaction.payment_gateway_ref == order_id)).first()
         if txn:
             txn.status = TransactionStatus.SUCCESS
-            txn.updated_at = datetime.utcnow()
+            txn.updated_at = datetime.now(UTC)
             
             # If topup, update wallet
             if txn.transaction_type == "wallet_topup":

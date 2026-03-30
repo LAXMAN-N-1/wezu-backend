@@ -49,7 +49,7 @@ def test_remove_role_success(client: TestClient, session: Session):
     session.commit()
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Action
     resp = client.delete(f"/api/v1/admin/rbac/users/{user.id}/roles/{r1.id}")
@@ -85,12 +85,12 @@ def test_remove_last_role_failure(client: TestClient, session: Session):
     session.commit()
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Action: Try to remove only role
     resp = client.delete(f"/api/v1/admin/rbac/users/{user.id}/roles/{r1.id}")
     assert resp.status_code == 400
-    assert "last role" in resp.json()["detail"]
+    assert "last role" in resp.json()["error"]
     
     # Verify: Still exists
     count = session.exec(select(func.count()).select_from(UserRole).where(UserRole.user_id == user.id)).one()

@@ -3,7 +3,7 @@ Hourly Scheduled Jobs
 Run every hour
 """
 from sqlmodel import Session, select
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from app.core.database import engine
 from app.workers.daily_jobs import create_job_execution, complete_job_execution
 import logging
@@ -50,7 +50,7 @@ def battery_health_checks():
             result = {
                 "batteries_checked": checked_count,
                 "alerts_created": alerts_created,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(UTC).isoformat()
             }
             
             logger.info(f"Battery health checks completed: {checked_count} batteries")

@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class Notification(SQLModel, table=True):
     __tablename__ = "notifications"
@@ -17,7 +17,7 @@ class Notification(SQLModel, table=True):
     status: str = Field(default="pending") # pending, sent, failed
     
     is_read: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationships
     user: "User" = Relationship()

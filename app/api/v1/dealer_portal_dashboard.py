@@ -4,7 +4,7 @@ Dealer Portal Dashboard — Aggregated KPIs, alerts, and activity feed.
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, func
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 
 from app.db.session import get_session
 from app.api.deps import get_current_user
@@ -64,7 +64,7 @@ def get_dashboard_summary(
     revenue_this_month = 0.0
     try:
         from app.models.commission import CommissionLog
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         revenue_this_month = db.exec(
             select(func.coalesce(func.sum(CommissionLog.amount), 0.0)).where(
@@ -143,7 +143,7 @@ def get_alerts(
     ).all()
     for station in stations:
         if station.last_maintenance_date:
-            days_since = (datetime.utcnow() - station.last_maintenance_date).days
+            days_since = (datetime.now(UTC) - station.last_maintenance_date).days
             if days_since > 30:
                 alerts.append({
                     "type": "maintenance_due",

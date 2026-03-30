@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class LateFee(SQLModel, table=True):
     __tablename__ = "late_fees"
@@ -37,8 +37,8 @@ class LateFee(SQLModel, table=True):
     # Waiver tracking
     waiver_request: Optional["LateFeeWaiver"] = Relationship(back_populates="late_fee")
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     rental: "Rental" = Relationship()
@@ -68,7 +68,7 @@ class LateFeeWaiver(SQLModel, table=True):
     
     admin_notes: Optional[str] = None
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     late_fee: LateFee = Relationship(back_populates="waiver_request")

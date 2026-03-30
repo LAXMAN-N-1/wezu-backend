@@ -1,7 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 
 from app.models.commission import CommissionConfig, CommissionTier, CommissionLog
 from app.models.settlement import Settlement
@@ -284,7 +284,7 @@ class TestDealerDashboard:
         headers = get_override_token(dealer)
 
         # Add pending commission for current month
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         session.add(CommissionLog(
             transaction_id=1, dealer_id=dealer.id, amount=75.0,
             status="pending", created_at=now,
@@ -302,7 +302,7 @@ class TestDealerDashboard:
         headers = get_override_token(dealer)
 
         # Use recent months (within last 12 months from now)
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         for i in range(3):
             month_offset = i + 1
             if now.month - month_offset > 0:

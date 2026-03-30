@@ -6,7 +6,7 @@ from app.models.rbac import Role, Permission, UserRole
 from app.models.user import User
 from typing import List, Any, Optional
 from pydantic import BaseModel
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 
 router = APIRouter()
 
@@ -147,7 +147,7 @@ async def get_role_distribution(
     
     # 4. Role growth trends (compare with 30 days ago)
     # This requires historical data from audit logs
-    month_ago = datetime.utcnow() - timedelta(days=30)
+    month_ago = datetime.now(UTC) - timedelta(days=30)
     
     role_growth_trends = []
     
@@ -198,7 +198,7 @@ async def get_role_distribution(
         most_used_roles=most_used,
         underutilized_roles=underutilized,
         empty_roles=empty_roles,
-        generated_at=datetime.utcnow()
+        generated_at=datetime.now(UTC)
     )
 
 
@@ -434,7 +434,7 @@ async def test_role_configuration(
         data_visibility=data_visibility,
         total_permissions=len(permissions),
         access_level=access_level,
-        generated_at=datetime.utcnow()
+        generated_at=datetime.now(UTC)
     )
 
 
@@ -525,7 +525,7 @@ async def bulk_assign_role(
             
             if request.replace_existing:
                 # Clear existing roles
-                user.roles = [role]
+                user.role_id = role.id
             else:
                 # Add role if not already assigned
                 if role not in user.roles:
@@ -537,7 +537,7 @@ async def bulk_assign_role(
                         )
                     ).first()
                     if not existing_link:
-                        user.roles.append(role)
+                        user.role_id = role.id
             
             db.add(user)
             try:
@@ -585,5 +585,5 @@ async def bulk_assign_role(
         failure_count=failure_count,
         role_name=role.name,
         results=results,
-        generated_at=datetime.utcnow()
+        generated_at=datetime.now(UTC)
     )

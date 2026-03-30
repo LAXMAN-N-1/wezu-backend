@@ -17,7 +17,7 @@ from app.services.review_service import ReviewService
 from app.models.station import StationStatus, Station, StationImage
 from app.models.battery import Battery
 from app.models.favorite import Favorite
-from datetime import datetime
+from datetime import datetime, UTC
 
 router = APIRouter()
 
@@ -130,7 +130,7 @@ async def update_station_status(
     if not station:
         raise HTTPException(status_code=404, detail="Station not found")
     station.status = status
-    station.updated_at = datetime.utcnow()
+    station.updated_at = datetime.now(UTC)
     db.add(station)
     db.commit()
     db.refresh(station)
@@ -218,7 +218,7 @@ async def update_station_maintenance_task(
         raise HTTPException(status_code=404, detail="Task not found")
     
     task.status = status
-    task.performed_at = datetime.utcnow()
+    task.performed_at = datetime.now(UTC)
     db.add(task)
     db.commit()
     db.refresh(task)

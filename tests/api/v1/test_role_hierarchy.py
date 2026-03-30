@@ -24,7 +24,7 @@ def create_superuser(session):
 def test_role_hierarchy_structure(client: TestClient, session: Session):
     admin = create_superuser(session)
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Create Hierarchy: Root -> Mid -> Leaf
     root = Role(name="Root", is_active=True)

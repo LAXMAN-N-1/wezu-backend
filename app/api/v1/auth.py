@@ -20,7 +20,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 import logging
 import re
 from typing import Any, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from jose import jwt, JWTError
 import uuid
 from app.middleware.rate_limit import limiter
@@ -104,15 +104,18 @@ async def register(
         status=UserStatus.ACTIVE
     )
     
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
     # Assign default role
     from app.models.rbac import Role
     from sqlalchemy.orm import selectinload
     customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
     if customer_role:
-        if customer_role not in user.roles:
-            user.roles.append(customer_role)
-            db.add(user)
-            db.commit()
+        user.role_id = customer_role.id
+        db.add(user)
+        db.commit()
         db.refresh(user)
 
     # Audit log
@@ -353,7 +356,7 @@ async def verify_registration_otp(
             logger.info(f"User {user.id} activated after OTP verification")
 
     # Update Last Login
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = datetime.now(UTC)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -513,7 +516,7 @@ async def social_login(
         db.refresh(user)
 
     # Update Last Login
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = datetime.now(UTC)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -744,9 +747,9 @@ async def login(
     
     # 1. Find User (by email or phone)
     if "@" in login_data.username:
-        statement = select(User).where(User.email == login_data.username).options(selectinload(User.roles))
+        statement = select(User).where(User.email == login_data.username).options(selectinload(User.role))
     else:
-        statement = select(User).where(User.phone_number == login_data.username).options(selectinload(User.roles))
+        statement = select(User).where(User.phone_number == login_data.username).options(selectinload(User.role))
     
     user = db.exec(statement).first()
     
@@ -789,7 +792,7 @@ async def login(
             )
             
     # Update Last Login
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(UTC)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -896,7 +899,7 @@ async def logout_all(
     Invalidate ALL sessions for the current user.
     Updates 'last_global_logout_at' timestamp. Any token issued before this time will be rejected.
     """
-    current_user.last_global_logout_at = datetime.utcnow()
+    current_user.last_global_logout_at = datetime.now(UTC)
     # Merge into current session to avoid "already attached to session" error
     # if current_user came from a different dependency session context
     updated_user = db.merge(current_user)
@@ -1013,7 +1016,7 @@ async def send_email_verification(
     
     # Rate limit: only allow one email every 2 minutes
     last_sent = getattr(current_user, 'email_verification_sent_at', None)
-    if last_sent and (datetime.utcnow() - last_sent).total_seconds() < 120:
+    if last_sent and (datetime.now(UTC) - last_sent).total_seconds() < 120:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Please wait 2 minutes before requesting another verification email"
@@ -1023,7 +1026,7 @@ async def send_email_verification(
     token = secrets.token_urlsafe(32)
     
     current_user.email_verification_token = token
-    current_user.email_verification_sent_at = datetime.utcnow()
+    current_user.email_verification_sent_at = datetime.now(UTC)
     
     db.add(current_user)
     db.commit()
@@ -1235,7 +1238,6 @@ async def admin_login(
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
     password_clean = login_data.password.strip()
-    logger.warning(f"Admin login debug - Password received length: {len(login_data.password)}, Exact match to 'Admin@123': {login_data.password == 'Admin@123'}")
     
     if not verify_password(password_clean, user.hashed_password):
         logger.warning(f"Admin login - invalid password for: {login_data.username}")

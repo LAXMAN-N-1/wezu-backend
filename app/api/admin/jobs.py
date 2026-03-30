@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List, Optional
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, UTC
 from app.api import deps
 from app.models.user import User
 from app.models.batch_job import BatchJob, JobExecution
@@ -15,7 +15,7 @@ router = APIRouter()
 @router.get("/", response_model=List[BatchJob])
 def list_jobs(
     is_active: Optional[bool] = None,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     """List all scheduled batch jobs"""
@@ -29,7 +29,7 @@ def list_jobs(
 @router.get("/{job_id}", response_model=BatchJob)
 def get_job(
     job_id: int,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     """Get job details"""
@@ -45,7 +45,7 @@ class JobTrigger(BaseModel):
 def trigger_job(
     job_id: int,
     req: JobTrigger,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     """Manually trigger a job"""
@@ -65,7 +65,7 @@ def trigger_job(
         status="PENDING",
         trigger_type="MANUAL",
         triggered_by=current_user.id,
-        started_at=datetime.utcnow()
+        started_at=datetime.now(UTC)
     )
     session.add(execution)
     session.commit()
@@ -84,7 +84,7 @@ def get_job_history(
     job_id: int,
     limit: int = 50,
     status: Optional[str] = None,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     """Get job execution history"""
@@ -100,7 +100,7 @@ def get_job_history(
 def get_execution_logs(
     job_id: int,
     execution_id: str,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     """Get execution logs"""
@@ -137,7 +137,7 @@ class JobUpdate(BaseModel):
 def update_job(
     job_id: int,
     req: JobUpdate,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     """Update job configuration"""
@@ -154,7 +154,7 @@ def update_job(
     if req.timeout_seconds is not None:
         job.timeout_seconds = req.timeout_seconds
     
-    job.updated_at = datetime.utcnow()
+    job.updated_at = datetime.now(UTC)
     session.add(job)
     session.commit()
     session.refresh(job)
@@ -164,7 +164,7 @@ def update_job(
 def get_recent_executions(
     limit: int = 100,
     status: Optional[str] = None,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     """Get recent job executions across all jobs"""

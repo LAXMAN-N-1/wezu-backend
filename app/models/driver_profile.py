@@ -1,5 +1,5 @@
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 from sqlmodel import SQLModel, Field, Relationship
 from app.models.user import User
 
@@ -24,7 +24,7 @@ class DriverProfile(SQLModel, table=True):
     total_delivery_time_seconds: int = Field(default=0)
     satisfaction_sum: float = Field(default=0.0)
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     user: User = Relationship(back_populates="driver_profile")

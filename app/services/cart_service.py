@@ -2,7 +2,7 @@ from sqlmodel import Session, select
 from app.models.cart import CartItem
 from app.models.catalog import CatalogProduct, CatalogProductVariant
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class CartService:
     @staticmethod
@@ -52,7 +52,7 @@ class CartService:
         
         if item:
             item.quantity += quantity
-            item.updated_at = datetime.utcnow()
+            item.updated_at = datetime.now(UTC)
         else:
             item = CartItem(
                 user_id=user_id,
@@ -79,7 +79,7 @@ class CartService:
             return None
             
         item.quantity = quantity
-        item.updated_at = datetime.utcnow()
+        item.updated_at = datetime.now(UTC)
         db.add(item)
         db.commit()
         db.refresh(item)

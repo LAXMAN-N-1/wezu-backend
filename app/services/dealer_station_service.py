@@ -4,7 +4,7 @@ Dealer Station Service — Handles dealer operations for stations, inventory, al
 
 from sqlmodel import Session, select, func
 from fastapi import HTTPException
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List, Dict, Any
 
 from app.models.station import Station, StationSlot
@@ -24,8 +24,8 @@ class DealerStationService:
             dealer_id=dealer_id,
             approval_status="pending",
             status="inactive",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC)
         )
         db.add(station)
         db.commit()
@@ -185,7 +185,7 @@ class DealerStationService:
         if not station:
             return False, "Station not found"
             
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         
         # 1. Check Maintenance
         downtime = db.exec(

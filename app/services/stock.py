@@ -1,5 +1,5 @@
 from typing import List, Optional
-from sqlmodel import Session
+from sqlmodel import func, select, Session
 from fastapi import HTTPException
 
 from app.models.stock import Stock
@@ -52,7 +52,7 @@ class StockService:
             for serial in request.serial_numbers:
                 # Find existing battery or create (simplified logic: update existing only for now)
                 # In real scenario, might need to create battery here if it's new
-                battery = self.session.query(Battery).filter(Battery.serial_number == serial).first()
+                battery = self.session.exec(select(Battery).where(Battery.serial_number == serial)).first()
                 if battery:
                     battery.warehouse_id = request.warehouse_id
                     self.session.add(battery)

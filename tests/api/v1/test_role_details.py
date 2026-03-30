@@ -53,7 +53,7 @@ def test_get_role_detail_structure(client: TestClient, session: Session):
     top_role, child_role = setup_role_hierarchy(session)
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Test Top Role
     resp = client.get(f"/api/v1/admin/rbac/roles/{top_role.id}")
@@ -71,7 +71,7 @@ def test_get_role_detail_user_count(client: TestClient, session: Session):
     top_role, child_role = setup_role_hierarchy(session)
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Test Child Role
     resp = client.get(f"/api/v1/admin/rbac/roles/{child_role.id}")
@@ -84,7 +84,7 @@ def test_get_role_detail_user_count(client: TestClient, session: Session):
 def test_get_role_detail_not_found(client: TestClient, session: Session):
     admin = create_superuser(session)
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     resp = client.get("/api/v1/admin/rbac/roles/999999")
     assert resp.status_code == 404

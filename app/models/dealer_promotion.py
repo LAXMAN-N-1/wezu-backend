@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, TYPE_CHECKING
-from datetime import datetime
+from datetime import datetime, UTC
 
 if TYPE_CHECKING:
     from app.models.dealer import DealerProfile
@@ -48,7 +48,7 @@ class DealerPromotion(SQLModel, table=True):
     approved_by: Optional[int] = Field(default=None, foreign_key="users.id")
     approved_at: Optional[datetime] = None
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     dealer: "DealerProfile" = Relationship()
@@ -69,7 +69,7 @@ class PromotionUsage(SQLModel, table=True):
     original_amount: float
     final_amount: float
     
-    used_at: datetime = Field(default_factory=datetime.utcnow)
+    used_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     promotion: DealerPromotion = Relationship(back_populates="usages")

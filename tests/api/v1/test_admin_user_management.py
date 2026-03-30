@@ -2,7 +2,7 @@ import io
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 
 from app.models.user import User
 from app.models.roles import RoleEnum
@@ -57,7 +57,7 @@ def _create_test_users(session, count=3, status="active"):
     ids = []
     for i in range(count):
         u = User(
-            email=f"bulk_test_{i}_{datetime.utcnow().timestamp()}@test.com",
+            email=f"bulk_test_{i}_{datetime.now(UTC).timestamp()}@test.com",
             hashed_password="pw", is_active=True, status=status,
         )
         session.add(u)
@@ -179,7 +179,7 @@ class TestPasswordHistory:
 
         user_ids = _create_test_users(session, 1)
         user = session.get(User, user_ids[0])
-        user.password_changed_at = datetime.utcnow() - timedelta(days=91)
+        user.password_changed_at = datetime.now(UTC) - timedelta(days=91)
         session.add(user)
         session.commit()
         session.refresh(user)
@@ -247,7 +247,7 @@ class TestStateTransitions:
             json={"new_status": "deleted"},
         )
         assert resp.status_code == 400
-        assert "Invalid transition" in resp.json()["detail"]
+        assert "Invalid transition" in resp.json()["error"]
 
     def test_transition_audit_logged(self, client, session, mock_users_and_roles):
         """#12: State change creates audit log."""

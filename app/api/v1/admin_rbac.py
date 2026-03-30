@@ -1,7 +1,8 @@
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, func, col, update
-from datetime import datetime
+from sqlalchemy.orm import selectinload
+from datetime import datetime, UTC
 from app.api import deps
 from app.models.admin_user import AdminUser
 from app.models.rbac import Role, Permission, RolePermission, AdminUserRole, UserRole
@@ -19,12 +20,13 @@ def read_roles(
     active_only: bool = False,
     include_permissions: bool = True,
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Retrieve roles.
     """
-    query = select(Role)
+    # Pre-fetch permissions efficiently
+    query = select(Role).options(selectinload(Role.permissions))
     
     if category:
         query = query.where(Role.category == category)
@@ -32,23 +34,34 @@ def read_roles(
     if active_only:
         query = query.where(Role.is_active == True)
         
-    # TODO: Implement stricter RBAC for non-superusers if needed
-    # For now, Super Admin sees all. 
-    # Logic for future: if not current_user.is_superuser: query = query.where(Role.level < current_user.role.level)
-
     roles = db.exec(query.offset(skip).limit(limit)).all()
     
     # Enrichment
     results = []
+    
+    # Batch count users for these roles to avoid N+1 and slow relationship loading
+    role_ids = [r.id for r in roles]
+    user_counts = {}
+    if role_ids:
+        from app.models.rbac import UserRole
+        # Efficient count query grouping by role_id
+        count_data = db.exec(
+            select(UserRole.role_id, func.count(UserRole.user_id))
+            .where(col(UserRole.role_id).in_(role_ids))
+            .group_by(UserRole.role_id)
+        ).all()
+        user_counts = {rid: count for rid, count in count_data}
+
     for role in roles:
-        # Load permissions if needed for count or return
-        # Using a separate query or relationship load depending on optimization needs
-        # Here accessing role.permissions lazy loads it
+        # Use pre-fetched permissions
         perms = role.permissions
         
         role_data = rbac_schema.RoleRead.model_validate(role)
         role_data.permission_count = len(perms)
         
+        # Use batch-fetched user count
+        role_data.user_count = user_counts.get(role.id, 0)
+            
         if not include_permissions:
             role_data.permissions = None
         
@@ -61,7 +74,7 @@ def create_role(
     *,
     db: Session = Depends(deps.get_db),
     role_in: rbac_schema.RoleCreate,
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Create new role.
@@ -117,30 +130,14 @@ def create_role(
         details=f"Created role '{role.name}'"
     )
     
-    return {
-        "id": role.id,
-        "name": role.name,
-        "description": role.description,
-        "category": role.category,
-        "level": role.level,
-        "is_active": role.is_active,
-        "parent_role_id": getattr(role, "parent_id", None),
-        "permissions": list(permissions_to_assign)
-    }
-
-
-    db.delete(role)
-    db.commit()
-    
-    return {"status": "success", "message": "Role unassigned from user"}
-
+    return role
 
 @router.post("/permissions", response_model=rbac_schema.PermissionRead)
 def create_permission(
     *,
     permission_in: rbac_schema.PermissionCreate,
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Create a new custom permission.
@@ -164,7 +161,7 @@ def read_permissions(
     skip: int = 0,
     limit: int = 1000, # Increased limit for grouping view
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Retrieve permissions grouped by module.
@@ -214,7 +211,7 @@ def read_permissions(
 def get_role_permissions(
     role_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Get all permissions for a role, including inherited ones.
@@ -305,7 +302,7 @@ def assign_permissions_to_role(
     role_id: int,
     assignment: rbac_schema.RolePermissionAssign,
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Assign permissions to a role.
@@ -386,7 +383,7 @@ def assign_permissions_to_role(
 def get_user_roles(
     user_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     List all roles assigned to a user with details.
@@ -402,7 +399,7 @@ def get_user_roles(
     user_roles = db.exec(select(UserRole).where(UserRole.user_id == user_id)).all()
     
     results = []
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     
     for ur in user_roles:
         role = db.get(Role, ur.role_id)
@@ -448,7 +445,7 @@ def bulk_assign_roles(
     *,
     assignment: rbac_schema.BulkRoleAssignRequest,
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Assign a role to multiple users.
@@ -488,7 +485,7 @@ def bulk_assign_roles(
                     user_id=uid,
                     role_id=role.id,
                     assigned_by=current_user.id,
-                    effective_from=datetime.utcnow()
+                    effective_from=datetime.now(UTC)
                 )
                 db.add(new_link)
                 # Invalidate Session
@@ -528,7 +525,7 @@ def get_users_by_role(
     region: Optional[str] = None,
     export_csv: bool = False,
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Get all users with a specific role.
@@ -627,7 +624,7 @@ def transfer_role_assignment(
     source_user_id: int,
     transfer_req: rbac_schema.RoleTransferRequest,
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Transfer a role from one user to another.
@@ -731,7 +728,7 @@ def assign_roles_to_user(
     user_id: int,
     assignment: rbac_schema.UserRoleAssign,
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Assign a role to a user.
@@ -775,7 +772,7 @@ def assign_roles_to_user(
             role_id=assignment.role_id,
             assigned_by=current_user.id,
             notes=assignment.notes,
-            effective_from=assignment.effective_from or datetime.utcnow(),
+            effective_from=assignment.effective_from or datetime.now(UTC),
             expires_at=assignment.expires_at
         )
         db.add(new_link)
@@ -808,7 +805,7 @@ def remove_role_from_user(
     user_id: int,
     role_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Remove a role from a user.
@@ -901,7 +898,7 @@ def update_role(
     role_id: int,
     role_in: rbac_schema.RoleUpdate,
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Update role.
@@ -1005,7 +1002,7 @@ def update_role(
 def get_role_detail(
     role_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Get detailed role information including hierarchy and stats.
@@ -1050,7 +1047,7 @@ def get_role_detail(
 def delete_role(
     role_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Soft delete a role.
@@ -1109,7 +1106,7 @@ def check_user_permission(
     permission: str,
     resource_id: Optional[int] = None,
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Verify if a user has a specific permission.
@@ -1182,7 +1179,7 @@ def check_user_permission(
 def get_user_permissions(
     user_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Get complete set of permissions for a user (direct + inherited).
@@ -1246,7 +1243,7 @@ def duplicate_role(
     role_id: int,
     duplicate_in: rbac_schema.RoleDuplicate,
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Duplicate an existing role.
@@ -1294,7 +1291,7 @@ def duplicate_role(
 @router.get("/hierarchy", response_model=List[rbac_schema.RoleHierarchy])
 def get_role_hierarchy(
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Get role hierarchy/tree.
@@ -1335,7 +1332,7 @@ def assign_access_path(
     user_id: int,
     path_in: rbac_schema.AccessPathCreate,
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Assign a geographic or hierarchical access path to a user.
@@ -1369,7 +1366,7 @@ def assign_access_path(
 def get_user_access_paths(
     user_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Get all access paths assigned to a user.
@@ -1401,7 +1398,7 @@ def remove_access_path(
     user_id: int,
     path_id: int,
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Revoke a specific access path.
@@ -1427,7 +1424,7 @@ def update_access_path(
     path_id: int,
     path_in: rbac_schema.AccessPathUpdate,
     db: Session = Depends(deps.get_db),
-    current_user: AdminUser = Depends(deps.get_current_active_superuser),
+    current_user: AdminUser = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
     Update access level for a specific path.

@@ -57,7 +57,7 @@ with Session(engine) as session:
     session.refresh(user)
     
     # Assign role
-    user.roles.append(role)
+    user.role_id = role.id
     session.add(user)
     session.commit()
 

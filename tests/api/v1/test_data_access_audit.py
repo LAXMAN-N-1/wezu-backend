@@ -4,7 +4,7 @@ from app.models.user import User
 from app.models.rbac import Role
 from app.core.config import settings
 from fastapi.testclient import TestClient
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 
 def get_auth_headers(client: TestClient, email: str = "data_audit_admin@test.com", role: str = "admin"):
     # 1. Register
@@ -111,7 +111,7 @@ def test_data_access_audit_filters(client, session: Session):
     
     # 5. Test Filter by Date Range
     # Assume logs are recent
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     start = (now - timedelta(minutes=1)).isoformat()
     end = (now + timedelta(minutes=1)).isoformat()
     

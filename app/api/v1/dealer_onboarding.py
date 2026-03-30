@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlmodel import Session, select
 from typing import Any, Dict, List
-from datetime import datetime
+from datetime import datetime, UTC
 
 from app.db.session import get_session
 from app.api.deps import get_current_user
@@ -155,7 +155,7 @@ def admin_complete_visit(
         raise HTTPException(status_code=404, detail="Record not found")
         
     visit.status = "COMPLETED"
-    visit.completed_date = datetime.utcnow()
+    visit.completed_date = datetime.now(UTC)
     visit.report_data = report_data
     
     app.log_stage("FIELD_VISIT_COMPLETED", "Field verification successful.")

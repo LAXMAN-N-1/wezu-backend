@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import datetime, UTC
 from fastapi import UploadFile
 from sqlmodel import Session, select
 from typing import List, Optional
@@ -62,7 +62,7 @@ class DealerKYCService:
             
             from_state = existing.application_state.value
             existing.application_state = KYCStateConfig.DOC_SUBMITTED
-            existing.updated_at = datetime.utcnow()
+            existing.updated_at = datetime.now(UTC)
             
             db.add(existing)
             db.commit()

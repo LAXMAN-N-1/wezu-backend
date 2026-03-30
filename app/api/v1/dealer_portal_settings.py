@@ -6,7 +6,7 @@ from typing import Any, Optional, Dict
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
 from pydantic import BaseModel, EmailStr
-from datetime import datetime
+from datetime import datetime, UTC
 
 from app.db.session import get_session
 from app.api.deps import get_current_user
@@ -140,7 +140,7 @@ def update_bank_account(
         "account_holder_name": data.account_holder_name,
         "bank_name": data.bank_name,
         "verified": False,
-        "updated_at": str(datetime.utcnow()),
+        "updated_at": str(datetime.now(UTC)),
     }
     db.add(dealer)
     db.commit()
@@ -222,7 +222,7 @@ def update_notification_preferences(
         if hasattr(prefs, key):
             setattr(prefs, key, value)
 
-    prefs.updated_at = datetime.utcnow()
+    prefs.updated_at = datetime.now(UTC)
     db.add(prefs)
     db.commit()
 

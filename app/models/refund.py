@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class Refund(SQLModel, table=True):
     __tablename__ = "refunds"
@@ -13,7 +13,7 @@ class Refund(SQLModel, table=True):
     gateway_refund_id: Optional[str] = None # Razorpay refund ID
     
     processed_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     transaction: "Transaction" = Relationship(back_populates="refund")

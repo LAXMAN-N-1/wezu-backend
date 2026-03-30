@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 from enum import Enum
 
 class SocialPlatform(str, Enum):
@@ -47,8 +47,8 @@ class Organization(SQLModel, table=True):
     logo_height: Optional[int] = None
     
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     social_links: List[OrganizationSocialLink] = Relationship(

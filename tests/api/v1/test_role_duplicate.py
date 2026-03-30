@@ -39,7 +39,7 @@ def test_duplicate_role_success(client: TestClient, session: Session):
     source_role, p1 = setup_source_role(session)
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     payload = {
         "new_name": "Cloned Role",
@@ -67,7 +67,7 @@ def test_duplicate_role_name_conflict(client: TestClient, session: Session):
     source_role, _ = setup_source_role(session)
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Try to duplicate with same name as source (which exists)
     payload = {"new_name": "Source Role"}

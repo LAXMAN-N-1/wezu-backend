@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional, List
-from pydantic import BaseModel, UUID4
+from pydantic import BaseModel, UUID4, ConfigDict
 from app.models.stock_movement import StockTransactionType, StockMovementDirection
 
 # Stock Schemas
@@ -25,8 +25,7 @@ class StockResponse(StockBase):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Stock Movement Schemas
 class StockMovementBase(BaseModel):
@@ -44,8 +43,7 @@ class StockMovementResponse(StockMovementBase):
     created_at: datetime
     created_by: Optional[int] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # Operation Schemas
 class StockReceiveRequest(BaseModel):

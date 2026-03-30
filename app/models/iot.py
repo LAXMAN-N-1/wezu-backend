@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 import uuid
 
 class IoTDevice(SQLModel, table=True):
@@ -21,8 +21,8 @@ class IoTDevice(SQLModel, table=True):
     last_heartbeat: Optional[datetime] = None
     last_ip_address: Optional[str] = None
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationships
     battery: Optional["Battery"] = Relationship(back_populates="iot_device")
@@ -40,7 +40,7 @@ class DeviceCommand(SQLModel, table=True):
     
     status: str = Field(default="queued") # queued, sent, acknowledged, executed, failed
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     sent_at: Optional[datetime] = None
     executed_at: Optional[datetime] = None
     response_data: Optional[str] = None # JSON string
@@ -59,4 +59,4 @@ class FirmwareUpdate(SQLModel, table=True):
     device_type: str
     
     is_critical: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
