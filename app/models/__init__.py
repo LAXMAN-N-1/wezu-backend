@@ -182,3 +182,6 @@ from app.models.article_view import ArticleView
 
 # Dealer Notifications
 from app.models.dealer_notification_pref import DealerNotificationPreference
+
+# User Invites
+from app.models.user_invite import UserInvite

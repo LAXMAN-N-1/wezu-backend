@@ -74,7 +74,7 @@ async def register(
         )
 
     if user_in.email:
-        existing_user = user_repository.get_by_email(db, user_in.email)
+        existing_user = db.exec(select(User).where(col(User.email) == user_in.email)).first()
         if existing_user:
             raise HTTPException(
                 status_code=400,
@@ -218,13 +218,13 @@ async def _process_login(username: str, password: str, db: Session, request: Req
     
     logger.info(f"LOGIN_SUCCESS: User ID {user.id}")
     
-    # Create Session
+    # Record Login History (Moved out from the duplicate block)
     try:
         # Record Login History
         from app.models.login_history import LoginHistory
         login_record = LoginHistory(
             user_id=user.id,
-            ip_address=request.client.host,
+            ip_address=request.client.host if request.client else None,
             user_agent=request.headers.get("user-agent", "Unknown"),
             device_type="web" if "Mozilla" in request.headers.get("user-agent", "") else "mobile",
             status="success"

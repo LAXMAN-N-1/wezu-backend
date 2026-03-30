@@ -52,3 +52,43 @@ class BulkInviteResponse(BaseModel):
     results: List[BulkInviteRowResult]
     emails_sent: int
     generated_at: datetime
+
+
+# --- Invite Tracking & History ---
+
+class UserInviteResponse(BaseModel):
+    id: int
+    email: str
+    full_name: Optional[str] = None
+    role_name: str
+    status: str
+    invited_by_name: Optional[str] = None
+    created_at: datetime
+    expires_at: datetime
+    accepted_at: Optional[datetime] = None
+    revoked_at: Optional[datetime] = None
+
+
+class UserInviteListResponse(BaseModel):
+    items: List[UserInviteResponse]
+    total_count: int
+    page: int
+    limit: int
+
+
+class UserCreationHistoryItem(BaseModel):
+    id: int
+    email: Optional[str] = None
+    full_name: Optional[str] = None
+    phone_number: Optional[str] = None
+    role_name: Optional[str] = None
+    created_by_name: Optional[str] = None
+    created_at: datetime
+    creation_method: str  # "direct", "invite", "bulk_invite", "self_registered"
+
+
+class UserCreationHistoryResponse(BaseModel):
+    items: List[UserCreationHistoryItem]
+    total_count: int
+    page: int
+    limit: int

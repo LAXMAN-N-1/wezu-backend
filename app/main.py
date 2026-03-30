@@ -45,7 +45,6 @@ from app.api.v1.admin import (
     support as admin_support, 
     faqs as admin_faqs, 
     analytics as admin_analytics, 
-    users as admin_users,
     promo as admin_coupons,
     reviews as admin_reviews,
     roles as admin_roles,
