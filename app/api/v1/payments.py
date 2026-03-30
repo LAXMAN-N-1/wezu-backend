@@ -384,7 +384,7 @@ def get_payment_methods(current_user: User = Depends(deps.get_current_user)):
 
 @router.post("/webhooks/razorpay")
 async def razorpay_webhook(
-    request: Request,
+    request: FastAPIRequest,
     session: Session = Depends(deps.get_db)
 ):
     """

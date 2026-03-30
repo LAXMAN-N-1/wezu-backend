@@ -1,5 +1,5 @@
-from typing import Any, List
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from typing import Any, List, Optional, Dict
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, File, UploadFile
 from sqlmodel import Session, select
 from pydantic import BaseModel
 from sqlalchemy.orm import selectinload
@@ -26,6 +26,13 @@ router = APIRouter()
 
 from app.schemas.station_monitoring import BatteryListResponse, BatteryHealthReport
 from app.services.battery_service import BatteryService
+from fastapi import Response, WebSocket, WebSocketDisconnect
+from app.schemas.common import DataResponse
+from app.services.qr_service import QRCodeService
+from app.services.battery_batch_service import battery_batch_service
+from app.services.mqtt_service import mqtt_service
+from app.services.websocket_service import manager
+from app.services.maintenance_service import MaintenanceService
 
 class QRGenerateRequest(BaseModel):
     battery_id: int
@@ -275,7 +282,6 @@ def create_battery(
     *,
     request: Request,
     session: Session = Depends(get_session),
-    current_user: User = Depends(deps.get_current_active_user),
     battery_in: BatteryCreate,
     current_user: User = Depends(deps.get_current_active_superuser)
 ) -> Any:
@@ -481,8 +487,9 @@ def update_battery_lifecycle(
             event_type="status_change",
             description=f"Status changed to {update_in.status}. {update_in.description or ''}"
         )
-    ).first()
-    
-    if not battery:
-        raise HTTPException(status_code=404, detail="Battery not found")
+        session.add(event)
+        session.add(battery)
+        session.commit()
+        session.refresh(battery)
+        
     return battery

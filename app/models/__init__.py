@@ -84,7 +84,6 @@ from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
 
 
 # Teammate Operations & IoT
-from app.models.commission import Commission
 from app.models.settlement import Settlement
 from app.models.iot import DeviceCommand, FirmwareUpdate
 from app.models.fraud import RiskScore, FraudCheckLog, Blacklist
@@ -130,7 +129,6 @@ from app.models.search_history import SearchHistory
 # Phase 1.5 & Phase 1 PowerFill Models
 from app.models.rbac import Role, Permission, RolePermission, AdminUserRole, UserRole, UserAccessPath
 from app.models.location import Continent, Country, Region, City, Zone
-from app.models.telematics import TelemeticsData
 from app.models.vendor import Vendor, VendorDocument
 from app.models.swap import SwapSession
 from app.models.settlement import Settlement
@@ -153,7 +151,6 @@ from app.models.feedback import Feedback
 # Operations & Logistics
 from app.models.logistics import BatteryTransfer, DeliveryOrder, DeliveryType, DeliveryStatus
 from app.models.delivery_assignment import DeliveryAssignment
-<<<<<<< HEAD
 from app.models.delivery_route import DeliveryRoute, RouteStop
 from app.models.swap import SwapSession
 from app.models.swap_suggestion import SwapSuggestion, SwapPreference
@@ -191,12 +188,3 @@ from app.models.staff import StaffProfile
 from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
 from app.models.driver_profile import DriverProfile
 from app.models.vendor import Vendor
-=======
-from app.models.oauth import BlacklistedToken
-from app.models.commission import CommissionConfig, CommissionLog, CommissionTier
-from app.models.dealer_kyc import DealerKYCApplication, KYCStateTransition
-from app.models.chargeback import Chargeback
-from app.models.settlement_dispute import SettlementDispute
-from app.models.password_history import PasswordHistory
-from app.models.revenue_report import RevenueReport
->>>>>>> origin/main

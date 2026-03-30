@@ -6,7 +6,7 @@ from app.models.dealer_promotion import DealerPromotion
 from app.models.user import User
 from app.models.station import Station
 from app.models.commission import CommissionLog
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import datetime
 from app.repositories.dealer import (
     dealer_profile_repository,
@@ -164,7 +164,6 @@ class DealerService:
                 "total_earnings": total_earnings,
                 "active_stations": len([s for s in stations if s.status == 'active'])
             }
-        }
 
     @staticmethod
     def get_sales_summary(db: Session, dealer_id: int) -> dict:

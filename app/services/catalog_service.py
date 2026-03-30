@@ -3,7 +3,7 @@ Catalog Service
 CatalogProduct catalog management with search and filtering
 """
 from sqlmodel import Session, select, or_, and_
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 from app.models.catalog import CatalogProduct, CatalogProductImage, CatalogProductVariant
 from app.schemas.catalog import ProductCreate, ProductUpdate
 from datetime import datetime

@@ -1,0 +1,1877 @@
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+INFO:     Started server process [43780]
+INFO:     Waiting for application startup.
+INFO:app.workers.scheduler:Registering scheduled jobs...
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+INFO:apscheduler.scheduler:Adding job tentatively -- it will be properly scheduled when the scheduler starts
+INFO:app.workers.scheduler:Registered 18 scheduled jobs
+INFO:apscheduler.scheduler:Added job "run_rental_expiry_job" to job store "default"
+INFO:apscheduler.scheduler:Added job "Daily Revenue Aggregation" to job store "default"
+INFO:apscheduler.scheduler:Added job "Daily Inventory Synchronization" to job store "default"
+INFO:apscheduler.scheduler:Added job "Daily Late Fee Calculation" to job store "default"
+INFO:apscheduler.scheduler:Added job "Daily Commission Accrual" to job store "default"
+INFO:apscheduler.scheduler:Added job "Daily Fraud Score Recalculation" to job store "default"
+INFO:apscheduler.scheduler:Added job "Hourly Battery Health Checks" to job store "default"
+INFO:apscheduler.scheduler:Added job "Hourly Geofence Violation Detection" to job store "default"
+INFO:apscheduler.scheduler:Added job "Hourly Low Stock Alerts" to job store "default"
+INFO:apscheduler.scheduler:Added job "Hourly Rental Overdue Check" to job store "default"
+INFO:apscheduler.scheduler:Added job "Smart Battery Swap Notifications" to job store "default"
+INFO:apscheduler.scheduler:Added job "Monthly Commission Settlement" to job store "default"
+INFO:apscheduler.scheduler:Added job "Monthly Financial Reconciliation" to job store "default"
+INFO:apscheduler.scheduler:Added job "Monthly Data Archival" to job store "default"
+INFO:apscheduler.scheduler:Added job "Periodic Station Health Check" to job store "default"
+INFO:apscheduler.scheduler:Added job "Periodic Battery Health Monitor" to job store "default"
+INFO:apscheduler.scheduler:Added job "Periodic Charging Optimization" to job store "default"
+INFO:apscheduler.scheduler:Added job "Monthly Batch Payment Processing" to job store "default"
+INFO:apscheduler.scheduler:Scheduler started
+INFO:app.workers.scheduler:Background scheduler started successfully
+INFO:app.workers.scheduler:Scheduled job: Periodic Station Health Check (ID: periodic_station_health_check)
+INFO:app.workers.scheduler:Scheduled job: run_rental_expiry_job (ID: rental_expiry_job)
+INFO:app.workers.scheduler:Scheduled job: Smart Battery Swap Notifications (ID: smart_battery_swap_notifications)
+INFO:app.workers.scheduler:Scheduled job: Periodic Charging Optimization (ID: periodic_charging_optimization)
+INFO:app.workers.scheduler:Scheduled job: Hourly Battery Health Checks (ID: hourly_battery_health)
+INFO:app.workers.scheduler:Scheduled job: Hourly Geofence Violation Detection (ID: hourly_geofence_check)
+INFO:app.workers.scheduler:Scheduled job: Hourly Rental Overdue Check (ID: hourly_rental_overdue_check)
+INFO:app.workers.scheduler:Scheduled job: Hourly Low Stock Alerts (ID: hourly_stock_alerts)
+INFO:app.workers.scheduler:Scheduled job: Periodic Battery Health Monitor (ID: periodic_battery_health_monitor)
+INFO:app.workers.scheduler:Scheduled job: Daily Revenue Aggregation (ID: daily_revenue_aggregation)
+INFO:app.workers.scheduler:Scheduled job: Daily Inventory Synchronization (ID: daily_inventory_sync)
+INFO:app.workers.scheduler:Scheduled job: Daily Late Fee Calculation (ID: daily_late_fee_calculation)
+INFO:app.workers.scheduler:Scheduled job: Daily Commission Accrual (ID: daily_commission_accrual)
+INFO:app.workers.scheduler:Scheduled job: Daily Fraud Score Recalculation (ID: daily_fraud_score_recalc)
+INFO:app.workers.scheduler:Scheduled job: Monthly Commission Settlement (ID: monthly_commission_settlement)
+INFO:app.workers.scheduler:Scheduled job: Monthly Financial Reconciliation (ID: monthly_financial_reconciliation)
+INFO:app.workers.scheduler:Scheduled job: Monthly Data Archival (ID: monthly_data_archival)
+INFO:app.workers.scheduler:Scheduled job: Monthly Batch Payment Processing (ID: monthly_batch_payment)
+WARNING:app.services.mqtt_service:MQTT Service: Failed to connect to broker at localhost:1883. Real-time updates disabled. Error: [WinError 10061] No connection could be made because the target machine actively refused it
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8005 (Press CTRL+C to quit)
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:25:10 IST)" (scheduled at 2026-03-25 16:25:10.863928+05:30)
+ERROR:app.tasks.station_monitor:Error in monitor_stations: (psycopg2.OperationalError) server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+[SQL: INSERT INTO alerts (station_id, alert_type, severity, message, created_at, acknowledged_at, acknowledged_by) VALUES (%(station_id)s, %(alert_type)s, %(severity)s, %(message)s, %(created_at)s, %(acknowledged_at)s, %(acknowledged_by)s) RETURNING alerts.id]
+[parameters: {'station_id': 30, 'alert_type': 'offline_prolonged', 'severity': 'critical', 'message': 'CRITICAL: Station Wezu Station 16 is offline for more than 10 minutes!', 'created_at': datetime.datetime(2026, 3, 25, 10, 55, 41, 182763), 'acknowledged_at': None, 'acknowledged_by': None}]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:27:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:29:10 IST)" (scheduled at 2026-03-25 16:27:10.863928+05:30)
+WARNING:apscheduler.scheduler:Execution of job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:29:10 IST)" skipped: maximum number of running instances reached (1)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:31:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:33:10 IST)" (scheduled at 2026-03-25 16:31:10.863928+05:30)
+WARNING:apscheduler.scheduler:Execution of job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:33:10 IST)" skipped: maximum number of running instances reached (1)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:35:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:37:10 IST)" (scheduled at 2026-03-25 16:35:10.863928+05:30)
+WARNING:apscheduler.scheduler:Execution of job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:37:10 IST)" skipped: maximum number of running instances reached (1)
+INFO:apscheduler.executors.default:Running job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-25 16:37:52 IST)" (scheduled at 2026-03-25 16:37:52.364851+05:30)
+INFO:app.workers.rental_expiry_worker:Running scheduled rental expiry job...
+INFO:apscheduler.executors.default:Job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-25 16:52:52 IST)" executed successfully
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:39:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:41:10 IST)" (scheduled at 2026-03-25 16:39:10.863928+05:30)
+WARNING:apscheduler.scheduler:Execution of job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:41:10 IST)" skipped: maximum number of running instances reached (1)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:43:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:45:10 IST)" (scheduled at 2026-03-25 16:43:10.863928+05:30)
+WARNING:apscheduler.scheduler:Execution of job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:45:10 IST)" skipped: maximum number of running instances reached (1)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:47:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:49:10 IST)" (scheduled at 2026-03-25 16:47:10.863928+05:30)
+WARNING:apscheduler.scheduler:Execution of job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:49:10 IST)" skipped: maximum number of running instances reached (1)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:51:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:53:10 IST)" (scheduled at 2026-03-25 16:51:10.863928+05:30)
+INFO:apscheduler.executors.default:Running job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-25 17:07:52 IST)" (scheduled at 2026-03-25 16:52:52.364851+05:30)
+INFO:app.workers.rental_expiry_worker:Running scheduled rental expiry job...
+INFO:apscheduler.executors.default:Job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-25 17:07:52 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Smart Battery Swap Notifications (trigger: interval[0:30:00], next run at: 2026-03-25 17:23:10 IST)" (scheduled at 2026-03-25 16:53:10.858797+05:30)
+INFO:app.workers.hourly_jobs:Starting smart battery swap notifications...
+INFO:apscheduler.executors.default:Running job "Periodic Charging Optimization (trigger: interval[0:30:00], next run at: 2026-03-25 16:53:10 IST)" (scheduled at 2026-03-25 16:53:10.863928+05:30)
+WARNING:apscheduler.scheduler:Execution of job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:53:10 IST)" skipped: maximum number of running instances reached (1)
+INFO:app.tasks.charging_optimizer:Starting charging queue optimization task...
+ERROR:apscheduler.executors.default:Job "Periodic Charging Optimization (trigger: interval[0:30:00], next run at: 2026-03-25 17:23:10 IST)" raised an exception
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.InvalidTextRepresentation: invalid input value for enum stationstatus: "active"
+LINE 3: WHERE stations.status = 'active'
+                                ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\apscheduler\executors\base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\app\tasks\charging_optimizer.py", line 23, in optimize_charging_queues
+    stations = session.exec(select(Station).where(Station.status == "active")).all()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlmodel\orm\session.py", line 68, in exec
+    results = super().execute(
+              ^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.DataError: (psycopg2.errors.InvalidTextRepresentation) invalid input value for enum stationstatus: "active"
+LINE 3: WHERE stations.status = 'active'
+                                ^
+
+[SQL: SELECT stations.id, stations.name, stations.tenant_id, stations.address, stations.city, stations.latitude, stations.longitude, stations.zone_id, stations.owner_id, stations.vendor_id, stations.dealer_id, stations.station_type, stations.total_slots, stations.power_rating_kw, stations.max_capacity, stations.charger_type, stations.temperature_control, stations.safety_features, stations.status, stations.approval_status, stations.contact_phone, stations.operating_hours, stations.is_24x7, stations.amenities, stations.image_url, stations.rating, stations.total_reviews, stations.last_maintenance_date, stations.low_stock_threshold_pct, stations.last_heartbeat, stations.created_at, stations.updated_at 
+FROM stations 
+WHERE stations.status = %(status_1)s]
+[parameters: {'status_1': 'active'}]
+(Background on this error at: https://sqlalche.me/e/20/9h9h)
+INFO:app.workers.hourly_jobs:Swap notifications completed: 0 sent
+INFO:apscheduler.executors.default:Job "Smart Battery Swap Notifications (trigger: interval[0:30:00], next run at: 2026-03-25 17:23:10 IST)" executed successfully
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:55:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:57:10 IST)" (scheduled at 2026-03-25 16:55:10.863928+05:30)
+WARNING:apscheduler.scheduler:Execution of job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:57:10 IST)" skipped: maximum number of running instances reached (1)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 16:59:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 17:01:10 IST)" (scheduled at 2026-03-25 16:59:10.863928+05:30)
+WARNING:apscheduler.scheduler:Execution of job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 17:01:10 IST)" skipped: maximum number of running instances reached (1)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 17:03:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 17:05:10 IST)" (scheduled at 2026-03-25 17:03:10.863928+05:30)
+WARNING:apscheduler.scheduler:Execution of job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 17:05:10 IST)" skipped: maximum number of running instances reached (1)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 17:07:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 17:09:10 IST)" (scheduled at 2026-03-25 17:07:10.863928+05:30)
+INFO:apscheduler.executors.default:Running job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-25 17:22:52 IST)" (scheduled at 2026-03-25 17:07:52.364851+05:30)
+INFO:app.workers.rental_expiry_worker:Running scheduled rental expiry job...
+INFO:apscheduler.executors.default:Job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-25 17:22:52 IST)" executed successfully
+WARNING:apscheduler.scheduler:Execution of job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 17:09:10 IST)" skipped: maximum number of running instances reached (1)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 17:11:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 17:13:10 IST)" (scheduled at 2026-03-25 17:11:10.863928+05:30)
+ERROR:app.tasks.station_monitor:Error in monitor_stations: (psycopg2.OperationalError) server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+[SQL: SELECT stations.id AS stations_id, stations.name AS stations_name, stations.tenant_id AS stations_tenant_id, stations.address AS stations_address, stations.city AS stations_city, stations.latitude AS stations_latitude, stations.longitude AS stations_longitude, stations.zone_id AS stations_zone_id, stations.owner_id AS stations_owner_id, stations.vendor_id AS stations_vendor_id, stations.dealer_id AS stations_dealer_id, stations.station_type AS stations_station_type, stations.total_slots AS stations_total_slots, stations.power_rating_kw AS stations_power_rating_kw, stations.max_capacity AS stations_max_capacity, stations.charger_type AS stations_charger_type, stations.temperature_control AS stations_temperature_control, stations.safety_features AS stations_safety_features, stations.status AS stations_status, stations.approval_status AS stations_approval_status, stations.contact_phone AS stations_contact_phone, stations.operating_hours AS stations_operating_hours, stations.is_24x7 AS stations_is_24x7, stations.amenities AS stations_amenities, stations.image_url AS stations_image_url, stations.rating AS stations_rating, stations.total_reviews AS stations_total_reviews, stations.last_maintenance_date AS stations_last_maintenance_date, stations.low_stock_threshold_pct AS stations_low_stock_threshold_pct, stations.last_heartbeat AS stations_last_heartbeat, stations.created_at AS stations_created_at, stations.updated_at AS stations_updated_at 
+FROM stations 
+WHERE stations.id = %(pk_1)s]
+[parameters: {'pk_1': 58}]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 17:13:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 17:25:10 IST)" (scheduled at 2026-03-25 17:23:10.863928+05:30)
+INFO:apscheduler.executors.default:Running job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-25 17:37:52 IST)" (scheduled at 2026-03-25 17:22:52.364851+05:30)
+INFO:apscheduler.executors.default:Running job "Hourly Battery Health Checks (trigger: interval[1:00:00], next run at: 2026-03-25 18:23:10 IST)" (scheduled at 2026-03-25 17:23:10.857767+05:30)
+INFO:app.workers.rental_expiry_worker:Running scheduled rental expiry job...
+INFO:app.workers.hourly_jobs:Starting battery health checks...
+INFO:apscheduler.executors.default:Running job "Hourly Geofence Violation Detection (trigger: interval[1:00:00], next run at: 2026-03-25 17:23:10 IST)" (scheduled at 2026-03-25 17:23:10.857767+05:30)
+INFO:app.workers.hourly_jobs:Starting geofence violation detection...
+INFO:apscheduler.executors.default:Running job "Hourly Rental Overdue Check (trigger: interval[1:00:00], next run at: 2026-03-25 17:23:10 IST)" (scheduled at 2026-03-25 17:23:10.858797+05:30)
+INFO:app.workers.rental_worker:Starting automated overdue rental scan...
+INFO:apscheduler.executors.default:Running job "Hourly Low Stock Alerts (trigger: interval[1:00:00], next run at: 2026-03-25 17:23:10 IST)" (scheduled at 2026-03-25 17:23:10.858797+05:30)
+INFO:app.workers.hourly_jobs:Starting low stock alerts...
+INFO:apscheduler.executors.default:Running job "Smart Battery Swap Notifications (trigger: interval[0:30:00], next run at: 2026-03-25 17:23:10 IST)" (scheduled at 2026-03-25 17:23:10.858797+05:30)
+INFO:app.workers.hourly_jobs:Starting smart battery swap notifications...
+INFO:apscheduler.executors.default:Running job "Periodic Battery Health Monitor (trigger: interval[1:00:00], next run at: 2026-03-25 17:23:10 IST)" (scheduled at 2026-03-25 17:23:10.863928+05:30)
+INFO:app.tasks.battery_health_monitor:Starting periodic battery health monitor task...
+INFO:apscheduler.executors.default:Running job "Periodic Charging Optimization (trigger: interval[0:30:00], next run at: 2026-03-25 17:23:10 IST)" (scheduled at 2026-03-25 17:23:10.863928+05:30)
+INFO:app.tasks.charging_optimizer:Starting charging queue optimization task...
+INFO:apscheduler.executors.default:Job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-25 17:37:52 IST)" executed successfully
+ERROR:apscheduler.executors.default:Job "Periodic Charging Optimization (trigger: interval[0:30:00], next run at: 2026-03-25 17:53:10 IST)" raised an exception
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.InvalidTextRepresentation: invalid input value for enum stationstatus: "active"
+LINE 3: WHERE stations.status = 'active'
+                                ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\apscheduler\executors\base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\app\tasks\charging_optimizer.py", line 23, in optimize_charging_queues
+    stations = session.exec(select(Station).where(Station.status == "active")).all()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlmodel\orm\session.py", line 68, in exec
+    results = super().execute(
+              ^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.DataError: (psycopg2.errors.InvalidTextRepresentation) invalid input value for enum stationstatus: "active"
+LINE 3: WHERE stations.status = 'active'
+                                ^
+
+[SQL: SELECT stations.id, stations.name, stations.tenant_id, stations.address, stations.city, stations.latitude, stations.longitude, stations.zone_id, stations.owner_id, stations.vendor_id, stations.dealer_id, stations.station_type, stations.total_slots, stations.power_rating_kw, stations.max_capacity, stations.charger_type, stations.temperature_control, stations.safety_features, stations.status, stations.approval_status, stations.contact_phone, stations.operating_hours, stations.is_24x7, stations.amenities, stations.image_url, stations.rating, stations.total_reviews, stations.last_maintenance_date, stations.low_stock_threshold_pct, stations.last_heartbeat, stations.created_at, stations.updated_at 
+FROM stations 
+WHERE stations.status = %(status_1)s]
+[parameters: {'status_1': 'active'}]
+(Background on this error at: https://sqlalche.me/e/20/9h9h)
+ERROR:apscheduler.executors.default:Job "Periodic Battery Health Monitor (trigger: interval[1:00:00], next run at: 2026-03-25 18:23:10 IST)" raised an exception
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.InvalidTextRepresentation: invalid input value for enum batterystatus: "ready"
+LINE 3: ...eries.status IN ('AVAILABLE', 'RENTED', 'CHARGING', 'ready')
+                                                               ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\apscheduler\executors\base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\app\tasks\battery_health_monitor.py", line 22, in monitor_battery_health
+    batteries = session.exec(stmt).all()
+                ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlmodel\orm\session.py", line 68, in exec
+    results = super().execute(
+              ^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.DataError: (psycopg2.errors.InvalidTextRepresentation) invalid input value for enum batterystatus: "ready"
+LINE 3: ...eries.status IN ('AVAILABLE', 'RENTED', 'CHARGING', 'ready')
+                                                               ^
+
+[SQL: SELECT batteries.id, batteries.serial_number, batteries.qr_code_data, batteries.iot_device_id, batteries.sku_id, batteries.station_id, batteries.current_user_id, batteries.created_by, batteries.status, batteries.health_status, batteries.current_charge, batteries.health_percentage, batteries.cycle_count, batteries.total_cycles, batteries.temperature_c, batteries.manufacturer, batteries.battery_type, batteries.notes, batteries.location_type, batteries.manufacture_date, batteries.purchase_date, batteries.warranty_expiry, batteries.last_charged_at, batteries.last_inspected_at, batteries.last_maintenance_date, batteries.last_maintenance_cycles, batteries.state_of_health, batteries.temperature_history, batteries.charge_cycles, batteries.location_id, batteries.last_telemetry_at, batteries.created_at, batteries.updated_at 
+FROM batteries 
+WHERE batteries.status IN (%(status_1_1)s, %(status_1_2)s, %(status_1_3)s, %(status_1_4)s)]
+[parameters: {'status_1_1': 'AVAILABLE', 'status_1_2': 'RENTED', 'status_1_3': 'CHARGING', 'status_1_4': 'ready'}]
+(Background on this error at: https://sqlalche.me/e/20/9h9h)
+INFO:app.workers.hourly_jobs:Low stock alerts completed: 0 alerts
+ERROR:app.workers.rental_worker:Overdue rental scan failed: 'Rental' object has no attribute 'duration_hours'
+ERROR:app.workers.hourly_jobs:Battery health checks failed: (psycopg2.errors.InvalidTextRepresentation) invalid input value for enum batterystatus: "in_use"
+LINE 3: WHERE batteries.status IN ('AVAILABLE', 'in_use')
+                                                ^
+
+[SQL: SELECT batteries.id, batteries.serial_number, batteries.qr_code_data, batteries.iot_device_id, batteries.sku_id, batteries.station_id, batteries.current_user_id, batteries.created_by, batteries.status, batteries.health_status, batteries.current_charge, batteries.health_percentage, batteries.cycle_count, batteries.total_cycles, batteries.temperature_c, batteries.manufacturer, batteries.battery_type, batteries.notes, batteries.location_type, batteries.manufacture_date, batteries.purchase_date, batteries.warranty_expiry, batteries.last_charged_at, batteries.last_inspected_at, batteries.last_maintenance_date, batteries.last_maintenance_cycles, batteries.state_of_health, batteries.temperature_history, batteries.charge_cycles, batteries.location_id, batteries.last_telemetry_at, batteries.created_at, batteries.updated_at 
+FROM batteries 
+WHERE batteries.status IN (%(status_1_1)s, %(status_1_2)s)]
+[parameters: {'status_1_1': 'AVAILABLE', 'status_1_2': 'in_use'}]
+(Background on this error at: https://sqlalche.me/e/20/9h9h)
+INFO:app.workers.hourly_jobs:Geofence check completed: 0 violations
+INFO:app.workers.hourly_jobs:Swap notifications completed: 0 sent
+INFO:apscheduler.executors.default:Job "Hourly Low Stock Alerts (trigger: interval[1:00:00], next run at: 2026-03-25 18:23:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Job "Hourly Rental Overdue Check (trigger: interval[1:00:00], next run at: 2026-03-25 18:23:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Job "Hourly Battery Health Checks (trigger: interval[1:00:00], next run at: 2026-03-25 18:23:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Job "Smart Battery Swap Notifications (trigger: interval[0:30:00], next run at: 2026-03-25 17:53:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Job "Hourly Geofence Violation Detection (trigger: interval[1:00:00], next run at: 2026-03-25 18:23:10 IST)" executed successfully
+WARNING:apscheduler.scheduler:Execution of job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 17:25:10 IST)" skipped: maximum number of running instances reached (1)
+ERROR:app.tasks.station_monitor:Error in monitor_stations: (psycopg2.OperationalError) server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 17:27:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 19:55:10 IST)" (scheduled at 2026-03-25 19:53:10.863928+05:30)
+INFO:apscheduler.executors.default:Running job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-25 20:07:52 IST)" (scheduled at 2026-03-25 19:52:52.364851+05:30)
+INFO:app.workers.rental_expiry_worker:Running scheduled rental expiry job...
+INFO:apscheduler.executors.default:Running job "Smart Battery Swap Notifications (trigger: interval[0:30:00], next run at: 2026-03-25 20:23:10 IST)" (scheduled at 2026-03-25 19:53:10.858797+05:30)
+INFO:app.workers.hourly_jobs:Starting smart battery swap notifications...
+INFO:apscheduler.executors.default:Running job "Periodic Charging Optimization (trigger: interval[0:30:00], next run at: 2026-03-25 20:23:10 IST)" (scheduled at 2026-03-25 19:53:10.863928+05:30)
+WARNING:apscheduler.executors.default:Run time of job "Hourly Battery Health Checks (trigger: interval[1:00:00], next run at: 2026-03-25 20:23:10 IST)" was missed by 0:30:43.910704
+INFO:app.tasks.charging_optimizer:Starting charging queue optimization task...
+WARNING:apscheduler.executors.default:Run time of job "Hourly Geofence Violation Detection (trigger: interval[1:00:00], next run at: 2026-03-25 20:23:10 IST)" was missed by 0:30:43.910704
+WARNING:apscheduler.executors.default:Run time of job "Hourly Rental Overdue Check (trigger: interval[1:00:00], next run at: 2026-03-25 20:23:10 IST)" was missed by 0:30:43.910772
+WARNING:apscheduler.executors.default:Run time of job "Hourly Low Stock Alerts (trigger: interval[1:00:00], next run at: 2026-03-25 20:23:10 IST)" was missed by 0:30:43.910772
+WARNING:apscheduler.executors.default:Run time of job "Periodic Battery Health Monitor (trigger: interval[1:00:00], next run at: 2026-03-25 20:23:10 IST)" was missed by 0:30:43.905641
+ERROR:apscheduler.executors.default:Job "Periodic Charging Optimization (trigger: interval[0:30:00], next run at: 2026-03-25 20:23:10 IST)" raised an exception
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.InvalidTextRepresentation: invalid input value for enum stationstatus: "active"
+LINE 3: WHERE stations.status = 'active'
+                                ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\apscheduler\executors\base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\app\tasks\charging_optimizer.py", line 23, in optimize_charging_queues
+    stations = session.exec(select(Station).where(Station.status == "active")).all()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlmodel\orm\session.py", line 68, in exec
+    results = super().execute(
+              ^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.DataError: (psycopg2.errors.InvalidTextRepresentation) invalid input value for enum stationstatus: "active"
+LINE 3: WHERE stations.status = 'active'
+                                ^
+
+[SQL: SELECT stations.id, stations.name, stations.tenant_id, stations.address, stations.city, stations.latitude, stations.longitude, stations.zone_id, stations.owner_id, stations.vendor_id, stations.dealer_id, stations.station_type, stations.total_slots, stations.power_rating_kw, stations.max_capacity, stations.charger_type, stations.temperature_control, stations.safety_features, stations.status, stations.approval_status, stations.contact_phone, stations.operating_hours, stations.is_24x7, stations.amenities, stations.image_url, stations.rating, stations.total_reviews, stations.last_maintenance_date, stations.low_stock_threshold_pct, stations.last_heartbeat, stations.created_at, stations.updated_at 
+FROM stations 
+WHERE stations.status = %(status_1)s]
+[parameters: {'status_1': 'active'}]
+(Background on this error at: https://sqlalche.me/e/20/9h9h)
+INFO:apscheduler.executors.default:Job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-25 20:07:52 IST)" executed successfully
+INFO:app.workers.hourly_jobs:Swap notifications completed: 0 sent
+ERROR:app.tasks.station_monitor:Error in monitor_stations: (psycopg2.OperationalError) server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+[SQL: INSERT INTO alerts (station_id, alert_type, severity, message, created_at, acknowledged_at, acknowledged_by) VALUES (%(station_id)s, %(alert_type)s, %(severity)s, %(message)s, %(created_at)s, %(acknowledged_at)s, %(acknowledged_by)s) RETURNING alerts.id]
+[parameters: {'station_id': 21, 'alert_type': 'offline_prolonged', 'severity': 'critical', 'message': 'CRITICAL: Station Wezu Station 7 is offline for more than 10 minutes!', 'created_at': datetime.datetime(2026, 3, 25, 14, 24, 21, 571081), 'acknowledged_at': None, 'acknowledged_by': None}]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-25 19:55:10 IST)" executed successfully
+ERROR:app.workers.hourly_jobs:Swap notifications failed: (psycopg2.OperationalError) server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+ERROR:apscheduler.executors.default:Job "Smart Battery Swap Notifications (trigger: interval[0:30:00], next run at: 2026-03-25 20:23:10 IST)" raised an exception
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 717, in checkout
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 715, in checkout
+    dbapi_connection = rec.get_connection()
+                       ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 837, in get_connection
+    self.__connect()
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\psycopg2\__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.OperationalError: connection to server at "ep-twilight-cherry-aip86ui8-pooler.c-4.us-east-1.aws.neon.tech" (2600:1f10:44f9:7118:cff2:eefe:417d:e5d2), port 5432 failed: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\app\workers\hourly_jobs.py", line 99, in smart_battery_swap_notifications
+    complete_job_execution(execution.execution_id, "COMPLETED", result)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\app\workers\daily_jobs.py", line 46, in complete_job_execution
+    execution = session.exec(
+                ^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlmodel\orm\session.py", line 68, in exec
+    results = super().execute(
+              ^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2239, in _execute_internal
+    conn = self._connection_for_bind(bind)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2108, in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in _connection_for_bind
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 1187, in _connection_for_bind
+    conn = bind.connect()
+           ^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3293, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 145, in __init__
+    Connection._handle_dbapi_exception_noconnection(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 2448, in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 717, in checkout
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 715, in checkout
+    dbapi_connection = rec.get_connection()
+                       ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 837, in get_connection
+    self.__connect()
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\psycopg2\__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) connection to server at "ep-twilight-cherry-aip86ui8-pooler.c-4.us-east-1.aws.neon.tech" (2600:1f10:44f9:7118:cff2:eefe:417d:e5d2), port 5432 failed: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1128, in _rollback_impl
+    self.engine.dialect.do_rollback(self.connection)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 712, in do_rollback
+    dbapi_connection.rollback()
+psycopg2.OperationalError: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\app\workers\hourly_jobs.py", line 74, in smart_battery_swap_notifications
+    with Session(engine) as session:
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 1809, in __exit__
+    self.close()
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2507, in close
+    self._close_impl(invalidate=False)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2576, in _close_impl
+    transaction.close(invalidate)
+  File "<string>", line 2, in close
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 1417, in close
+    transaction.close()
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 2597, in close
+    self._do_close()
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 2735, in _do_close
+    self._close_impl()
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 2721, in _close_impl
+    self._connection_rollback_impl()
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 2713, in _connection_rollback_impl
+    self.connection._rollback_impl()
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1130, in _rollback_impl
+    self._handle_dbapi_exception(e, None, None, None, None)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1128, in _rollback_impl
+    self.engine.dialect.do_rollback(self.connection)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 712, in do_rollback
+    dbapi_connection.rollback()
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 717, in checkout
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 715, in checkout
+    dbapi_connection = rec.get_connection()
+                       ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 866, in get_connection
+    self.__connect()
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\psycopg2\__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.OperationalError: connection to server at "ep-twilight-cherry-aip86ui8-pooler.c-4.us-east-1.aws.neon.tech" (2600:1f10:44f9:710a:3a89:1dc1:c141:1098), port 5432 failed: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\apscheduler\executors\base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\app\workers\hourly_jobs.py", line 103, in smart_battery_swap_notifications
+    complete_job_execution(execution.execution_id, "FAILED", error=str(e))
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\app\workers\daily_jobs.py", line 46, in complete_job_execution
+    execution = session.exec(
+                ^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlmodel\orm\session.py", line 68, in exec
+    results = super().execute(
+              ^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2239, in _execute_internal
+    conn = self._connection_for_bind(bind)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2108, in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in _connection_for_bind
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 1187, in _connection_for_bind
+    conn = bind.connect()
+           ^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3293, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 145, in __init__
+    Connection._handle_dbapi_exception_noconnection(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 2448, in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 717, in checkout
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 715, in checkout
+    dbapi_connection = rec.get_connection()
+                       ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 866, in get_connection
+    self.__connect()
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\psycopg2\__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) connection to server at "ep-twilight-cherry-aip86ui8-pooler.c-4.us-east-1.aws.neon.tech" (2600:1f10:44f9:710a:3a89:1dc1:c141:1098), port 5432 failed: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 13:47:10 IST)" (scheduled at 2026-03-26 13:45:10.863928+05:30)
+WARNING:apscheduler.executors.default:Run time of job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-26 13:52:52 IST)" was missed by 0:07:35.511811
+WARNING:apscheduler.executors.default:Run time of job "Hourly Battery Health Checks (trigger: interval[1:00:00], next run at: 2026-03-26 14:23:10 IST)" was missed by 0:22:17.018895
+WARNING:apscheduler.executors.default:Run time of job "Hourly Geofence Violation Detection (trigger: interval[1:00:00], next run at: 2026-03-26 14:23:10 IST)" was missed by 0:22:17.018895
+WARNING:apscheduler.executors.default:Run time of job "Daily Inventory Synchronization (trigger: cron[hour='0', minute='15'], next run at: 2026-03-27 00:15:00 IST)" was missed by 13:30:27.876662
+WARNING:apscheduler.executors.default:Run time of job "Hourly Low Stock Alerts (trigger: interval[1:00:00], next run at: 2026-03-26 14:23:10 IST)" was missed by 0:22:17.017865
+WARNING:apscheduler.executors.default:Run time of job "Smart Battery Swap Notifications (trigger: interval[0:30:00], next run at: 2026-03-26 13:53:10 IST)" was missed by 0:22:17.017865
+WARNING:apscheduler.executors.default:Run time of job "Periodic Battery Health Monitor (trigger: interval[1:00:00], next run at: 2026-03-26 14:23:10 IST)" was missed by 0:22:17.012734
+WARNING:apscheduler.executors.default:Run time of job "Periodic Charging Optimization (trigger: interval[0:30:00], next run at: 2026-03-26 13:53:10 IST)" was missed by 0:22:17.012734
+WARNING:apscheduler.executors.default:Run time of job "Daily Revenue Aggregation (trigger: cron[hour='0', minute='0'], next run at: 2026-03-27 00:00:00 IST)" was missed by 13:45:27.876662
+WARNING:apscheduler.executors.default:Run time of job "Hourly Rental Overdue Check (trigger: interval[1:00:00], next run at: 2026-03-26 14:23:10 IST)" was missed by 0:22:17.017865
+WARNING:apscheduler.executors.default:Run time of job "Daily Late Fee Calculation (trigger: cron[hour='0', minute='30'], next run at: 2026-03-27 00:30:00 IST)" was missed by 13:15:27.876662
+WARNING:apscheduler.executors.default:Run time of job "Daily Commission Accrual (trigger: cron[hour='0', minute='45'], next run at: 2026-03-27 00:45:00 IST)" was missed by 13:00:27.876662
+WARNING:apscheduler.executors.default:Run time of job "Daily Fraud Score Recalculation (trigger: cron[hour='1', minute='0'], next run at: 2026-03-27 01:00:00 IST)" was missed by 12:45:27.876662
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 13:47:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 13:47:10 IST)" (scheduled at 2026-03-26 13:47:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 13:49:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 13:51:10 IST)" (scheduled at 2026-03-26 13:49:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 13:51:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 13:51:10 IST)" (scheduled at 2026-03-26 13:51:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 13:53:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-26 14:07:52 IST)" (scheduled at 2026-03-26 13:52:52.364851+05:30)
+INFO:app.workers.rental_expiry_worker:Running scheduled rental expiry job...
+INFO:apscheduler.executors.default:Job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-26 14:07:52 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Smart Battery Swap Notifications (trigger: interval[0:30:00], next run at: 2026-03-26 14:23:10 IST)" (scheduled at 2026-03-26 13:53:10.858797+05:30)
+INFO:apscheduler.executors.default:Running job "Periodic Charging Optimization (trigger: interval[0:30:00], next run at: 2026-03-26 14:23:10 IST)" (scheduled at 2026-03-26 13:53:10.863928+05:30)
+INFO:app.tasks.charging_optimizer:Starting charging queue optimization task...
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 13:55:10 IST)" (scheduled at 2026-03-26 13:53:10.863928+05:30)
+INFO:app.workers.hourly_jobs:Starting smart battery swap notifications...
+INFO:app.tasks.charging_optimizer:Charging queue optimization completed.
+INFO:apscheduler.executors.default:Job "Periodic Charging Optimization (trigger: interval[0:30:00], next run at: 2026-03-26 14:23:10 IST)" executed successfully
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 13:55:10 IST)" executed successfully
+INFO:app.workers.hourly_jobs:Swap notifications completed: 0 sent
+INFO:apscheduler.executors.default:Job "Smart Battery Swap Notifications (trigger: interval[0:30:00], next run at: 2026-03-26 14:23:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 13:57:10 IST)" (scheduled at 2026-03-26 13:55:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 13:57:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 13:57:10 IST)" (scheduled at 2026-03-26 13:57:10.863928+05:30)
+ERROR:app.tasks.station_monitor:Error in monitor_stations: (psycopg2.OperationalError) could not translate host name "ep-twilight-cherry-aip86ui8-pooler.c-4.us-east-1.aws.neon.tech" to address: No such host is known. 
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 13:59:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 13:59:10 IST)" (scheduled at 2026-03-26 13:59:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:01:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:03:10 IST)" (scheduled at 2026-03-26 14:01:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:03:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:05:10 IST)" (scheduled at 2026-03-26 14:03:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:05:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:07:10 IST)" (scheduled at 2026-03-26 14:05:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:07:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:07:10 IST)" (scheduled at 2026-03-26 14:07:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:09:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-26 14:22:52 IST)" (scheduled at 2026-03-26 14:07:52.364851+05:30)
+INFO:app.workers.rental_expiry_worker:Running scheduled rental expiry job...
+INFO:apscheduler.executors.default:Job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-26 14:22:52 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:11:10 IST)" (scheduled at 2026-03-26 14:09:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:11:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:13:10 IST)" (scheduled at 2026-03-26 14:11:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:13:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:15:10 IST)" (scheduled at 2026-03-26 14:13:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:15:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:17:10 IST)" (scheduled at 2026-03-26 14:15:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:17:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:17:10 IST)" (scheduled at 2026-03-26 14:17:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:19:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:21:10 IST)" (scheduled at 2026-03-26 14:19:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:21:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:23:10 IST)" (scheduled at 2026-03-26 14:21:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:23:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-26 14:37:52 IST)" (scheduled at 2026-03-26 14:22:52.364851+05:30)
+INFO:app.workers.rental_expiry_worker:Running scheduled rental expiry job...
+INFO:apscheduler.executors.default:Job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-26 14:37:52 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Hourly Battery Health Checks (trigger: interval[1:00:00], next run at: 2026-03-26 15:23:10 IST)" (scheduled at 2026-03-26 14:23:10.857767+05:30)
+INFO:app.workers.hourly_jobs:Starting battery health checks...
+INFO:apscheduler.executors.default:Running job "Hourly Geofence Violation Detection (trigger: interval[1:00:00], next run at: 2026-03-26 15:23:10 IST)" (scheduled at 2026-03-26 14:23:10.857767+05:30)
+INFO:app.workers.hourly_jobs:Starting geofence violation detection...
+INFO:apscheduler.executors.default:Running job "Hourly Rental Overdue Check (trigger: interval[1:00:00], next run at: 2026-03-26 15:23:10 IST)" (scheduled at 2026-03-26 14:23:10.858797+05:30)
+INFO:apscheduler.executors.default:Running job "Hourly Low Stock Alerts (trigger: interval[1:00:00], next run at: 2026-03-26 15:23:10 IST)" (scheduled at 2026-03-26 14:23:10.858797+05:30)
+INFO:apscheduler.executors.default:Running job "Smart Battery Swap Notifications (trigger: interval[0:30:00], next run at: 2026-03-26 14:53:10 IST)" (scheduled at 2026-03-26 14:23:10.858797+05:30)
+INFO:apscheduler.executors.default:Running job "Periodic Battery Health Monitor (trigger: interval[1:00:00], next run at: 2026-03-26 15:23:10 IST)" (scheduled at 2026-03-26 14:23:10.863928+05:30)
+INFO:app.workers.rental_worker:Starting automated overdue rental scan...
+INFO:apscheduler.executors.default:Running job "Periodic Charging Optimization (trigger: interval[0:30:00], next run at: 2026-03-26 14:53:10 IST)" (scheduled at 2026-03-26 14:23:10.863928+05:30)
+INFO:app.tasks.charging_optimizer:Starting charging queue optimization task...
+INFO:app.workers.hourly_jobs:Starting low stock alerts...
+INFO:app.workers.hourly_jobs:Starting smart battery swap notifications...
+INFO:app.tasks.battery_health_monitor:Starting periodic battery health monitor task...
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:25:10 IST)" (scheduled at 2026-03-26 14:23:10.863928+05:30)
+INFO:app.tasks.charging_optimizer:Charging queue optimization completed.
+INFO:apscheduler.executors.default:Job "Periodic Charging Optimization (trigger: interval[0:30:00], next run at: 2026-03-26 14:53:10 IST)" executed successfully
+ERROR:apscheduler.executors.default:Job "Periodic Battery Health Monitor (trigger: interval[1:00:00], next run at: 2026-03-26 15:23:10 IST)" raised an exception
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.InvalidTextRepresentation: invalid input value for enum batterystatus: "ready"
+LINE 3: ...eries.status IN ('AVAILABLE', 'RENTED', 'CHARGING', 'ready')
+                                                               ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\apscheduler\executors\base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\app\tasks\battery_health_monitor.py", line 22, in monitor_battery_health
+    batteries = session.exec(stmt).all()
+                ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlmodel\orm\session.py", line 68, in exec
+    results = super().execute(
+              ^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.DataError: (psycopg2.errors.InvalidTextRepresentation) invalid input value for enum batterystatus: "ready"
+LINE 3: ...eries.status IN ('AVAILABLE', 'RENTED', 'CHARGING', 'ready')
+                                                               ^
+
+[SQL: SELECT batteries.id, batteries.serial_number, batteries.qr_code_data, batteries.iot_device_id, batteries.sku_id, batteries.station_id, batteries.current_user_id, batteries.created_by, batteries.status, batteries.health_status, batteries.current_charge, batteries.health_percentage, batteries.cycle_count, batteries.total_cycles, batteries.temperature_c, batteries.manufacturer, batteries.battery_type, batteries.notes, batteries.location_type, batteries.manufacture_date, batteries.purchase_date, batteries.warranty_expiry, batteries.last_charged_at, batteries.last_inspected_at, batteries.last_maintenance_date, batteries.last_maintenance_cycles, batteries.state_of_health, batteries.temperature_history, batteries.charge_cycles, batteries.location_id, batteries.last_telemetry_at, batteries.created_at, batteries.updated_at 
+FROM batteries 
+WHERE batteries.status IN (%(status_1_1)s, %(status_1_2)s, %(status_1_3)s, %(status_1_4)s)]
+[parameters: {'status_1_1': 'AVAILABLE', 'status_1_2': 'RENTED', 'status_1_3': 'CHARGING', 'status_1_4': 'ready'}]
+(Background on this error at: https://sqlalche.me/e/20/9h9h)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:25:10 IST)" executed successfully
+INFO:app.workers.hourly_jobs:Geofence check completed: 0 violations
+INFO:app.workers.hourly_jobs:Swap notifications completed: 0 sent
+INFO:app.workers.rental_worker:Overdue scan completed: 0 fees applied/updated
+INFO:app.workers.hourly_jobs:Low stock alerts completed: 0 alerts
+ERROR:app.workers.hourly_jobs:Battery health checks failed: (psycopg2.errors.InvalidTextRepresentation) invalid input value for enum batterystatus: "in_use"
+LINE 3: WHERE batteries.status IN ('AVAILABLE', 'in_use')
+                                                ^
+
+[SQL: SELECT batteries.id, batteries.serial_number, batteries.qr_code_data, batteries.iot_device_id, batteries.sku_id, batteries.station_id, batteries.current_user_id, batteries.created_by, batteries.status, batteries.health_status, batteries.current_charge, batteries.health_percentage, batteries.cycle_count, batteries.total_cycles, batteries.temperature_c, batteries.manufacturer, batteries.battery_type, batteries.notes, batteries.location_type, batteries.manufacture_date, batteries.purchase_date, batteries.warranty_expiry, batteries.last_charged_at, batteries.last_inspected_at, batteries.last_maintenance_date, batteries.last_maintenance_cycles, batteries.state_of_health, batteries.temperature_history, batteries.charge_cycles, batteries.location_id, batteries.last_telemetry_at, batteries.created_at, batteries.updated_at 
+FROM batteries 
+WHERE batteries.status IN (%(status_1_1)s, %(status_1_2)s)]
+[parameters: {'status_1_1': 'AVAILABLE', 'status_1_2': 'in_use'}]
+(Background on this error at: https://sqlalche.me/e/20/9h9h)
+INFO:apscheduler.executors.default:Job "Hourly Battery Health Checks (trigger: interval[1:00:00], next run at: 2026-03-26 15:23:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Job "Hourly Geofence Violation Detection (trigger: interval[1:00:00], next run at: 2026-03-26 15:23:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Job "Hourly Rental Overdue Check (trigger: interval[1:00:00], next run at: 2026-03-26 15:23:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Job "Smart Battery Swap Notifications (trigger: interval[0:30:00], next run at: 2026-03-26 14:53:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Job "Hourly Low Stock Alerts (trigger: interval[1:00:00], next run at: 2026-03-26 15:23:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:27:10 IST)" (scheduled at 2026-03-26 14:25:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:27:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:29:10 IST)" (scheduled at 2026-03-26 14:27:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:29:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:31:10 IST)" (scheduled at 2026-03-26 14:29:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:31:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:33:10 IST)" (scheduled at 2026-03-26 14:31:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:33:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:35:10 IST)" (scheduled at 2026-03-26 14:33:10.863928+05:30)
+ERROR:app.tasks.station_monitor:Error in monitor_stations: (psycopg2.OperationalError) could not translate host name "ep-twilight-cherry-aip86ui8-pooler.c-4.us-east-1.aws.neon.tech" to address: No such host is known. 
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 14:35:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 15:43:10 IST)" (scheduled at 2026-03-26 15:41:10.863928+05:30)
+WARNING:apscheduler.executors.default:Run time of job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-26 15:52:52 IST)" was missed by 0:05:02.264892
+WARNING:apscheduler.executors.default:Run time of job "Smart Battery Swap Notifications (trigger: interval[0:30:00], next run at: 2026-03-26 15:53:10 IST)" was missed by 0:19:43.773838
+WARNING:apscheduler.executors.default:Run time of job "Periodic Charging Optimization (trigger: interval[0:30:00], next run at: 2026-03-26 15:53:10 IST)" was missed by 0:19:43.768707
+WARNING:apscheduler.executors.default:Run time of job "Hourly Battery Health Checks (trigger: interval[1:00:00], next run at: 2026-03-26 16:23:10 IST)" was missed by 0:19:43.774868
+WARNING:apscheduler.executors.default:Run time of job "Hourly Geofence Violation Detection (trigger: interval[1:00:00], next run at: 2026-03-26 16:23:10 IST)" was missed by 0:19:43.774868
+WARNING:apscheduler.executors.default:Run time of job "Hourly Rental Overdue Check (trigger: interval[1:00:00], next run at: 2026-03-26 16:23:10 IST)" was missed by 0:19:43.773838
+WARNING:apscheduler.executors.default:Run time of job "Hourly Low Stock Alerts (trigger: interval[1:00:00], next run at: 2026-03-26 16:23:10 IST)" was missed by 0:19:43.773838
+WARNING:apscheduler.executors.default:Run time of job "Periodic Battery Health Monitor (trigger: interval[1:00:00], next run at: 2026-03-26 16:23:10 IST)" was missed by 0:19:43.768707
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 15:43:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 15:45:10 IST)" (scheduled at 2026-03-26 15:43:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 15:45:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 15:47:10 IST)" (scheduled at 2026-03-26 15:45:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 15:47:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 15:49:10 IST)" (scheduled at 2026-03-26 15:47:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 15:49:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 15:51:10 IST)" (scheduled at 2026-03-26 15:49:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 15:51:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 15:53:10 IST)" (scheduled at 2026-03-26 15:51:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 15:53:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-26 16:07:52 IST)" (scheduled at 2026-03-26 15:52:52.364851+05:30)
+INFO:app.workers.rental_expiry_worker:Running scheduled rental expiry job...
+INFO:apscheduler.executors.default:Running job "Smart Battery Swap Notifications (trigger: interval[0:30:00], next run at: 2026-03-26 15:53:10 IST)" (scheduled at 2026-03-26 15:53:10.858797+05:30)
+INFO:app.workers.hourly_jobs:Starting smart battery swap notifications...
+INFO:apscheduler.executors.default:Running job "Periodic Charging Optimization (trigger: interval[0:30:00], next run at: 2026-03-26 16:23:10 IST)" (scheduled at 2026-03-26 15:53:10.863928+05:30)
+INFO:app.tasks.charging_optimizer:Starting charging queue optimization task...
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 15:55:10 IST)" (scheduled at 2026-03-26 15:53:10.863928+05:30)
+ERROR:apscheduler.executors.default:Job "Periodic Charging Optimization (trigger: interval[0:30:00], next run at: 2026-03-26 16:23:10 IST)" raised an exception
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 717, in checkout
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 715, in checkout
+    dbapi_connection = rec.get_connection()
+                       ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 837, in get_connection
+    self.__connect()
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\psycopg2\__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.OperationalError: could not translate host name "ep-twilight-cherry-aip86ui8-pooler.c-4.us-east-1.aws.neon.tech" to address: No such host is known. 
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\apscheduler\executors\base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\app\tasks\charging_optimizer.py", line 23, in optimize_charging_queues
+    stations = session.exec(select(Station).where(Station.status == "active")).all()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlmodel\orm\session.py", line 68, in exec
+    results = super().execute(
+              ^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2239, in _execute_internal
+    conn = self._connection_for_bind(bind)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2108, in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in _connection_for_bind
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 1187, in _connection_for_bind
+    conn = bind.connect()
+           ^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3293, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 145, in __init__
+    Connection._handle_dbapi_exception_noconnection(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 2448, in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 717, in checkout
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 715, in checkout
+    dbapi_connection = rec.get_connection()
+                       ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 837, in get_connection
+    self.__connect()
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\psycopg2\__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) could not translate host name "ep-twilight-cherry-aip86ui8-pooler.c-4.us-east-1.aws.neon.tech" to address: No such host is known. 
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+ERROR:apscheduler.executors.default:Job "Smart Battery Swap Notifications (trigger: interval[0:30:00], next run at: 2026-03-26 16:23:10 IST)" raised an exception
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 717, in checkout
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 715, in checkout
+    dbapi_connection = rec.get_connection()
+                       ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 866, in get_connection
+    self.__connect()
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\psycopg2\__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.OperationalError: could not translate host name "ep-twilight-cherry-aip86ui8-pooler.c-4.us-east-1.aws.neon.tech" to address: No such host is known. 
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\apscheduler\executors\base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\app\workers\hourly_jobs.py", line 67, in smart_battery_swap_notifications
+    execution = create_job_execution("hourly_swap_alerts")
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\app\workers\daily_jobs.py", line 18, in create_job_execution
+    job = session.exec(select(BatchJob).where(BatchJob.job_name == job_name)).first()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlmodel\orm\session.py", line 68, in exec
+    results = super().execute(
+              ^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2239, in _execute_internal
+    conn = self._connection_for_bind(bind)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2108, in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in _connection_for_bind
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 1187, in _connection_for_bind
+    conn = bind.connect()
+           ^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3293, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 145, in __init__
+    Connection._handle_dbapi_exception_noconnection(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 2448, in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 717, in checkout
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 715, in checkout
+    dbapi_connection = rec.get_connection()
+                       ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 866, in get_connection
+    self.__connect()
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\psycopg2\__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) could not translate host name "ep-twilight-cherry-aip86ui8-pooler.c-4.us-east-1.aws.neon.tech" to address: No such host is known. 
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+ERROR:app.tasks.station_monitor:Error in monitor_stations: (psycopg2.OperationalError) could not translate host name "ep-twilight-cherry-aip86ui8-pooler.c-4.us-east-1.aws.neon.tech" to address: No such host is known. 
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 15:55:10 IST)" executed successfully
+ERROR:apscheduler.executors.default:Job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-26 16:07:52 IST)" raised an exception
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 717, in checkout
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 715, in checkout
+    dbapi_connection = rec.get_connection()
+                       ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 866, in get_connection
+    self.__connect()
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\psycopg2\__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.OperationalError: connection to server at "ep-twilight-cherry-aip86ui8-pooler.c-4.us-east-1.aws.neon.tech" (2600:1f10:44f9:7118:cff2:eefe:417d:e5d2), port 5432 failed: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+SSL SYSCALL error: Connection reset by peer (0x00002746/10054)
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\apscheduler\executors\base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\app\workers\rental_expiry_worker.py", line 23, in run_rental_expiry_job
+    expiring_rentals = db.exec(statement).all()
+                       ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlmodel\orm\session.py", line 68, in exec
+    results = super().execute(
+              ^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2239, in _execute_internal
+    conn = self._connection_for_bind(bind)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2108, in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in _connection_for_bind
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 1187, in _connection_for_bind
+    conn = bind.connect()
+           ^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3293, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 145, in __init__
+    Connection._handle_dbapi_exception_noconnection(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 2448, in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 717, in checkout
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 715, in checkout
+    dbapi_connection = rec.get_connection()
+                       ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 866, in get_connection
+    self.__connect()
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\psycopg2\__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) connection to server at "ep-twilight-cherry-aip86ui8-pooler.c-4.us-east-1.aws.neon.tech" (2600:1f10:44f9:7118:cff2:eefe:417d:e5d2), port 5432 failed: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+SSL SYSCALL error: Connection reset by peer (0x00002746/10054)
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 20:37:10 IST)" (scheduled at 2026-03-26 20:35:10.863928+05:30)
+WARNING:apscheduler.executors.default:Run time of job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-26 20:37:52 IST)" was missed by 0:12:21.764521
+WARNING:apscheduler.executors.default:Run time of job "Hourly Battery Health Checks (trigger: interval[1:00:00], next run at: 2026-03-26 21:23:10 IST)" was missed by 0:12:03.271605
+WARNING:apscheduler.executors.default:Run time of job "Hourly Geofence Violation Detection (trigger: interval[1:00:00], next run at: 2026-03-26 21:23:10 IST)" was missed by 0:12:03.271605
+WARNING:apscheduler.executors.default:Run time of job "Hourly Rental Overdue Check (trigger: interval[1:00:00], next run at: 2026-03-26 21:23:10 IST)" was missed by 0:12:03.276786
+WARNING:apscheduler.executors.default:Run time of job "Hourly Low Stock Alerts (trigger: interval[1:00:00], next run at: 2026-03-26 21:23:10 IST)" was missed by 0:12:03.276786
+WARNING:apscheduler.executors.default:Run time of job "Smart Battery Swap Notifications (trigger: interval[0:30:00], next run at: 2026-03-26 20:53:10 IST)" was missed by 0:12:03.276786
+WARNING:apscheduler.executors.default:Run time of job "Periodic Battery Health Monitor (trigger: interval[1:00:00], next run at: 2026-03-26 21:23:10 IST)" was missed by 0:12:03.271655
+WARNING:apscheduler.executors.default:Run time of job "Periodic Charging Optimization (trigger: interval[0:30:00], next run at: 2026-03-26 20:53:10 IST)" was missed by 0:12:03.271655
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 20:37:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 20:39:10 IST)" (scheduled at 2026-03-26 20:37:10.863928+05:30)
+ERROR:app.tasks.station_monitor:Error in monitor_stations: (psycopg2.OperationalError) could not translate host name "ep-twilight-cherry-aip86ui8-pooler.c-4.us-east-1.aws.neon.tech" to address: No such host is known. 
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 20:39:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-26 20:52:52 IST)" (scheduled at 2026-03-26 20:37:52.364851+05:30)
+INFO:app.workers.rental_expiry_worker:Running scheduled rental expiry job...
+INFO:apscheduler.executors.default:Job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-26 20:52:52 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 20:41:10 IST)" (scheduled at 2026-03-26 20:39:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 20:41:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 20:41:10 IST)" (scheduled at 2026-03-26 20:41:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 20:43:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 20:45:10 IST)" (scheduled at 2026-03-26 20:43:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 20:45:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 20:47:10 IST)" (scheduled at 2026-03-26 20:45:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 20:47:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 20:49:10 IST)" (scheduled at 2026-03-26 20:47:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 20:49:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 20:53:10 IST)" (scheduled at 2026-03-26 20:51:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 20:53:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-26 21:07:52 IST)" (scheduled at 2026-03-26 20:52:52.364851+05:30)
+INFO:app.workers.rental_expiry_worker:Running scheduled rental expiry job...
+INFO:apscheduler.executors.default:Job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-26 21:07:52 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Smart Battery Swap Notifications (trigger: interval[0:30:00], next run at: 2026-03-26 21:23:10 IST)" (scheduled at 2026-03-26 20:53:10.858797+05:30)
+INFO:apscheduler.executors.default:Running job "Periodic Charging Optimization (trigger: interval[0:30:00], next run at: 2026-03-26 21:23:10 IST)" (scheduled at 2026-03-26 20:53:10.863928+05:30)
+INFO:app.tasks.charging_optimizer:Starting charging queue optimization task...
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 20:55:10 IST)" (scheduled at 2026-03-26 20:53:10.863928+05:30)
+INFO:app.workers.hourly_jobs:Starting smart battery swap notifications...
+ERROR:app.tasks.station_monitor:Error in monitor_stations: (psycopg2.OperationalError) connection to server at "ep-twilight-cherry-aip86ui8-pooler.c-4.us-east-1.aws.neon.tech" (54.86.249.90), port 5432 failed: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 20:55:10 IST)" executed successfully
+ERROR:apscheduler.executors.default:Job "Smart Battery Swap Notifications (trigger: interval[0:30:00], next run at: 2026-03-26 21:23:10 IST)" raised an exception
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 717, in checkout
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 715, in checkout
+    dbapi_connection = rec.get_connection()
+                       ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 866, in get_connection
+    self.__connect()
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\psycopg2\__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.OperationalError: connection to server at "ep-twilight-cherry-aip86ui8-pooler.c-4.us-east-1.aws.neon.tech" (54.86.249.90), port 5432 failed: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\apscheduler\executors\base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\app\workers\hourly_jobs.py", line 67, in smart_battery_swap_notifications
+    execution = create_job_execution("hourly_swap_alerts")
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\app\workers\daily_jobs.py", line 18, in create_job_execution
+    job = session.exec(select(BatchJob).where(BatchJob.job_name == job_name)).first()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlmodel\orm\session.py", line 68, in exec
+    results = super().execute(
+              ^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2239, in _execute_internal
+    conn = self._connection_for_bind(bind)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2108, in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in _connection_for_bind
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 1187, in _connection_for_bind
+    conn = bind.connect()
+           ^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3293, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 145, in __init__
+    Connection._handle_dbapi_exception_noconnection(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 2448, in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 717, in checkout
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 715, in checkout
+    dbapi_connection = rec.get_connection()
+                       ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 866, in get_connection
+    self.__connect()
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\psycopg2\__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) connection to server at "ep-twilight-cherry-aip86ui8-pooler.c-4.us-east-1.aws.neon.tech" (54.86.249.90), port 5432 failed: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+ERROR:apscheduler.executors.default:Job "Periodic Charging Optimization (trigger: interval[0:30:00], next run at: 2026-03-26 21:23:10 IST)" raised an exception
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 717, in checkout
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 715, in checkout
+    dbapi_connection = rec.get_connection()
+                       ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 837, in get_connection
+    self.__connect()
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\psycopg2\__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+psycopg2.OperationalError: connection to server at "ep-twilight-cherry-aip86ui8-pooler.c-4.us-east-1.aws.neon.tech" (54.86.249.90), port 5432 failed: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\apscheduler\executors\base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\app\tasks\charging_optimizer.py", line 23, in optimize_charging_queues
+    stations = session.exec(select(Station).where(Station.status == "active")).all()
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlmodel\orm\session.py", line 68, in exec
+    results = super().execute(
+              ^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2239, in _execute_internal
+    conn = self._connection_for_bind(bind)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2108, in _connection_for_bind
+    return trans._connection_for_bind(engine, execution_options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 2, in _connection_for_bind
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 1187, in _connection_for_bind
+    conn = bind.connect()
+           ^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3293, in connect
+    return self._connection_cls(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 145, in __init__
+    Connection._handle_dbapi_exception_noconnection(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 2448, in _handle_dbapi_exception_noconnection
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 3317, in raw_connection
+    return self.pool.connect()
+           ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 448, in connect
+    return _ConnectionFairy._checkout(self)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 1272, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 717, in checkout
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 715, in checkout
+    dbapi_connection = rec.get_connection()
+                       ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 837, in get_connection
+    self.__connect()
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 900, in __connect
+    with util.safe_reraise():
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 121, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\pool\base.py", line 896, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\create.py", line 667, in connect
+    return dialect.connect(*cargs_tup, **cparams)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 630, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\psycopg2\__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) connection to server at "ep-twilight-cherry-aip86ui8-pooler.c-4.us-east-1.aws.neon.tech" (54.86.249.90), port 5432 failed: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 20:59:10 IST)" (scheduled at 2026-03-26 20:57:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 20:59:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:01:10 IST)" (scheduled at 2026-03-26 20:59:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:01:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:03:10 IST)" (scheduled at 2026-03-26 21:01:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:03:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:05:10 IST)" (scheduled at 2026-03-26 21:03:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:05:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:07:10 IST)" (scheduled at 2026-03-26 21:05:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:07:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:09:10 IST)" (scheduled at 2026-03-26 21:07:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:09:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-26 21:22:52 IST)" (scheduled at 2026-03-26 21:07:52.364851+05:30)
+INFO:app.workers.rental_expiry_worker:Running scheduled rental expiry job...
+INFO:apscheduler.executors.default:Job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-26 21:22:52 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:11:10 IST)" (scheduled at 2026-03-26 21:09:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:11:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:13:10 IST)" (scheduled at 2026-03-26 21:11:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:13:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:15:10 IST)" (scheduled at 2026-03-26 21:13:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:15:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:17:10 IST)" (scheduled at 2026-03-26 21:15:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:17:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:19:10 IST)" (scheduled at 2026-03-26 21:17:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:19:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:21:10 IST)" (scheduled at 2026-03-26 21:19:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:21:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:23:10 IST)" (scheduled at 2026-03-26 21:21:10.863928+05:30)
+ERROR:app.tasks.station_monitor:Error in monitor_stations: (psycopg2.OperationalError) connection to server at "ep-twilight-cherry-aip86ui8-pooler.c-4.us-east-1.aws.neon.tech" (44.211.114.173), port 5432 failed: server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+server closed the connection unexpectedly
+	This probably means the server terminated abnormally
+	before or while processing the request.
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-26 21:23:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-30 11:22:52 IST)" (scheduled at 2026-03-30 11:07:52.364851+05:30)
+INFO:app.workers.rental_expiry_worker:Running scheduled rental expiry job...
+WARNING:apscheduler.executors.default:Run time of job "Hourly Battery Health Checks (trigger: interval[1:00:00], next run at: 2026-03-30 11:23:10 IST)" was missed by 0:48:01.650250
+WARNING:apscheduler.executors.default:Run time of job "Hourly Geofence Violation Detection (trigger: interval[1:00:00], next run at: 2026-03-30 11:23:10 IST)" was missed by 0:48:01.659481
+WARNING:apscheduler.executors.default:Run time of job "Hourly Rental Overdue Check (trigger: interval[1:00:00], next run at: 2026-03-30 11:23:10 IST)" was missed by 0:48:01.658451
+WARNING:apscheduler.executors.default:Run time of job "Hourly Low Stock Alerts (trigger: interval[1:00:00], next run at: 2026-03-30 11:23:10 IST)" was missed by 0:48:01.658972
+WARNING:apscheduler.executors.default:Run time of job "Smart Battery Swap Notifications (trigger: interval[0:30:00], next run at: 2026-03-30 11:23:10 IST)" was missed by 0:18:01.665853
+WARNING:apscheduler.executors.default:Run time of job "Periodic Battery Health Monitor (trigger: interval[1:00:00], next run at: 2026-03-30 11:23:10 IST)" was missed by 0:48:01.661387
+WARNING:apscheduler.executors.default:Run time of job "Periodic Charging Optimization (trigger: interval[0:30:00], next run at: 2026-03-30 11:23:10 IST)" was missed by 0:18:01.663710
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:13:10 IST)" (scheduled at 2026-03-30 11:11:10.863928+05:30)
+WARNING:apscheduler.executors.default:Run time of job "Daily Revenue Aggregation (trigger: cron[hour='0', minute='0'], next run at: 2026-03-31 00:00:00 IST)" was missed by 11:11:12.529433
+WARNING:apscheduler.executors.default:Run time of job "Daily Inventory Synchronization (trigger: cron[hour='0', minute='15'], next run at: 2026-03-31 00:15:00 IST)" was missed by 10:56:12.529433
+WARNING:apscheduler.executors.default:Run time of job "Daily Late Fee Calculation (trigger: cron[hour='0', minute='30'], next run at: 2026-03-31 00:30:00 IST)" was missed by 10:41:12.529433
+WARNING:apscheduler.executors.default:Run time of job "Daily Commission Accrual (trigger: cron[hour='0', minute='45'], next run at: 2026-03-31 00:45:00 IST)" was missed by 10:26:12.529433
+WARNING:apscheduler.executors.default:Run time of job "Daily Fraud Score Recalculation (trigger: cron[hour='1', minute='0'], next run at: 2026-03-31 01:00:00 IST)" was missed by 10:11:12.529433
+INFO:apscheduler.executors.default:Job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-30 11:22:52 IST)" executed successfully
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:13:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:15:10 IST)" (scheduled at 2026-03-30 11:13:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:15:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:17:10 IST)" (scheduled at 2026-03-30 11:15:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:17:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:19:10 IST)" (scheduled at 2026-03-30 11:17:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:19:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:21:10 IST)" (scheduled at 2026-03-30 11:19:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:21:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:23:10 IST)" (scheduled at 2026-03-30 11:21:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:23:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-30 11:37:52 IST)" (scheduled at 2026-03-30 11:22:52.364851+05:30)
+INFO:app.workers.rental_expiry_worker:Running scheduled rental expiry job...
+INFO:apscheduler.executors.default:Running job "Hourly Battery Health Checks (trigger: interval[1:00:00], next run at: 2026-03-30 12:23:10 IST)" (scheduled at 2026-03-30 11:23:10.857767+05:30)
+INFO:app.workers.hourly_jobs:Starting battery health checks...
+INFO:apscheduler.executors.default:Running job "Hourly Geofence Violation Detection (trigger: interval[1:00:00], next run at: 2026-03-30 12:23:10 IST)" (scheduled at 2026-03-30 11:23:10.857767+05:30)
+INFO:app.workers.hourly_jobs:Starting geofence violation detection...
+INFO:apscheduler.executors.default:Running job "Hourly Rental Overdue Check (trigger: interval[1:00:00], next run at: 2026-03-30 12:23:10 IST)" (scheduled at 2026-03-30 11:23:10.858797+05:30)
+INFO:app.workers.rental_worker:Starting automated overdue rental scan...
+INFO:apscheduler.executors.default:Running job "Smart Battery Swap Notifications (trigger: interval[0:30:00], next run at: 2026-03-30 11:53:10 IST)" (scheduled at 2026-03-30 11:23:10.858797+05:30)
+INFO:apscheduler.executors.default:Running job "Hourly Low Stock Alerts (trigger: interval[1:00:00], next run at: 2026-03-30 12:23:10 IST)" (scheduled at 2026-03-30 11:23:10.858797+05:30)
+INFO:app.workers.hourly_jobs:Starting low stock alerts...
+INFO:apscheduler.executors.default:Running job "Periodic Battery Health Monitor (trigger: interval[1:00:00], next run at: 2026-03-30 12:23:10 IST)" (scheduled at 2026-03-30 11:23:10.863928+05:30)
+INFO:apscheduler.executors.default:Running job "Periodic Charging Optimization (trigger: interval[0:30:00], next run at: 2026-03-30 11:53:10 IST)" (scheduled at 2026-03-30 11:23:10.863928+05:30)
+INFO:app.workers.hourly_jobs:Starting smart battery swap notifications...
+INFO:app.tasks.battery_health_monitor:Starting periodic battery health monitor task...
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:25:10 IST)" (scheduled at 2026-03-30 11:23:10.863928+05:30)
+INFO:app.tasks.charging_optimizer:Starting charging queue optimization task...
+INFO:app.tasks.charging_optimizer:Charging queue optimization completed.
+ERROR:apscheduler.executors.default:Job "Periodic Battery Health Monitor (trigger: interval[1:00:00], next run at: 2026-03-30 12:23:10 IST)" raised an exception
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.InvalidTextRepresentation: invalid input value for enum batterystatus: "ready"
+LINE 3: ...eries.status IN ('AVAILABLE', 'RENTED', 'CHARGING', 'ready')
+                                                               ^
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\apscheduler\executors\base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\app\tasks\battery_health_monitor.py", line 22, in monitor_battery_health
+    batteries = session.exec(stmt).all()
+                ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlmodel\orm\session.py", line 68, in exec
+    results = super().execute(
+              ^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\orm\context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\sql\elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\wezu_e\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.DataError: (psycopg2.errors.InvalidTextRepresentation) invalid input value for enum batterystatus: "ready"
+LINE 3: ...eries.status IN ('AVAILABLE', 'RENTED', 'CHARGING', 'ready')
+                                                               ^
+
+[SQL: SELECT batteries.id, batteries.serial_number, batteries.qr_code_data, batteries.iot_device_id, batteries.sku_id, batteries.station_id, batteries.current_user_id, batteries.created_by, batteries.status, batteries.health_status, batteries.current_charge, batteries.health_percentage, batteries.cycle_count, batteries.total_cycles, batteries.temperature_c, batteries.manufacturer, batteries.battery_type, batteries.notes, batteries.location_type, batteries.manufacture_date, batteries.purchase_date, batteries.warranty_expiry, batteries.last_charged_at, batteries.last_inspected_at, batteries.last_maintenance_date, batteries.last_maintenance_cycles, batteries.state_of_health, batteries.temperature_history, batteries.charge_cycles, batteries.location_id, batteries.last_telemetry_at, batteries.created_at, batteries.updated_at 
+FROM batteries 
+WHERE batteries.status IN (%(status_1_1)s, %(status_1_2)s, %(status_1_3)s, %(status_1_4)s)]
+[parameters: {'status_1_1': 'AVAILABLE', 'status_1_2': 'RENTED', 'status_1_3': 'CHARGING', 'status_1_4': 'ready'}]
+(Background on this error at: https://sqlalche.me/e/20/9h9h)
+INFO:apscheduler.executors.default:Job "Periodic Charging Optimization (trigger: interval[0:30:00], next run at: 2026-03-30 11:53:10 IST)" executed successfully
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:25:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-30 11:37:52 IST)" executed successfully
+INFO:app.workers.hourly_jobs:Geofence check completed: 0 violations
+INFO:app.workers.rental_worker:Overdue scan completed: 0 fees applied/updated
+INFO:app.workers.hourly_jobs:Swap notifications completed: 0 sent
+INFO:app.workers.hourly_jobs:Low stock alerts completed: 0 alerts
+ERROR:app.workers.hourly_jobs:Battery health checks failed: (psycopg2.errors.InvalidTextRepresentation) invalid input value for enum batterystatus: "in_use"
+LINE 3: WHERE batteries.status IN ('AVAILABLE', 'in_use')
+                                                ^
+
+[SQL: SELECT batteries.id, batteries.serial_number, batteries.qr_code_data, batteries.iot_device_id, batteries.sku_id, batteries.station_id, batteries.current_user_id, batteries.created_by, batteries.status, batteries.health_status, batteries.current_charge, batteries.health_percentage, batteries.cycle_count, batteries.total_cycles, batteries.temperature_c, batteries.manufacturer, batteries.battery_type, batteries.notes, batteries.location_type, batteries.manufacture_date, batteries.purchase_date, batteries.warranty_expiry, batteries.last_charged_at, batteries.last_inspected_at, batteries.last_maintenance_date, batteries.last_maintenance_cycles, batteries.state_of_health, batteries.temperature_history, batteries.charge_cycles, batteries.location_id, batteries.last_telemetry_at, batteries.created_at, batteries.updated_at 
+FROM batteries 
+WHERE batteries.status IN (%(status_1_1)s, %(status_1_2)s)]
+[parameters: {'status_1_1': 'AVAILABLE', 'status_1_2': 'in_use'}]
+(Background on this error at: https://sqlalche.me/e/20/9h9h)
+INFO:apscheduler.executors.default:Job "Hourly Geofence Violation Detection (trigger: interval[1:00:00], next run at: 2026-03-30 12:23:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Job "Hourly Low Stock Alerts (trigger: interval[1:00:00], next run at: 2026-03-30 12:23:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Job "Smart Battery Swap Notifications (trigger: interval[0:30:00], next run at: 2026-03-30 11:53:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Job "Hourly Rental Overdue Check (trigger: interval[1:00:00], next run at: 2026-03-30 12:23:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Job "Hourly Battery Health Checks (trigger: interval[1:00:00], next run at: 2026-03-30 12:23:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:25:10 IST)" (scheduled at 2026-03-30 11:25:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:27:10 IST)" executed successfully

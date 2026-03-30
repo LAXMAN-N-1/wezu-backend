@@ -55,3 +55,19 @@ def verify_permission(user, permission_slug: str) -> bool:
     if user.is_superuser:
         return True
     return user.has_permission(permission_slug)
+
+import pyotp
+import secrets
+
+def generate_totp_secret() -> str:
+    return pyotp.random_base32()
+
+def verify_totp(secret: str, code: str) -> bool:
+    totp = pyotp.TOTP(secret)
+    return totp.verify(code)
+
+def generate_backup_codes(num_codes: int = 10, length: int = 8) -> list:
+    return [secrets.token_hex(length // 2) for _ in range(num_codes)]
+
+def generate_qr_uri(secret: str, email: str, issuer: str = "WEZU") -> str:
+    return pyotp.totp.TOTP(secret).provisioning_uri(name=email, issuer_name=issuer)

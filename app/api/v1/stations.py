@@ -4,6 +4,10 @@ from typing import List, Optional
 from app.api import deps
 from app.core.audit import audit_log
 from app.models.user import User
+from app.models.station import Station, StationStatus
+from app.models.favorite import Favorite
+from app.models.battery import Battery
+from app.schemas.battery import BatteryResponse
 from app.schemas.station import (
     StationResponse, StationCreate, NearbyStationResponse,
     StationUpdate, StationPerformanceResponse, StationMapResponse,

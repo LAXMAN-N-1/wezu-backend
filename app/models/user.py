@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from app.models.staff import StaffProfile
     from app.models.rbac import Role, UserAccessPath
     from app.models.token import SessionToken
+    from app.models.user_profile import UserProfile
 
 class UserType(str, Enum):
     CUSTOMER = "customer"
@@ -129,14 +130,8 @@ class User(SQLModel, table=True):
     access_paths: List["UserAccessPath"] = Relationship(back_populates="user")
     sessions: List["UserSession"] = Relationship(back_populates="user")
     session_tokens: List["SessionToken"] = Relationship(back_populates="user")
-<<<<<<< HEAD
-    two_factor_auth: Optional["TwoFactorAuth"] = Relationship(
-        back_populates="user",
-        sa_relationship_kwargs={"uselist": False}
-    )
-=======
     two_factor_auth: Optional["TwoFactorAuth"] = Relationship(back_populates="user")
->>>>>>> origin/main
+    user_profile: Optional["UserProfile"] = Relationship(back_populates="user")
 
     # --- Granular RBAC Helpers ---
     @property
@@ -155,6 +150,10 @@ class User(SQLModel, table=True):
         return slug in self.all_permissions
 
 # OTP class removed (moved to app/models/otp.py)
+
+    @property
+    def is_active(self) -> bool:
+        return self.status == UserStatus.ACTIVE
 
     @is_active.setter
     def is_active(self, value: bool):

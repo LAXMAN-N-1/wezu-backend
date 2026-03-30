@@ -182,77 +182,26 @@ logistics_deps = [Depends(deps.get_current_user)]
 app.include_router(logistics.router, prefix=f"{logistics_api}", tags=["Logistics: Main"], dependencies=logistics_deps)
 app.include_router(warehouses.router, prefix=f"{logistics_api}/warehouses", tags=["Logistics: Warehouses"], dependencies=logistics_deps)
 
-# Customer Vehicles
-from app.api.v1 import vehicles
-app.include_router(vehicles.router, prefix=f"{settings.API_V1_STR}/vehicles", tags=["Customer Vehicles"])
-
-# Swap Operations
-from app.api.v1 import swaps
-app.include_router(swaps.router, prefix=f"{settings.API_V1_STR}/swaps", tags=["Swap Operations"])
-
-# Financial Settlements
-from app.api.v1 import settlements
-app.include_router(settlements.router, prefix=f"{settings.API_V1_STR}/settlements", tags=["Financial Settlements"])
-
-# Telematics Ingestion
-from app.api.v1 import telematics
+# Phase 5: Additional Service Integrations (Telematics, Monitoring, etc.)
+from app.api.v1 import telematics, battery_alerts, dealer_analytics, dealer_campaigns, dealer_stations
 app.include_router(telematics.router, prefix=f"{settings.API_V1_STR}/telematics", tags=["Telematics & IoT"])
-
-# Support Tickets
-from app.api.v1 import support
-app.include_router(support.router, prefix=f"{settings.API_V1_STR}/support", tags=["Support & Ticketing"])
-
-# Admin / RBAC
-from app.api.v1 import admin_rbac, security, admin_audit
-app.include_router(admin_rbac.router, prefix=f"{settings.API_V1_STR}/admin/rbac", tags=["Admin RBAC"])
-app.include_router(security.router, prefix=f"{settings.API_V1_STR}/admin/security", tags=["Admin Security"])
-app.include_router(admin_audit.router, prefix=f"{settings.API_V1_STR}/admin/audit-logs", tags=["Admin Audit Logs"])
-app.include_router(support_enhanced.router, prefix=f"{settings.API_V1_STR}/support", tags=["Support Enhanced"])
-app.include_router(rentals_enhanced.router, prefix=f"{settings.API_V1_STR}/rentals", tags=["Rentals Enhanced"])
-app.include_router(purchases_enhanced.router, prefix=f"{settings.API_V1_STR}/purchases", tags=["Purchases Enhanced"])
-app.include_router(analytics_enhanced.router, prefix=f"{settings.API_V1_STR}/analytics", tags=["Analytics Enhanced"])
-
-# Dealer Analytics
-from app.api.v1 import dealer_analytics
+app.include_router(battery_alerts.router, prefix=f"{settings.API_V1_STR}/customer/battery-alerts", tags=["Customer: Battery Alerts"])
 app.include_router(dealer_analytics.router, prefix=f"{settings.API_V1_STR}/dealer-analytics", tags=["Dealer Analytics"])
-
-# Dealer Campaigns
-from app.api.v1 import dealer_campaigns
 app.include_router(dealer_campaigns.router, prefix=f"{settings.API_V1_STR}/dealer-campaigns", tags=["Dealer Campaigns"])
-
-# Dealer Stations (Inventory & Management)
-from app.api.v1 import dealer_stations
 app.include_router(dealer_stations.router, prefix=f"{settings.API_V1_STR}/dealer-stations", tags=["Dealer Stations"])
 
-# RBAC API Routes
-app.include_router(roles.router, prefix=f"{settings.API_V1_STR}/roles", tags=["Roles"])
-app.include_router(menus.router, prefix=f"{settings.API_V1_STR}/menus", tags=["Menus"])
-app.include_router(role_rights.router, prefix=f"{settings.API_V1_STR}/role-rights", tags=["Role Rights"])
-
-# ML & Dynamics (Phase 5)
-from app.api.v1 import ml, admin_roles, admin_kyc, admin_financial_reports
-app.include_router(ml.router, prefix=f"{settings.API_V1_STR}/ml", tags=["Machine Learning"])
-app.include_router(admin_roles.router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin Role Management"])
-app.include_router(admin_kyc.router, prefix=f"{settings.API_V1_STR}/admin/kyc", tags=["Admin KYC Management"])
-app.include_router(admin_financial_reports.router, prefix=f"{settings.API_V1_STR}/admin/reports", tags=["Admin Financial Reports"])
-
-
-# Webhooks
-app.include_router(razorpay_webhook.router, prefix="/api/webhooks", tags=["Webhooks"])
+# Webhooks (Handled in payments.py or similar, removing duplicate router)
+# app.include_router(razorpay_webhook.router, prefix="/api/webhooks", tags=["Webhooks"])
 
 # Battery Catalog (Specs)
-from app.api.v1 import battery_catalog
+from app.api.v1 import catalog as battery_catalog
 app.include_router(battery_catalog.router, prefix=f"{settings.API_V1_STR}/batteries", tags=["Battery Catalog"])
 
-# Logistics (Warehouses & Transfers)
-from app.api.v1 import logistics
-app.include_router(logistics.router, prefix=f"{settings.API_V1_STR}/logistics", tags=["Logistics & Supply Chain"])
-
-# Dealer Onboarding
-from app.api.v1 import dealers, dealer_kyc, dealer_commission
-app.include_router(dealers.router, prefix=f"{settings.API_V1_STR}/dealers", tags=["Dealers"])
+# Dealer Commission & KYC (Extended)
+from app.api.v1 import dealer_kyc, dealer_commission, admin_financial_reports
 app.include_router(dealer_kyc.router, prefix=f"{settings.API_V1_STR}/dealer-kyc", tags=["Dealer KYC"])
 app.include_router(dealer_commission.router, prefix=f"{settings.API_V1_STR}/dealer-commission", tags=["Dealer Commission & Settlement"])
+app.include_router(admin_financial_reports.router, prefix=f"{settings.API_V1_STR}/admin/reports", tags=["Admin Financial Reports"])
 
 # Driver Onboarding
 from app.api.v1 import drivers

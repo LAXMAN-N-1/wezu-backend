@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import Session
-from typing import List
+from typing import List, Optional
 from app.api import deps
 from app.core.audit import audit_log
 from app.models.user import User

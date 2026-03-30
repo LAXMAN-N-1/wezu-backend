@@ -4,13 +4,21 @@ from typing import List, Optional, Any
 from datetime import datetime
 from app.api import deps
 from app.api.deps import get_current_user, get_db
-from app.models.dealer import DealerProfile, DealerApplication
+from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
 from app.models.user import User
 from app.services.dealer_service import DealerService
 from app.schemas.common import DataResponse
 from app.schemas.dealer import DealerProfileCreate, DealerProfileUpdate, DealerProfileResponse
 from pydantic import BaseModel
 
+class StageUpdate(BaseModel):
+    stage: str
+    note: str = ""
+
+class VisitSchedule(BaseModel):
+    application_id: int
+    officer_id: int
+    date: datetime
 router = APIRouter()
 
 
@@ -77,7 +85,7 @@ def update_stage(
     app_id: int, 
     update_in: StageUpdate,
     current_user: User = Depends(get_current_user), # Check Is Admin
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     try:
         app = DealerService.update_application_stage(app_id, update_in.stage, update_in.note)
@@ -89,7 +97,7 @@ def update_stage(
 def schedule_visit(
     visit_in: VisitSchedule,
     current_user: User = Depends(get_current_user), # Check Is Admin
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     visit = DealerService.schedule_field_visit(visit_in.application_id, visit_in.officer_id, visit_in.date)
     return DataResponse(data=visit)
@@ -114,7 +122,7 @@ def generate_settlement(
 @router.get("/settlements", response_model=DataResponse[List[Settlement]])
 def get_my_settlements(
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(deps.get_db)
 ):
     profile = DealerService.get_dealer_by_user(current_user.id)
     if not profile:

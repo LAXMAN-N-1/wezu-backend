@@ -155,3 +155,26 @@ class AuditService:
             }
             for log in logs
         ]
+
+    async def get_logs(self, user_id: int, page: int, limit: int) -> dict:
+        return {"logs": [], "total_count": 0}
+
+    async def log_event(self, event_type: str, user_id: int, action: str, resource: str = None, status: str = None, metadata: Dict[str, Any] = None, ip_address: str = None):
+        """Async compatibility wrapper for middleware and security events."""
+        try:
+            import json
+            from sqlmodel import Session
+            from app.core.database import engine
+            with Session(engine) as db:
+                self.log_action(
+                    db=db,
+                    action=f"{action}",
+                    resource_type=resource or "unknown",
+                    user_id=user_id,
+                    details=json.dumps(metadata) if metadata else None,
+                    ip_address=ip_address
+                )
+        except Exception as e:
+            logger.error(f"Failed to write async audit log: {e}")
+
+audit_service = AuditService()
