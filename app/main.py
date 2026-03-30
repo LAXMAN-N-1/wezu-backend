@@ -42,7 +42,8 @@ from app.api.v1 import (
     organizations, warehouses, screens, stock, dealers, logistics, 
     settlements, telemetry, vehicles, locations, system, roles, 
     menus, role_rights, admin_kyc, audit, ml, inventory,
-    admin_stations, station_monitoring, battery_alerts
+    admin_stations, station_monitoring, battery_alerts,
+    admin_alerts, maintenance, vendors
 )
 from app.api.v1.admin import (
     support as admin_support, 
@@ -185,6 +186,10 @@ from app.api.v1 import customer_auth
 app.include_router(customer_auth.router, prefix=f"{settings.API_V1_STR}/customer/auth", tags=["Customer Auth"])
 from app.api.v1 import sessions
 app.include_router(sessions.router, prefix=f"{settings.API_V1_STR}/sessions", tags=["Session Management"])
+app.include_router(profile.router, prefix=f"{settings.API_V1_STR}/profile", tags=["Customer: Profile"])
+app.include_router(station_clusters.router, prefix=f"{settings.API_V1_STR}/stations", tags=["Customer: Stations"])
+app.include_router(bookings.router, prefix=f"{settings.API_V1_STR}/bookings", tags=["Customer: Bookings"])
+app.include_router(battery_alerts.router, prefix=f"{settings.API_V1_STR}/customer/battery-alerts", tags=["Customer: Battery Alerts"])
 app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["Users"])
 from app.api.v1 import admin_users, admin_user_bulk
 app.include_router(admin_users.router, prefix=f"{settings.API_V1_STR}/admin/users", tags=["Admin User Management"])
@@ -218,6 +223,10 @@ admin_deps = [Depends(deps.get_current_active_superuser)]
 
 # Use the consolidated admin router which includes stations, users, rentals, etc.
 app.include_router(admin_router, prefix=f"{admin_api}", tags=["Admin: Main"], dependencies=admin_deps)
+app.include_router(admin_alerts.router, prefix=f"{admin_api}/alerts", tags=["Admin: Alerts"], dependencies=admin_deps)
+app.include_router(maintenance.router, prefix=f"{admin_api}/maintenance", tags=["Admin: Maintenance"], dependencies=admin_deps)
+app.include_router(vendors.router, prefix=f"{admin_api}/vendors", tags=["Admin: Vendors"], dependencies=admin_deps)
+app.include_router(inventory.router, prefix=f"{admin_api}/inventory", tags=["Admin: Inventory"], dependencies=admin_deps)
 app.include_router(warranty.admin_router, prefix=f"{admin_api}/warranty", tags=["Admin: Warranty"], dependencies=admin_deps)
 app.include_router(admin_users.router, prefix=f"{admin_api}/users", tags=["Admin: Users"], dependencies=admin_deps)
 app.include_router(admin_roles.router, prefix=f"{admin_api}/roles", tags=["Admin: Roles"], dependencies=admin_deps)
@@ -285,6 +294,9 @@ app.include_router(settlements.router, prefix=f"{settings.API_V1_STR}/settlement
 # Telematics Ingestion
 from app.api.v1 import telematics
 app.include_router(telematics.router, prefix=f"{settings.API_V1_STR}/telematics", tags=["Telematics & IoT"])
+app.include_router(telemetry.router, prefix=f"{settings.API_V1_STR}/telemetry", tags=["Telemetry"])
+app.include_router(locations.router, prefix=f"{settings.API_V1_STR}/locations", tags=["Locations"])
+app.include_router(system.router, prefix=f"{settings.API_V1_STR}/system", tags=["System & Metrics"])
 
 # Support Tickets
 from app.api.v1 import support
