@@ -32,24 +32,17 @@ class LateFeeService:
         if not rental:
             return {'late_fee': 0, 'hours_late': 0, 'is_late': False}
         
-        # Check if rental has ended
+        # Determine expected end time using explicit field when available
+        expected_end = rental.expected_end_time or (rental.start_time + timedelta(hours=24))
+
         if not rental.end_time:
-            # Still active, check if overdue
-            expected_end = rental.start_time + timedelta(hours=rental.duration_hours or 24)
             now = datetime.utcnow()
-            
             if now <= expected_end:
                 return {'late_fee': 0, 'hours_late': 0, 'is_late': False}
-            
-            # Calculate hours late
             hours_late = (now - expected_end).total_seconds() / 3600
         else:
-            # Rental ended, check if it was late
-            expected_end = rental.start_time + timedelta(hours=rental.duration_hours or 24)
-            
             if rental.end_time <= expected_end:
                 return {'late_fee': 0, 'hours_late': 0, 'is_late': False}
-            
             hours_late = (rental.end_time - expected_end).total_seconds() / 3600
         
         # Apply grace period
@@ -68,7 +61,12 @@ class LateFeeService:
         
         # Late fee is 1.5x the daily rate per hour
         late_fee_multiplier = settings.LATE_FEE_MULTIPLIER if hasattr(settings, 'LATE_FEE_MULTIPLIER') else 1.5
-        hourly_rate = rental.daily_rate / 24
+        # Derive hourly rate defensively
+        if getattr(rental, "daily_rate", None):
+            hourly_rate = rental.daily_rate / 24
+        else:
+            total_hours = ((expected_end - rental.start_time).total_seconds() / 3600) or 24
+            hourly_rate = (rental.total_amount or 0) / total_hours
         late_fee = chargeable_hours * hourly_rate * late_fee_multiplier
         
         return {
@@ -127,13 +125,13 @@ class LateFeeService:
             db.add(new_fee)
             
             # Also register a transaction for visibility (optional, but good for financial logs)
-            from app.models.financial import Transaction
+            from app.models.financial import Transaction, TransactionType, TransactionStatus
             transaction = Transaction(
                 user_id=rental.user_id,
                 rental_id=rental_id,
-                transaction_type="LATE_FEE",
+                transaction_type=TransactionType.LATE_FEE,
                 amount=fee_details['late_fee'],
-                status="PENDING",
+                status=TransactionStatus.PENDING,
                 description=f"Late fee for {fee_details['hours_late']:.1f} hours overdue",
                 metadata=str(fee_details)
             )
@@ -162,7 +160,7 @@ class LateFeeService:
         
         overdue = []
         for rental in active_rentals:
-            expected_end = rental.start_time + timedelta(hours=rental.duration_hours or 24)
+            expected_end = rental.expected_end_time or (rental.start_time + timedelta(hours=24))
             
             if now > expected_end:
                 fee_details = LateFeeService.calculate_late_fee(rental.id, session)

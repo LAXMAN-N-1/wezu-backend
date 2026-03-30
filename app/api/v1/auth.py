@@ -24,6 +24,14 @@ from datetime import datetime, timedelta
 from jose import jwt, JWTError
 import uuid
 from app.middleware.rate_limit import limiter
+from app.repositories.user_repository import user_repository
+from app.services.security_service import SecurityService
+from app.schemas.auth import (
+    VerifyEmailRequest, ChangePasswordRequest, TwoFASetupResponse, 
+    TwoFAVerifyRequest, TwoFADisableRequest, BiometricRegisterRequest, 
+    BiometricLoginRequest, SecurityQuestionResponse, SetSecurityQuestionRequest, 
+    VerifySecurityQuestionRequest
+)
 
 router = APIRouter()
 logger = logging.getLogger("wezu_auth")
@@ -112,22 +120,7 @@ async def register(
         
     return user
 
-@router.post("/login", response_model=Token)
-@router.post("/token", response_model=Token)
-async def login_access_token(
-    request: Request,
-    db: Session = Depends(get_session),
-    form_data: OAuth2PasswordRequestForm = Depends()
-) -> Any:
-    """
-    JSON based login for cleaner UI (uses 'email' field)
-    """
-    return await _process_login(
-        username=login_data.email,
-        password=login_data.password,
-        db=db,
-        request=request
-    )
+
 
 class EmailPasswordRequestForm:
     """
@@ -149,7 +142,7 @@ class EmailPasswordRequestForm:
         self.client_id = client_id
         self.client_secret = client_secret
 
-@router.post("/token", response_model=Token)
+@router.post("/token", response_model=Token, tags=["authentication"])
 @limiter.limit("5/minute")
 async def login_access_token(
     request: Request,
@@ -175,7 +168,7 @@ async def _process_login(username: str, password: str, db: Session, request: Req
         # Try by phone number if email fails
         user = user_repository.get_by_phone(db, username)
 
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if not user or not verify_password(password, user.hashed_password):
         # Extract IP and User-Agent
         ip_address = request.client.host if request.client else None
         user_agent = request.headers.get("user-agent")
@@ -184,13 +177,13 @@ async def _process_login(username: str, password: str, db: Session, request: Req
             None, 
             "FAILED_LOGIN", 
             "AUTH", 
-            metadata={"username": form_data.username, "reason": "invalid_credentials"},
+            metadata={"username": username, "reason": "invalid_credentials"},
             ip_address=ip_address,
             user_agent=user_agent
         )
         raise HTTPException(status_code=400, detail="Incorrect email or password")
     
-    if not user.is_active:
+    if user.status != UserStatus.ACTIVE:
         AuditLogger.log_event(db, user.id, "FAILED_LOGIN", "AUTH", metadata={"reason": "inactive_account"})
         raise HTTPException(status_code=400, detail="Inactive user")
         
@@ -210,15 +203,6 @@ async def _process_login(username: str, password: str, db: Session, request: Req
     
     # Create Session
     try:
-        AuthService.create_session(
-            db=db, 
-            user_id=user.id, 
-            access_token=access_token, 
-            refresh_token=refresh_token, 
-            device_info=request.headers.get("user-agent", "Unknown"), 
-            ip_address=request.client.host
-        )
-        
         # Record Login History
         from app.models.login_history import LoginHistory
         login_record = LoginHistory(
@@ -231,7 +215,8 @@ async def _process_login(username: str, password: str, db: Session, request: Req
         db.add(login_record)
         db.commit()
     except Exception as e:
-        logger.error(f"SESSION_CREATION_FAILED: {str(e)}")
+        db.rollback()
+        logger.error(f"SESSION_HISTORY_RECORD_FAILED: {str(e)}")
         # Some systems might still log in but token usage might fail later if session is strict
     
     return Token(
@@ -654,7 +639,7 @@ async def login_with_password(
             detail="Incorrect username or password",
         )
     
-    if not user.is_active:
+    if user.status != UserStatus.ACTIVE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Inactive user"
@@ -707,7 +692,13 @@ async def refresh_token(
         
         # Revoke old session and create new one (Session Rotation)
         AuthService.revoke_session(db, refresh_data.refresh_token)
-        AuthService.create_session(db, user.id, new_access_token, new_refresh_token, device_info=session.device_type, ip_address=session.ip_address)
+        AuthService.create_user_session(
+            db, 
+            user.id, 
+            new_refresh_token, 
+            ip_address=session.ip_address,
+            user_agent=session.user_agent
+        )
         
         # Update Session (Rotation)
         old_jti = payload.get("jti")
@@ -768,7 +759,7 @@ async def login(
         AuditLogger.log_event(db, user.id, "FAILED_LOGIN", "AUTH", metadata={"reason": "invalid_password"})
         raise HTTPException(status_code=401, detail="Invalid credentials")
         
-    if not user.is_active:
+    if user.status != UserStatus.ACTIVE:
          AuditLogger.log_event(db, user.id, "FAILED_LOGIN", "AUTH", metadata={"reason": "inactive_account"})
          raise HTTPException(status_code=403, detail="Account is inactive")
 
@@ -1062,19 +1053,7 @@ async def verify_email(
             detail="User not found"
         )
     
-    # 3. Update password
-    from app.core.security import get_password_hash
-    user.hashed_password = get_password_hash(request.new_password)
-    
-    # 4. Global Logout (Security Best Practice)
-    AuthService.revoke_all_user_sessions(db, user.id)
-    
-    # Check expiry (24 hours)
-    if user.email_verification_sent_at:
-        expiry = user.email_verification_sent_at + timedelta(hours=24)
-        if datetime.utcnow() > expiry:
-            raise HTTPException(status_code=400, detail="Verification token has expired")
-
+    # Email verified successfully
     user.is_email_verified = True
     user.email_verification_token = None
     user.kyc_status = KYCStatus.APPROVED # Auto-approve KYC for verified email
@@ -1094,14 +1073,14 @@ async def change_password(
     from app.core.security import verify_password, get_password_hash
     
     # Verify current password
-    if not verify_password(request.current_password, current_user.hashed_password):
+    if not verify_password(data.current_password, current_user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Current password is incorrect"
         )
     
     # Update password
-    current_user.hashed_password = get_password_hash(request.new_password)
+    current_user.hashed_password = get_password_hash(data.new_password)
     
     # Merge into current session to avoid "already attached" error
     updated_user = db.merge(current_user)
@@ -1197,7 +1176,13 @@ async def biometric_login(
         # Proceed to login
         access_token = create_access_token(subject=user.id)
         refresh_token = create_refresh_token(subject=user.id)
-        AuthService.create_session(db, user.id, access_token, refresh_token, device_info="Biometric", ip_address=request.client.host)
+        AuthService.create_user_session(
+            db, 
+            user.id, 
+            refresh_token, 
+            request=request,
+            user_agent="Biometric"
+        )
         return Token(access_token=access_token, refresh_token=refresh_token, user=user)
     
     raise HTTPException(status_code=401, detail="Biometric verification failed")
@@ -1248,16 +1233,19 @@ async def admin_login(
     Admin login endpoint (JSON body).
     Validates credentials and ensures the user has an admin-level role.
     """
-    logger.info(f"Admin login attempt for: {login_data.username}")
-
-    # Look up user by email
-    user = db.exec(select(User).where(User.email == login_data.username)).first()
+    # Look up user by email (case-insensitive & stripped)
+    username_clean = login_data.username.strip().lower()
+    from sqlalchemy import func
+    user = db.exec(select(User).where(func.lower(User.email) == username_clean)).first()
 
     if not user:
         logger.warning(f"Admin login - user not found: {login_data.username}")
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
-    if not verify_password(login_data.password, user.hashed_password):
+    password_clean = login_data.password.strip()
+    logger.warning(f"Admin login debug - Password received length: {len(login_data.password)}, Exact match to 'Admin@123': {login_data.password == 'Admin@123'}")
+    
+    if not verify_password(password_clean, user.hashed_password):
         logger.warning(f"Admin login - invalid password for: {login_data.username}")
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
@@ -1293,7 +1281,12 @@ async def admin_login(
     refresh_tok = create_refresh_token(subject=user.id)
 
     # Create session
-    AuthService.create_session(db, user.id, access_token, refresh_tok, device_info="Admin Web", ip_address=None)
+    AuthService.create_user_session(
+        db, 
+        user.id, 
+        refresh_tok, 
+        user_agent="Admin Web"
+    )
 
     logger.info(f"Admin login successful for user ID: {user.id}")
     return {

@@ -1,6 +1,9 @@
 from app.models.station import Station, StationImage, StationSlot, StationStatus
 from sqlmodel import Session, select, func
 from datetime import datetime
+from math import radians, cos, sin, asin, sqrt
+from app.models.alert import Alert
+from app.models.station_heartbeat import StationHeartbeat
 
 from app.models.battery import Battery
 from app.models.rental import Rental
@@ -79,11 +82,8 @@ class StationService:
                 
             dist = StationService.haversine(lon, lat, station.longitude, station.latitude)
             if dist <= radius_km:
-                # Create the response object
                 station_data = station.model_dump()
-                # Images need to be converted to schemas too if the relation is loaded
-                # For simplicity, we can load images or just pass empty for now if not needed
-                # However, StationResponse expects List[StationImageResponse]
+                station_data.pop("available_batteries", None)
                 images = [StationImageResponse(url=img.url, is_primary=img.is_primary) for img in station.images]
                 
                 nearby_station = NearbyStationResponse(
@@ -250,6 +250,33 @@ class StationService:
         ).all()
 
     @staticmethod
+    def record_heartbeat(db: Session, station_id: int, status: str, metrics: dict):
+        """
+        Simplified heartbeat recorder for tests. Creates a StationHeartbeat and raises alerts on high temperature.
+        """
+        hb = StationHeartbeat(
+            station_id=station_id,
+            status=status,
+            temperature=metrics.get("temperature"),
+            power_consumption=metrics.get("power_consumption"),
+            network_latency_ms=metrics.get("network_latency"),
+            recorded_at=datetime.utcnow()
+        )
+        db.add(hb)
+
+        # High temperature alert
+        if metrics.get("temperature", 0) >= 80:
+            alert = Alert(
+                station_id=station_id,
+                alert_type="HARDWARE",
+                severity="CRITICAL",
+                message=f"High temperature detected: {metrics.get('temperature')}",
+                created_at=datetime.utcnow()
+            )
+            db.add(alert)
+        db.commit()
+
+    @staticmethod
     def get_heatmap_data(db: Session) -> List[Dict[str, Any]]:
         # Aggregate demand by recent rentals per station
         week_ago = datetime.utcnow() - timedelta(days=7)
@@ -274,4 +301,3 @@ class StationService:
             }
             for r in results
         ]
-

@@ -31,13 +31,16 @@ class DealerProfile(SQLModel, table=True):
     pincode: str
     
     # Financial Details
-    bank_details: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSONB))
+    bank_details: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
     is_active: bool = Field(default=False)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Relationships
-    user: "User" = Relationship(back_populates="dealer_profile")
+    user: "User" = Relationship(
+        back_populates="dealer_profile",
+        sa_relationship_kwargs={"foreign_keys": "[DealerProfile.user_id]"}
+    )
     stations: List["Station"] = Relationship(back_populates="dealer")
     application: Optional["DealerApplication"] = Relationship(back_populates="dealer")
     # commissions: List["Commission"] = Relationship(back_populates="dealer")
@@ -51,11 +54,17 @@ class DealerDocument(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     dealer_id: int = Field(foreign_key="dealer_profiles.id")
     document_type: str = Field(index=True) # gst, pan, registration, cancelled_cheque
+    category: Optional[str] = Field(default="verification") # verification, business, operational
+    
     file_url: str
+    version: int = Field(default=1)
+    status: str = Field(default="PENDING") # PENDING, VERIFIED, REJECTED, EXPIRED, ARCHIVED
+    
+    valid_until: Optional[datetime] = None
     uploaded_at: datetime = Field(default_factory=datetime.utcnow)
     is_verified: bool = Field(default=False)
     
-    dealer: DealerProfile = Relationship(back_populates="documents")
+    dealer: "DealerProfile" = Relationship(back_populates="documents")
 
 class DealerApplication(SQLModel, table=True):
     __tablename__ = "dealer_applications"
@@ -63,8 +72,8 @@ class DealerApplication(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     dealer_id: int = Field(foreign_key="dealer_profiles.id", unique=True)
     
-    # Stages: SUBMITTED, KYC_PENDING, KYC_SUBMITTED, REVIEW_PENDING, 
-    # FIELD_VISIT_SCHEDULED, FIELD_VISIT_COMPLETED, REJECTED, APPROVED, ACTIVE
+    # Stages: SUBMITTED, AUTOMATED_CHECKS_PASSED, KYC_SUBMITTED, MANUAL_REVIEW_PASSED, 
+    # FIELD_VISIT_SCHEDULED, FIELD_VISIT_COMPLETED, REJECTED, APPROVED, TRAINING_COMPLETED, ACTIVE
     current_stage: str = Field(default="SUBMITTED")
     
     risk_score: float = Field(default=0.0)
@@ -75,8 +84,20 @@ class DealerApplication(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     
-    dealer: DealerProfile = Relationship(back_populates="application")
+    dealer: "DealerProfile" = Relationship(back_populates="application")
     field_visits: List["FieldVisit"] = Relationship(back_populates="application")
+    
+    def log_stage(self, new_stage: str, notes: str = ""):
+        self.current_stage = new_stage
+        self.updated_at = datetime.utcnow()
+        # Create a new list if it's None or empty, then append the new entry
+        history = list(self.status_history) if self.status_history else []
+        history.append({
+            "stage": new_stage,
+            "timestamp": self.updated_at.isoformat(),
+            "notes": notes
+        })
+        self.status_history = history
 
 class FieldVisit(SQLModel, table=True):
     __tablename__ = "field_visits"

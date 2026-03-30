@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.abspath("."))
 
 from app.db.session import get_session, engine
 from sqlmodel import SQLModel, select
+from app.core.security import get_password_hash
 from app.models import (
     User, UserType, UserStatus, 
     Battery, BatteryCatalog, BatteryStatus, 
@@ -71,7 +72,8 @@ def seed():
             full_name="System Admin",
             user_type=UserType.ADMIN,
             status=UserStatus.ACTIVE,
-            is_superuser=True
+            is_superuser=True,
+            hashed_password=get_password_hash("Admin@123")
         )
         db.add(admin)
         
@@ -82,7 +84,8 @@ def seed():
             email="customer@wezu.com",
             full_name="Demo Customer",
             user_type=UserType.CUSTOMER,
-            status=UserStatus.ACTIVE
+            status=UserStatus.ACTIVE,
+            hashed_password=get_password_hash("password")
         )
         db.add(customer)
     db.commit()

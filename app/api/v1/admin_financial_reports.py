@@ -14,7 +14,9 @@ from app.api.deps import get_current_active_superuser
 from app.core.database import get_db
 from app.models.revenue_report import RevenueReport
 from app.models.user import User
+from app.models.financial import TransactionStatus
 from app.services.financial_report_service import FinancialReportService
+from app.services.analytics_service import AnalyticsService
 
 router = APIRouter()
 
@@ -68,6 +70,17 @@ def get_revenue_trends(
 ):
     """Get revenue trends for the last N periods."""
     return FinancialReportService.get_trends(db, period_type, periods)
+
+
+@router.get("/revenue/forecast")
+def get_revenue_forecast(
+    *,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_superuser),
+    period: str = Query("monthly", description="daily, weekly, or monthly"),
+):
+    """Get revenue forecast for the next period."""
+    return FinancialReportService.generate_revenue_forecast(db, period)
 
 
 @router.get("/reconciliation")
@@ -181,6 +194,41 @@ def get_report_by_id(
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
     return FinancialReportService.export_report_json(report)
+
+
+@router.get("/revenue/forecast/profitability")
+def get_profitability_forecast(
+    *,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_superuser),
+    months: int = Query(6, ge=1, le=12),
+):
+    """Admin: Get profitability forecast for next N months."""
+    return AnalyticsService.get_profitability_forecast(db, months)
+
+
+@router.get("/revenue/margins")
+def get_profit_margins(
+    *,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_superuser),
+    period: str = Query("30d"),
+):
+    """Admin: Get detailed profit margins by station (Real COGS)."""
+    return AnalyticsService.get_profit_margins(db, period)
+
+
+@router.get("/revenue/comparison")
+def get_revenue_comparison(
+    *,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_superuser),
+    period: str = Query("monthly"),
+    target_date: Optional[str] = Query(None, alias="date"),
+):
+    """Admin: Get MoM/WoW/YoY revenue comparison."""
+    dt = _parse_date(target_date)
+    return FinancialReportService.get_revenue_comparison(db, period, dt)
 
 
 # ─── Helpers ───

@@ -1,12 +1,11 @@
-from typing import Optional, List
-from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional
 
 class FAQBase(BaseModel):
-    question: str
-    answer: str
-    category: str = "general"
-    is_active: bool = True
+    question: str = Field(..., description="The FAQ question")
+    answer: str = Field(..., description="The FAQ answer")
+    category: str = Field(default="general", description="Category of the FAQ")
+    is_active: bool = Field(default=True, description="Whether the FAQ is active")
 
 class FAQCreate(FAQBase):
     pass
@@ -19,10 +18,8 @@ class FAQUpdate(BaseModel):
 
 class FAQResponse(FAQBase):
     id: int
-    helpful_count: int
-    not_helpful_count: int
-    created_at: datetime
-    updated_at: datetime
+    helpful_count: int = 0
+    not_helpful_count: int = 0
     
     model_config = ConfigDict(from_attributes=True)
 

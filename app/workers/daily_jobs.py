@@ -62,7 +62,7 @@ def revenue_aggregation():
     execution = create_job_execution("daily_revenue_aggregation")
     
     try:
-        from app.models.financial import Transaction
+        from app.models.financial import Transaction, TransactionStatus
         from app.models.station import Station
         
         with Session(engine) as session:
@@ -81,8 +81,8 @@ def revenue_aggregation():
                     select(func.sum(Transaction.amount))
                     .where(Transaction.created_at >= yesterday_start)
                     .where(Transaction.created_at < yesterday_end)
-                    .where(Transaction.status == "completed")
-                    # Would need station_id in Transaction model
+                    .where(Transaction.status == TransactionStatus.SUCCESS)
+                    # TODO: attach station_id to transaction for accurate per-station revenue
                 ).one() or 0
                 
                 station_revenues[station.name] = float(revenue)
@@ -142,70 +142,25 @@ def late_fee_calculation():
     execution = create_job_execution("daily_late_fee_calculation")
     
     try:
-        from app.models.rental import Rental
-        from app.models.late_fee import LateFee
+        from app.services.late_fee_service import LateFeeService
         
         with Session(engine) as session:
-            now = datetime.utcnow()
-            
-            # Find overdue rentals
-            overdue_rentals = session.exec(
-                select(Rental)
-                .where(Rental.status == "active")
-                .where(Rental.end_date < now)
-            ).all()
-            
-            fees_created = 0
+            overdue = LateFeeService.get_overdue_rentals(session)
+            fees_applied = 0
             total_fees = 0.0
-            
-            for rental in overdue_rentals:
-                # Check if late fee already exists
-                existing_fee = session.exec(
-                    select(LateFee).where(LateFee.rental_id == rental.id)
-                ).first()
-                
-                if not existing_fee:
-                    days_overdue = (now - rental.end_date).days
-                    daily_rate = rental.daily_rate * 1.5  # 150% of normal rate
-                    base_fee = days_overdue * daily_rate
-                    
-                    # Progressive penalty (10% extra per week)
-                    weeks_overdue = days_overdue // 7
-                    progressive_penalty = base_fee * (weeks_overdue * 0.1)
-                    
-                    total_late_fee = base_fee + progressive_penalty
-                    
-                    late_fee = LateFee(
-                        rental_id=rental.id,
-                        user_id=rental.user_id,
-                        original_end_date=rental.end_date,
-                        days_overdue=days_overdue,
-                        daily_late_fee_rate=daily_rate,
-                        base_late_fee=base_fee,
-                        progressive_penalty=progressive_penalty,
-                        total_late_fee=total_late_fee,
-                        amount_outstanding=total_late_fee,
-                        payment_status="PENDING"
-                    )
-                    session.add(late_fee)
-                    fees_created += 1
-                    total_fees += total_late_fee
-                else:
-                    # Update existing fee
-                    days_overdue = (now - rental.end_date).days
-                    existing_fee.days_overdue = days_overdue
-                    # Recalculate fees
-                    session.add(existing_fee)
-            
-            session.commit()
-            
+            for item in overdue:
+                fee = LateFeeService.apply_late_fee(item["rental_id"], session)
+                if fee:
+                    fees_applied += 1
+                    total_fees += fee.total_late_fee
+
             result = {
-                "overdue_rentals": len(overdue_rentals),
-                "fees_created": fees_created,
+                "overdue_rentals": len(overdue),
+                "fees_created": fees_applied,
                 "total_fees": total_fees
             }
             
-            logger.info(f"Late fee calculation completed: {fees_created} fees, ₹{total_fees}")
+            logger.info(f"Late fee calculation completed: {fees_applied} fees, ₹{total_fees}")
             complete_job_execution(execution.execution_id, "COMPLETED", result)
             
     except Exception as e:

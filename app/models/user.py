@@ -28,6 +28,7 @@ class UserType(str, Enum):
     CUSTOMER = "customer"
     ADMIN = "admin"
     DEALER = "dealer"
+    DEALER_STAFF = "dealer_staff"
     SUPPORT_AGENT = "support_agent"
     LOGISTICS = "logistics"
 
@@ -35,6 +36,8 @@ class UserStatus(str, Enum):
     ACTIVE = "active"
     SUSPENDED = "suspended"
     PENDING_VERIFICATION = "pending_verification"
+    PENDING = "pending"
+    INACTIVE = "inactive"
     DELETED = "deleted"
 
 class KYCStatus(str, Enum):
@@ -51,7 +54,7 @@ class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     
     # Core Identity
-    phone_number: str = Field(unique=True, index=True)
+    phone_number: Optional[str] = Field(default=None, unique=True, index=True)
     email: Optional[str] = Field(default=None, unique=True, index=True)
     full_name: Optional[str] = None
     hashed_password: Optional[str] = None
@@ -61,6 +64,23 @@ class User(SQLModel, table=True):
     status: UserStatus = Field(default=UserStatus.ACTIVE, index=True)
     is_superuser: bool = Field(default=False)
     role_id: Optional[int] = Field(default=None, foreign_key="roles.id")
+    
+    # Dealer Staff Scoping
+    created_by_dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id", index=True)
+    created_by_user_id: Optional[int] = Field(default=None)  # Which admin created this user
+    
+    # Invite Flow
+    invite_token: Optional[str] = Field(default=None, index=True)
+    invite_token_expires: Optional[datetime] = None
+    invite_sent_at: Optional[datetime] = None
+    
+    # Staff Metadata
+    department: Optional[str] = None
+    notes_internal: Optional[str] = None  # Admin-only notes, never shown to user
+    
+    # Brute Force Protection
+    failed_login_attempts: int = Field(default=0)
+    locked_until: Optional[datetime] = None
     
     # Profile & Media
     profile_picture: Optional[str] = None
@@ -80,7 +100,6 @@ class User(SQLModel, table=True):
     security_answer: Optional[str] = None
     reset_token: Optional[str] = Field(default=None, index=True)
     reset_token_expires: Optional[datetime] = None
-    reset_token_expires: Optional[datetime] = None
     last_global_logout_at: Optional[datetime] = None
     last_login: Optional[datetime] = Field(default=None, index=True)
 
@@ -97,13 +116,11 @@ class User(SQLModel, table=True):
     deletion_reason: Optional[str] = None
     deleted_at: Optional[datetime] = None
     
-    # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
     # Relationship
     role: Optional["Role"] = Relationship(sa_relationship_kwargs={"viewonly": True}) # Legacy/Primary role. Viewonly to prevent conflict with roles list
     wallet: Optional["Wallet"] = Relationship(back_populates="user")
+    user_profile: Optional["UserProfile"] = Relationship(back_populates="user")
     addresses: List["Address"] = Relationship(back_populates="user")
     
     # Fix for ambiguous foreign keys: explicitly specify which FK on KYCDocument to use.
@@ -115,7 +132,13 @@ class User(SQLModel, table=True):
     kyc_records: List["KYCRecord"] = Relationship(back_populates="user", sa_relationship_kwargs={"foreign_keys": "[KYCRecord.user_id]"})
     devices: List["Device"] = Relationship(back_populates="user")
     vehicles: List["Vehicle"] = Relationship(back_populates="user")
-    dealer_profile: Optional["DealerProfile"] = Relationship(back_populates="user")
+    
+    # Fix for ambiguous foreign keys: explicitly specify which FK links a user to their OWN dealer profile
+    dealer_profile: Optional["DealerProfile"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"foreign_keys": "[DealerProfile.user_id]"}
+    )
+    
     driver_profile: Optional["DriverProfile"] = Relationship(back_populates="user")
     staff_profile: Optional["StaffProfile"] = Relationship(
         back_populates="user",
@@ -133,6 +156,11 @@ class User(SQLModel, table=True):
     two_factor_auth: Optional["TwoFactorAuth"] = Relationship(back_populates="user")
     user_profile: Optional["UserProfile"] = Relationship(back_populates="user")
 
+    @property
+    def is_active(self) -> bool:
+        """Helper for schema compatibility."""
+        return self.status == UserStatus.ACTIVE
+
     # --- Granular RBAC Helpers ---
     @property
     def all_permissions(self) -> set:
@@ -148,13 +176,3 @@ class User(SQLModel, table=True):
         if self.is_superuser:
             return True
         return slug in self.all_permissions
-
-# OTP class removed (moved to app/models/otp.py)
-
-    @property
-    def is_active(self) -> bool:
-        return self.status == UserStatus.ACTIVE
-
-    @is_active.setter
-    def is_active(self, value: bool):
-        self.status = UserStatus.ACTIVE if value else UserStatus.SUSPENDED

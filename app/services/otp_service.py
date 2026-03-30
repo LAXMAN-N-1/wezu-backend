@@ -11,7 +11,8 @@ from sendgrid.helpers.mail import Mail
 class OTPService:
     @staticmethod
     def generate_otp(target: str, purpose: str = "registration", length: int = 6) -> str:
-        if settings.ENVIRONMENT == "development" or settings.DEBUG:
+        """Create an OTP. Only allow the static test code in non-production."""
+        if (settings.ENVIRONMENT != "production") and settings.DEBUG:
             return "964056"
         code = ''.join(random.choices(string.digits, k=length))
         return code
@@ -140,8 +141,8 @@ class OTPService:
 
     @staticmethod
     def verify_otp(db: Session, target: str, code: str, purpose: str = "registration") -> bool:
-        # Mock OTP Bypass for Testing (Universal)
-        if code == "964056":
+        # Mock OTP Bypass for Testing (only in non-prod)
+        if (settings.ENVIRONMENT != "production") and settings.DEBUG and code == "964056":
              return True
              
         from app.integrations.twilio import twilio_integration

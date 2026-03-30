@@ -12,6 +12,7 @@ from app.db.session import engine
 from app.models.user import User, UserType, UserStatus
 from app.models.station import Station, StationStatus
 from app.models.battery import Battery, BatteryStatus, BatteryHealth
+from app.models.battery_health import BatteryHealthSnapshot
 from app.models.rental import Rental, RentalStatus
 from app.models.financial import Transaction, TransactionType, TransactionStatus, Wallet
 from app.models.support import SupportTicket, TicketStatus, TicketPriority
@@ -35,6 +36,16 @@ def seed_admin_analytics():
             return
 
         now = datetime.utcnow()
+
+        # Normalize station metadata for analytics visuals
+        for station in stations:
+            if not station.rating or station.rating == 0:
+                station.rating = round(random.uniform(4.0, 4.9), 1)
+            if not station.available_batteries:
+                station.available_batteries = random.randint(4, max(5, station.total_slots))
+            station.available_slots = max(station.total_slots - station.available_batteries, 0)
+            session.add(station)
+        session.commit()
 
         # 1. Seed User Growth (Backdated users)
         logger.info("👥 Seeding User Growth data...")
@@ -75,7 +86,7 @@ def seed_admin_analytics():
 
         # 2. Seed Revenue & Trends (Rentals & Transactions)
         logger.info("💰 Seeding Revenue & Trends...")
-        for _ in range(200):
+        for _ in range(320):
             user = random.choice(users)
             station_start = random.choice(stations)
             battery = random.choice(batteries)
@@ -143,14 +154,27 @@ def seed_admin_analytics():
         # 5. Diversify Battery Health Distribution
         logger.info("🔋 Diversifying Battery Health...")
         for battery in batteries:
-            battery.health_percentage = random.uniform(70.0, 100.0)
-            if battery.health_percentage < 80:
+            battery.health_percentage = random.uniform(65.0, 100.0)
+            if battery.health_percentage < 70:
+                battery.health_status = BatteryHealth.CRITICAL
+            elif battery.health_percentage < 80:
                 battery.health_status = BatteryHealth.FAIR
-            elif battery.health_percentage < 75:
-                 battery.health_status = BatteryHealth.CRITICAL
             else:
-                 battery.health_status = BatteryHealth.GOOD
+                battery.health_status = BatteryHealth.GOOD
             session.add(battery)
+
+        logger.info("🩺 Capturing battery health snapshots for trend baselines...")
+        for battery in batteries[:40]:
+            base_health = battery.health_percentage
+            for days_back in range(0, 60, 10):
+                drift = random.uniform(-5.0, 2.0)
+                session.add(
+                    BatteryHealthSnapshot(
+                        battery_id=battery.id,
+                        health_percentage=max(50.0, min(100.0, base_health + drift)),
+                        recorded_at=now - timedelta(days=days_back),
+                    )
+                )
 
         session.commit()
         logger.info("✅ Admin Analytics Seeding Complete!")

@@ -57,7 +57,7 @@ class DealerAnalyticsService:
             ).one() or 0
 
             revenue_month = db.exec(
-                select(func.coalesce(func.sum(SwapSession.amount), 0.0)).where(
+                select(func.coalesce(func.sum(SwapSession.swap_amount), 0.0)).where(
                     col(SwapSession.station_id).in_(station_ids),
                     SwapSession.status == "completed",
                     SwapSession.created_at >= month_start,
@@ -461,6 +461,73 @@ class DealerAnalyticsService:
 
     # ─── Helpers ───
 
+    @staticmethod
+    def get_profitability_analysis(db: Session, dealer_id: int) -> dict:
+        """
+        Comprehensive profitability analysis for the dealer.
+        Formula: Revenue - (Depreciation + Estimated Power Cost + Maintenance)
+        """
+        overview = DealerAnalyticsService.get_overview(db, dealer_id)
+        station_ids = DealerAnalyticsService._get_station_ids(db, dealer_id)
+        
+        revenue = overview["revenue_month"]
+        
+        # Estimate costs
+        from app.models.battery import Battery
+        total_asset_value = db.exec(
+            select(func.sum(Battery.purchase_cost)).where(
+                col(Battery.station_id).in_(station_ids)
+            )
+        ).one() or 0.0
+        monthly_depreciation = total_asset_value * 0.01
+        
+        swaps = overview["swaps_month"]
+        power_cost = swaps * 10.0
+        maintenance_cost = len(station_ids) * 500.0
+        
+        total_cost = monthly_depreciation + power_cost + maintenance_cost
+        gross_profit = revenue - total_cost
+        margin_pct = (gross_profit / revenue * 100) if revenue > 0 else 0.0
+        
+        return {
+            "revenue": revenue,
+            "estimated_costs": {
+                "depreciation": round(float(monthly_depreciation), 2),
+                "power": round(power_cost, 2),
+                "maintenance": round(maintenance_cost, 2),
+                "total": round(float(total_cost), 2)
+            },
+            "gross_profit": round(float(gross_profit), 2),
+            "margin_percentage": round(margin_pct, 1),
+            "forecast_next_month_profit": round(float(gross_profit * 1.05), 2)
+        }
+
+    @staticmethod
+    def get_margin_by_battery_type(db: Session, dealer_id: int) -> List[dict]:
+        """Breakdown of revenue vs estimated cost per battery type."""
+        from app.models.battery import Battery
+        station_ids = DealerAnalyticsService._get_station_ids(db, dealer_id)
+        if not station_ids:
+            return []
+            
+        battery_data = db.exec(
+            select(Battery.battery_type, func.count(Battery.id), func.sum(Battery.purchase_cost))
+            .where(col(Battery.station_id).in_(station_ids))
+            .group_by(Battery.battery_type)
+        ).all()
+        
+        results = []
+        for b_type, count, cost in battery_data:
+            results.append({
+                "battery_type": b_type,
+                "count": count,
+                "asset_value": round(float(cost), 2),
+                "monthly_depreciation": round(float(cost) * 0.01, 2)
+            })
+            
+        return results
+
+    # ─── Helpers ───
     @staticmethod
     def _get_station_ids(db: Session, dealer_id: int) -> List[int]:
         return list(db.exec(

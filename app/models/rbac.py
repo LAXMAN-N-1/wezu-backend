@@ -47,7 +47,6 @@ class Permission(SQLModel, table=True):
     scope: str = Field(default="global") # global, regional, organizational, own
     constraints: Optional[str] = None # JSON string for action-level rules
     description: Optional[str] = None
-    scope: str = Field(default="all") # e.g., "all", "own", "region"
     
     roles: List["Role"] = Relationship(back_populates="permissions", link_model=RolePermission)
 
@@ -62,6 +61,16 @@ class Role(SQLModel, table=True):
     parent_id: Optional[int] = Field(default=None, foreign_key="roles.id")
     is_system_role: bool = Field(default=False)  # If True, cannot be deleted (e.g., Super Admin)
     is_active: bool = Field(default=True)
+    
+    # Dealer Scoping (Phases 5/6)
+    dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id", index=True)
+    
+    # UI Attributes
+    icon: Optional[str] = Field(default="shield") # Lucide icon name
+    color: Optional[str] = Field(default="#4CAF50") # HEX color
+    
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Hierarchy relationships
     parent: Optional["Role"] = Relationship(
@@ -94,6 +103,14 @@ class Role(SQLModel, table=True):
     
     # Merged from app/models/role.py (Legacy/Chandu branch)
     role_rights: List["RoleRight"] = Relationship(back_populates="role", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
+
+    @property
+    def parent_role_id(self):
+        return self.parent_id
+    
+    @parent_role_id.setter
+    def parent_role_id(self, value):
+        self.parent_id = value
 
 
 

@@ -5,9 +5,9 @@ from datetime import datetime
 # --- Battery Spec Schemas ---
 class BatterySpecBase(BaseModel):
     name: str
-    manufacturer: str
+    brand: str
     voltage: float
-    capacity_ah: float
+    capacity_mah: float
     weight_kg: Optional[float] = None
     dimensions: Optional[str] = None
     cycle_life_expectancy: int = 1500

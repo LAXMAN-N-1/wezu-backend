@@ -7,7 +7,7 @@ from app.models.delivery_assignment import DeliveryAssignment
 from app.models.driver_profile import DriverProfile
 from app.models.ecommerce import EcommerceOrder
 from app.models.station import Station, StationSlot
-from app.models.battery import Battery
+from app.models.battery import Battery, LocationType, BatteryStatus
 from app.services.notification_service import NotificationService
 from datetime import datetime
 from typing import List, Optional, Any
@@ -181,8 +181,9 @@ class LogisticsService:
             # Find a 'ready' battery in the warehouse
             from app.models.battery import Battery
             battery = db.exec(select(Battery).where(
-                Battery.warehouse_id == warehouse.id,
-                Battery.status == "ready"
+                Battery.location_type == LocationType.WAREHOUSE,
+                Battery.location_id == warehouse.id,
+                Battery.status == BatteryStatus.AVAILABLE
             )).first()
             
             if battery:
@@ -197,7 +198,9 @@ class LogisticsService:
                 db.add(transfer)
                 
                 # Update battery status to 'maintenance' which acts as a 'transfer_pending' state
-                battery.status = "maintenance" 
+                battery.status = BatteryStatus.MAINTENANCE 
+                battery.location_type = LocationType.WAREHOUSE
+                battery.location_id = warehouse.id
                 db.add(battery)
                 
                 db.commit()

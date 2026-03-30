@@ -15,7 +15,10 @@ from app.models.battery import Battery
 logger = logging.getLogger(__name__)
 
 class IoTService:
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    try:
+        client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    except AttributeError:
+        client = mqtt.Client()
 
     @staticmethod
     def on_connect(client, userdata, flags, rc):

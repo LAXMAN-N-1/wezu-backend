@@ -16,6 +16,12 @@ sys.modules["firebase_admin.messaging"] = MagicMock()
 from app.main import app
 from app.api import deps
 from app.core.config import settings
+from app.core import database
+from app.core.security import get_password_hash
+from app.models.rbac import Role, Permission
+from app.models.role_right import RoleRight
+from app.models.menu import Menu
+from app.models.user import User, UserStatus, UserType
 
 # --- PATCH FOR SQLITE JSONB COMPATIBILITY ---
 from sqlalchemy.dialects.postgresql import JSONB
@@ -81,6 +87,50 @@ def session_fixture():
             session.execute(table.delete())
         session.commit()
 
+
+@pytest.fixture(autouse=True)
+def seed_basics(session: Session):
+    """
+    Seed minimal roles, menus, permissions and a superuser so RBAC/user tests have baseline data.
+    Data is cleared after each test by session_fixture teardown.
+    """
+    # Role
+    admin_role = Role(name="admin", description="Super Admin", category="system", level=100)
+    session.add(admin_role)
+    session.commit()
+    session.refresh(admin_role)
+
+    # Menu
+    menu = Menu(name="dashboard", display_name="Dashboard", route="/dashboard", icon="home")
+    session.add(menu)
+    session.commit()
+    session.refresh(menu)
+
+    # Permission
+    perm = Permission(slug="dashboard:view", module="dashboard", action="view", scope="all")
+    session.add(perm)
+    session.commit()
+    session.refresh(perm)
+
+    # RoleRight and RolePermission association
+    rr = RoleRight(role_id=admin_role.id, menu_id=menu.id, can_view=True, can_create=True, can_edit=True, can_delete=True)
+    session.add(rr)
+    session.commit()
+
+    # Superuser
+    admin_user = User(
+        phone_number="9999999999",
+        email="admin@test.com",
+        full_name="Admin",
+        hashed_password=get_password_hash("password"),
+        is_superuser=True,
+        status=UserStatus.ACTIVE,
+        user_type=UserType.ADMIN,
+        role_id=admin_role.id,
+    )
+    session.add(admin_user)
+    session.commit()
+
 from app.db.session import get_session as db_get_session
 
 # --- PATCH FOR HTTPX 0.28+ / STARLETTE COMPATIBILITY ---
@@ -100,6 +150,7 @@ def client_fixture(session: Session):
         return session
 
     app.dependency_overrides[deps.get_db] = get_session_override
+    app.dependency_overrides[database.get_db] = get_session_override
     app.dependency_overrides[db_get_session] = get_session_override
     
     # Replace lifespan with a no-op to prevent init_db/start_scheduler

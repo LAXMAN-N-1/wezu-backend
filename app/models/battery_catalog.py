@@ -14,13 +14,15 @@ class BatteryCatalog(SQLModel, table=True):
     
     # Product Info
     name: str = Field(index=True)
-    brand: str
+    brand: Optional[str] = None
     model: Optional[str] = None
     image_url: Optional[str] = None
     description: Optional[str] = None
     
     # Specs
-    capacity_mah: int
+    capacity_mah: Optional[int] = None
+    capacity_ah: Optional[float] = None
+    cycle_life_expectancy: Optional[int] = None
     voltage: float
     battery_type: str = Field(default="lithium_ion", index=True) # lithium_ion, lfp, nmc
     weight_kg: Optional[float] = None
@@ -54,4 +56,3 @@ class BatteryBatch(SQLModel, table=True):
     batch_number: str = Field(unique=True, index=True)
     manufacturer: str
     production_date: datetime = Field(default_factory=datetime.utcnow)
-

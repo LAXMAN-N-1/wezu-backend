@@ -129,16 +129,70 @@ def verify_kyc_submission(
     
     return {"status": "success", "user_status": user.kyc_status}
 
-@router.get("/documents/pending", response_model=List[KYCDocumentResponse])
-def get_pending_documents(
+@router.get("/documents", response_model=dict)
+def list_kyc_documents(
+    skip: int = 0,
+    limit: int = 50,
+    status: str = None,
     db: Session = Depends(deps.get_db),
     current_user: Any = Depends(deps.get_current_active_superuser),
 ) -> Any:
-    """
-    List all documents waiting for verification.
-    """
-    docs = db.exec(select(KYCDocument).where(KYCDocument.status == "pending")).all()
-    return docs
+    """Admin: List all KYC documents with user info."""
+    query = select(KYCDocument, User).join(User, KYCDocument.user_id == User.id)
+    
+    if status:
+        query = query.where(KYCDocument.status == status)
+        
+    query = query.order_by(KYCDocument.uploaded_at.desc())
+        
+    total_count = db.exec(select(func.count()).select_from(query.subquery())).one()
+    results = db.exec(query.offset(skip).limit(limit)).all()
+    
+    docs_list = []
+    for doc, user in results:
+        docs_list.append({
+            "id": doc.id,
+            "user_id": user.id,
+            "user_name": user.full_name or "Unknown",
+            "user_email": user.email or "",
+            "user_phone": user.phone_number,
+            "document_type": getattr(doc, "document_type", "Unknown"),
+            "document_number": getattr(doc, "document_number", None),
+            "file_url": doc.file_url,
+            "status": doc.status,
+            "rejection_reason": getattr(doc, "rejection_reason", getattr(doc, "verification_response", None)),
+            "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+            "verified_at": getattr(doc, "verified_at", None),
+            "verified_by": getattr(doc, "verified_by", None),
+        })
+        
+    return {
+        "documents": docs_list,
+        "total_count": total_count
+    }
+
+@router.get("/stats", response_model=dict)
+def get_kyc_stats(
+    db: Session = Depends(deps.get_db),
+    current_user: Any = Depends(deps.get_current_active_superuser),
+) -> Any:
+    """Admin: KYC Global Stats"""
+    docs = db.exec(select(KYCDocument.status)).all()
+    
+    total = len(docs)
+    pending = sum(1 for d in docs if d == "PENDING")
+    verified = sum(1 for d in docs if d == "VERIFIED")
+    rejected = sum(1 for d in docs if d == "REJECTED")
+    
+    pending_users = db.exec(select(func.count(User.id)).where(User.kyc_status == "PENDING")).one()
+    
+    return {
+        "total_documents": total,
+        "total_pending": pending,
+        "total_verified": verified,
+        "total_rejected": rejected,
+        "pending_users": pending_users
+    }
 
 @router.post("/documents/{doc_id}/approve", response_model=KYCDocumentResponse)
 def approve_document(

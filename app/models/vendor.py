@@ -33,6 +33,7 @@ class Vendor(SQLModel, table=True):
     
     # Relationships
     documents: List["VendorDocument"] = Relationship(back_populates="vendor")
+    settlements: List["Settlement"] = Relationship(back_populates="vendor")
     # stations: List["Station"] = Relationship(back_populates="vendor") # To be linked in Station
 
 class VendorDocument(SQLModel, table=True):

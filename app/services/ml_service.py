@@ -4,7 +4,6 @@ from app.ml.models.battery_health import BatteryHealthModel, DemandForecastModel
 from typing import Dict, Any
 
 from app.ml.registry import ModelRegistry
-import numpy as np
 from datetime import datetime, timedelta
 
 class MLService:

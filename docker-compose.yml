@@ -1,41 +1,79 @@
-version: '3.8'
-
 services:
   # The WEZU Frontend Load Balancer
   nginx:
     image: nginx:alpine
+    # Keep nginx opt-in on shared VPS hosts where system nginx owns :80/:443.
+    profiles: ["edge"]
+    restart: "on-failure:5"
+    init: true
+    cpus: "0.25"
+    mem_limit: 64m
     ports:
       - "80:80"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - wezu_net
 
-  # The WEZU Backend Application (Scalable)
+  # The WEZU Backend Application
   api:
     build: .
-    restart: always
+    restart: "on-failure:5"
+    init: true
+    stop_grace_period: 30s
+    cpus: "0.75"
+    mem_limit: 512m
+    ports:
+      # Shared VPS pattern: keep app private on localhost and route by host nginx.
+      - "${API_BIND_HOST:-127.0.0.1}:${API_HOST_PORT:-18081}:8000"
     env_file:
       - .env.production
     environment:
       - DATABASE_URL=postgresql://wezu:wezupassword@db/wezu_prod
       - REDIS_URL=redis://redis:6379/0
-    deploy:
-      replicas: 3 # Run 3 horizontal instances behind Nginx
+      - GUNICORN_WORKERS=1
+      - DB_POOL_SIZE=3
+      - DB_MAX_OVERFLOW=3
+      - DB_POOL_TIMEOUT=30
+      - DB_POOL_RECYCLE=1800
+      - DB_INIT_ON_STARTUP=false
+      - RUN_BACKGROUND_TASKS=false
+      - SCHEDULER_ENABLED=false
+      - MQTT_ENABLED=false
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - wezu_net
     depends_on:
       db:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
 
   # Primary Database
   db:
     image: postgres:15-alpine
-    restart: always
+    restart: "on-failure:5"
+    init: true
+    cpus: "0.75"
+    mem_limit: 384m
     environment:
       POSTGRES_USER: wezu
       POSTGRES_PASSWORD: wezupassword
@@ -47,16 +85,36 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 20s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - wezu_net
 
   # Redis for Caching and Rate Limiting
   redis:
     image: redis:7-alpine
-    restart: always
+    restart: "on-failure:5"
+    init: true
+    cpus: "0.25"
+    mem_limit: 128m
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     networks:
       - wezu_net
 

@@ -8,7 +8,10 @@ from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
 from app.models.user import User
 from app.services.dealer_service import DealerService
 from app.schemas.common import DataResponse
-from app.schemas.dealer import DealerProfileCreate, DealerProfileUpdate, DealerProfileResponse
+from app.schemas.dealer import (
+    DealerProfileCreate, DealerProfileUpdate, DealerProfileResponse,
+    DealerApplicationUpdate, FieldVisitSchedule
+)
 from pydantic import BaseModel
 
 class StageUpdate(BaseModel):
@@ -83,9 +86,9 @@ def get_dealer_dashboard(
 @router.post("/application/{app_id}/stage", response_model=DataResponse[DealerApplication])
 def update_stage(
     app_id: int, 
-    update_in: StageUpdate,
+    update_in: DealerApplicationUpdate,
     current_user: User = Depends(get_current_user), # Check Is Admin
-    session: Session = Depends(deps.get_db)
+    session: Session = Depends(get_db)
 ):
     try:
         app = DealerService.update_application_stage(app_id, update_in.stage, update_in.note)
@@ -95,9 +98,9 @@ def update_stage(
 
 @router.post("/visits/schedule", response_model=DataResponse[FieldVisit])
 def schedule_visit(
-    visit_in: VisitSchedule,
+    visit_in: FieldVisitSchedule,
     current_user: User = Depends(get_current_user), # Check Is Admin
-    session: Session = Depends(deps.get_db)
+    session: Session = Depends(get_db)
 ):
     visit = DealerService.schedule_field_visit(visit_in.application_id, visit_in.officer_id, visit_in.date)
     return DataResponse(data=visit)
@@ -122,7 +125,7 @@ def generate_settlement(
 @router.get("/settlements", response_model=DataResponse[List[Settlement]])
 def get_my_settlements(
     current_user: User = Depends(get_current_user),
-    session: Session = Depends(deps.get_db)
+    session: Session = Depends(get_db)
 ):
     profile = DealerService.get_dealer_by_user(current_user.id)
     if not profile:

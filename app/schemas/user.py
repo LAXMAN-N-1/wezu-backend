@@ -4,7 +4,7 @@ from datetime import datetime, date
 from app.models.user import User
 
 class AddressBase(BaseModel):
-    street_address: str
+    street_address: Optional[str] = None
     city: str
     state: str
     postal_code: str
@@ -83,7 +83,7 @@ from app.schemas.rbac import RoleResponse
 
 class UserResponse(UserBase):
     id: int
-    is_active: bool
+    is_active: Optional[bool] = True
     is_superuser: bool
     profile_picture: Optional[str] = None
     kyc_status: str
@@ -160,7 +160,7 @@ class UserProfileResponse(BaseModel):
     preferred_language: Optional[str] = None
     
     # Status
-    is_active: bool
+    is_active: Optional[bool] = True
     is_superuser: bool
     kyc_status: str
     
@@ -274,7 +274,7 @@ class UserSearchItem(BaseModel):
     email: Optional[EmailStr] = None
     phone_number: Optional[str] = None
     profile_picture: Optional[str] = None
-    is_active: bool
+    is_active: Optional[bool] = True
     kyc_status: str
     roles: List[str]
     created_at: datetime

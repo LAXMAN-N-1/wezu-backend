@@ -13,12 +13,13 @@ class SettlementUpdateRequest(BaseModel):
 
 class SettlementResponse(BaseModel):
     id: int
-    vendor_id: int
+    vendor_id: Optional[int] = None
+    dealer_id: Optional[int] = None
     start_date: datetime
     end_date: datetime
     total_revenue: float
     platform_fee: float
-    payable_amount: float
+    net_payable: float
     status: str
     created_at: datetime
     

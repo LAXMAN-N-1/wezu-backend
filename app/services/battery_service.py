@@ -10,6 +10,8 @@ from sqlalchemy import desc
 from app.models.battery_health_log import BatteryHealthLog as BatteryHealthLogModel
 from app.models.battery_catalog import BatterySpec
 from app.schemas.station_monitoring import BatteryHealthStatus, BatteryHealthReport, BatteryHealthLog
+from app.models.alert import Alert
+from app.models.battery import BatteryHealth as BatteryHealthEnum
 
 class BatteryService:
     @staticmethod
@@ -31,16 +33,6 @@ class BatteryService:
             
         battery = Battery(**data)
         db.add(battery)
-        
-        # Log event
-        event = BatteryLifecycleEvent(
-            battery_id=battery_id,
-            event_type="maintenance_complete",
-            description=notes,
-            actor_id=actor_id
-        )
-        db.add(event)
-        
         db.commit()
         db.refresh(battery)
         
@@ -197,3 +189,69 @@ class BatteryService:
             "retired_count": retired,
             "utilization_percentage": round(utilization, 2)
         }
+
+    # -------- Health Utilities for tests --------
+    @staticmethod
+    def calculate_soh(db: Session, battery: Battery) -> float:
+        """
+        Estimate State of Health using latest BatteryHealthLog and spec.
+        """
+        log = db.exec(
+            select(BatteryHealthLogModel)
+            .where(BatteryHealthLogModel.battery_id == battery.id)
+            .order_by(desc(BatteryHealthLogModel.timestamp))
+        ).first()
+        spec = None
+        if battery.sku_id:
+            spec = db.get(BatterySpec, battery.sku_id)
+        elif getattr(battery, "spec_id", None):
+            spec = db.get(BatterySpec, battery.spec_id)
+
+        if not log or not spec:
+            return battery.state_of_health or battery.health_percentage or 100.0
+
+        # Base SOH from capacity
+        nominal_mah = (spec.capacity_ah or 0) * 1000
+        base_soh = (log.current_capacity_mah / nominal_mah) * 100 if nominal_mah else log.health_percentage or 100.0
+
+        # Penalties
+        cycle_over = max(0, (battery.charge_cycles or log.cycle_count or 0) - (spec.cycle_life_expectancy or 0))
+        cycle_penalty = cycle_over * 0.01  # 1% per extra cycle
+
+        high_temp_events = len([t for t in (battery.temperature_history or []) if t > 45])
+        temp_penalty = high_temp_events * 0.05
+
+        soh = base_soh - cycle_penalty - temp_penalty
+        battery.state_of_health = soh
+        db.add(battery)
+        db.commit()
+        db.refresh(battery)
+        return soh
+
+    @staticmethod
+    def update_health_status(db: Session, battery: Battery) -> str:
+        """
+        Update health_status field based on state_of_health and log alert event.
+        """
+        soh = battery.state_of_health or 100.0
+        status = BatteryHealthEnum.GOOD
+        if soh < 70:
+            status = BatteryHealthEnum.DAMAGED
+        elif soh < 80:
+            status = BatteryHealthEnum.POOR
+        elif soh < 90:
+            status = BatteryHealthEnum.FAIR
+        battery.health_status = status
+        db.add(battery)
+        db.commit()
+
+        if status == BatteryHealthEnum.DAMAGED:
+            event = BatteryLifecycleEvent(
+                battery_id=battery.id,
+                event_type="health_alert",
+                description=f"Battery SOH degraded to {soh:.1f}%",
+                timestamp=datetime.utcnow()
+            )
+            db.add(event)
+            db.commit()
+        return status

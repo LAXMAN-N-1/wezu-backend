@@ -11,7 +11,7 @@ class BatteryLifecycleEventBase(BaseModel):
     description: Optional[str] = None
 
 class BatteryLifecycleEventCreate(BatteryLifecycleEventBase):
-    battery_id: uuid.UUID
+    battery_id: int
     actor_id: Optional[int] = None
 
 class BatteryLifecycleEventResponse(BatteryLifecycleEventBase):
@@ -58,7 +58,7 @@ class BatteryUpdate(BaseModel):
     description: Optional[str] = None # For lifecycle event/audit log
 
 class BatteryResponse(BatteryBase):
-    id: uuid.UUID
+    id: int
     status: str
     health_status: str
     current_charge: float
@@ -112,7 +112,7 @@ class BatteryMaintenanceCreate(BaseModel):
 # --- Audit & History ---
 class BatteryAuditLogResponse(BaseModel):
     id: int
-    battery_id: uuid.UUID
+    battery_id: int
     field_changed: str
     old_value: Optional[str] = None
     new_value: Optional[str] = None
@@ -124,7 +124,7 @@ class BatteryAuditLogResponse(BaseModel):
 
 class BatteryHealthHistoryResponse(BaseModel):
     id: int
-    battery_id: uuid.UUID
+    battery_id: int
     health_percentage: float
     recorded_at: datetime
 
@@ -135,5 +135,5 @@ class BatteryListResponse(BaseModel):
     total_count: int
 
 class BatteryBulkUpdateRequest(BaseModel):
-    battery_ids: List[uuid.UUID]
+    battery_ids: List[int]
     status: str

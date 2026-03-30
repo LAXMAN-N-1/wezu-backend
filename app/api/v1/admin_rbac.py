@@ -71,13 +71,14 @@ def create_role(
     if existing:
         raise HTTPException(status_code=400, detail="Role name already exists")
         
-    role_data = role_in.dict(exclude={"permissions", "parent_id"})
+    role_data = role_in.model_dump(exclude={"permissions", "permission_ids", "parent_role_id", "parent_id"})
     
     # 2. Inheritance Logic
-    permissions_to_assign = set(role_in.permissions)
+    permissions_to_assign = set(role_in.permissions or [])
     
-    if role_in.parent_id:
-        parent_role = db.get(Role, role_in.parent_id)
+    parent_id = role_in.parent_role_id or role_in.parent_id
+    if parent_id:
+        parent_role = db.get(Role, parent_id)
         if not parent_role:
              raise HTTPException(status_code=404, detail="Parent role not found")
         
@@ -87,7 +88,7 @@ def create_role(
         parent_perms = db.exec(select(Permission.slug).join(RolePermission).where(RolePermission.role_id == parent_role.id)).all()
         permissions_to_assign.update(parent_perms)
         
-        role_data["parent_id"] = role_in.parent_id
+        role_data["parent_id"] = parent_id
 
     role = Role(**role_data)
     db.add(role)
@@ -116,7 +117,16 @@ def create_role(
         details=f"Created role '{role.name}'"
     )
     
-    return role
+    return {
+        "id": role.id,
+        "name": role.name,
+        "description": role.description,
+        "category": role.category,
+        "level": role.level,
+        "is_active": role.is_active,
+        "parent_role_id": getattr(role, "parent_id", None),
+        "permissions": list(permissions_to_assign)
+    }
 
 
     db.delete(role)
@@ -365,18 +375,11 @@ def assign_permissions_to_role(
                  AuthService.revoke_all_user_sessions(db, uid)
             users_affected = len(user_ids)
     
-    return rbac_schema.RolePermissionUpdateResponse(
-        role_id=role.id,
-        users_affected=users_affected,
-        active_permissions=[p.slug for p in role.permissions]
-    )
-
-    
-    return rbac_schema.RolePermissionUpdateResponse(
-        role_id=role.id,
-        users_affected=users_affected,
-        active_permissions=[p.slug for p in role.permissions]
-    )
+    return {
+        "role_id": role.id,
+        "users_affected": users_affected,
+        "active_permissions": [p.slug for p in role.permissions]
+    }
 
 
 @router.get("/users/{user_id}/roles", response_model=List[rbac_schema.UserRoleDetail])
@@ -933,10 +936,10 @@ def update_role(
     if role_in.level is not None and role_in.level != role.level:
         changes.append(f"Level: {role.level} -> {role_in.level}")
         role.level = role_in.level
-    if role_in.parent_role_id is not None and role_in.parent_role_id != role.parent_role_id:
+    if role_in.parent_role_id is not None and role_in.parent_role_id != role.parent_id:
         # Prevent circular logic usually, but keep simple for now
-        changes.append(f"Parent Role ID: {role.parent_role_id} -> {role_in.parent_role_id}")
-        role.parent_role_id = role_in.parent_role_id
+        changes.append(f"Parent Role ID: {getattr(role, 'parent_id', None)} -> {role_in.parent_role_id}")
+        role.parent_id = role_in.parent_role_id
         
     db.add(role)
     db.commit()
@@ -986,7 +989,16 @@ def update_role(
         details=f"Updated role '{role.name}'. Changes: {'; '.join(changes)}" if changes else f"Updated role '{role.name}' (No field changes, possibly permissions)"
     )
     
-    return role
+    return {
+        "id": role.id,
+        "name": role.name,
+        "description": role.description,
+        "category": role.category,
+        "level": role.level,
+        "is_active": role.is_active,
+        "parent_role_id": getattr(role, "parent_id", None),
+        "permissions": [p.slug for p in role.permissions]
+    }
 
 
 @router.get("/roles/{role_id}", response_model=rbac_schema.RoleDetail)
@@ -1017,12 +1029,12 @@ def get_role_detail(
         
     # 3. Hierarchy
     parent_role = None
-    if role.parent_role_id:
-        parent_role_obj = db.get(Role, role.parent_role_id)
+    if role.parent_id:
+        parent_role_obj = db.get(Role, role.parent_id)
         if parent_role_obj:
             parent_role = rbac_schema.RoleRead.model_validate(parent_role_obj)
             
-    child_roles_objs = db.exec(select(Role).where(Role.parent_role_id == role_id)).all()
+    child_roles_objs = db.exec(select(Role).where(Role.parent_id == role_id)).all()
     child_roles = [rbac_schema.RoleRead.model_validate(c) for c in child_roles_objs]
     
     # Construct Response

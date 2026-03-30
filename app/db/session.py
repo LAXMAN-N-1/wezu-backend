@@ -1,15 +1,23 @@
 from sqlmodel import Session, SQLModel, create_engine
 from app.core.config import settings
 from app.core.database import engine
-from app.models import *
+# Removed bulk import to prevent circularities
 
-engine = create_engine(
-    settings.DATABASE_URL, 
-    echo=settings.SQLALCHEMY_ECHO,
-    pool_size=20,
-    max_overflow=40,
-    pool_pre_ping=True
-)
+print(f"DEBUG: app/db/session.py - DATABASE_URL: {settings.DATABASE_URL}")
+try:
+    engine = create_engine(
+        settings.DATABASE_URL, 
+        echo=settings.SQLALCHEMY_ECHO,
+        pool_size=20,
+        max_overflow=40,
+        pool_pre_ping=True
+    )
+    print("DEBUG: app/db/session.py - Engine created")
+except Exception as e:
+    print(f"DEBUG: app/db/session.py - Engine creation FAILED: {e}")
+    import traceback
+    traceback.print_exc()
+    raise
 
 def init_db():
     from sqlmodel import Session, text
@@ -21,7 +29,7 @@ def init_db():
             conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema};"))
         conn.commit()
     
-    # 2. Create Tables within schemas - Only if not using Alembic or for initial dev
+    # 2. Create Tables within schemas - Disabling temporarily to prevent hangs in dev
     # SQLModel.metadata.create_all(engine)
     
     # 3. TimescaleDB initialization

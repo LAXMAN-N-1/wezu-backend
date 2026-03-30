@@ -12,15 +12,16 @@ router = APIRouter()
 
 @router.get("/overview")
 def get_platform_overview(
+    period: str = Query("30d"),
     current_user: User = Depends(deps.get_current_active_superuser),
     db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: Platform KPIs (active users, total rentals, revenue today)"""
-    return AnalyticsService.get_platform_overview(db)
+    return AnalyticsService.get_platform_overview(db, period)
 
 @router.get("/trends")
 def get_platform_trends(
-    period: str = Query("daily", enum=["daily", "weekly", "monthly"]),
+    period: str = Query("30d"),
     current_user: User = Depends(deps.get_current_active_superuser),
     db: Session = Depends(deps.get_db)
 ) -> Any:
@@ -56,16 +57,35 @@ def get_demand_forecast(
     current_user: User = Depends(deps.get_current_active_superuser),
     db: Session = Depends(deps.get_db)
 ) -> Any:
-    """Admin: 30-day demand forecast per station"""
+    """Admin: 7-day demand forecast with actuals"""
     return AnalyticsService.get_demand_forecast_per_station(db)
 
 @router.get("/recent-activity")
 def get_recent_activity(
+    type: Optional[str] = Query(None, description="Filter by activity type"),
     current_user: User = Depends(deps.get_current_active_superuser),
     db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: Recent Activities"""
-    return AnalyticsService.get_recent_activity(db)
+    return AnalyticsService.get_recent_activity(db, type)
+
+@router.get("/revenue/by-station")
+def get_revenue_by_station(
+    period: str = Query("30d"),
+    current_user: User = Depends(deps.get_current_active_superuser),
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """Admin: Revenue distribution by station"""
+    return AnalyticsService.get_revenue_by_station_detailed(db, period)
+
+@router.get("/revenue/by-battery-type")
+def get_revenue_by_battery_type(
+    period: str = Query("30d"),
+    current_user: User = Depends(deps.get_current_active_superuser),
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """Admin: Revenue split by battery chemistry/model"""
+    return AnalyticsService.get_revenue_by_battery_type(db, period)
 
 @router.get("/top-stations")
 def get_top_stations(
@@ -137,13 +157,13 @@ def export_analytics_report(
     filename = f"analytics_{report_type}.csv"
     
     if report_type == "overview":
-        data = AnalyticsService.get_platform_overview(db)
+        data = AnalyticsService.get_platform_overview(db, "30d")
         writer.writerow(["Metric", "Value"])
         for k, v in data.items():
-            writer.writerow([k, v])
+            writer.writerow([k, v.get("value", v)])
             
     elif report_type == "trends":
-        data = AnalyticsService.get_trends(db)
+        data = AnalyticsService.get_trends(db, "30d")
         if data:
             writer.writerow(data[0].keys())
             for row in data:
@@ -151,21 +171,18 @@ def export_analytics_report(
                 
     elif report_type == "forecast":
         data = AnalyticsService.get_demand_forecast_per_station(db)
-        if data:
-            writer.writerow(data[0].keys())
-            for row in data:
+        forecast = data.get("forecast", []) if isinstance(data, dict) else data
+        if forecast:
+            writer.writerow(forecast[0].keys())
+            for row in forecast:
                 writer.writerow(row.values())
 
     elif report_type == "behavior":
         data = AnalyticsService.get_user_behavior(db)
         writer.writerow(["Metric", "Value"])
-        writer.writerow(["Avg Session Minutes", data["avg_session_minutes"]])
-        writer.writerow(["Peak Hours", ",".join(map(str, data["peak_hours"]))])
-        writer.writerow([])
-        writer.writerow(["Popular Stations"])
-        writer.writerow(["Name", "Rentals"])
-        for s in data["popular_stations"]:
-            writer.writerow([s["name"], s["rentals"]])
+        writer.writerow(["Avg Session Minutes", data.get("avg_session_duration", 0)])
+        writer.writerow(["Avg Rentals/User", data.get("avg_rentals_per_user", 0)])
+        writer.writerow(["Peak Hours", ",".join(map(str, data.get("peak_hours", {}).keys()))])
 
     content = output.getvalue()
     return Response(

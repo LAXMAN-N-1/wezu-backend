@@ -11,7 +11,7 @@ class UserProfile(SQLModel, table=True):
     __tablename__ = "user_profiles"
     # __table_args__ = {"schema": "public"}
 
-    id: int = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
+    id: Optional[int] = Field(default=None, primary_key=True, index=True)
     user_id: int = Field(foreign_key="users.id", unique=True, index=True)
 
     # Address Details

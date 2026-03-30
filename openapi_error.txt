@@ -1875,3 +1875,27 @@ INFO:apscheduler.executors.default:Job "Hourly Battery Health Checks (trigger: i
 INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:25:10 IST)" (scheduled at 2026-03-30 11:25:10.863928+05:30)
 INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
 INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:27:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:27:10 IST)" (scheduled at 2026-03-30 11:27:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:29:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:31:10 IST)" (scheduled at 2026-03-30 11:29:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:31:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:33:10 IST)" (scheduled at 2026-03-30 11:31:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:33:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:35:10 IST)" (scheduled at 2026-03-30 11:33:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:35:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:37:10 IST)" (scheduled at 2026-03-30 11:35:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:37:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:39:10 IST)" (scheduled at 2026-03-30 11:37:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:39:10 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-30 11:52:52 IST)" (scheduled at 2026-03-30 11:37:52.364851+05:30)
+INFO:app.workers.rental_expiry_worker:Running scheduled rental expiry job...
+INFO:apscheduler.executors.default:Job "run_rental_expiry_job (trigger: interval[0:15:00], next run at: 2026-03-30 11:52:52 IST)" executed successfully
+INFO:apscheduler.executors.default:Running job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:41:10 IST)" (scheduled at 2026-03-30 11:39:10.863928+05:30)
+INFO:app.tasks.station_monitor:Health check completed. Found 0 new offline stations.
+INFO:apscheduler.executors.default:Job "Periodic Station Health Check (trigger: interval[0:02:00], next run at: 2026-03-30 11:41:10 IST)" executed successfully

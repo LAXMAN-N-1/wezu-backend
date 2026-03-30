@@ -32,6 +32,87 @@ router = APIRouter()
 
 
 # =====================================================================
+#  LIST / SEARCH USERS
+# =====================================================================
+
+@router.get("/", response_model=dict)
+async def list_users(
+    skip: int = 0,
+    limit: int = 100,
+    search: Optional[str] = None,
+    status: Optional[str] = None,
+    user_type: Optional[str] = None,
+    kyc_status: Optional[str] = None,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_superuser),
+):
+    """Admin: List all users with filtering and pagination."""
+    query = select(User)
+    
+    if search:
+        search_term = f"%{search}%"
+        query = query.where(
+            (User.email.ilike(search_term)) |
+            (User.full_name.ilike(search_term)) |
+            (User.phone_number.ilike(search_term))
+        )
+    
+    if status is not None:
+        if status.lower() == "active":
+            query = query.where(User.status == "active")
+        elif status.lower() == "suspended":
+            query = query.where(User.status == "suspended")
+        elif status.lower() == "pending_verification":
+            query = query.where(User.status == "pending_verification")
+            
+    if user_type:
+        query = query.where(User.user_type == user_type)
+        
+    if kyc_status:
+        query = query.where(User.kyc_status == kyc_status)
+        
+    query = query.order_by(User.created_at.desc())
+    
+    total_count = db.exec(select(func.count()).select_from(query.subquery())).one()
+    users = db.exec(query.offset(skip).limit(limit)).all()
+    
+    return {
+        "users": users,
+        "total_count": total_count,
+    }
+
+
+@router.get("/suspended", response_model=dict)
+async def list_suspended_users(
+    skip: int = 0,
+    limit: int = 100,
+    search: Optional[str] = None,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_superuser),
+):
+    """Admin: List all suspended users."""
+    query = select(User).where(User.status == "suspended")
+    
+    if search:
+        search_term = f"%{search}%"
+        query = query.where(
+            (User.email.ilike(search_term)) |
+            (User.full_name.ilike(search_term)) |
+            (User.phone_number.ilike(search_term))
+        )
+        
+    query = query.order_by(User.created_at.desc())
+    
+    total_count = db.exec(select(func.count()).select_from(query.subquery())).one()
+    users = db.exec(query.offset(skip).limit(limit)).all()
+    
+    return {
+        "users": users,
+        "total_count": total_count,
+    }
+
+
+# =====================================================================
 #  CREATE / INVITE / BULK-INVITE  (new admin user-management endpoints)
 # =====================================================================
 

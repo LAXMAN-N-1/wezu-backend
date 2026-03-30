@@ -44,22 +44,48 @@ class AuditService:
             db.add(log)
             db.commit()
         except Exception as e:
-            # Fallback to standard logging if MongoDB fails
-            import logging
-            logging.error(f"Failed to write audit log to MongoDB: {e}")
-            logging.info(f"Audit Event: {log_entry}")
+            logger.error(f"Failed to write audit log: {e}")
+
+    async def log_event(
+        self,
+        event_type: str,
+        user_id: Optional[int],
+        resource: str,
+        action: str,
+        status: str,
+        metadata: Dict[str, Any],
+        ip_address: Optional[str] = None
+    ):
+        """Async version for middleware and high-frequency logging."""
+        with Session(engine) as db:
+            try:
+                log = AuditLog(
+                    user_id=user_id,
+                    action=action,
+                    resource_type=event_type,
+                    resource_id=resource,
+                    details=f"Status: {status}",
+                    ip_address=ip_address,
+                    meta_data=metadata
+                )
+                db.add(log)
+                db.commit()
+            except Exception as e:
+                logger.error(f"Failed to log event: {e}")
 
     async def log_security_event(self, user_id: int, event: str, metadata: Dict[str, Any]):
         """Specialized helper for security-related events like login/password change"""
         await self.log_event(
             event_type="security",
             user_id=user_id,
+            resource="auth",
             action=event,
+            status="success",
             metadata=metadata
         )
 
     @staticmethod
-    def log_security_event(
+    def log_security_event_sync(
         db: Session,
         event_type: str,
         severity: str,
@@ -82,6 +108,22 @@ class AuditService:
                 logger.critical(f"SECURITY ALERT: {event_type} from {source_ip}")
         except Exception as e:
             logger.error(f"Failed to write security event: {e}")
+
+    async def get_logs(self, user_id: int = None, page: int = 1, limit: int = 20):
+        """Fetch paginated logs."""
+        with Session(engine) as db:
+            query = select(AuditLog)
+            if user_id:
+                query = query.where(AuditLog.user_id == user_id)
+            
+            total = len(db.exec(query).all())
+            query = query.order_by(AuditLog.timestamp.desc()).offset((page - 1) * limit).limit(limit)
+            logs = db.exec(query).all()
+            
+            return {
+                "logs": [log.to_dict() if hasattr(log, "to_dict") else log for log in logs],
+                "total_count": total
+            }
 
     @staticmethod
     def _build_query(
@@ -155,26 +197,5 @@ class AuditService:
             }
             for log in logs
         ]
-
-    async def get_logs(self, user_id: int, page: int, limit: int) -> dict:
-        return {"logs": [], "total_count": 0}
-
-    async def log_event(self, event_type: str, user_id: int, action: str, resource: str = None, status: str = None, metadata: Dict[str, Any] = None, ip_address: str = None):
-        """Async compatibility wrapper for middleware and security events."""
-        try:
-            import json
-            from sqlmodel import Session
-            from app.core.database import engine
-            with Session(engine) as db:
-                self.log_action(
-                    db=db,
-                    action=f"{action}",
-                    resource_type=resource or "unknown",
-                    user_id=user_id,
-                    details=json.dumps(metadata) if metadata else None,
-                    ip_address=ip_address
-                )
-        except Exception as e:
-            logger.error(f"Failed to write async audit log: {e}")
 
 audit_service = AuditService()

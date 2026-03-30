@@ -47,15 +47,6 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def verify_permission(user, permission_slug: str) -> bool:
-    """
-    Check if a user has a specific permission.
-    Returns True if user is superuser or has the permission via their roles.
-    """
-    if user.is_superuser:
-        return True
-    return user.has_permission(permission_slug)
-
 import pyotp
 import secrets
 
@@ -66,8 +57,20 @@ def verify_totp(secret: str, code: str) -> bool:
     totp = pyotp.TOTP(secret)
     return totp.verify(code)
 
-def generate_backup_codes(num_codes: int = 10, length: int = 8) -> list:
-    return [secrets.token_hex(length // 2) for _ in range(num_codes)]
+def generate_backup_codes(count: int = 10) -> list:
+    return [secrets.token_hex(4).upper() for _ in range(count)]
 
-def generate_qr_uri(secret: str, email: str, issuer: str = "WEZU") -> str:
-    return pyotp.totp.TOTP(secret).provisioning_uri(name=email, issuer_name=issuer)
+def generate_qr_uri(secret: str, user_email: str) -> str:
+    return pyotp.totp.TOTP(secret).provisioning_uri(
+        name=user_email, issuer_name="Wezu Energy"
+    )
+
+def verify_permission(user, permission_slug: str) -> bool:
+    """
+    Check if a user has a specific permission.
+    Returns True if user is superuser or has the permission via their roles.
+    """
+    if user.is_superuser:
+        return True
+    return user.has_permission(permission_slug)
+

@@ -2,10 +2,10 @@
 TimescaleDB Service
 Time-series data management for IoT and analytics
 """
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
-from app.core.config import settings
+from app.core.database import engine
 import logging
 
 logger = logging.getLogger(__name__)
@@ -14,8 +14,8 @@ class TimescaleDBService:
     """TimescaleDB integration for time-series data"""
     
     def __init__(self):
-        # Use same database but with TimescaleDB extension
-        self.engine = create_engine(settings.DATABASE_URL)
+        # Reuse shared application engine to avoid duplicate DB pools.
+        self.engine = engine
     
     def setup_hypertables(self):
         """

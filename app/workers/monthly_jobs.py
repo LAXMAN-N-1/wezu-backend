@@ -75,6 +75,21 @@ def batch_payment_processing():
             
             result = SettlementService.process_batch_payments(session, month_str)
             
+            # FR-ADMIN-FIN-003: Failed settlement alert
+            failed_count = result.get("failed_count", 0)
+            if failed_count > 0:
+                logger.error(f"ALERT: {failed_count} settlements failed in batch {month_str}")
+                # In production, trigger Email/SMS alert to Admin
+                from app.services.audit_service import AuditService
+                AuditService.log_action(
+                    session, 
+                    user_id=None, 
+                    action="SETTLEMENT_BATCH_FAILURE",
+                    resource="settlement",
+                    resource_id=month_str,
+                    details=f"Batch payment failure detected: {failed_count} records"
+                )
+            
             logger.info(f"Batch payment completed: {result}")
             complete_job_execution(execution.execution_id, "COMPLETED", result)
             

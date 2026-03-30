@@ -87,6 +87,26 @@ def get_peak_hours(
     return DealerAnalyticsService.get_peak_hours(db, dealer_id)
 
 
+@router.get("/profitability")
+def get_profitability_analysis(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get detailed profitability analysis (Revenue vs Estimated Costs)."""
+    dealer_id = _get_dealer_id(db, current_user.id)
+    return DealerAnalyticsService.get_profitability_analysis(db, dealer_id)
+
+
+@router.get("/margin-by-battery")
+def get_margin_by_battery(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get revenue/cost breakdown by battery type."""
+    dealer_id = _get_dealer_id(db, current_user.id)
+    return DealerAnalyticsService.get_margin_by_battery_type(db, dealer_id)
+
+
 @router.get("/export/csv")
 def export_csv(
     db: Session = Depends(get_session),

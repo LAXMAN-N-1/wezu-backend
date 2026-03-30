@@ -21,12 +21,12 @@ class BatteryStatus(str, Enum):
     RETIRED = "retired"
 
 class BatteryHealth(str, Enum):
-    GOOD = "good"
-    FAIR = "fair"
-    POOR = "poor"
-    CRITICAL = "critical"
-    EXCELLENT = "excellent"
-    DAMAGED = "damaged"
+    GOOD = "GOOD"
+    FAIR = "FAIR"
+    POOR = "POOR"
+    CRITICAL = "CRITICAL"
+    EXCELLENT = "EXCELLENT"
+    DAMAGED = "DAMAGED"
 
 
 class LocationType(str, Enum):
@@ -47,6 +47,7 @@ class Battery(SQLModel, table=True):
     
     # Product Catalog Link
     sku_id: Optional[int] = Field(default=None, foreign_key="battery_catalog.id")
+    spec_id: Optional[int] = Field(default=None, foreign_key="battery_catalog.id")
     
     # Location tracking
     station_id: Optional[int] = Field(default=None, foreign_key="stations.id", index=True)
@@ -66,6 +67,7 @@ class Battery(SQLModel, table=True):
     # New Battery Management Fields
     manufacturer: Optional[str] = Field(default=None)
     battery_type: Optional[str] = Field(default="48V/30Ah")
+    purchase_cost: float = Field(default=0.0)
     notes: Optional[str] = Field(default=None)
     location_type: LocationType = Field(default=LocationType.WAREHOUSE)
     

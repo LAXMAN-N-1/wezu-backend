@@ -1,5 +1,5 @@
 from typing import Any, List, Optional, Dict
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect, UploadFile, File
 from sqlmodel import Session, select
 from pydantic import BaseModel
 from sqlalchemy.orm import selectinload
@@ -18,21 +18,18 @@ from app.schemas.battery import (
     BatteryAuditLogResponse, BatteryHealthHistoryResponse
 )
 from app.api import deps
-from app.core.audit import audit_log
-from app.models.user import User
-from app.models.station import Station
-
-router = APIRouter()
-
+from app.schemas.common import DataResponse
 from app.schemas.station_monitoring import BatteryListResponse, BatteryHealthReport
 from app.services.battery_service import BatteryService
-from fastapi import Response, WebSocket, WebSocketDisconnect
-from app.schemas.common import DataResponse
+from app.services.maintenance_service import MaintenanceService
 from app.services.qr_service import QRCodeService
 from app.services.battery_batch_service import battery_batch_service
 from app.services.mqtt_service import mqtt_service
 from app.services.websocket_service import manager
-from app.services.maintenance_service import MaintenanceService
+from app.core.audit import audit_log
+from app.models.station import Station
+
+router = APIRouter()
 
 class QRGenerateRequest(BaseModel):
     battery_id: int
@@ -282,8 +279,8 @@ def create_battery(
     *,
     request: Request,
     session: Session = Depends(get_session),
+    current_user: User = Depends(deps.get_current_active_superuser),
     battery_in: BatteryCreate,
-    current_user: User = Depends(deps.get_current_active_superuser)
 ) -> Any:
     """Create a new battery record manually."""
     return BatteryService.create_battery(session, battery_in, current_user.id)
@@ -478,18 +475,29 @@ def update_battery_lifecycle(
     if not battery:
         raise HTTPException(status_code=404, detail="Battery not found")
     
+    # Apply updates
     if update_in.status:
         battery.status = update_in.status
-        
-        # Log event
         event = BatteryLifecycleEvent(
             battery_id=battery.id,
             event_type="status_change",
             description=f"Status changed to {update_in.status}. {update_in.description or ''}"
         )
         session.add(event)
-        session.add(battery)
-        session.commit()
-        session.refresh(battery)
-        
+    if update_in.health_status:
+        battery.health_status = update_in.health_status
+    if update_in.health_percentage is not None:
+        battery.health_percentage = update_in.health_percentage
+    if update_in.location_type:
+        battery.location_type = update_in.location_type
+    if update_in.station_id is not None:
+        battery.station_id = update_in.station_id
+    if update_in.notes:
+        battery.notes = update_in.notes
+    if update_in.description:
+        battery.notes = (battery.notes or "") + f" {update_in.description}".strip()
+
+    session.add(battery)
+    session.commit()
+    session.refresh(battery)
     return battery
