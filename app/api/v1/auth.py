@@ -745,17 +745,25 @@ async def login(
     """
     from app.core.security import verify_password
     
-    # 1. Find User (by email or phone)
-    if "@" in login_data.username:
-        statement = select(User).where(User.email == login_data.username).options(selectinload(User.role))
+    # 1. Find User (by email or phone) using normalized credential
+    credential = login_data.credential.strip()
+    if "@" in credential:
+        from sqlalchemy import func
+        statement = select(User).where(func.lower(User.email) == credential.lower()).options(selectinload(User.role))
     else:
-        statement = select(User).where(User.phone_number == login_data.username).options(selectinload(User.role))
+        statement = select(User).where(User.phone_number == credential).options(selectinload(User.role))
     
     user = db.exec(statement).first()
     
     if not user:
         # Audit: failed login (unknown user)
-        AuditLogger.log_event(db, None, "FAILED_LOGIN", "AUTH", metadata={"username": login_data.username, "reason": "user_not_found"})
+        AuditLogger.log_event(
+            db,
+            None,
+            "FAILED_LOGIN",
+            "AUTH",
+            metadata={"credential": credential, "reason": "user_not_found"},
+        )
         raise HTTPException(status_code=401, detail="Invalid credentials")
         
     if not verify_password(login_data.password, user.hashed_password):
