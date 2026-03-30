@@ -615,7 +615,7 @@ async def register_with_password(
     refresh_token = create_refresh_token(subject=new_user.id)
     return Token(access_token=access_token, refresh_token=refresh_token, user=new_user)
 
-@router.post("/login", response_model=Token)
+@router.post("/login/form", response_model=Token)
 async def login_with_password(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
