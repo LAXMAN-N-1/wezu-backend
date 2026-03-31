@@ -21,9 +21,18 @@ class DealerProfile(SQLModel, table=True):
     gst_number: Optional[str] = None
     pan_number: Optional[str] = None
     
+    # Extra Business Info
+    year_established: Optional[str] = None
+    website_url: Optional[str] = None
+    business_description: Optional[str] = None
+    
     contact_person: str
     contact_email: str
     contact_phone: str
+    alternate_phone: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+    support_email: Optional[str] = None
+    support_phone: Optional[str] = None
     
     address_line1: str
     city: str
@@ -32,6 +41,11 @@ class DealerProfile(SQLModel, table=True):
     
     # Financial Details
     bank_details: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
+    
+    # Global Settings Defaults
+    global_station_defaults: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
+    global_inventory_rules: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
+    holiday_calendar: Optional[List[Dict]] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
     is_active: bool = Field(default=False)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
