@@ -117,6 +117,8 @@ class User(SQLModel, table=True):
     
     # Preferences (JSON string)
     notification_preferences: Optional[str] = None
+    ui_preferences: Optional[str] = None
+    dashboard_layout: Optional[str] = None
     
     # Timestamps
     created_at: datetime = Field(default_factory=datetime.utcnow)

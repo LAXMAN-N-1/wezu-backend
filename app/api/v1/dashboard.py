@@ -296,3 +296,34 @@ async def get_dashboard_top_stations(
         ]
 
     return {"stations": top_stations[:limit]}
+
+
+@router.get("/layout")
+async def get_dashboard_layout(
+    current_user: User = Depends(deps.get_current_active_superuser)
+):
+    """Retrieve customisable drag-and-drop dashboard widget layout JSON."""
+    import json
+    layout = {}
+    if current_user.dashboard_layout:
+        try:
+            layout = json.loads(current_user.dashboard_layout)
+        except json.JSONDecodeError:
+            pass
+    return {"layout": layout}
+
+@router.post("/layout")
+async def save_dashboard_layout(
+    layout_data: dict,
+    current_user: User = Depends(deps.get_current_active_superuser),
+    db: Session = Depends(deps.get_db)
+):
+    """Save customisable drag-and-drop dashboard widget layout JSON."""
+    import json
+    new_layout = layout_data.get("layout", layout_data)
+    
+    current_user.dashboard_layout = json.dumps(new_layout)
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return {"message": "Dashboard layout saved successfully", "layout": new_layout}

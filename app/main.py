@@ -197,6 +197,11 @@ app.include_router(customer_auth.router, prefix=f"{settings.API_V1_STR}/customer
 from app.api.v1 import sessions
 app.include_router(sessions.router, prefix=f"{settings.API_V1_STR}/sessions", tags=["Session Management"])
 app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["Users"])
+
+# UI Preferences specifically at /api/v1/user/preferences
+from app.api.v1 import user_preferences
+app.include_router(user_preferences.router, prefix=f"{settings.API_V1_STR}/user", tags=["User Preferences"])
+
 from app.api.v1 import admin_users, admin_user_bulk
 app.include_router(admin_users.router, prefix=f"{settings.API_V1_STR}/admin/users", tags=["Admin User Management"])
 app.include_router(admin_user_bulk.router, prefix=f"{settings.API_V1_STR}/admin/users", tags=["Admin User Bulk Operations"])
