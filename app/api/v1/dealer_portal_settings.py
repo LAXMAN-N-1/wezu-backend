@@ -31,6 +31,15 @@ class UpdateProfileRequest(BaseModel):
     pincode: Optional[str] = None
     gst_number: Optional[str] = None
     pan_number: Optional[str] = None
+    
+    # New Fields
+    year_established: Optional[str] = None
+    website_url: Optional[str] = None
+    business_description: Optional[str] = None
+    alternate_phone: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+    support_email: Optional[EmailStr] = None
+    support_phone: Optional[str] = None
 
 
 class BankAccountRequest(BaseModel):
@@ -76,15 +85,26 @@ def get_profile(
         "id": dealer.id,
         "user_id": dealer.user_id,
         "business_name": dealer.business_name,
+        "gst_number": dealer.gst_number,
+        "pan_number": dealer.pan_number,
+        
+        "year_established": dealer.year_established,
+        "website_url": dealer.website_url,
+        "business_description": dealer.business_description,
+        
         "contact_person": dealer.contact_person,
         "contact_email": dealer.contact_email,
         "contact_phone": dealer.contact_phone,
+        "alternate_phone": dealer.alternate_phone,
+        "whatsapp_number": dealer.whatsapp_number,
+        "support_email": dealer.support_email,
+        "support_phone": dealer.support_phone,
+        
         "address_line1": dealer.address_line1,
         "city": dealer.city,
         "state": dealer.state,
         "pincode": dealer.pincode,
-        "gst_number": dealer.gst_number,
-        "pan_number": dealer.pan_number,
+        
         "bank_details": dealer.bank_details,
         "is_active": dealer.is_active,
         "created_at": str(dealer.created_at),
@@ -318,4 +338,112 @@ def mark_all_read(
 
     db.commit()
 
+
     return {"message": f"Marked {len(notifications)} notifications as read"}
+
+
+# ── Global Settings & Defaults ───────────────────────────
+
+@router.get("/station-defaults")
+def get_station_defaults(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get global station defaults for the dealer."""
+    dealer = db.exec(
+        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
+    ).first()
+    if not dealer:
+        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    return {"station_defaults": dealer.global_station_defaults or {}}
+
+
+@router.patch("/station-defaults")
+def update_station_defaults(
+    data: Dict[str, Any],
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Update global station defaults."""
+    dealer = db.exec(
+        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
+    ).first()
+    if not dealer:
+        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    
+    current_defaults = dealer.global_station_defaults or {}
+    current_defaults.update(data)
+    dealer.global_station_defaults = current_defaults
+    
+    db.add(dealer)
+    db.commit()
+    return {"message": "Station defaults updated"}
+
+
+@router.get("/inventory-rules")
+def get_inventory_rules(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get global inventory rule thresholds."""
+    dealer = db.exec(
+        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
+    ).first()
+    if not dealer:
+        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    return {"inventory_rules": dealer.global_inventory_rules or {}}
+
+
+@router.patch("/inventory-rules")
+def update_inventory_rules(
+    data: Dict[str, Any],
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Update global inventory rules."""
+    dealer = db.exec(
+        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
+    ).first()
+    if not dealer:
+        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    
+    current_rules = dealer.global_inventory_rules or {}
+    current_rules.update(data)
+    dealer.global_inventory_rules = current_rules
+    
+    db.add(dealer)
+    db.commit()
+    return {"message": "Inventory rules updated"}
+
+
+@router.get("/holiday-calendar")
+def get_holiday_calendar(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get dealer's holiday calendar."""
+    dealer = db.exec(
+        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
+    ).first()
+    if not dealer:
+        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    return {"holiday_calendar": dealer.holiday_calendar or []}
+
+
+@router.patch("/holiday-calendar")
+def update_holiday_calendar(
+    data: List[Dict[str, Any]],
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Update holiday calendar (full replacement)."""
+    dealer = db.exec(
+        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
+    ).first()
+    if not dealer:
+        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    
+    dealer.holiday_calendar = data
+    db.add(dealer)
+    db.commit()
+    return {"message": "Holiday calendar updated"}
