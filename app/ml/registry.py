@@ -1,6 +1,6 @@
 import os
 import joblib
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Dict, Any, Optional
 
 class ModelRegistry:
@@ -11,7 +11,7 @@ class ModelRegistry:
     
     @staticmethod
     def save_model(model: Any, name: str, metrics: Dict[str, float]) -> str:
-        version = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        version = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
         model_dir = os.path.join(ModelRegistry.BASE_PATH, name, version)
         os.makedirs(model_dir, exist_ok=True)
         
@@ -26,7 +26,7 @@ class ModelRegistry:
                 "name": name,
                 "version": version,
                 "metrics": metrics,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(UTC).isoformat()
             }, f)
             
         # Update 'latest' pointer (symlink or file)

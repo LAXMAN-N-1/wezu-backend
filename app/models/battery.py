@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
@@ -93,10 +93,10 @@ class Battery(SQLModel, table=True):
     
     # Timestamps
     last_telemetry_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
-        sa_column_kwargs={"onupdate": datetime.utcnow}
+        default_factory=lambda: datetime.now(UTC),
+        sa_column_kwargs={"onupdate": lambda: datetime.now(UTC)}
     )
 
     # Relationships
@@ -128,7 +128,7 @@ class BatteryLifecycleEvent(SQLModel, table=True):
     description: Optional[str] = None
     actor_id: Optional[int] = None # User ID
     
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     battery: Battery = Relationship(back_populates="lifecycle_events")
 
@@ -144,7 +144,7 @@ class BatteryAuditLog(SQLModel, table=True):
     new_value: Optional[str] = None
     reason: Optional[str] = None
     
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class BatteryHealthHistory(SQLModel, table=True):
     __tablename__ = "battery_health_history"
@@ -153,4 +153,4 @@ class BatteryHealthHistory(SQLModel, table=True):
     battery_id: int = Field(foreign_key="batteries.id", index=True)
     
     health_percentage: float
-    recorded_at: datetime = Field(default_factory=datetime.utcnow)
+    recorded_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

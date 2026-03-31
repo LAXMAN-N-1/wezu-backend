@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List, TYPE_CHECKING
-from datetime import datetime
+from datetime import datetime, UTC
 import uuid
 
 if TYPE_CHECKING:
@@ -35,8 +35,8 @@ class BatteryCatalog(SQLModel, table=True):
     
     # Meta
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationships
     batteries: List["Battery"] = Relationship(
@@ -55,4 +55,4 @@ class BatteryBatch(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     batch_number: str = Field(unique=True, index=True)
     manufacturer: str
-    production_date: datetime = Field(default_factory=datetime.utcnow)
+    production_date: datetime = Field(default_factory=lambda: datetime.now(UTC))

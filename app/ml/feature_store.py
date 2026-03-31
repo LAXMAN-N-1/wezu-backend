@@ -1,5 +1,5 @@
 from typing import Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from sqlmodel import Session, select, func
 from app.models.battery import Battery
 from app.models.telemetry import Telemetry
@@ -18,7 +18,7 @@ class FeatureStore:
             return {}
             
         # Recent logs from Telemetry (TimescaleDB)
-        since = datetime.utcnow() - timedelta(days=30)
+        since = datetime.now(UTC) - timedelta(days=30)
         logs = db.exec(select(Telemetry).where(
             Telemetry.battery_id == battery_id,
             Telemetry.timestamp >= since
@@ -32,7 +32,7 @@ class FeatureStore:
             "charge_cycle_count": battery.cycle_count,
             "avg_temperature_30d": avg_temp,
             "voltage_drop_rate": voltage_drop,
-            "battery_age_days": (datetime.utcnow() - battery.created_at).days,
+            "battery_age_days": (datetime.now(UTC) - battery.created_at).days,
             "current_soh": battery.health_percentage
         }
 
@@ -65,5 +65,5 @@ class FeatureStore:
             "overdue_rate": overdue_count / total_rentals if total_rentals > 0 else 0,
             "failed_payment_count": failed_payments,
             "avg_swap_interval_days": avg_swap_interval,
-            "account_age_days": (datetime.utcnow() - rentals[0].created_at).days if rentals else 0
+            "account_age_days": (datetime.now(UTC) - rentals[0].created_at).days if rentals else 0
         }

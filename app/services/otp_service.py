@@ -1,6 +1,6 @@
 import random
 import string
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from typing import Optional
 from sqlmodel import Session, select
 from app.models.otp import OTP
@@ -21,7 +21,7 @@ class OTPService:
     def create_otp_record(db: Session, target: str, code: str, purpose: str = "registration", validity_minutes: int = 15) -> OTP:
         # Rate Limiting Logic
         # 1. Count OTPs in the last 30 minutes
-        window_start = datetime.utcnow() - timedelta(minutes=30)
+        window_start = datetime.now(UTC) - timedelta(minutes=30)
         statement = select(OTP).where(
             OTP.target == target, 
             OTP.purpose == purpose, 
@@ -42,7 +42,7 @@ class OTPService:
         # 3. Progressive Delays
         if count > 0:
             last_otp_time = recent_otps[0].created_at
-            time_since_last = datetime.utcnow() - last_otp_time
+            time_since_last = datetime.now(UTC) - last_otp_time
             
             # After 1st OTP (attempting 2nd): Wait 1 minute
             if count == 1 and time_since_last < timedelta(minutes=1):
@@ -69,7 +69,7 @@ class OTPService:
             old_otp.is_active = False # Mark as inactive instead of is_used
             db.add(old_otp)
         
-        expires_at = datetime.utcnow() + timedelta(minutes=validity_minutes)
+        expires_at = datetime.now(UTC) + timedelta(minutes=validity_minutes)
         otp_record = OTP(
             target=target,
             code=code,
@@ -169,7 +169,7 @@ class OTPService:
             OTP.purpose == purpose,
             OTP.is_active == True,
             OTP.is_used == False,
-            OTP.expires_at > datetime.utcnow()
+            OTP.expires_at > datetime.now(UTC)
         )
         otp_record = db.exec(statement).first()
         

@@ -4,7 +4,7 @@ Order creation, management, and fulfillment
 """
 from sqlmodel import Session, select
 from typing import List, Dict, Optional
-from datetime import datetime
+from datetime import datetime, UTC
 import uuid
 from app.models.catalog import CatalogOrder, CatalogOrderItem, DeliveryTracking, DeliveryEvent, CatalogProduct, CatalogProductVariant as ProductVariant
 from app.services.catalog_service import CatalogService
@@ -86,7 +86,7 @@ class OrderService:
             total_amount = subtotal + tax_amount + shipping_fee
             
             # Generate order number
-            order_number = f"ORD-{datetime.utcnow().strftime('%Y%m%d')}-{uuid.uuid4().hex[:8].upper()}"
+            order_number = f"ORD-{datetime.now(UTC).strftime('%Y%m%d')}-{uuid.uuid4().hex[:8].upper()}"
             
             # Create order
             order = CatalogOrder(
@@ -144,7 +144,7 @@ class OrderService:
             order.status = "CONFIRMED"
             order.payment_status = "PAID"
             order.payment_id = payment_id
-            order.confirmed_at = datetime.utcnow()
+            order.confirmed_at = datetime.now(UTC)
             
             session.add(order)
             session.commit()
@@ -204,7 +204,7 @@ class OrderService:
                 )
             
             order.status = "CANCELLED"
-            order.cancelled_at = datetime.utcnow()
+            order.cancelled_at = datetime.now(UTC)
             order.admin_notes = reason
             
             session.add(order)
@@ -222,7 +222,7 @@ class OrderService:
         """Create delivery tracking for order"""
         try:
             # Generate tracking number
-            tracking_number = f"TRK-{datetime.utcnow().strftime('%Y%m%d')}-{uuid.uuid4().hex[:10].upper()}"
+            tracking_number = f"TRK-{datetime.now(UTC).strftime('%Y%m%d')}-{uuid.uuid4().hex[:10].upper()}"
             
             tracking = DeliveryTracking(
                 order_id=order_id,
@@ -267,7 +267,7 @@ class OrderService:
             tracking.current_status = status
             if location:
                 tracking.current_location = location
-            tracking.updated_at = datetime.utcnow()
+            tracking.updated_at = datetime.now(UTC)
             
             # Create event
             event = DeliveryEvent(
@@ -286,8 +286,8 @@ class OrderService:
                 order = session.get(CatalogOrder, tracking.order_id)
                 if order:
                     order.status = "DELIVERED"
-                    order.delivered_at = datetime.utcnow()
-                    tracking.actual_delivery_date = datetime.utcnow()
+                    order.delivered_at = datetime.now(UTC)
+                    tracking.actual_delivery_date = datetime.now(UTC)
                     session.add(order)
                     session.commit()
             

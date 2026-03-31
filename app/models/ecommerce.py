@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 
 class EcommerceProduct(SQLModel, table=True):
     __tablename__ = "ecommerce_products"
@@ -14,7 +14,7 @@ class EcommerceProduct(SQLModel, table=True):
     category: str = Field(default="battery") # battery, charger, accessory
     image_url: Optional[str] = None
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     order_items: List["EcommerceOrderItem"] = Relationship(back_populates="product")
@@ -30,8 +30,8 @@ class EcommerceOrder(SQLModel, table=True):
     shipping_address_id: Optional[int] = Field(default=None, foreign_key="addresses.id")
     payment_transaction_id: Optional[int] = Field(default=None, foreign_key="payment_transactions.id") # Link to payment_transactions if needed
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     user: "User" = Relationship()

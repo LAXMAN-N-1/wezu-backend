@@ -4,7 +4,7 @@ from app.ml.models.battery_health import BatteryHealthModel, DemandForecastModel
 from typing import Dict, Any
 
 from app.ml.registry import ModelRegistry
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 
 class MLService:
     @staticmethod
@@ -42,7 +42,7 @@ class MLService:
         from sqlalchemy import func
         
         # 1. Fetch swap counts per day for the last 30 days
-        since = datetime.utcnow() - timedelta(days=30)
+        since = datetime.now(UTC) - timedelta(days=30)
         history_stmt = select(
             func.date(SwapSession.created_at).label("date"),
             func.count(SwapSession.id).label("count")

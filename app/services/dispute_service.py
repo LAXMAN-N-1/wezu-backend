@@ -1,5 +1,5 @@
 from sqlmodel import Session, select
-from datetime import datetime
+from datetime import datetime, UTC
 from app.models.settlement_dispute import SettlementDispute
 from app.models.settlement import Settlement
 import logging
@@ -80,7 +80,7 @@ class DisputeService:
             raise ValueError("action must be 'approve' or 'reject'")
 
         dispute.resolution_notes = notes
-        dispute.resolved_at = datetime.utcnow()
+        dispute.resolved_at = datetime.now(UTC)
         db.add(dispute)
         db.commit()
         db.refresh(dispute)

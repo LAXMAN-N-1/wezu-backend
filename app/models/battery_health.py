@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Optional, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
@@ -64,7 +64,7 @@ class BatteryHealthSnapshot(SQLModel, table=True):
 
     snapshot_type: SnapshotType = Field(default=SnapshotType.MANUAL)
     recorded_by: Optional[int] = Field(default=None, foreign_key="users.id")
-    recorded_at: datetime = Field(default_factory=datetime.utcnow)
+    recorded_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class BatteryMaintenanceSchedule(SQLModel, table=True):
@@ -87,7 +87,7 @@ class BatteryMaintenanceSchedule(SQLModel, table=True):
 
     completed_at: Optional[datetime] = None
     created_by: Optional[int] = Field(default=None, foreign_key="users.id")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class BatteryHealthAlert(SQLModel, table=True):
@@ -106,4 +106,4 @@ class BatteryHealthAlert(SQLModel, table=True):
     resolved_at: Optional[datetime] = None
     resolution_reason: Optional[str] = None
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

@@ -3,7 +3,7 @@ from typing import List, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from app.models.user import User
     from app.models.role_right import RoleRight
-from datetime import datetime
+from datetime import datetime, UTC
 
 # Link Table for Role <-> Permission
 class RolePermission(SQLModel, table=True):
@@ -20,7 +20,7 @@ class AdminUserRole(SQLModel, table=True):
     role_id: int = Field(foreign_key="roles.id", primary_key=True)
     
     assigned_by: Optional[int] = Field(default=None, foreign_key="admin_users.id")
-    assigned_at: datetime = Field(default_factory=datetime.utcnow)
+    assigned_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 # Link Table for User <-> Role (Many-to-Many)
@@ -32,9 +32,9 @@ class UserRole(SQLModel, table=True):
     
     assigned_by: Optional[int] = Field(default=None, foreign_key="admin_users.id")
     notes: Optional[str] = None
-    effective_from: datetime = Field(default_factory=datetime.utcnow)
+    effective_from: datetime = Field(default_factory=lambda: datetime.now(UTC))
     expires_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class Permission(SQLModel, table=True):
     __tablename__ = "permissions"
@@ -69,8 +69,8 @@ class Role(SQLModel, table=True):
     icon: Optional[str] = Field(default="shield") # Lucide icon name
     color: Optional[str] = Field(default="#4CAF50") # HEX color
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Hierarchy relationships
     parent: Optional["Role"] = Relationship(
@@ -128,7 +128,7 @@ class UserAccessPath(SQLModel, table=True):
     # Access Level
     access_level: str = Field(default="view") # view, manage, admin
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     created_by: Optional[int] = Field(default=None, foreign_key="admin_users.id")
     
     # Relationships

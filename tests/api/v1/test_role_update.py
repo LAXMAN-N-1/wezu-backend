@@ -7,7 +7,7 @@ from app.models.admin_user import AdminUser
 from app.models.rbac import Role, Permission, RolePermission, UserRole
 from app.models.user import User
 from app.models.session import UserSession
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 
 def create_superuser(session):
     user = session.exec(select(AdminUser).where(AdminUser.email == "admin@roles.com")).first()
@@ -44,7 +44,7 @@ def setup_role_and_user(session):
     session.commit()
     session.add(UserRole(user_id=user.id, role_id=role.id))
     
-    us = UserSession(user_id=user.id, token_id="t1", expires_at=datetime.utcnow() + timedelta(hours=1), ip_address="1.1.1.1")
+    us = UserSession(user_id=user.id, token_id="t1", expires_at=datetime.now(UTC) + timedelta(hours=1), ip_address="1.1.1.1")
     session.add(us)
     session.commit()
     session.refresh(us)
@@ -56,7 +56,7 @@ def test_update_role_metadata(client: TestClient, session: Session):
     role, _, _ = setup_role_and_user(session)
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     payload = {
         "description": "New Desc",
@@ -73,7 +73,7 @@ def test_update_role_permissions_and_invalidation(client: TestClient, session: S
     role, user, us = setup_role_and_user(session)
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     assert us.is_active is True
     
@@ -103,7 +103,7 @@ def test_update_system_role_protection(client: TestClient, session: Session):
     session.commit()
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Try rename
     payload = {"name": "New Name"}

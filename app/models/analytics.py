@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime, date
+from datetime import datetime, UTC, date
 import sqlalchemy as sa
 from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
@@ -39,7 +39,7 @@ class DemandForecast(SQLModel, table=True):
     model_version: str = Field(default="v1.0")
     model_features: Optional[dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class ChurnPrediction(SQLModel, table=True):
     __tablename__ = "churn_predictions"
@@ -87,7 +87,7 @@ class ChurnPrediction(SQLModel, table=True):
     model_version: str = Field(default="v1.0")
     prediction_date: date = Field(default_factory=date.today)
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     user: "User" = Relationship()
@@ -136,4 +136,4 @@ class PricingRecommendation(SQLModel, table=True):
     actual_revenue_change: Optional[float] = None
     actual_volume_change: Optional[float] = None
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

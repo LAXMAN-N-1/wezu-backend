@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import time, datetime
+from datetime import time, datetime, UTC
 
 class NotificationPreference(SQLModel, table=True):
     __tablename__ = "notification_preferences"
@@ -70,7 +70,7 @@ class NotificationPreference(SQLModel, table=True):
     # Language preference
     preferred_language: str = Field(default="en")  # en, hi, etc.
     
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
-    user: "User" = Relationship()
+    user: "User" = Relationship(back_populates="notification_preference")

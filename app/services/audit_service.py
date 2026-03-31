@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any
 from sqlmodel import Session, select
 from app.core.database import engine
 from app.models.audit_log import AuditLog, SecurityEvent
-from datetime import datetime
+from datetime import datetime, UTC
 
 logger = logging.getLogger(__name__)
 

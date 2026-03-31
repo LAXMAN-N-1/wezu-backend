@@ -38,7 +38,7 @@ def test_get_kyc_queue(client: TestClient, session: Session):
     
     # Update user status to pending_verification manually for speed
     user = session.exec(select(User).where(User.email == email)).first()
-    user.kyc_status = "pending_verification"
+    user.kyc_status = "pending"
     session.add(user)
     session.commit()
     session.refresh(user)
@@ -88,7 +88,7 @@ def test_verify_kyc_submission(client: TestClient, session: Session):
     headers = get_auth_headers(client, email=email)
     
     user = session.exec(select(User).where(User.email == email)).first()
-    user.kyc_status = "pending_verification"
+    user.kyc_status = "pending"
     session.add(user)
     session.commit()
     
@@ -122,5 +122,5 @@ def test_verify_kyc_submission(client: TestClient, session: Session):
     # 4. Verify DB updates
     session.refresh(user)
     session.refresh(doc)
-    assert user.kyc_status == "verified"
+    assert user.kyc_status == "approved"
     assert doc.status == "verified"

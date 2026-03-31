@@ -5,7 +5,7 @@ Full CRUD for dealer staff users, invite flow, sessions, password management.
 from typing import List, Optional, Dict
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session, select, func, or_
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 import secrets
 import logging
 
@@ -198,8 +198,8 @@ def create_dealer_user(
         # Generate invite token
         token = _generate_invite_token()
         user.invite_token = token
-        user.invite_token_expires = datetime.utcnow() + timedelta(hours=INVITE_TOKEN_EXPIRY_HOURS)
-        user.invite_sent_at = datetime.utcnow()
+        user.invite_token_expires = datetime.now(UTC) + timedelta(hours=INVITE_TOKEN_EXPIRY_HOURS)
+        user.invite_sent_at = datetime.now(UTC)
         user.status = UserStatus.PENDING
 
         # TODO: Send actual email with invite link containing token
@@ -358,7 +358,7 @@ def update_dealer_user(
                 old_values[key] = getattr(user, key)
                 setattr(user, key, value)
 
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(UTC)
     db.add(user)
 
     _audit(db, current_user.id, dealer.id, AuditActionType.DATA_MODIFICATION,
@@ -387,7 +387,7 @@ def delete_dealer_user(
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
 
     user.is_deleted = True
-    user.deleted_at = datetime.utcnow()
+    user.deleted_at = datetime.now(UTC)
     user.deletion_reason = "Deleted by admin"
     user.status = UserStatus.DELETED
     db.add(user)
@@ -399,7 +399,7 @@ def delete_dealer_user(
     for s in sessions:
         s.is_active = False
         s.is_revoked = True
-        s.revoked_at = datetime.utcnow()
+        s.revoked_at = datetime.now(UTC)
         db.add(s)
 
     _audit(db, current_user.id, dealer.id, AuditActionType.DATA_MODIFICATION,
@@ -428,7 +428,7 @@ def change_user_status(
 
     old_status = user.status
     user.status = data.status
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(UTC)
 
     # If deactivating, revoke all sessions
     if data.status in ["inactive", "suspended"]:
@@ -438,7 +438,7 @@ def change_user_status(
         for s in sessions:
             s.is_active = False
             s.is_revoked = True
-            s.revoked_at = datetime.utcnow()
+            s.revoked_at = datetime.now(UTC)
             db.add(s)
 
     db.add(user)
@@ -470,8 +470,8 @@ def reset_user_password(
             raise HTTPException(status_code=400, detail="Password required")
         user.hashed_password = get_password_hash(data.password)
         user.force_password_change = data.force_password_change
-        user.password_changed_at = datetime.utcnow()
-        user.updated_at = datetime.utcnow()
+        user.password_changed_at = datetime.now(UTC)
+        user.updated_at = datetime.now(UTC)
         db.add(user)
 
         # Revoke all sessions to force re-login
@@ -481,14 +481,14 @@ def reset_user_password(
         for s in sessions:
             s.is_active = False
             s.is_revoked = True
-            s.revoked_at = datetime.utcnow()
+            s.revoked_at = datetime.now(UTC)
             db.add(s)
 
     elif data.mode == "email":
         # Generate password reset token (reuse invite_token field)
         token = _generate_invite_token()
         user.invite_token = token
-        user.invite_token_expires = datetime.utcnow() + timedelta(hours=1)
+        user.invite_token_expires = datetime.now(UTC) + timedelta(hours=1)
         db.add(user)
         # TODO: Send reset email
         logger.info(f"[RESET] Password reset token for {user.email}: {token}")
@@ -519,8 +519,8 @@ def resend_invite(
     # Generate new token
     token = _generate_invite_token()
     user.invite_token = token
-    user.invite_token_expires = datetime.utcnow() + timedelta(hours=INVITE_TOKEN_EXPIRY_HOURS)
-    user.invite_sent_at = datetime.utcnow()
+    user.invite_token_expires = datetime.now(UTC) + timedelta(hours=INVITE_TOKEN_EXPIRY_HOURS)
+    user.invite_sent_at = datetime.now(UTC)
     db.add(user)
 
     # TODO: Send actual email
@@ -582,7 +582,7 @@ def terminate_all_sessions(
     for s in sessions:
         s.is_active = False
         s.is_revoked = True
-        s.revoked_at = datetime.utcnow()
+        s.revoked_at = datetime.now(UTC)
         db.add(s)
         count += 1
 
@@ -611,7 +611,7 @@ def terminate_session(
 
     session.is_active = False
     session.is_revoked = True
-    session.revoked_at = datetime.utcnow()
+    session.revoked_at = datetime.now(UTC)
     db.add(session)
 
     _audit(db, current_user.id, dealer.id, AuditActionType.SESSION_TERMINATED,
@@ -662,10 +662,10 @@ def bulk_action(
 
             elif data.action == BulkActionType.DELETE:
                 user.is_deleted = True
-                user.deleted_at = datetime.utcnow()
+                user.deleted_at = datetime.now(UTC)
                 user.status = UserStatus.DELETED
 
-            user.updated_at = datetime.utcnow()
+            user.updated_at = datetime.now(UTC)
             db.add(user)
             results["success"] += 1
 

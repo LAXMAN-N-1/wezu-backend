@@ -43,7 +43,7 @@ def test_transfer_role(client: TestClient, session: Session):
     session.commit()
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Action: Transfer Source -> Target
     payload = {
@@ -88,7 +88,7 @@ def test_transfer_fail_no_role(client: TestClient, session: Session):
     session.commit()
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     payload = {
         "new_user_id": u2.id,
@@ -98,4 +98,4 @@ def test_transfer_fail_no_role(client: TestClient, session: Session):
     # Try to transfer role that u1 doesn't have
     resp = client.post(f"/api/v1/admin/rbac/users/{u1.id}/roles/transfer", json=payload)
     assert resp.status_code == 400
-    assert "does not have" in resp.json()["detail"]
+    assert "does not have" in resp.json()["error"]

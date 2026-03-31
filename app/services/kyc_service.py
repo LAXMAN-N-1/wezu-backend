@@ -3,7 +3,7 @@ from app.models.kyc import KYCDocumentType, KYCDocumentStatus
 from app.models.user import User, KYCStatus
 from app.core.config import settings
 from sqlmodel import Session, select, func
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 import logging
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ class KYCService:
         result = await self.provider.verify_pan(pan_number)
         
         if result.get("success"):
-            user.kyc_status = KYCStatus.VERIFIED
+            user.kyc_status = KYCStatus.APPROVED
             db.add(user)
             db.commit()
             
@@ -84,7 +84,7 @@ class KYCService:
             record = KYCRecord(user_id=user_id)
         
         record.utility_bill_url = file_path
-        record.updated_at = datetime.utcnow()
+        record.updated_at = datetime.now(UTC)
         db.add(record)
         db.commit()
         
@@ -129,7 +129,7 @@ class KYCService:
         from app.models.user import User
         from sqlalchemy import Date, cast
         
-        today = datetime.utcnow().date()
+        today = datetime.now(UTC).date()
         
         pending_count = db.exec(select(func.count(User.id)).where(User.kyc_status == KYCStatus.PENDING)).one()
         

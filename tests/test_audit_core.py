@@ -3,7 +3,7 @@ Unit Tests for app/core/audit.py
 Tests AuditLogger.log_event, cleanup_old_logs, and _log_from_context
 """
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from unittest.mock import MagicMock, patch
 from sqlmodel import Session, SQLModel, create_engine, select
 from sqlmodel.pool import StaticPool
@@ -120,7 +120,7 @@ class TestCleanupOldLogs:
                 user_id=1,
                 action="TEST",
                 resource_type="TEST",
-                timestamp=datetime.utcnow() - timedelta(days=days),
+                timestamp=datetime.now(UTC) - timedelta(days=days),
             )
             db.add(log)
         db.commit()

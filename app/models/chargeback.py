@@ -1,5 +1,5 @@
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 from sqlmodel import SQLModel, Field
 
 
@@ -18,4 +18,4 @@ class Chargeback(SQLModel, table=True):
     # Settlement linkage (filled when deducted)
     settlement_id: Optional[int] = Field(default=None, foreign_key="settlements.id")
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

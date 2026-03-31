@@ -6,7 +6,7 @@ from sqlmodel import Session, select, or_, and_
 from typing import List, Optional, Dict, Any
 from app.models.catalog import CatalogProduct, CatalogProductImage, CatalogProductVariant
 from app.schemas.catalog import ProductCreate, ProductUpdate
-from datetime import datetime
+from datetime import datetime, UTC
 import logging
 
 logger = logging.getLogger(__name__)
@@ -284,7 +284,7 @@ class CatalogService:
         for key, value in update_data.items():
             setattr(product, key, value)
             
-        product.updated_at = datetime.utcnow()
+        product.updated_at = datetime.now(UTC)
         session.add(product)
         session.commit()
         session.refresh(product)
@@ -298,7 +298,7 @@ class CatalogService:
             return False
             
         product.status = "INACTIVE"
-        product.updated_at = datetime.utcnow()
+        product.updated_at = datetime.now(UTC)
         session.add(product)
         session.commit()
         return True

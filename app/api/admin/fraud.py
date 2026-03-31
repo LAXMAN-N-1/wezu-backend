@@ -16,7 +16,7 @@ router = APIRouter()
 def get_high_risk_users(
     threshold: float = 50.0,
     limit: int = 100,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     """List users with high fraud risk scores"""
@@ -45,7 +45,7 @@ def get_high_risk_users(
 def get_duplicate_accounts(
     status: Optional[str] = None,
     min_confidence: float = 50.0,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     """Get potential duplicate accounts"""
@@ -69,7 +69,7 @@ class BlacklistAdd(BaseModel):
 @router.post("/blacklist", response_model=Blacklist)
 def add_to_blacklist(
     req: BlacklistAdd,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     """Add entry to blacklist"""
@@ -96,7 +96,7 @@ def add_to_blacklist(
 @router.get("/blacklist", response_model=List[Blacklist])
 def get_blacklist(
     type: Optional[str] = None,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     """Get blacklist entries"""
@@ -110,7 +110,7 @@ def get_blacklist(
 @router.delete("/blacklist/{id}")
 def remove_from_blacklist(
     id: int,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     """Remove from blacklist"""
@@ -127,7 +127,7 @@ def get_device_fingerprints(
     user_id: Optional[int] = None,
     suspicious_only: bool = False,
     limit: int = 100,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     """Get device fingerprints for analysis"""
@@ -170,7 +170,7 @@ class DuplicateAction(BaseModel):
 def handle_duplicate_account(
     id: int,
     req: DuplicateAction,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     """Take action on duplicate account detection"""
@@ -181,7 +181,7 @@ def handle_duplicate_account(
     dup.action_taken = req.action
     dup.notes = req.notes
     dup.investigated_by = current_user.id
-    dup.investigated_at = datetime.utcnow()
+    dup.investigated_at = datetime.now(UTC)
     
     if req.action == "CONFIRMED":
         dup.status = "CONFIRMED"
@@ -195,4 +195,4 @@ def handle_duplicate_account(
     
     return {"status": "updated", "action": req.action}
 
-from datetime import datetime
+from datetime import datetime, UTC

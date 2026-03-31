@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func, desc
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from app.api import deps
 from app.models.user import User
 from app.models.battery import Battery
@@ -16,7 +16,7 @@ router = APIRouter()
 
 @router.get("/stats")
 def get_iot_stats(
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(get_db),
 ):
     """Get aggregated IoT device statistics."""
@@ -37,7 +37,7 @@ def list_iot_devices(
     skip: int = 0,
     limit: int = 20,
     status: Optional[str] = None,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(get_db),
 ):
     """List all IoT devices with optional status filtering."""
@@ -51,7 +51,7 @@ def send_device_command(
     device_id: int,
     command_type: str,
     payload: Optional[str] = None,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(get_db),
 ):
     """Send a remote command to an IoT device."""
@@ -74,7 +74,7 @@ def send_device_command(
 def get_command_history(
     device_id: Optional[int] = None,
     limit: int = 50,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(get_db),
 ):
     """Get history of commands sent to devices."""
@@ -85,7 +85,7 @@ def get_command_history(
 
 @router.get("/geofences", response_model=List[Geofence])
 def list_geofences(
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(get_db),
 ):
     """List all configured geofences."""
@@ -94,7 +94,7 @@ def list_geofences(
 @router.post("/geofences", response_model=Geofence)
 def create_geofence(
     geofence: Geofence,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(get_db),
 ):
     """Create a new geofence zone."""
@@ -108,7 +108,7 @@ def list_alerts(
     severity: Optional[str] = None,
     active_only: bool = True,
     limit: int = 50,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(get_db),
 ):
     """List system alerts with filtering."""
@@ -122,7 +122,7 @@ def list_alerts(
 @router.put("/alerts/{alert_id}/acknowledge")
 def acknowledge_alert(
     alert_id: int,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(get_db),
 ):
     """Acknowledge and resolve an alert."""
@@ -130,7 +130,7 @@ def acknowledge_alert(
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
     
-    alert.acknowledged_at = datetime.utcnow()
+    alert.acknowledged_at = datetime.now(UTC)
     alert.acknowledged_by = current_user.id
     db.add(alert)
     db.commit()
@@ -138,7 +138,7 @@ def acknowledge_alert(
 
 @router.get("/batteries/health")
 def get_battery_health_overview(
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(get_db),
 ):
     """Get health status distribution of all batteries."""
@@ -155,11 +155,11 @@ def get_battery_health_overview(
 def get_battery_telematics(
     battery_id: int,
     hours: int = 24,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(get_db),
 ):
     """Get historical telematics for a specific battery."""
-    since = datetime.utcnow() - timedelta(hours=hours)
+    since = datetime.now(UTC) - timedelta(hours=hours)
     statement = select(Telemetry).where(
         Telemetry.battery_id == battery_id,
         Telemetry.timestamp >= since

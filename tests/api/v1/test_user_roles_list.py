@@ -2,7 +2,7 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from app.api import deps
 from app.models.admin_user import AdminUser
 from app.models.rbac import Role, UserRole
@@ -54,14 +54,14 @@ def test_get_user_roles(client: TestClient, session: Session):
         user_id=user.id, 
         role_id=r2.id, 
         assigned_by=admin.id,
-        expires_at=datetime.utcnow() - timedelta(days=1)
+        expires_at=datetime.now(UTC) - timedelta(days=1)
     )
     # 3. Future
     ur3 = UserRole(
         user_id=user.id, 
         role_id=r3.id, 
         assigned_by=admin.id,
-        effective_from=datetime.utcnow() + timedelta(days=1)
+        effective_from=datetime.now(UTC) + timedelta(days=1)
     )
     
     session.add(ur1)
@@ -70,7 +70,7 @@ def test_get_user_roles(client: TestClient, session: Session):
     session.commit()
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Action
     resp = client.get(f"/api/v1/admin/rbac/users/{user.id}/roles")

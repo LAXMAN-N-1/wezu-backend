@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from sqlmodel import Session, select
 from pydantic import BaseModel, Field
 from app.api import deps
@@ -74,7 +74,7 @@ def get_rental_telemetry(
     if not battery:
         raise HTTPException(status_code=404, detail="Battery not found")
         
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     # Logic for voltage/temp simulation...
     voltage = 72.0 + random.uniform(-1.5, 1.5)
     temp = 32.0 + (datetime.now().minute % 10) 

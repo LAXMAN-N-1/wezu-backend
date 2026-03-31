@@ -15,6 +15,6 @@ async def get_dealer_overview(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_dealer)
 ):
-    dealer_profile = db.query(DealerProfile).filter(DealerProfile.user_id == current_user.id).first()
+    dealer_profile = db.exec(select(DealerProfile).where(DealerProfile.user_id == current_user.id)).first()
     d_id = dealer_profile.id if dealer_profile else None
     return await analytics_dealer_service.get_overview(db, period, dealer_profile_id=d_id)

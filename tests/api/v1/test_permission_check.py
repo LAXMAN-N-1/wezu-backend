@@ -61,7 +61,7 @@ def test_check_permission_direct(client: TestClient, session: Session):
     user, child, parent = setup_user_and_roles(session)
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Check direct permission
     resp = client.get(
@@ -80,7 +80,7 @@ def test_check_permission_inherited(client: TestClient, session: Session):
     user, child, parent = setup_user_and_roles(session)
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Check inherited permission
     resp = client.get(
@@ -101,7 +101,7 @@ def test_check_permission_negative(client: TestClient, session: Session):
     user, child, parent = setup_user_and_roles(session)
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     resp = client.get(
         f"/api/v1/admin/rbac/users/{user.id}/permissions/check",
@@ -116,7 +116,7 @@ def test_check_permission_negative(client: TestClient, session: Session):
 def test_check_permission_user_not_found(client: TestClient, session: Session):
     admin = create_superuser(session)
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     resp = client.get(
         "/api/v1/admin/rbac/users/99999/permissions/check",

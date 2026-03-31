@@ -6,7 +6,7 @@ customer insights, peak hours, and export.
 import csv
 import io
 import logging
-from datetime import datetime, timedelta, date
+from datetime import datetime, UTC, timedelta, date
 from typing import Dict, Any, List, Optional
 
 from sqlmodel import Session, select, func, col
@@ -28,7 +28,7 @@ class DealerAnalyticsService:
         Returns: swap counts (today/month), revenue, avg rating,
         active batteries, and station count.
         """
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
@@ -172,7 +172,7 @@ class DealerAnalyticsService:
         if not station_ids:
             return []
 
-        now = end_date or datetime.utcnow()
+        now = end_date or datetime.now(UTC)
         trends = []
 
         for i in range(num_periods - 1, -1, -1):  # oldest first
@@ -231,7 +231,7 @@ class DealerAnalyticsService:
         """Revenue + swap volume trends for current period vs previous period."""
         current_trends = DealerAnalyticsService.get_trends(db, dealer_id, period, num_periods)
         
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         if period == "daily":
             prev_end = now - timedelta(days=num_periods)
         elif period == "weekly":
@@ -269,7 +269,7 @@ class DealerAnalyticsService:
             select(Station).where(Station.dealer_id == dealer_id)
         ).all()
 
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         metrics = []
 
@@ -339,7 +339,7 @@ class DealerAnalyticsService:
                 "churn_rate_pct": 0.0,
             }
 
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         prev_month_start = (month_start - timedelta(days=1)).replace(day=1)
 
@@ -445,7 +445,7 @@ class DealerAnalyticsService:
         if not station_ids:
             return [{"hour": h, "swap_count": 0} for h in range(24)]
 
-        since = datetime.utcnow() - timedelta(days=30)
+        since = datetime.now(UTC) - timedelta(days=30)
         # Get all completed swaps in the last 30 days
         swaps = db.exec(
             select(SwapSession).where(
@@ -479,7 +479,7 @@ class DealerAnalyticsService:
     def export_pdf(data: dict) -> str:
         """Generate PDF using PDFService."""
         from app.services.pdf_service import PDFService
-        from datetime import datetime
+        from datetime import datetime, UTC
         import uuid
         import os
 
@@ -490,7 +490,7 @@ class DealerAnalyticsService:
         # Assuming PDFService has generate_invoice that writes to a file
         # We'll build the data dict for PDFService
         pdf_data = {
-            "invoice_number": f"REP-{datetime.utcnow().strftime('%Y%M')}",
+            "invoice_number": f"REP-{datetime.now(UTC).strftime('%Y%M')}",
             "dealer_report": True,
             "date": data.get("timestamp"),
             "amount_due": data.get("revenue_month"),
@@ -540,7 +540,7 @@ class DealerAnalyticsService:
         pdf_path = DealerAnalyticsService.export_pdf(data)
 
         # Send email
-        body = f"Attached is your performance overview up to {datetime.utcnow().isoformat()}."
+        body = f"Attached is your performance overview up to {datetime.now(UTC).isoformat()}."
         # In actual prod we attach the file via EmailService (which is currently mocked)
         EmailService.send_email(dealer.contact_email, "Dealer Performance Report", body)
         return {"status": "success", "email": dealer.contact_email}

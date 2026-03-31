@@ -1,7 +1,7 @@
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, col
-from datetime import datetime
+from datetime import datetime, UTC
 from app.api.deps import get_db
 from app.models.settlement import Settlement
 from app.models.vendor import Vendor
@@ -98,7 +98,7 @@ def update_settlement_status(
     if request.transaction_reference:
         settlement.transaction_reference = request.transaction_reference
     if request.status == "paid" and not settlement.paid_at:
-        settlement.paid_at = datetime.utcnow()
+        settlement.paid_at = datetime.now(UTC)
         
     session.add(settlement)
     session.commit()

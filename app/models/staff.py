@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 
 class StaffProfile(SQLModel, table=True):
     __tablename__ = "staff_profiles"
@@ -18,7 +18,7 @@ class StaffProfile(SQLModel, table=True):
     reporting_manager_id: Optional[int] = Field(default=None, foreign_key="users.id")
     
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     user: "User" = Relationship(

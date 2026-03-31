@@ -4,7 +4,7 @@ from app.models.invoice import Invoice
 from app.models.financial import Transaction
 from app.models.commission import CommissionLog
 from app.models.settlement import Settlement
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 import uuid
 
 class FinancialService:
@@ -12,7 +12,7 @@ class FinancialService:
     @staticmethod
     def _get_next_invoice_number(session: Session) -> str:
         """Sequential invoice numbering: INV-YYYY-NNNN"""
-        year = datetime.utcnow().year
+        year = datetime.now(UTC).year
         prefix = f"INV-{year}-"
         
         # Find last invoice for this year
@@ -54,7 +54,7 @@ class FinancialService:
                 total=total,
                 gstin="27AAACW1234X1ZX",
                 pdf_url=f"/api/v1/invoices/{transaction_id}/pdf", # Updated to local API
-                created_at=datetime.utcnow()
+                created_at=datetime.now(UTC)
             )
             session.add(invoice)
             session.commit()
@@ -90,7 +90,7 @@ class FinancialService:
             platform_fee=deductions,
             payable_amount=net_payable,
             status="generated",
-            created_at=datetime.utcnow()
+            created_at=datetime.now(UTC)
         )
         db.add(settlement)
         db.commit()
@@ -115,7 +115,7 @@ class FinancialService:
             raise ValueError("Settlement record not found")
             
         settlement.status = "paid"
-        settlement.paid_at = datetime.utcnow()
+        settlement.paid_at = datetime.now(UTC)
         settlement.transaction_reference = payment_ref
         
         # Batch update commissions to 'paid'

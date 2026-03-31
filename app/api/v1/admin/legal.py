@@ -6,7 +6,7 @@ from app.models.user import User
 from app.models.legal import LegalDocument
 from app.schemas.legal import LegalDocumentCreate, LegalDocumentUpdate, LegalDocumentRead
 from app.api.deps import get_current_active_admin
-from datetime import datetime
+from datetime import datetime, UTC
 
 router = APIRouter()
 
@@ -27,7 +27,7 @@ def create_legal_document(
     admin: User = Depends(get_current_active_admin),
 ):
     db_doc = LegalDocument.model_validate(doc_in)
-    db_doc.published_at = datetime.utcnow()
+    db_doc.published_at = datetime.now(UTC)
     session.add(db_doc)
     session.commit()
     session.refresh(db_doc)
@@ -60,7 +60,7 @@ def update_legal_document(
     for key, value in doc_data.items():
         setattr(db_doc, key, value)
     
-    db_doc.updated_at = datetime.utcnow()
+    db_doc.updated_at = datetime.now(UTC)
     session.add(db_doc)
     session.commit()
     session.refresh(db_doc)

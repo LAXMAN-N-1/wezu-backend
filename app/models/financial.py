@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
@@ -51,8 +51,8 @@ class Transaction(SQLModel, table=True):
     payment_gateway_ref: Optional[str] = Field(default=None, index=True) # Razorpay/Stripe ID
     
     description: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationships
     user: "User" = Relationship(back_populates="transactions")
@@ -73,7 +73,7 @@ class Wallet(SQLModel, table=True):
     
     is_frozen: bool = Field(default=False)
     
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationships
     user: "User" = Relationship(back_populates="wallet")
@@ -89,7 +89,7 @@ class WalletWithdrawalRequest(SQLModel, table=True):
     status: str = Field(default="requested") # requested, approved, rejected, processed
     bank_details: str 
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     processed_at: Optional[datetime] = None
     
     wallet: "Wallet" = Relationship(back_populates="withdrawal_requests")

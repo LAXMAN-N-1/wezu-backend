@@ -1,6 +1,6 @@
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
-from datetime import datetime
+from datetime import datetime, UTC
 from sqlmodel import Session, select
 from app.api.deps import get_current_user
 from app.core.audit import audit_log
@@ -93,7 +93,7 @@ def complete_swap(
     swap_session.amount = cost
     swap_session.status = "completed"
     swap_session.payment_status = "paid"
-    swap_session.completed_at = datetime.utcnow()
+    swap_session.completed_at = datetime.now(UTC)
     
     # 2. Deduct Wallet
     wallet = session.exec(select(Wallet).where(Wallet.user_id == swap_session.user_id)).first()

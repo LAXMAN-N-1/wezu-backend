@@ -4,7 +4,7 @@ from app.models.rental import Rental
 from app.schemas.battery import BatteryCreate, BatteryUpdate
 from app.services.qr_service import QRCodeService
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from sqlmodel import Session, select, func
 from sqlalchemy import desc
 from app.models.battery_health_log import BatteryHealthLog as BatteryHealthLogModel
@@ -44,7 +44,7 @@ class BatteryService:
         health_history = BatteryHealthHistory(
             battery_id=battery.id,
             health_percentage=battery.health_percentage,
-            recorded_at=datetime.utcnow()
+            recorded_at=datetime.now(UTC)
         )
         db.add(health_history)
 
@@ -61,7 +61,7 @@ class BatteryService:
             old_value=None,
             new_value=str(battery.id),
             reason="Initial registration",
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(UTC)
         )
         db.add(audit)
         
@@ -81,7 +81,7 @@ class BatteryService:
             battery_id=battery_id,
             event_type=event_type,
             description=description,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(UTC)
         )
         db.add(event)
         db.commit()
@@ -103,7 +103,7 @@ class BatteryService:
             old_value=str(old_val) if old_val is not None else None,
             new_value=str(new_val) if new_val is not None else None,
             reason=reason,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(UTC)
         )
         db.add(audit)
         db.commit()
@@ -115,7 +115,7 @@ class BatteryService:
         
         old_status = battery.status
         battery.status = status
-        battery.updated_at = datetime.utcnow()
+        battery.updated_at = datetime.now(UTC)
         db.add(battery)
         
         BatteryService.log_lifecycle_event(
@@ -131,7 +131,7 @@ class BatteryService:
             old_value=str(old_status),
             new_value=str(status),
             reason=description,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(UTC)
         )
         db.add(audit)
 
@@ -145,7 +145,7 @@ class BatteryService:
             return None
             
         battery.station_id = station_id
-        battery.updated_at = datetime.utcnow()
+        battery.updated_at = datetime.now(UTC)
         db.add(battery)
         
         BatteryService.log_lifecycle_event(
@@ -250,7 +250,7 @@ class BatteryService:
                 battery_id=battery.id,
                 event_type="health_alert",
                 description=f"Battery SOH degraded to {soh:.1f}%",
-                timestamp=datetime.utcnow()
+                timestamp=datetime.now(UTC)
             )
             db.add(event)
             db.commit()

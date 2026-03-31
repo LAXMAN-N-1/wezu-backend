@@ -193,11 +193,23 @@ def delete_address(
 @router.get("/preferences")
 def get_preferences(
     current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
 ):
     """Get notification preferences"""
+    from app.models.notification_preference import NotificationPreference
+    from sqlmodel import select
+    
+    pref = db.exec(
+        select(NotificationPreference).where(NotificationPreference.user_id == current_user.id)
+    ).first()
 
-    if current_user.notification_preferences:
-        return json.loads(current_user.notification_preferences)
+    if pref:
+        dump = pref.model_dump(exclude={"id", "user_id", "updated_at"})
+        if dump.get('quiet_hours_start'):
+            dump['quiet_hours_start'] = dump['quiet_hours_start'].strftime("%H:%M")
+        if dump.get('quiet_hours_end'):
+            dump['quiet_hours_end'] = dump['quiet_hours_end'].strftime("%H:%M")
+        return dump
 
     return {}
 
@@ -209,10 +221,21 @@ def update_preferences(
     db: Session = Depends(deps.get_db),
 ):
     """Update preferences"""
+    from app.models.notification_preference import NotificationPreference
+    from sqlmodel import select
+    
+    pref = db.exec(
+        select(NotificationPreference).where(NotificationPreference.user_id == current_user.id)
+    ).first()
 
-    current_user.notification_preferences = json.dumps(preferences)
+    if not pref:
+        pref = NotificationPreference(user_id=current_user.id)
+        db.add(pref)
+        
+    for key, value in preferences.items():
+        if hasattr(pref, key) and key not in ["id", "user_id"]:
+            setattr(pref, key, value)
 
-    db.add(current_user)
     db.commit()
 
     return {"message": "Preferences updated"}

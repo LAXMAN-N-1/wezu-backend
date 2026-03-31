@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class PromoCode(SQLModel, table=True):
     __tablename__ = "promo_codes"
@@ -14,10 +14,10 @@ class PromoCode(SQLModel, table=True):
     min_rental_days: int = Field(default=0)
     
     is_active: bool = Field(default=True)
-    valid_from: datetime = Field(default_factory=datetime.utcnow)
+    valid_from: datetime = Field(default_factory=lambda: datetime.now(UTC))
     valid_until: Optional[datetime] = None
     
     usage_limit: int = Field(default=0) # 0 = unlimited
     usage_count: int = Field(default=0)
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

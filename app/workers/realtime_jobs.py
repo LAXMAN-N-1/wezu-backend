@@ -3,7 +3,7 @@ Real-time / Event-driven Jobs
 These are called from API endpoints or webhooks, not scheduled
 """
 from sqlmodel import Session
-from datetime import datetime
+from datetime import datetime, UTC
 from app.core.database import engine
 import logging
 
@@ -32,7 +32,7 @@ def process_iot_telemetry(device_id: str, telemetry_data: dict):
                 return
             
             # Update device status
-            device.last_communication = datetime.utcnow()
+            device.last_communication = datetime.now(UTC)
             device.battery_soc = telemetry_data.get('soc', device.battery_soc)
             device.battery_voltage = telemetry_data.get('voltage', device.battery_voltage)
             device.battery_temperature = telemetry_data.get('temperature', device.battery_temperature)
@@ -50,7 +50,7 @@ def process_iot_telemetry(device_id: str, telemetry_data: dict):
                     temperature=telemetry_data.get('temperature', 0),
                     cycle_count=telemetry_data.get('cycle_count', 0),
                     health_percentage=telemetry_data.get('health', 100),
-                    timestamp=datetime.utcnow()
+                    timestamp=datetime.now(UTC)
                 )
                 session.add(health_log)
                 
@@ -92,7 +92,7 @@ def update_gps_tracking(rental_id: int, latitude: float, longitude: float):
                 battery_id=rental.battery_id,
                 latitude=latitude,
                 longitude=longitude,
-                timestamp=datetime.utcnow()
+                timestamp=datetime.now(UTC)
             )
             session.add(gps_log)
             session.commit()

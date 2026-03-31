@@ -89,6 +89,51 @@ class AuthService:
             )
 
     @staticmethod
+    def get_permissions_for_role(role_name: str) -> list[str]:
+        """
+        Return default permission slugs for the given role.
+        Kept lightweight to avoid login hard-failing if RBAC seed data is incomplete.
+        """
+        role_permissions = {
+            "customer": [
+                "profile:read:own",
+                "profile:update:own",
+                "stations:view:all",
+                "rentals:create:own",
+                "rentals:view:own",
+                "wallet:view:own",
+            ],
+            "vendor_owner": [
+                "dashboard:view:own",
+                "stations:manage:own",
+                "staff:manage:own",
+                "finance:view:own",
+            ],
+            "dealer": [
+                "dashboard:view:own",
+                "stations:manage:own",
+                "staff:manage:own",
+                "finance:view:own",
+            ],
+            "admin": [
+                "dashboard:view:all",
+                "users:manage:all",
+                "dealers:manage:all",
+                "settings:manage:all",
+                "audit:read:all",
+            ],
+            "super_admin": [
+                "dashboard:view:all",
+                "users:manage:all",
+                "dealers:manage:all",
+                "settings:manage:all",
+                "audit:read:all",
+                "rbac:manage:all",
+            ],
+        }
+        return role_permissions.get(role_name, [])
+
+    @staticmethod
     def get_menu_for_role(role_name: str) -> list[dict]:
         # Avoiding circular import by returning dicts or importing locally if needed
         # But returning dicts is safer for service layer decoupling if schema isn't strictly needed here 
@@ -131,6 +176,11 @@ class AuthService:
         """
         from app.models.session import UserSession
         from datetime import datetime, timedelta
+        try:
+            from datetime import UTC
+        except ImportError:
+            import datetime as dt
+            UTC = dt.timezone.utc
         from app.core.config import settings
         import hashlib
 
@@ -218,7 +268,7 @@ class AuthService:
             device_type=device_type,
             device_id=device_id,
             device_name=device_name,
-            expires_at=datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+            expires_at=datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         )
         db.add(session)
         db.commit()
@@ -238,6 +288,11 @@ class AuthService:
         from app.models.session import UserSession
         from sqlmodel import select
         from datetime import datetime, timedelta
+        try:
+            from datetime import UTC
+        except ImportError:
+            import datetime as dt
+            UTC = dt.timezone.utc
         from app.core.config import settings
         import hashlib
         from jose import jwt
@@ -260,8 +315,8 @@ class AuthService:
             # Update existing session
             session.token_id = new_token_jti or "unknown"
             session.refresh_token_hash = new_hash
-            session.last_active_at = datetime.utcnow()
-            session.expires_at = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+            session.last_active_at = datetime.now(UTC)
+            session.expires_at = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
             
             # Update IP/UA if provided
             if request:
@@ -290,11 +345,16 @@ class AuthService:
         from app.models.session import UserSession
         from sqlmodel import select
         from datetime import datetime
+        try:
+            from datetime import UTC
+        except ImportError:
+            import datetime as dt
+            UTC = dt.timezone.utc
         
         # 1. Update Global Logout Timestamp
         user = db.get(User, user_id)
         if user:
-            user.last_global_logout_at = datetime.utcnow()
+            user.last_global_logout_at = datetime.now(UTC)
             db.add(user)
         
         # 2. Mark all sessions inactive

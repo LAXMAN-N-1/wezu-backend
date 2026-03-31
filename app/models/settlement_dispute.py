@@ -1,5 +1,5 @@
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 from sqlmodel import SQLModel, Field
 
 
@@ -17,5 +17,5 @@ class SettlementDispute(SQLModel, table=True):
     resolution_notes: Optional[str] = None
     adjustment_amount: Optional[float] = Field(default=None)
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     resolved_at: Optional[datetime] = None

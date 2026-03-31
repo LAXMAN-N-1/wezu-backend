@@ -136,7 +136,7 @@ async def export_analytics_data(
     
     data = {
         "user_id": current_user.id,
-        "export_date": datetime.datetime.utcnow().isoformat(),
+        "export_date": datetime.datetime.now(UTC).isoformat(),
         "rentals": [
             {
                 "id": r.id,

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from enum import Enum
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List, TYPE_CHECKING
@@ -8,7 +8,7 @@ class ReturnInspection(SQLModel, table=True):
     # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     return_request_id: int = Field(foreign_key="return_requests.id", index=True)
-    inspection_date: datetime = Field(default_factory=datetime.utcnow)
+    inspection_date: datetime = Field(default_factory=lambda: datetime.now(UTC))
     inspector_id: int = Field(foreign_key="users.id")
     condition: str
     notes: Optional[str] = None
@@ -44,8 +44,8 @@ class ReturnRequest(SQLModel, table=True):
     refund_amount: Optional[float] = None
     inspection_notes: Optional[str] = None
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     delivery_order: Optional["DeliveryOrder"] = Relationship(back_populates="return_request")

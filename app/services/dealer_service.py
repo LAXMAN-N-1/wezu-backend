@@ -7,7 +7,7 @@ from app.models.user import User
 from app.models.station import Station
 from app.models.commission import CommissionLog
 from typing import List, Optional, Any
-from datetime import datetime
+from datetime import datetime, UTC
 from app.repositories.dealer import (
     dealer_profile_repository,
     dealer_application_repository,
@@ -26,7 +26,7 @@ class DealerService:
         
         # Auto-create application
         app = DealerApplication(dealer_id=profile.id, current_stage="SUBMITTED")
-        app.status_history = [{"stage": "SUBMITTED", "timestamp": str(datetime.utcnow()), "note": "Initial Submission"}]
+        app.status_history = [{"stage": "SUBMITTED", "timestamp": str(datetime.now(UTC)), "note": "Initial Submission"}]
         # Mock initial risk score
         app.risk_score = 10.0 # Low risk base
         dealer_application_repository.create(db, obj_in=app)
@@ -79,7 +79,7 @@ class DealerService:
         
         # Append history
         history = list(app.status_history) if app.status_history else []
-        history.append({"stage": new_stage, "timestamp": str(datetime.utcnow()), "note": note})
+        history.append({"stage": new_stage, "timestamp": str(datetime.now(UTC)), "note": note})
         app.status_history = history
         
         # If Active, activate profile
@@ -90,7 +90,7 @@ class DealerService:
             
             # Append history
             history = list(app.status_history) if app.status_history else []
-            history.append({"stage": new_stage, "timestamp": str(datetime.utcnow()), "note": note})
+            history.append({"stage": new_stage, "timestamp": str(datetime.now(UTC)), "note": note})
             app.status_history = history
             
             # If Active, activate profile and assign role
@@ -142,7 +142,7 @@ class DealerService:
             raise ValueError("Visit not found")
         
         visit.status = "COMPLETED"
-        visit.completed_date = datetime.utcnow()
+        visit.completed_date = datetime.now(UTC)
         visit.report_data = report
         visit.images = images
         field_visit_repository.update(db, db_obj=visit, obj_in=visit)
@@ -172,9 +172,9 @@ class DealerService:
         station_ids = [s.id for s in stations]
         
         from app.models.rental import Rental
-        from datetime import datetime, timedelta
+        from datetime import datetime, UTC, timedelta
         
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         day_ago = now - timedelta(days=1)
         week_ago = now - timedelta(days=7)
         month_ago = now - timedelta(days=30)

@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class UserStatusLog(SQLModel, table=True):
     __tablename__ = "user_status_logs"
@@ -16,7 +16,7 @@ class UserStatusLog(SQLModel, table=True):
     reason: Optional[str] = None
     
     expires_at: Optional[datetime] = None # For temporary suspensions
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationships
     user: "User" = Relationship(sa_relationship_kwargs={"foreign_keys": "[UserStatusLog.user_id]"})

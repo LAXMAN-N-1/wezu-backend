@@ -1,9 +1,10 @@
 from fastapi import APIRouter
 
-from . import main, fraud, jobs, monitoring, users, rentals, finance, iot, batteries, stock, health, stations, kyc_admin, rbac_admin, dealers, cms
+from . import main, fraud, jobs, monitoring, users, rentals, finance, iot, batteries, stock, health, stations, kyc_admin, rbac_admin, dealers, cms, analytics, admin_groups, audit_trails, logistics, support, bess, notifications, settings, security
 
 router = APIRouter()
 router.include_router(main.router)
+router.include_router(audit_trails.router, prefix="/audit-trails", tags=["Admin Audit Trails"])
 router.include_router(stations.router, prefix="/stations", tags=["Admin Stations"])
 router.include_router(cms.router, prefix="/cms", tags=["Admin CMS"])
 router.include_router(users.router, prefix="/users", tags=["Admin Users"])
@@ -19,3 +20,13 @@ router.include_router(monitoring.router, prefix="/monitoring", tags=["Admin Moni
 router.include_router(kyc_admin.router, prefix="/kyc-docs", tags=["Admin KYC Documents"])
 router.include_router(rbac_admin.router, prefix="/rbac", tags=["Admin RBAC"])
 router.include_router(dealers.router, prefix="/dealers", tags=["Admin Dealers"])
+router.include_router(admin_groups.router, prefix="/groups", tags=["Admin Groups"])
+router.include_router(analytics.router, prefix="/analytics", tags=["Admin Analytics"])
+router.include_router(logistics.router, prefix="/logistics", tags=["Admin Logistics"])
+router.include_router(support.router, prefix="/support", tags=["Admin Support"])
+
+# New module routers
+router.include_router(bess.router, prefix="/bess", tags=["Admin BESS"])
+router.include_router(notifications.router, prefix="/notifications", tags=["Admin Notifications"])
+router.include_router(settings.router, prefix="/settings", tags=["Admin Settings"])
+router.include_router(security.router, prefix="/security", tags=["Admin Security"])

@@ -1,5 +1,5 @@
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 from sqlmodel import SQLModel, Field, Relationship
 from app.models.driver_profile import DriverProfile
 from typing import TYPE_CHECKING
@@ -23,7 +23,7 @@ class DeliveryAssignment(SQLModel, table=True):
     pickup_address: str
     delivery_address: str
     
-    assigned_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
+    assigned_at: Optional[datetime] = Field(default_factory=lambda: datetime.now(UTC))
     picked_up_at: Optional[datetime] = None
     delivered_at: Optional[datetime] = None
     
@@ -31,7 +31,7 @@ class DeliveryAssignment(SQLModel, table=True):
     customer_signature: Optional[str] = None
     otp_verified: bool = Field(default=False)
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     driver: Optional[DriverProfile] = Relationship()

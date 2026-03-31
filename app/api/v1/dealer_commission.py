@@ -2,7 +2,7 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlmodel import Session, select
-from datetime import datetime
+from datetime import datetime, UTC
 from pydantic import BaseModel, ConfigDict
 
 from app.db.session import get_session
@@ -110,7 +110,7 @@ def create_commission_rate(
         transaction_type=request.transaction_type,
         percentage=request.percentage,
         flat_fee=request.flat_fee,
-        effective_from=request.effective_from or datetime.utcnow(),
+        effective_from=request.effective_from or datetime.now(UTC),
         effective_until=request.effective_until,
     )
     db.add(config)

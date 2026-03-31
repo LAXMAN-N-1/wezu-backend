@@ -5,7 +5,7 @@ from app.models.battery import Battery
 from app.models.user import User
 from app.schemas.rental import RentalCreate
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from fastapi import HTTPException
 from app.services.security_service import SecurityService
 
@@ -63,9 +63,9 @@ class RentalService:
         rental = Rental(
             user_id=user_id,
             battery_id=rental_in.battery_id,
-            start_station_id=rental_in.pickup_station_id, # Corrected field name
-            start_time=datetime.utcnow(),
-            expected_end_time=datetime.utcnow() + timedelta(days=rental_in.duration_days),
+            start_station_id=rental_in.start_station_id, # Corrected field name
+            start_time=datetime.now(UTC),
+            expected_end_time=datetime.now(UTC) + timedelta(days=rental_in.duration_days),
             status="pending_payment",
             # Metrics
             total_amount=price_details["total_payable"], # Corrected field name
@@ -109,7 +109,7 @@ class RentalService:
         # 2. Update Rental Status
         rental.status = "active"
         rental.payment_transaction_id = payment_ref
-        rental.terms_accepted_at = datetime.utcnow()
+        rental.terms_accepted_at = datetime.now(UTC)
         
         # 3. Update Battery status
         battery = db.get(Battery, rental.battery_id)
@@ -165,7 +165,7 @@ class RentalService:
             
         rental.status = "completed"
         rental.end_station_id = station_id # Corrected field name
-        rental.end_time = datetime.utcnow() # Corrected field name
+        rental.end_time = datetime.now(UTC) # Corrected field name
         
         battery = db.get(Battery, rental.battery_id)
         if battery:

@@ -4,7 +4,7 @@ from app.models.rbac import UserRole
 from app.models.two_factor_auth import TwoFactorAuth
 
 from typing import Optional, List, TYPE_CHECKING
-from datetime import datetime
+from datetime import datetime, UTC
 from enum import Enum
 import sqlalchemy as sa
 
@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from app.models.staff import StaffProfile
     from app.models.rbac import Role, UserAccessPath
     from app.models.token import SessionToken
+    from app.models.notification_preference import NotificationPreference
 
 class UserType(str, Enum):
     CUSTOMER = "customer"
@@ -37,6 +38,7 @@ class UserStatus(str, Enum):
     PENDING_VERIFICATION = "pending_verification"
     PENDING = "pending"
     INACTIVE = "inactive"
+    VERIFIED = "verified"
     DELETED = "deleted"
 
 class KYCStatus(str, Enum):
@@ -107,8 +109,8 @@ class User(SQLModel, table=True):
     force_password_change: bool = Field(default=False)
 
     # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Soft Delete
     is_deleted: bool = Field(default=False)
@@ -117,7 +119,10 @@ class User(SQLModel, table=True):
     
 
     # Relationship
-    role: Optional["Role"] = Relationship(sa_relationship_kwargs={"viewonly": True}) # Legacy/Primary role. Viewonly to prevent conflict with roles list
+    role: Optional["Role"] = Relationship(
+        back_populates="users",
+        sa_relationship_kwargs={"foreign_keys": "[User.role_id]"}
+    ) # Primary role relationship
     wallet: Optional["Wallet"] = Relationship(back_populates="user")
     user_profile: Optional["UserProfile"] = Relationship(back_populates="user")
     addresses: List["Address"] = Relationship(back_populates="user")
@@ -153,11 +158,31 @@ class User(SQLModel, table=True):
     sessions: List["UserSession"] = Relationship(back_populates="user")
     session_tokens: List["SessionToken"] = Relationship(back_populates="user")
     two_factor_auth: Optional["TwoFactorAuth"] = Relationship(back_populates="user")
+    notification_preference: Optional["NotificationPreference"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"uselist": False}
+    )
 
     @property
     def is_active(self) -> bool:
         """Helper for schema compatibility."""
         return self.status == UserStatus.ACTIVE
+
+    @is_active.setter
+    def is_active(self, value: bool):
+        if value:
+            # Only change if currently inactive/suspended
+            if self.status in [UserStatus.INACTIVE, UserStatus.SUSPENDED]:
+                self.status = UserStatus.ACTIVE
+        else:
+            # Only change if currently active/verified
+            if self.status in [UserStatus.ACTIVE, UserStatus.VERIFIED]:
+                self.status = UserStatus.SUSPENDED
+
+    @property
+    def roles(self) -> List["Role"]:
+        """Backward compatibility for legacy Many-to-Many role checks."""
+        return [self.role] if self.role else []
 
     # --- Granular RBAC Helpers ---
     @property

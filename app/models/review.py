@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class Review(SQLModel, table=True):
     __tablename__ = "reviews"
@@ -19,7 +19,7 @@ class Review(SQLModel, table=True):
     is_hidden: bool = Field(default=False)
     helpful_count: int = Field(default=0)
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationships
     user: "User" = Relationship()

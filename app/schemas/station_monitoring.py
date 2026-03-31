@@ -11,7 +11,7 @@ class HeartbeatRequestV2(BaseModel):
     station_id: str
     status: str # ONLINE | WARNING | ERROR
     metrics: HeartbeatMetrics
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class StationHealthStatus(BaseModel):
     station_id: str

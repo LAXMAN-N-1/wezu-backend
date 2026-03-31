@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship, UniqueConstraint
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class RoleRight(SQLModel, table=True):
     __tablename__ = "role_rights"
@@ -14,8 +14,8 @@ class RoleRight(SQLModel, table=True):
     can_edit: bool = Field(default=False)
     can_delete: bool = Field(default=False)
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     created_by: Optional[str] = None
     modified_by: Optional[str] = None
 

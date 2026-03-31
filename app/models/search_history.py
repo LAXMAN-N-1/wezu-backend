@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class SearchHistory(SQLModel, table=True):
     __tablename__ = "search_histories"
@@ -45,7 +45,7 @@ class SearchHistory(SQLModel, table=True):
     device_type: Optional[str] = None  # MOBILE, WEB, TABLET
     platform: Optional[str] = None  # iOS, Android, Web
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     user: Optional["User"] = Relationship()

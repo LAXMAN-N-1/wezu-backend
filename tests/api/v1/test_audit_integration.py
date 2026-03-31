@@ -45,7 +45,7 @@ def _create_user_with_password(session: Session, email="login@test.com", phone="
     from app.models.rbac import Role
     role = session.exec(select(Role).where(Role.name == "driver")).first()
     if role and role not in user.roles:
-        user.roles.append(role)
+        user.role_id = role.id
         session.add(user)
         try:
             session.commit()

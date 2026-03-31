@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, func
 from typing import Any, List, Optional
-from datetime import datetime, date
+from datetime import datetime, UTC, date
 from pydantic import BaseModel
 from app.api import deps
 from app.models.user import User, KYCStatus
@@ -22,7 +22,7 @@ def list_kyc_documents(
     status: Optional[str] = None,  # pending, verified, rejected
     search: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """List all KYC documents with user details, filterable by status."""
     statement = select(KYCDocument)
@@ -36,10 +36,12 @@ def list_kyc_documents(
     statement = statement.order_by(KYCDocument.uploaded_at.desc()).offset(skip).limit(limit)
     documents = db.exec(statement).all()
 
+    user_ids = {doc.user_id for doc in documents if doc.user_id}
+    user_map = {u.id: u for u in db.exec(select(User).where(User.id.in_(user_ids))).all()} if user_ids else {}
+
     result = []
     for doc in documents:
-        # Fetch user info
-        user = db.get(User, doc.user_id)
+        user = user_map.get(doc.user_id)
         result.append({
             "id": doc.id,
             "user_id": doc.user_id,
@@ -67,7 +69,7 @@ def list_kyc_documents(
 @router.get("/stats")
 def get_kyc_stats(
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Get KYC dashboard statistics."""
     total_pending = db.exec(
@@ -102,7 +104,7 @@ def get_kyc_stats(
 def get_document_detail(
     doc_id: int,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Get a single KYC document with user details."""
     doc = db.get(KYCDocument, doc_id)
@@ -134,7 +136,7 @@ def get_document_detail(
 def approve_document(
     doc_id: int,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Approve a KYC document."""
     doc = db.get(KYCDocument, doc_id)
@@ -142,7 +144,7 @@ def approve_document(
         raise HTTPException(status_code=404, detail="Document not found")
 
     doc.status = KYCDocumentStatus.VERIFIED
-    doc.verified_at = datetime.utcnow()
+    doc.verified_at = datetime.now(UTC)
     doc.verified_by = current_user.id
     db.add(doc)
 
@@ -154,7 +156,7 @@ def approve_document(
         user = db.get(User, doc.user_id)
         if user:
             user.kyc_status = KYCStatus.APPROVED
-            user.updated_at = datetime.utcnow()
+            user.updated_at = datetime.now(UTC)
             db.add(user)
 
     db.commit()
@@ -168,7 +170,7 @@ def reject_document(
     doc_id: int,
     request: KYCRejectRequest,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Reject a KYC document with reason."""
     doc = db.get(KYCDocument, doc_id)
@@ -177,7 +179,7 @@ def reject_document(
 
     doc.status = KYCDocumentStatus.REJECTED
     doc.rejection_reason = request.reason
-    doc.verified_at = datetime.utcnow()
+    doc.verified_at = datetime.now(UTC)
     doc.verified_by = current_user.id
     db.add(doc)
 
@@ -186,7 +188,7 @@ def reject_document(
     if user:
         user.kyc_status = KYCStatus.REJECTED
         user.kyc_rejection_reason = request.reason
-        user.updated_at = datetime.utcnow()
+        user.updated_at = datetime.now(UTC)
         db.add(user)
 
     db.commit()

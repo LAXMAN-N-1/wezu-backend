@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
 from typing import List, Optional, Any
-from datetime import datetime
+from datetime import datetime, UTC
 from pydantic import BaseModel
 from app.api import deps
 from app.models.user import User
@@ -24,7 +24,7 @@ class WaiverReviewRequest(BaseModel):
 @router.get("/stats")
 def get_rental_stats(
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Get high-level statistics for rentals and orders."""
     total_active = db.exec(select(func.count(Rental.id)).where(Rental.status == RentalStatus.ACTIVE)).one()
@@ -32,7 +32,7 @@ def get_rental_stats(
     total_swaps = db.exec(select(func.count(SwapSession.id))).one()
     
     # Simple revenue calculation for today
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     today_revenue = db.exec(select(func.sum(Rental.total_amount)).where(Rental.created_at >= today_start)).one() or 0.0
     
     return {
@@ -49,15 +49,19 @@ def list_active_rentals(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """List all currently active rentals."""
     statement = select(Rental).where(Rental.status == RentalStatus.ACTIVE).offset(skip).limit(limit)
     rentals = db.exec(statement).all()
     
+    user_ids = {r.user_id for r in rentals if r.user_id}
+    users = db.exec(select(User).where(User.id.in_(user_ids))).all() if user_ids else []
+    user_map = {u.id: u for u in users}
+
     result = []
     for r in rentals:
-        user = db.get(User, r.user_id)
+        user = user_map.get(r.user_id)
         result.append({
             "id": r.id,
             "user_name": user.full_name if user else "Unknown",
@@ -75,7 +79,7 @@ def list_rental_history(
     limit: int = 50,
     search: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """List completed/cancelled rentals with search."""
     statement = select(Rental).where(Rental.status.in_([RentalStatus.COMPLETED, RentalStatus.CANCELLED]))
@@ -84,9 +88,13 @@ def list_rental_history(
     statement = statement.order_by(Rental.end_time.desc()).offset(skip).limit(limit)
     rentals = db.exec(statement).all()
     
+    user_ids = {r.user_id for r in rentals if r.user_id}
+    users = db.exec(select(User).where(User.id.in_(user_ids))).all() if user_ids else []
+    user_map = {u.id: u for u in users}
+
     result = []
     for r in rentals:
-        user = db.get(User, r.user_id)
+        user = user_map.get(r.user_id)
         result.append({
             "id": r.id,
             "user_name": user.full_name if user else "Unknown",
@@ -104,18 +112,20 @@ def list_swaps(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """List battery swap sessions."""
     statement = select(SwapSession).order_by(SwapSession.created_at.desc()).offset(skip).limit(limit)
     swaps = db.exec(statement).all()
     
+    user_ids = {s.user_id for s in swaps if s.user_id}
+    user_map = {u.id: u.full_name for u in db.exec(select(User).where(User.id.in_(user_ids))).all()} if user_ids else {}
+
     result = []
     for s in swaps:
-        user = db.get(User, s.user_id)
         result.append({
             "id": s.id,
-            "user_name": user.full_name if user else "Unknown",
+            "user_name": user_map.get(s.user_id, "Unknown"),
             "station_id": s.station_id,
             "old_battery_soc": s.old_battery_soc,
             "new_battery_soc": s.new_battery_soc,
@@ -131,18 +141,20 @@ def list_purchases(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """List battery purchase orders."""
     statement = select(Purchase).order_by(Purchase.timestamp.desc()).offset(skip).limit(limit)
     purchases = db.exec(statement).all()
     
+    user_ids = {p.user_id for p in purchases if p.user_id}
+    user_map = {u.id: u.full_name for u in db.exec(select(User).where(User.id.in_(user_ids))).all()} if user_ids else {}
+
     result = []
     for p in purchases:
-        user = db.get(User, p.user_id)
         result.append({
             "id": p.id,
-            "user_name": user.full_name if user else "Unknown",
+            "user_name": user_map.get(p.user_id, "Unknown"),
             "battery_id": p.battery_id,
             "amount": p.amount,
             "timestamp": p.timestamp
@@ -154,20 +166,23 @@ def list_purchases(
 @router.get("/late-fees")
 def list_late_fees(
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """List all late fees and associated waiver requests."""
     late_fees = db.exec(select(LateFee).order_by(LateFee.created_at.desc())).all()
     
+    user_ids = {lf.user_id for lf in late_fees if lf.user_id}
+    user_map = {u.id: u.full_name for u in db.exec(select(User).where(User.id.in_(user_ids))).all()} if user_ids else {}
+
+    lf_ids = {lf.id for lf in late_fees}
+    waiver_map = {w.late_fee_id: w for w in db.exec(select(LateFeeWaiver).where(LateFeeWaiver.late_fee_id.in_(lf_ids))).all()} if lf_ids else {}
+
     result = []
     for lf in late_fees:
-        user = db.get(User, lf.user_id)
-        # Check for waiver
-        waiver = db.exec(select(LateFeeWaiver).where(LateFeeWaiver.late_fee_id == lf.id)).first()
-        
+        waiver = waiver_map.get(lf.id)
         result.append({
             "id": lf.id,
-            "user_name": user.full_name if user else "Unknown",
+            "user_name": user_map.get(lf.user_id, "Unknown"),
             "days_overdue": lf.days_overdue,
             "total_late_fee": lf.total_late_fee,
             "payment_status": lf.payment_status,
@@ -182,7 +197,7 @@ def review_waiver(
     waiver_id: int,
     request: WaiverReviewRequest,
     db: Session = Depends(get_db),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Approve or reject a late fee waiver request."""
     waiver = db.get(LateFeeWaiver, waiver_id)
@@ -192,7 +207,7 @@ def review_waiver(
     waiver.status = request.status
     waiver.admin_notes = request.admin_notes
     waiver.reviewed_by = current_user.id
-    waiver.reviewed_at = datetime.utcnow()
+    waiver.reviewed_at = datetime.now(UTC)
     
     if request.status == "APPROVED" and request.approved_amount is not None:
         waiver.approved_waiver_amount = request.approved_amount
@@ -213,7 +228,7 @@ def review_waiver(
 def terminate_rental(
     rental_id: int,
     reason: str = Query(...),
-    current_user: Any = Depends(deps.get_current_active_superuser),
+    current_user: Any = Depends(deps.get_current_active_admin),
     db: Session = Depends(get_db),
 ):
     """Forcefully terminate a rental."""
@@ -225,7 +240,7 @@ def terminate_rental(
         raise HTTPException(status_code=400, detail="Rental already completed")
     
     rental.status = RentalStatus.CANCELLED
-    rental.end_time = datetime.utcnow()
+    rental.end_time = datetime.now(UTC)
     db.add(rental)
     db.commit()
     return {"status": "success", "message": f"Rental terminated: {reason}"}

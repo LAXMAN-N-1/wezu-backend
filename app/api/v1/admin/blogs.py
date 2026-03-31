@@ -6,7 +6,7 @@ from app.models.user import User
 from app.models.blog import Blog
 from app.schemas.blog import BlogCreate, BlogUpdate, BlogRead
 from app.api.deps import get_current_active_admin
-from datetime import datetime
+from datetime import datetime, UTC
 
 router = APIRouter()
 
@@ -38,7 +38,7 @@ def create_blog(
     db_blog = Blog.model_validate(blog_in)
     db_blog.author_id = admin.id
     if db_blog.status == "published":
-        db_blog.published_at = datetime.utcnow()
+        db_blog.published_at = datetime.now(UTC)
     
     session.add(db_blog)
     session.commit()
@@ -73,9 +73,9 @@ def update_blog(
         setattr(db_blog, key, value)
     
     if "status" in blog_data and blog_data["status"] == "published" and not db_blog.published_at:
-        db_blog.published_at = datetime.utcnow()
+        db_blog.published_at = datetime.now(UTC)
         
-    db_blog.updated_at = datetime.utcnow()
+    db_blog.updated_at = datetime.now(UTC)
     session.add(db_blog)
     session.commit()
     session.refresh(db_blog)

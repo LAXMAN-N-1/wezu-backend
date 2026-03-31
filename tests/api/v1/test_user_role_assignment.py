@@ -2,7 +2,7 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from app.api import deps
 from app.models.admin_user import AdminUser
 from app.models.rbac import Role, Permission, UserRole
@@ -46,13 +46,13 @@ def test_assign_role_to_user(client: TestClient, session: Session):
     session.commit()
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Action
     payload = {
         "role_id": role.id,
         "notes": "Testing assignment",
-        "expires_at": (datetime.utcnow() + timedelta(days=30)).isoformat()
+        "expires_at": (datetime.now(UTC) + timedelta(days=30)).isoformat()
     }
     
     resp = client.post(f"/api/v1/admin/rbac/users/{target_user.id}/roles", json=payload)
@@ -89,7 +89,7 @@ def test_assign_role_update_existing(client: TestClient, session: Session):
     session.commit()
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     payload = {
         "role_id": role.id,

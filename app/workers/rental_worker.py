@@ -1,5 +1,5 @@
 from sqlmodel import Session, select
-from datetime import datetime
+from datetime import datetime, UTC
 from app.core.database import engine
 from app.models.rental import Rental
 from app.services.late_fee_service import LateFeeService
@@ -28,7 +28,7 @@ def process_overdue_rentals():
             result = {
                 "overdue_detected": len(overdue_list),
                 "fees_applied": applied_count,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(UTC).isoformat()
             }
             
             logger.info(f"Overdue scan completed: {applied_count} fees applied/updated")

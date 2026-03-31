@@ -13,7 +13,7 @@ router = APIRouter()
 @router.get("/overview")
 def get_platform_overview(
     period: str = Query("30d"),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: Platform KPIs (active users, total rentals, revenue today)"""
@@ -22,7 +22,7 @@ def get_platform_overview(
 @router.get("/trends")
 def get_platform_trends(
     period: str = Query("30d"),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: Daily/weekly/monthly trend data for rentals and revenue"""
@@ -30,7 +30,7 @@ def get_platform_trends(
 
 @router.get("/conversion-funnel")
 def get_conversion_funnel(
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: Funnel (installs -> registrations -> first rental)"""
@@ -38,7 +38,7 @@ def get_conversion_funnel(
 
 @router.get("/user-behavior")
 def get_user_behavior(
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: Aggregated user behavior metrics"""
@@ -46,7 +46,7 @@ def get_user_behavior(
 
 @router.get("/battery-health-distribution")
 def get_battery_health_distribution(
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: Distribution of all batteries by health % range"""
@@ -54,7 +54,7 @@ def get_battery_health_distribution(
 
 @router.get("/demand-forecast")
 def get_demand_forecast(
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: 7-day demand forecast with actuals"""
@@ -63,7 +63,7 @@ def get_demand_forecast(
 @router.get("/recent-activity")
 def get_recent_activity(
     type: Optional[str] = Query(None, description="Filter by activity type"),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: Recent Activities"""
@@ -72,7 +72,7 @@ def get_recent_activity(
 @router.get("/revenue/by-station")
 def get_revenue_by_station(
     period: str = Query("30d"),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: Revenue distribution by station"""
@@ -81,7 +81,7 @@ def get_revenue_by_station(
 @router.get("/revenue/by-battery-type")
 def get_revenue_by_battery_type(
     period: str = Query("30d"),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: Revenue split by battery chemistry/model"""
@@ -89,7 +89,7 @@ def get_revenue_by_battery_type(
 
 @router.get("/top-stations")
 def get_top_stations(
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: Top Stations Dashboard Endpoint"""
@@ -97,7 +97,7 @@ def get_top_stations(
 
 @router.get("/revenue/by-region")
 def get_revenue_by_region(
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: Revenue breakdown by city/region"""
@@ -106,7 +106,7 @@ def get_revenue_by_region(
 @router.get("/user-growth")
 def get_user_growth_metrics(
     period: str = Query("monthly", enum=["weekly", "monthly"]),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: User acquisition and retention trends"""
@@ -114,7 +114,7 @@ def get_user_growth_metrics(
 
 @router.get("/inventory-status")
 def get_global_inventory_status(
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(deps.get_db)
 ) -> Any:
     """Admin: Health of fleet and hardware utilization summary"""
@@ -123,7 +123,7 @@ def get_global_inventory_status(
 @router.get("/export")
 def export_analytics_report(
     report_type: str = Query(..., enum=["overview", "trends", "forecast", "behavior"]),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(deps.get_db)
 ):
     """Admin: Export any analytics report as CSV"""

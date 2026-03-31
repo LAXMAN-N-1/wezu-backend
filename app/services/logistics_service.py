@@ -9,7 +9,7 @@ from app.models.ecommerce import EcommerceOrder
 from app.models.station import Station, StationSlot
 from app.models.battery import Battery, LocationType, BatteryStatus
 from app.services.notification_service import NotificationService
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List, Optional, Any
 
 class LogisticsService:
@@ -31,7 +31,7 @@ class LogisticsService:
         
         order.assigned_driver_id = driver_id
         order.status = DeliveryStatus.ASSIGNED
-        order.updated_at = datetime.utcnow()
+        order.updated_at = datetime.now(UTC)
         db.add(order)
         db.commit()
         db.refresh(order)
@@ -46,9 +46,9 @@ class LogisticsService:
             
         order.status = status
         if status == "in_transit" and not order.started_at:
-            order.started_at = datetime.utcnow()
+            order.started_at = datetime.now(UTC)
         elif status == "delivered":
-            order.completed_at = datetime.utcnow()
+            order.completed_at = datetime.now(UTC)
             # Update driver stats
             if order.assigned_driver_id:
                 from app.models.driver_profile import DriverProfile
@@ -101,7 +101,7 @@ class LogisticsService:
         # In production, use Google Matrix API or similar
         # For now, just return stops in original order but wrap in a route object
         from app.models.delivery_route import DeliveryRoute
-        route = DeliveryRoute(driver_id=driver_id, route_name=f"Route {datetime.utcnow().date()}", total_stops=len(stops))
+        route = DeliveryRoute(driver_id=driver_id, route_name=f"Route {datetime.now(UTC).date()}", total_stops=len(stops))
         db.add(route)
         db.commit()
         db.refresh(route)

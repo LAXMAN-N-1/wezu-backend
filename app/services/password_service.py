@@ -3,7 +3,7 @@ Password management service — history check (last 5), expiry (90-day), and rec
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from typing import Optional
 
 from sqlmodel import Session, select
@@ -46,9 +46,9 @@ class PasswordService:
         if user.password_changed_at is None:
             # Never changed — treat as expired if account is old enough
             if user.created_at:
-                return (datetime.utcnow() - user.created_at).days > PASSWORD_EXPIRY_DAYS
+                return (datetime.now(UTC) - user.created_at).days > PASSWORD_EXPIRY_DAYS
             return False
-        return (datetime.utcnow() - user.password_changed_at).days > PASSWORD_EXPIRY_DAYS
+        return (datetime.now(UTC) - user.password_changed_at).days > PASSWORD_EXPIRY_DAYS
 
     @staticmethod
     def record_password_change(
@@ -68,7 +68,7 @@ class PasswordService:
         # Update user timestamp
         user = db.get(User, user_id)
         if user:
-            user.password_changed_at = datetime.utcnow()
+            user.password_changed_at = datetime.now(UTC)
             user.force_password_change = False
             db.add(user)
 

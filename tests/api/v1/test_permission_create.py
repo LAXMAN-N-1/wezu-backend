@@ -24,7 +24,7 @@ def create_superuser(session):
 def test_create_permission_success(client: TestClient, session: Session):
     admin = create_superuser(session)
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     payload = {
         "slug": "custom:feature:access",
@@ -50,7 +50,7 @@ def test_create_permission_success(client: TestClient, session: Session):
 def test_create_permission_duplicate_slug(client: TestClient, session: Session):
     admin = create_superuser(session)
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Existing perm
     p1 = Permission(slug="exist:p1", module="exist", action="read")
@@ -65,4 +65,4 @@ def test_create_permission_duplicate_slug(client: TestClient, session: Session):
     
     resp = client.post("/api/v1/admin/rbac/permissions", json=payload)
     assert resp.status_code == 400
-    assert "slug already exists" in resp.json()["detail"]
+    assert "slug already exists" in resp.json()["error"]

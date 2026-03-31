@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 import sqlalchemy as sa
 from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
@@ -32,8 +32,8 @@ class BatchJob(SQLModel, table=True):
     
     description: Optional[str] = None
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     executions: list["JobExecution"] = Relationship(back_populates="job")
@@ -79,7 +79,7 @@ class JobExecution(SQLModel, table=True):
     memory_usage_mb: Optional[float] = None
     cpu_usage_percent: Optional[float] = None
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     job: BatchJob = Relationship(back_populates="executions")

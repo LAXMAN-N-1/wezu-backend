@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, UTC
 from sqlalchemy import Column, JSON
 
 class Feedback(SQLModel, table=True):
@@ -17,4 +17,4 @@ class Feedback(SQLModel, table=True):
     
     metadata_: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON), alias="metadata")
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

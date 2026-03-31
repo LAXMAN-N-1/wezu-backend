@@ -3,7 +3,7 @@ Daily Scheduled Jobs
 Run at midnight IST (00:00)
 """
 from sqlmodel import Session, select, func
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from app.core.database import engine
 from app.models.batch_job import BatchJob, JobExecution
 import logging
@@ -33,7 +33,7 @@ def create_job_execution(job_name: str, trigger_type: str = "SCHEDULED") -> JobE
             execution_id=str(uuid.uuid4()),
             status="RUNNING",
             trigger_type=trigger_type,
-            started_at=datetime.utcnow()
+            started_at=datetime.now(UTC)
         )
         session.add(execution)
         session.commit()
@@ -49,8 +49,17 @@ def complete_job_execution(execution_id: str, status: str, result_summary: dict 
         
         if execution:
             execution.status = status
-            execution.completed_at = datetime.utcnow()
-            execution.duration_seconds = int((execution.completed_at - execution.started_at).total_seconds())
+            execution.completed_at = datetime.now(UTC)
+            
+            started_at = execution.started_at
+            if started_at and started_at.tzinfo is None:
+                started_at = started_at.replace(tzinfo=UTC)
+                
+            if started_at:
+                execution.duration_seconds = int((execution.completed_at - started_at).total_seconds())
+            else:
+                execution.duration_seconds = 0
+                
             execution.result_summary = result_summary
             execution.error_message = error
             session.add(execution)
@@ -66,7 +75,7 @@ def revenue_aggregation():
         from app.models.station import Station
         
         with Session(engine) as session:
-            yesterday = datetime.utcnow() - timedelta(days=1)
+            yesterday = datetime.now(UTC) - timedelta(days=1)
             yesterday_start = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
             yesterday_end = yesterday_start + timedelta(days=1)
             
@@ -118,7 +127,7 @@ def inventory_sync():
             for inventory in inventories:
                 # Recalculate available batteries
                 # This is simplified - in production, would sync with actual battery status
-                inventory.updated_at = datetime.utcnow()
+                inventory.updated_at = datetime.now(UTC)
                 session.add(inventory)
                 synced_count += 1
             
@@ -126,7 +135,7 @@ def inventory_sync():
             
             result = {
                 "synced_inventories": synced_count,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(UTC).isoformat()
             }
             
             logger.info(f"Inventory sync completed: {synced_count} inventories")
@@ -178,7 +187,7 @@ def commission_accrual():
         from app.models.rental import Rental
         
         with Session(engine) as session:
-            yesterday = datetime.utcnow() - timedelta(days=1)
+            yesterday = datetime.now(UTC) - timedelta(days=1)
             yesterday_start = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
             yesterday_end = yesterday_start + timedelta(days=1)
             
@@ -240,12 +249,12 @@ def fraud_score_recalculation():
                 recent_checks = session.exec(
                     select(FraudCheckLog)
                     .where(FraudCheckLog.user_id == user.id)
-                    .where(FraudCheckLog.created_at >= datetime.utcnow() - timedelta(days=30))
+                    .where(FraudCheckLog.created_at >= datetime.now(UTC) - timedelta(days=30))
                 ).all()
                 
                 failed_checks = sum(1 for check in recent_checks if check.status == "FAIL")
                 risk_score.total_score = failed_checks * 15  # 15 points per failed check
-                risk_score.last_updated = datetime.utcnow()
+                risk_score.last_updated = datetime.now(UTC)
                 
                 session.add(risk_score)
                 updated_count += 1

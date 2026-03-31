@@ -1,7 +1,7 @@
 from sqlmodel import Session, select
 from app.core.database import engine
 from app.models.driver_profile import DriverProfile
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List
 
 class DriverService:
@@ -27,7 +27,7 @@ class DriverService:
             if driver:
                 driver.current_latitude = lat
                 driver.current_longitude = lng
-                driver.last_location_update = datetime.utcnow()
+                driver.last_location_update = datetime.now(UTC)
                 session.add(driver)
                 session.commit()
 

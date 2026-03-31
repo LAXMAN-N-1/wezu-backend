@@ -1,5 +1,5 @@
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from sqlmodel import Session, select
 
 from app.models.user import User
@@ -96,7 +96,7 @@ def dealer_env(session: Session):
     session.refresh(customer1)
     session.refresh(customer2)
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     swaps = [
         SwapSession(user_id=customer1.id, station_id=station.id, amount=100.0,
                      status="completed", created_at=now),

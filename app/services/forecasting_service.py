@@ -2,7 +2,7 @@ from sqlmodel import Session, select, func
 from app.models.analytics import DemandForecast
 from app.models.swap import SwapSession
 from app.models.station import Station
-from datetime import datetime, date, timedelta
+from datetime import datetime, UTC, date, timedelta
 import logging
 
 logger = logging.getLogger("wezu_forecasting")
@@ -18,7 +18,7 @@ class ForecastingService:
         
         for station in stations:
             # Look at last 7 days of actual swaps
-            history_start = datetime.utcnow() - timedelta(days=7)
+            history_start = datetime.now(UTC) - timedelta(days=7)
             stmt = select(func.count(SwapSession.id)).where(
                 SwapSession.station_id == station.id,
                 SwapSession.created_at >= history_start

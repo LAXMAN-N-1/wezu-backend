@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, Dict, Any, TYPE_CHECKING
-from datetime import date, datetime
+from datetime import date, datetime, UTC
 import uuid
 from sqlalchemy import Column, JSON
 
@@ -31,8 +31,8 @@ class UserProfile(SQLModel, table=True):
     notification_preferences: Dict[str, Any] = Field(default={}, sa_column=Column(JSON))
 
     # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationship
     user: "User" = Relationship(back_populates="user_profile")

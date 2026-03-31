@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Optional, TYPE_CHECKING, List
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
@@ -34,8 +34,8 @@ class SupportTicket(SQLModel, table=True):
     
     category: str = Field(default="general") # billing, technical, hardware, other
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     resolved_at: Optional[datetime] = None
 
     # Relationships
@@ -53,7 +53,7 @@ class TicketMessage(SQLModel, table=True):
     message: str
     is_internal_note: bool = Field(default=False)
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     ticket: "SupportTicket" = Relationship(back_populates="messages")
@@ -73,8 +73,8 @@ class ChatSession(SQLModel, table=True):
     
     status: ChatStatus = Field(default=ChatStatus.WAITING)
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     user: "User" = Relationship(sa_relationship_kwargs={"foreign_keys": "[ChatSession.user_id]"})
@@ -89,7 +89,7 @@ class ChatMessage(SQLModel, table=True):
     sender_id: int = Field(default=0) # 0 for system/bot
     
     message: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     session: "ChatSession" = Relationship(back_populates="messages")

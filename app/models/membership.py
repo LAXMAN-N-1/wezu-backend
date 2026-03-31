@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List, TYPE_CHECKING
-from datetime import datetime
+from datetime import datetime, UTC
 from enum import Enum
 
 if TYPE_CHECKING:
@@ -23,8 +23,8 @@ class UserMembership(SQLModel, table=True):
     status: str = Field(default="active") # active, expired, suspended
     
     tier_expiry: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationships
     user: "User" = Relationship(back_populates="membership")

@@ -1,5 +1,5 @@
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from sqlmodel import select
 
 from app.models.user import User
@@ -82,7 +82,7 @@ def analytics_test_env(session):
         new_battery_id=b1.id,
         amount=5.0,
         status="completed",
-        created_at=datetime.utcnow() - timedelta(days=1)
+        created_at=datetime.now(UTC) - timedelta(days=1)
     )
     # Average swap
     swap2 = SwapSession(
@@ -92,7 +92,7 @@ def analytics_test_env(session):
         new_battery_id=b2.id,
         amount=5.0,
         status="completed",
-        created_at=datetime.utcnow() - timedelta(days=2)
+        created_at=datetime.now(UTC) - timedelta(days=2)
     )
     # Detractor swap
     swap3 = SwapSession(
@@ -102,7 +102,7 @@ def analytics_test_env(session):
         new_battery_id=b1.id,
         amount=10.0,
         status="completed",
-        created_at=datetime.utcnow() - timedelta(days=3)
+        created_at=datetime.now(UTC) - timedelta(days=3)
     )
     session.add_all([swap1, swap2, swap3])
 

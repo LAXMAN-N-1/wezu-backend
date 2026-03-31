@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 from sqlmodel import Session
 from app.core.config import settings
 from app.api import deps
-from datetime import datetime
+from datetime import datetime, UTC
 import psutil
 import platform
 
@@ -18,7 +18,7 @@ async def health_check():
     """Basic health check"""
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(UTC).isoformat()
     }
 
 
@@ -34,7 +34,7 @@ async def detailed_health_check(db: Session = Depends(deps.get_db)):
     
     return {
         "status": "healthy" if db_status == "healthy" else "degraded",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "components": {
             "database": db_status,
             "api": "healthy"

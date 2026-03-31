@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List, Dict
-from datetime import datetime
+from datetime import datetime, UTC
 import enum
 from sqlalchemy import Column
 from sqlalchemy.dialects.postgresql import JSONB
@@ -34,8 +34,8 @@ class DealerKYCApplication(SQLModel, table=True):
     admin_comments: Optional[str] = None
     rejection_reason: Optional[str] = None
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     transitions: List["KYCStateTransition"] = Relationship(back_populates="application")
 
@@ -50,6 +50,6 @@ class KYCStateTransition(SQLModel, table=True):
     reason: Optional[str] = None
     changed_by_user_id: Optional[int] = Field(foreign_key="users.id")
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     application: DealerKYCApplication = Relationship(back_populates="transitions")

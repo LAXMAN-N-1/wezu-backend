@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from sqlmodel import Session, select, func
 from app.models.otp import OTP
 from app.models.fraud import Blacklist
@@ -15,7 +15,7 @@ class FraudService:
         Returns True if action is allowed, False if velocity limit exceeded.
         """
         if action_type == "otp":
-            window_start = datetime.utcnow() - timedelta(minutes=window_minutes)
+            window_start = datetime.now(UTC) - timedelta(minutes=window_minutes)
             statement = select(func.count(OTP.id)).where(
                 OTP.target == target,
                 OTP.created_at >= window_start

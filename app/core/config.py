@@ -1,3 +1,4 @@
+from pydantic import ConfigDict
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
@@ -6,16 +7,16 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     
     # Database
-    DATABASE_URL: str = "postgresql://user:password@localhost:5432/wezy_db"
+    DATABASE_URL: str # No default allowed, must be provided in env
     SQLALCHEMY_ECHO: bool = False
-    DB_POOL_SIZE: int = 3
-    DB_MAX_OVERFLOW: int = 3
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 20
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 1800
     DB_POOL_PRE_PING: bool = True
     
     # Redis (Sessions & Caching)
-    REDIS_URL: str = "redis://127.0.0.1:6379/0"
+    REDIS_URL: str # No default allowed, must be provided in env
     REDIS_SESSION_DB: int = 1
     REDIS_CACHE_DB: int = 2
     
@@ -112,7 +113,7 @@ class Settings(BaseSettings):
     
     # Background Jobs
     RUN_BACKGROUND_TASKS: bool = True
-    DB_INIT_ON_STARTUP: bool = True
+    DB_INIT_ON_STARTUP: bool = False
     SCHEDULER_ENABLED: bool = True
     SCHEDULER_TIMEZONE: str = "Asia/Kolkata"
     

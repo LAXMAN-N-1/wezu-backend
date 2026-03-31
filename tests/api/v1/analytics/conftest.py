@@ -47,13 +47,9 @@ def mock_customer_token_headers_fixture(client, normal_user: User, session: Sess
         session.refresh(customer_role)
 
     # Assign the role to the normal_user
-    existing_link = session.query(UserRole).filter(
-        UserRole.user_id == normal_user.id,
-        UserRole.role_id == customer_role.id
-    ).first()
-    if not existing_link:
-        user_role = UserRole(user_id=normal_user.id, role_id=customer_role.id)
-        session.add(user_role)
+    if normal_user.role_id != customer_role.id:
+        normal_user.role_id = customer_role.id
+        session.add(normal_user)
         session.commit()
 
     # Refresh user to load roles relationship

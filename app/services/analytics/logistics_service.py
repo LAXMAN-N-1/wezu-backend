@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, desc, extract
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from typing import Dict, List, Any
 
 from app.schemas.analytics.logistics import LogisticsOverviewResponse
@@ -14,25 +14,25 @@ class AnalyticsLogisticsService(BaseAnalyticsService):
     @staticmethod
     async def get_overview(db: Session, period: str = "30d", logistics_user_id: int = None) -> LogisticsOverviewResponse:
         days = BaseAnalyticsService.parse_period(period)
-        target_date = datetime.utcnow() - timedelta(days=days)
+        target_date = datetime.now(UTC) - timedelta(days=days)
         
         # 1. Delivery Analytics (Mapping to BatteryTransfers)
         deliveries_today = db.query(func.count(BatteryTransfer.id)).filter(
-            BatteryTransfer.created_at >= datetime.utcnow().replace(hour=0, minute=0, second=0)
+            BatteryTransfer.created_at >= datetime.now(UTC).replace(hour=0, minute=0, second=0)
         ).scalar() or 0
         
         pending_deliv = db.query(func.count(BatteryTransfer.id)).filter(BatteryTransfer.status == "pending").scalar() or 0
         failed_deliv = db.query(func.count(BatteryTransfer.id)).filter(BatteryTransfer.status == "cancelled").scalar() or 0
         
         delivery_analytics = {
-            "total_deliveries": db.query(func.count(BatteryTransfer.id)).scalar() or 0,
+            "total_deliveries": db.exec(select(func.count(BatteryTransfer.id))).one() or 0,
             "deliveries_today": deliveries_today,
             "pending_deliveries": pending_deliv,
             "failed_deliveries": failed_deliv
         }
 
         # 2. Route & Driver Analytics
-        avg_time = db.query(func.avg(extract('epoch', BatteryTransfer.completed_at - BatteryTransfer.created_at) / 60)).filter(
+        avg_time = db.query(func.avg(extract('epoch', BatteryTransfer.updated_at - BatteryTransfer.created_at) / 60)).filter(
             BatteryTransfer.status == "completed"
         ).scalar() or 0
         
@@ -42,7 +42,7 @@ class AnalyticsLogisticsService(BaseAnalyticsService):
             "distance_covered": 450.0 # Mocked
         }
 
-        driver_perf = db.query(User.full_name, func.count(BatteryTransfer.id)).join(BatteryTransfer, BatteryTransfer.driver_id == User.id).group_by(User.full_name).limit(5).all()
+        driver_perf = [] # Mocked since driver_id is not in BatteryTransfer directly
         
         driver_analytics = {
             "driver_performance": [{"name": row[0], "deliveries": row[1]} for row in driver_perf],
@@ -50,7 +50,7 @@ class AnalyticsLogisticsService(BaseAnalyticsService):
         }
 
         # 3. Order Analytics
-        total_orders = db.query(func.count(BatteryTransfer.id)).scalar() or 1
+        total_orders = db.exec(select(func.count(BatteryTransfer.id))).one() or 1
         success_rate = (db.query(func.count(BatteryTransfer.id)).filter(BatteryTransfer.status == "completed").scalar() or 0) / total_orders * 100
         
         order_analytics = {

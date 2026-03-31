@@ -6,7 +6,7 @@ from app.models.station import Station
 from app.models.station_heartbeat import StationHeartbeat
 from app.schemas.common import DataResponse
 from typing import List, Any
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 
 router = APIRouter()
 
@@ -30,7 +30,7 @@ def get_station_health_stats(
         stations = session.exec(select(Station)).all()
         results = []
         
-        threshold_24h = datetime.utcnow() - timedelta(hours=24)
+        threshold_24h = datetime.now(UTC) - timedelta(hours=24)
         max_hbs = 24 * 60 # 1hb per minute
         
         for s in stations:

@@ -4,7 +4,7 @@ Dealer Portal Dashboard — Aggregated KPIs, alerts, and activity feed.
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, func
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 
 from app.db.session import get_session
 from app.api.deps import get_current_user
@@ -64,7 +64,7 @@ def get_dashboard_summary(
     revenue_this_month = 0.0
     try:
         from app.models.commission import CommissionLog
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         revenue_this_month = db.exec(
             select(func.coalesce(func.sum(CommissionLog.amount), 0.0)).where(
@@ -389,3 +389,130 @@ def get_dealer_users(
         }
     ]
     return {"data": mock_users, "total": len(mock_users)}
+
+
+# ── Documents ────────────────────────────────────────────────
+
+@router.get("/documents")
+def list_dealer_documents(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """List all documents for the dealer."""
+    dealer = _get_dealer(db, current_user.id)
+    from app.models.dealer import DealerDocument
+    docs = db.exec(
+        select(DealerDocument).where(
+            DealerDocument.dealer_id == dealer.id,
+            DealerDocument.status != "ARCHIVED",
+        )
+    ).all()
+
+    data = []
+    for d in docs:
+        data.append({
+            "id": d.id,
+            "document_type": d.document_type,
+            "category": d.category or "verification",
+            "file_url": d.file_url,
+            "status": d.status,
+            "version": d.version,
+            "valid_until": str(d.valid_until) if d.valid_until else None,
+            "created_at": str(d.uploaded_at) if d.uploaded_at else None,
+        })
+    return {"data": data, "total": len(data)}
+
+
+@router.post("/documents/upload")
+def upload_dealer_document(
+    data: dict,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Upload a new document or a newer version of an existing document."""
+    dealer = _get_dealer(db, current_user.id)
+    from app.models.dealer import DealerDocument
+
+    document_type = data.get("document_type", "other")
+    category = data.get("category", "verification")
+    file_url = data.get("file_url", "")
+    valid_until_str = data.get("valid_until")
+
+    # Find existing and determine next version
+    existing_docs = db.exec(
+        select(DealerDocument).where(
+            DealerDocument.dealer_id == dealer.id,
+            DealerDocument.document_type == document_type,
+        )
+    ).all()
+
+    next_version = 1
+    if existing_docs:
+        for doc in existing_docs:
+            if doc.status != "ARCHIVED":
+                doc.status = "ARCHIVED"
+        highest = max(d.version for d in existing_docs)
+        next_version = highest + 1
+
+    valid_until = None
+    if valid_until_str:
+        try:
+            valid_until = datetime.fromisoformat(valid_until_str)
+        except Exception:
+            pass
+
+    new_doc = DealerDocument(
+        dealer_id=dealer.id,
+        document_type=document_type,
+        category=category,
+        file_url=file_url,
+        version=next_version,
+        status="PENDING",
+        valid_until=valid_until,
+        is_verified=False,
+    )
+    db.add(new_doc)
+    db.commit()
+    db.refresh(new_doc)
+
+    return {"message": "Document uploaded successfully", "id": new_doc.id, "version": next_version}
+
+
+# ── Transactions / Revenue ───────────────────────────────────
+
+@router.get("/transactions")
+def get_dealer_transactions(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get rental transactions (revenue) for the dealer's stations."""
+    dealer = _get_dealer(db, current_user.id)
+    stations = db.exec(
+        select(Station).where(Station.dealer_id == dealer.id)
+    ).all()
+    station_ids = [s.id for s in stations]
+
+    if not station_ids:
+        return {"data": [], "total": 0}
+
+    rentals = db.exec(
+        select(Rental)
+        .where(Rental.start_station_id.in_(station_ids))
+        .order_by(Rental.created_at.desc())
+        .limit(100)
+    ).all()
+
+    data = []
+    for r in rentals:
+        customer = db.get(User, r.user_id)
+        station = db.get(Station, r.start_station_id) if r.start_station_id else None
+        data.append({
+            "id": r.id,
+            "transaction_type": "Rental",
+            "amount": float(r.total_amount or 0),
+            "status": r.status.value if hasattr(r.status, 'value') else str(r.status),
+            "created_at": str(r.created_at),
+            "description": f"{customer.full_name if customer else 'Customer'} at {station.name if station else 'Station'}",
+        })
+
+    return {"data": data, "total": len(data)}

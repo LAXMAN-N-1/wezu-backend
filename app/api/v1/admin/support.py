@@ -83,8 +83,8 @@ def update_ticket_status(
         
     ticket.status = status
     if status == TicketStatus.RESOLVED:
-        from datetime import datetime
-        ticket.resolved_at = datetime.utcnow()
+        from datetime import datetime, UTC
+        ticket.resolved_at = datetime.now(UTC)
         
     db.add(ticket)
     db.commit()

@@ -4,7 +4,7 @@ if TYPE_CHECKING:
     from app.models.user import User
     from app.models.organization import Organization
     from app.models.warehouse import Warehouse
-from datetime import datetime
+from datetime import datetime, UTC
 
 class Branch(SQLModel, table=True):
     __tablename__ = "branches"
@@ -24,8 +24,8 @@ class Branch(SQLModel, table=True):
     organization_id: Optional[int] = Field(default=None, foreign_key="organizations.id")
     
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     manager: Optional["User"] = Relationship()

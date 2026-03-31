@@ -56,7 +56,7 @@ def test_get_users_by_role(client: TestClient, session: Session):
     session.commit()
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Case 1: List All for Role
     resp = client.get(f"/api/v1/admin/rbac/roles/{role.id}/users")

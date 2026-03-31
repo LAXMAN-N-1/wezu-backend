@@ -5,7 +5,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, UTC
 
 from app.db.session import get_session
 from app.api.deps import get_current_user
@@ -176,7 +176,7 @@ def reply_to_ticket(
     )
     db.add(msg)
 
-    ticket.updated_at = datetime.utcnow()
+    ticket.updated_at = datetime.now(UTC)
     if ticket.status == TicketStatus.RESOLVED:
         ticket.status = TicketStatus.OPEN  # Reopen if dealer replies after resolution
     db.add(ticket)
@@ -203,8 +203,8 @@ def close_ticket(
         raise HTTPException(status_code=404, detail="Ticket not found")
 
     ticket.status = TicketStatus.CLOSED
-    ticket.resolved_at = datetime.utcnow()
-    ticket.updated_at = datetime.utcnow()
+    ticket.resolved_at = datetime.now(UTC)
+    ticket.updated_at = datetime.now(UTC)
     db.add(ticket)
     db.commit()
 

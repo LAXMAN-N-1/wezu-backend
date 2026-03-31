@@ -385,7 +385,7 @@ def generate_handover_qr(
         raise HTTPException(status_code=404, detail="Transfer not found")
     
     # Simple logic: QR is just the transfer ID + secret for now
-    qr_data = f"TRANSFER:{transfer_id}:{datetime.utcnow().timestamp()}"
+    qr_data = f"TRANSFER:{transfer_id}:{datetime.now(UTC).timestamp()}"
     return {"qr_code": qr_data, "transfer_id": transfer_id}
 
 @router.post("/handover/warehouse-scan")
