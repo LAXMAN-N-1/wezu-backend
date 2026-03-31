@@ -183,11 +183,17 @@ class DealerService:
         weekly = db.exec(select(func.count(Rental.id)).where(Rental.start_station_id.in_(station_ids)).where(Rental.created_at >= week_ago)).one()
         monthly = db.exec(select(func.count(Rental.id)).where(Rental.start_station_id.in_(station_ids)).where(Rental.created_at >= month_ago)).one()
         
+        revenue = db.exec(
+            select(func.coalesce(func.sum(Rental.total_amount), 0.0))
+            .where(Rental.start_station_id.in_(station_ids))
+            .where(Rental.created_at >= month_ago)
+        ).one()
+        
         return {
             "daily_rentals": daily,
             "weekly_rentals": weekly,
             "monthly_rentals": monthly,
-            "revenue": 0.0 # Placeholder
+            "revenue": float(revenue)
         }
 
     @staticmethod

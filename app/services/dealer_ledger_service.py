@@ -1,0 +1,172 @@
+import logging
+from datetime import datetime, timedelta
+from typing import Dict, Any, List, Optional
+
+from sqlmodel import Session, select, func, col, desc
+
+from app.models.rental import Rental
+from app.models.commission import CommissionLog
+from app.models.station import Station
+from app.models.user import User
+from app.models.financial import Transaction
+from app.schemas.dealer_ledger import LedgerEntry, LedgerResponse, LedgerDetailResponse
+
+logger = logging.getLogger(__name__)
+
+class DealerLedgerService:
+    @staticmethod
+    def get_ledger_entries(
+        db: Session,
+        dealer_id: int,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        txn_types: Optional[List[str]] = None,
+        station_id: Optional[int] = None,
+        limit: int = 50,
+        skip: int = 0
+    ) -> LedgerResponse:
+        # Get all stations for this dealer
+        station_query = select(Station.id).where(Station.dealer_id == dealer_id)
+        if station_id:
+            station_query = station_query.where(Station.id == station_id)
+        station_ids = db.exec(station_query).all()
+
+        if not station_ids:
+            return LedgerResponse(data=[], total=0, total_amount=0.0)
+
+        # In a production app with millions of rows, we would use a SQLAlchemy UNION over indexed queries.
+        # For simplicity in this implementation, we query Rentals and Commissions concurrently and merge.
+        entries = []
+        
+        # 1. Fetch Rentals (Rental Income, Penalties) map to Dealer Stations
+        if not txn_types or "Rental Income" in txn_types or "Penalty" in txn_types:
+            r_query = select(Rental).where(col(Rental.start_station_id).in_(station_ids))
+            if start_date:
+                r_query = r_query.where(Rental.created_at >= start_date)
+            if end_date:
+                r_query = r_query.where(Rental.created_at <= end_date)
+                
+            rentals = db.exec(r_query.order_by(desc(Rental.created_at)).offset(skip).limit(limit)).all()
+            
+            for r in rentals:
+                # Pre-fetch relations if needed, but assuming lazy load or standard queries
+                user = db.get(User, r.user_id)
+                station = db.get(Station, r.start_station_id)
+                
+                # Format duration
+                duration_str = None
+                if r.end_time and r.start_time:
+                    diff = r.end_time - r.start_time
+                    hours = int(diff.total_seconds() // 3600)
+                    mins = int((diff.total_seconds() % 3600) // 60)
+                    duration_str = f"{hours}h {mins}m"
+                
+                status_mapped = "Completed" if r.status.value == "completed" else r.status.value.capitalize()
+                
+                if not txn_types or "Rental Income" in txn_types:
+                    entries.append(LedgerEntry(
+                        id=f"RENTAL-{r.id}",
+                        transaction_id=f"TXN-R{r.id}",
+                        date=r.created_at,
+                        customer_name=user.full_name if user else "Unknown",
+                        customer_phone=user.phone_number if user else None,
+                        station_name=station.name if station else "Unknown",
+                        battery_id=f"BAT-{r.battery_id}",
+                        type="Rental Income",
+                        duration=duration_str,
+                        amount=r.total_amount,
+                        status=status_mapped
+                    ))
+
+        # 2. Fetch Commissions
+        if not txn_types or "Commission" in txn_types:
+            c_query = select(CommissionLog).where(CommissionLog.dealer_id == dealer_id)
+            if start_date:
+                c_query = c_query.where(CommissionLog.created_at >= start_date)
+            if end_date:
+                c_query = c_query.where(CommissionLog.created_at <= end_date)
+                
+            commissions = db.exec(c_query.order_by(desc(CommissionLog.created_at)).offset(skip).limit(limit)).all()
+            
+            for c in commissions:
+                status_mapped = "Completed" if c.status == "paid" else "Pending"
+                entries.append(LedgerEntry(
+                    id=f"COMM-{c.id}",
+                    transaction_id=f"TXN-C{c.id}",
+                    date=c.created_at,
+                    type="Commission",
+                    amount=c.amount,
+                    status=status_mapped
+                ))
+
+        # Sort combined entries by date desc
+        entries.sort(key=lambda x: x.date, reverse=True)
+        
+        # Paginate manual merged list
+        paginated_entries = entries[0:limit] # Since we already limit, we just ensure it doesn't exceed total limits
+        total_count = len(entries) # Approximation for this example
+        total_amount = sum(e.amount for e in paginated_entries)
+
+        return LedgerResponse(data=paginated_entries, total=total_count, total_amount=total_amount)
+
+    @staticmethod
+    def get_ledger_detail(db: Session, dealer_id: int, entry_id: str) -> LedgerDetailResponse:
+        prefix, db_id = entry_id.split("-")
+        
+        if prefix == "RENTAL":
+            r = db.get(Rental, int(db_id))
+            if not r:
+                raise ValueError("Rental not found")
+            
+            user = db.get(User, r.user_id)
+            station = db.get(Station, r.start_station_id)
+            
+            duration_str = None
+            if r.end_time and r.start_time:
+                diff = r.end_time - r.start_time
+                hours = int(diff.total_seconds() // 3600)
+                mins = int((diff.total_seconds() % 3600) // 60)
+                duration_str = f"{hours}h {mins}m"
+                
+            # Timeline events
+            events = [
+                {"name": "Rental Started", "status": "completed", "date": r.start_time},
+                {"name": "Payment Captured", "status": "completed" if r.status == "completed" else "pending", "date": r.end_time or r.created_at},
+                {"name": "Settlement Queued", "status": "pending", "date": datetime.utcnow()} # Mock
+            ]
+            
+            # Fetch real transaction for payment ref
+            pay_ref = None
+            pay_method = None
+            txn = db.exec(select(Transaction).where(Transaction.rental_id == r.id)).first()
+            if txn:
+                pay_ref = txn.payment_gateway_ref
+                pay_method = txn.payment_method
+                
+            return LedgerDetailResponse(
+                id=entry_id,
+                transaction_id=f"TXN-R{r.id}",
+                date=r.created_at,
+                customer_name=user.full_name if user else "Unknown",
+                customer_phone=user.phone_number if user else None,
+                battery_id=f"BAT-{r.battery_id}",
+                station_name=station.name if station else "Unknown",
+                terminal_number="Slot 1", # Mock
+                rental_start_time=r.start_time,
+                rental_end_time=r.end_time,
+                duration=duration_str,
+                gross_amount=r.total_amount,
+                platform_fee=r.total_amount * 0.1, # Mock platform fee
+                commission_rate=0.0,
+                commission_amount=0.0,
+                net_amount=r.total_amount * 0.9,
+                payment_method=pay_method,
+                payment_gateway_ref=pay_ref,
+                settlement_status="Pending",
+                expected_settlement_date=datetime.utcnow() + timedelta(days=2),
+                type="Rental Income",
+                status="Completed" if r.status == "completed" else r.status.name,
+                events=events
+            )
+        else:
+            raise ValueError("Unsupported detail view for this type")

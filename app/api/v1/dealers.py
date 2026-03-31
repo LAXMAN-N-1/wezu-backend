@@ -12,6 +12,8 @@ from app.schemas.dealer import (
     DealerProfileCreate, DealerProfileUpdate, DealerProfileResponse,
     DealerApplicationUpdate, FieldVisitSchedule
 )
+from app.schemas.dealer_ledger import LedgerResponse, LedgerDetailResponse
+from app.services.dealer_ledger_service import DealerLedgerService
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -67,7 +69,7 @@ def get_dealer_dashboard(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
-    profile = DealerService.get_dealer_by_user(current_user.id)
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
     if not profile:
         raise HTTPException(status_code=403, detail="Access denied")
         
@@ -119,12 +121,12 @@ def get_my_settlements(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
-    profile = DealerService.get_dealer_by_user(current_user.id)
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
     if not profile:
         raise HTTPException(status_code=404, detail="Not a dealer")
         
-    stats = DealerService.get_dashboard_stats(session, profile.id)
-    return DataResponse(success=True, data=stats)
+    settlements = session.exec(select(Settlement).where(Settlement.dealer_id == profile.id)).all()
+    return DataResponse(success=True, data=settlements)
 
 @router.get("/me/stations", response_model=DataResponse[list])
 def get_dealer_stations(
@@ -139,6 +141,52 @@ def get_dealer_stations(
     from app.models.station import Station
     stations = session.exec(select(Station).where(Station.dealer_id == profile.id)).all()
     return DataResponse(success=True, data=stations)
+
+@router.get("/me/transactions", response_model=DataResponse[LedgerResponse])
+def get_dealer_transactions(
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    txn_types: Optional[str] = None, # comma separated
+    station_id: Optional[int] = None,
+    limit: int = 50,
+    skip: int = 0,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
+):
+    """Dealer: Unified ledger of rentals, commissions, etc."""
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Not a dealer")
+    
+    type_list = txn_types.split(",") if txn_types else None
+    
+    ledger = DealerLedgerService.get_ledger_entries(
+        db=session,
+        dealer_id=profile.id,
+        start_date=start_date,
+        end_date=end_date,
+        txn_types=type_list,
+        station_id=station_id,
+        limit=limit,
+        skip=skip
+    )
+    return DataResponse(success=True, data=ledger)
+
+@router.get("/me/transactions/{txn_id}", response_model=DataResponse[LedgerDetailResponse])
+def get_dealer_transaction_details(
+    txn_id: str,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
+):
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Not a dealer")
+        
+    try:
+        detail = DealerLedgerService.get_ledger_detail(session, profile.id, txn_id)
+        return DataResponse(success=True, data=detail)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 @router.get("/me/inventory", response_model=DataResponse[list])
 def get_dealer_inventory(
