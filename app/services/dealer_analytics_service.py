@@ -164,14 +164,15 @@ class DealerAnalyticsService:
 
     @staticmethod
     def get_trends(
-        db: Session, dealer_id: int, period: str = "daily", num_periods: int = 7
+        db: Session, dealer_id: int, period: str = "daily", num_periods: int = 7,
+        end_date: Optional[datetime] = None
     ) -> List[dict]:
         """Revenue + swap volume trends for the last N periods."""
         station_ids = DealerAnalyticsService._get_station_ids(db, dealer_id)
         if not station_ids:
             return []
 
-        now = datetime.utcnow()
+        now = end_date or datetime.utcnow()
         trends = []
 
         for i in range(num_periods - 1, -1, -1):  # oldest first
@@ -222,6 +223,42 @@ class DealerAnalyticsService:
             })
 
         return trends
+
+    @staticmethod
+    def get_comparison_trends(
+        db: Session, dealer_id: int, period: str = "daily", num_periods: int = 7
+    ) -> List[dict]:
+        """Revenue + swap volume trends for current period vs previous period."""
+        current_trends = DealerAnalyticsService.get_trends(db, dealer_id, period, num_periods)
+        
+        now = datetime.utcnow()
+        if period == "daily":
+            prev_end = now - timedelta(days=num_periods)
+        elif period == "weekly":
+            prev_end = now - timedelta(weeks=num_periods)
+        else:
+            month_offset = now.month - num_periods
+            year = now.year
+            while month_offset < 1:
+                month_offset += 12
+                year -= 1
+            # Just approximation for rolling month shift
+            prev_end = datetime(year, month_offset, now.day if now.day <= 28 else 28)
+            
+        prev_trends = DealerAnalyticsService.get_trends(db, dealer_id, period, num_periods, end_date=prev_end)
+        
+        comparison = []
+        for i in range(len(current_trends)):
+            curr = current_trends[i]
+            prev = prev_trends[i] if i < len(prev_trends) else {"swaps": 0, "revenue": 0.0}
+            comparison.append({
+                "period": curr["period"],
+                "swaps": curr["swaps"],
+                "revenue": curr["revenue"],
+                "prev_swaps": prev["swaps"],
+                "prev_revenue": prev["prev_revenue"] if "prev_revenue" in prev else prev["revenue"]
+            })
+        return comparison
 
     # ─── 3. Station Metrics ───
 

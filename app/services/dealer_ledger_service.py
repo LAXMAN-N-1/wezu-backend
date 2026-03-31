@@ -2,6 +2,8 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
+import csv
+import io
 from sqlmodel import Session, select, func, col, desc
 
 from app.models.rental import Rental
@@ -154,6 +156,43 @@ class DealerLedgerService:
         total_amount = sum(e.amount for e in paginated_entries)
 
         return LedgerResponse(data=paginated_entries, total=total_count, total_amount=total_amount)
+
+    @staticmethod
+    def generate_ledger_csv(
+        db: Session,
+        dealer_id: int,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        txn_types: Optional[List[str]] = None,
+        station_id: Optional[int] = None,
+        search: Optional[str] = None,
+        amount_min: Optional[float] = None,
+        amount_max: Optional[float] = None,
+        status_types: Optional[List[str]] = None,
+    ) -> str:
+        # Re-use the query mechanism, but fetch universally
+        ledger = DealerLedgerService.get_ledger_entries(
+            db, dealer_id, start_date, end_date, txn_types, station_id, 
+            search, amount_min, amount_max, status_types, limit=10000, skip=0
+        )
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        # Headers matching UI Column needs
+        writer.writerow(["Date & Time", "TXN ID", "Type", "Reference ID", "Station", "Amount", "Status"])
+        
+        for e in ledger.data:
+            writer.writerow([
+                e.date.strftime("%Y-%m-%d %H:%M:%S"),
+                e.transaction_id,
+                e.type,
+                e.battery_id or "-",
+                e.station_name or "-",
+                f"{e.amount:.2f}",
+                e.status
+            ])
+            
+        return output.getvalue()
 
     @staticmethod
     def get_ledger_detail(db: Session, dealer_id: int, entry_id: str) -> LedgerDetailResponse:
