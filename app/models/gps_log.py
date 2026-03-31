@@ -1,3 +1,4 @@
+import uuid
 """
 GPS Tracking Log Model
 Stores location history for active rentals
@@ -13,7 +14,7 @@ class GPSTrackingLog(SQLModel, table=True):
     
     id: Optional[int] = Field(default=None, primary_key=True)
     rental_id: int = Field(foreign_key="rentals.rentals.id", index=True)
-    battery_id: int = Field(foreign_key="inventory.batteries.id", index=True)
+    battery_id: Optional[uuid.UUID] = Field(foreign_key="inventory.batteries.id", index=True)
     
     # Location data
     latitude: float = Field(index=True)

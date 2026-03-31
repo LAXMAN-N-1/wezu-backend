@@ -1,7 +1,7 @@
+import uuid
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, Dict, Any, TYPE_CHECKING
 from datetime import date, datetime
-import uuid
 from sqlalchemy import Column, JSON
 
 if TYPE_CHECKING:

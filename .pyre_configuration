@@ -1,0 +1,8 @@
+{
+  "source_directories": [
+    "."
+  ],
+  "search_path": [
+    "wezu_env/Lib/site-packages"
+  ]
+}

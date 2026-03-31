@@ -5,16 +5,16 @@ from contextlib import asynccontextmanager
 
 from app.core.config import settings
 
-import sentry_sdk
-from sentry_sdk.integrations.fastapi import FastApiIntegration
+# import sentry_sdk
+# from sentry_sdk.integrations.fastapi import FastApiIntegration
 
-if settings.SENTRY_DSN:
-    sentry_sdk.init(
-        dsn=settings.SENTRY_DSN,
-        environment=settings.ENVIRONMENT,
-        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
-        integrations=[FastApiIntegration()]
-    )
+# if settings.SENTRY_DSN:
+#     sentry_sdk.init(
+#         dsn=settings.SENTRY_DSN,
+#         environment=settings.ENVIRONMENT,
+#         traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+#         integrations=[FastApiIntegration()]
+#     )
 
 # Customer-facing endpoints
 from app.api.v1 import (
@@ -24,7 +24,8 @@ from app.api.v1 import (
     organizations, warehouses, screens, stock, dealers, logistics, 
     settlements, telemetry, vehicles, locations, system, roles, 
     menus, role_rights, admin_kyc, audit, ml, inventory,
-    admin_stations, station_monitoring
+    admin_stations, station_monitoring, user_analytics,
+    indents, grn, station_camera, maintenance
 )
 from app.api.v1.admin import (
     support as admin_support, 
@@ -37,7 +38,8 @@ from app.api.v1.admin import (
     legal as admin_legal,
     banners as admin_banners,
     media as admin_media,
-    blogs as admin_blogs
+    blogs as admin_blogs,
+    campaigns as admin_campaigns
 )
 from app.api.admin import router as admin_router
 from app.api.webhooks import razorpay as razorpay_webhook
@@ -80,11 +82,26 @@ async def lifespan(app: FastAPI):
     except:
         pass
 
+from fastapi.openapi.docs import get_swagger_ui_html
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
+    docs_url=None,  # Disable default docs because we're overriding it
+    redoc_url=f"{settings.API_V1_STR}/redoc",
     lifespan=lifespan,
 )
+
+@app.get("/docs", include_in_schema=False)
+async def custom_swagger_ui_html():
+    """Override Swagger UI CDN to use cdnjs instead of jsdelivr/unpkg (which might be blocked)"""
+    return get_swagger_ui_html(
+        openapi_url=app.openapi_url,
+        title=app.title + " - Swagger UI",
+        oauth2_redirect_url=app.swagger_ui_oauth2_redirect_url,
+        swagger_js_url="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui-bundle.min.js",
+        swagger_css_url="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.0/swagger-ui.min.css",
+    )
 
 # ----------------------------
 # Rate Limiting
@@ -133,6 +150,7 @@ app.include_router(favorites.router, prefix=f"{settings.API_V1_STR}/users/me/fav
 app.include_router(promo.router, prefix=f"{settings.API_V1_STR}/coupons", tags=["Customer: Coupons"])
 app.include_router(swaps.router, prefix=f"{customer_api}/swaps", tags=["Customer: Swaps"])
 app.include_router(vehicles.router, prefix=f"{customer_api}/vehicles", tags=["Customer: Vehicles"])
+app.include_router(user_analytics.router, prefix=f"{customer_api}/users", tags=["Customer: User Analytics"])
 
 # 2. Admin Application Endpoints
 admin_api = f"{settings.API_V1_STR}/admin"
@@ -155,10 +173,13 @@ app.include_router(admin_coupons.router, prefix=f"{admin_api}/coupons", tags=["A
 app.include_router(admin_blogs.router, prefix=f"{admin_api}/blogs", tags=["Admin: CMS - Blogs"], dependencies=admin_deps)
 app.include_router(admin_reviews.router, prefix=f"{admin_api}/reviews", tags=["Admin: Review Moderation"], dependencies=admin_deps)
 app.include_router(admin_stations.router, prefix=f"{admin_api}/stations", tags=["Admin: Stations"], dependencies=admin_deps)
+app.include_router(admin_campaigns.router, prefix=f"{admin_api}/campaigns", tags=["Admin: Campaigns"], dependencies=admin_deps)
+app.include_router(maintenance.router, prefix=f"{admin_api}/maintenance", tags=["Admin: Maintenance"], dependencies=admin_deps)
 
 # 3. Monitoring Application Endpoints
 monitoring_api = f"{settings.API_V1_STR}/monitoring"
 app.include_router(station_monitoring.router, prefix=f"{monitoring_api}/stations", tags=["Monitoring: Stations"])
+app.include_router(station_camera.router, prefix=f"{monitoring_api}/cameras", tags=["Monitoring: Station Cameras"])
 
 # 3. Dealer Application Endpoints
 dealer_api = f"{settings.API_V1_STR}/dealer"
@@ -181,6 +202,9 @@ app.include_router(telemetry.router, prefix=f"{infra_api}/telemetry", tags=["Inf
 app.include_router(i18n.router, prefix=f"{infra_api}/i18n", tags=["Infra: i18n"])
 app.include_router(locations.router, prefix=f"{infra_api}/locations", tags=["Infra: Locations"])
 app.include_router(inventory.router, prefix=f"{settings.API_V1_STR}/inventory", tags=["Logistics: Inventory"])
+app.include_router(indents.router, prefix=f"{settings.API_V1_STR}/indents", tags=["Inventory: Indents"])
+app.include_router(grn.router, prefix=f"{settings.API_V1_STR}/grn", tags=["Inventory: GRN"])
+
 
 
 # Analytics Module (V2 Architecture)

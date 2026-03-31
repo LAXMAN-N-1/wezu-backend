@@ -1,3 +1,4 @@
+import uuid
 from sqlmodel import SQLModel, Field
 from typing import Optional
 from datetime import datetime
@@ -7,7 +8,7 @@ class InventoryAuditLog(SQLModel, table=True):
     __table_args__ = {"schema": "inventory"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    battery_id: int = Field(foreign_key="inventory.batteries.id", index=True)
+    battery_id: Optional[uuid.UUID] = Field(foreign_key="inventory.batteries.id", index=True)
     
     action_type: str = Field(index=True) # transfer, manual_entry, disposal, status_change
     

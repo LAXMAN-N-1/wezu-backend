@@ -1,0 +1,7 @@
+{
+    "venvPath": ".",
+    "venv": "wezu_env",
+    "extraPaths": [
+        "wezu_env/Lib/site-packages"
+    ]
+}

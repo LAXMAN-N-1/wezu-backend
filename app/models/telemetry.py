@@ -1,3 +1,4 @@
+import uuid
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
 from datetime import datetime
@@ -10,7 +11,7 @@ class Telemetry(SQLModel, table=True):
     
     # Source
     device_id: str = Field(index=True) # IoT Device ID
-    battery_id: Optional[int] = Field(default=None, foreign_key="inventory.batteries.id", index=True)
+    battery_id: Optional[uuid.UUID] = Field(default=None, foreign_key="inventory.batteries.id", index=True)
     rental_id: Optional[int] = Field(default=None, foreign_key="rentals.rentals.id")
     
     # Data

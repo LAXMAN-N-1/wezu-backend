@@ -1,7 +1,7 @@
+import uuid
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, TYPE_CHECKING
 from datetime import datetime
-import uuid
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -19,8 +19,8 @@ class SwapSession(SQLModel, table=True):
     station_id: int = Field(foreign_key="stations.stations.id", index=True)
     
     # Battery Details
-    old_battery_id: Optional[int] = Field(default=None, foreign_key="inventory.batteries.id")
-    new_battery_id: Optional[int] = Field(default=None, foreign_key="inventory.batteries.id")
+    old_battery_id: Optional[uuid.UUID] = Field(default=None, foreign_key="inventory.batteries.id")
+    new_battery_id: Optional[uuid.UUID] = Field(default=None, foreign_key="inventory.batteries.id")
     
     old_battery_soc: float = Field(default=0.0)
     new_battery_soc: float = Field(default=0.0)

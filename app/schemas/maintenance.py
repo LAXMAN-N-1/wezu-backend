@@ -3,31 +3,88 @@ Maintenance-related Pydantic schemas
 Maintenance schedules, records, and station downtime
 """
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List
+from typing import Optional, List, Dict
 from datetime import datetime
+
+# Maintenance Templates
+class MaintenanceTemplateBase(BaseModel):
+    name: str
+    station_type: Optional[str] = None
+    entity_type: Optional[str] = Field("station", pattern=r'^(battery|station)$')
+    maintenance_type: Optional[str] = None
+    description: Optional[str] = None
+    checklist: List[str] # List of items
+    version: int = 1
+    is_active: bool = True
+
+class MaintenanceTemplateCreate(MaintenanceTemplateBase):
+    pass
+
+class MaintenanceTemplateUpdate(BaseModel):
+    name: Optional[str] = None
+    entity_type: Optional[str] = None
+    description: Optional[str] = None
+    checklist: Optional[List[Dict]] = None
+    is_active: Optional[bool] = None
+
+class MaintenanceTemplateResponse(MaintenanceTemplateBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
 
 # Request Models
 class MaintenanceScheduleCreate(BaseModel):
     """Create maintenance schedule"""
-    battery_id: int
-    maintenance_type: str = Field(..., pattern=r'^(ROUTINE|INSPECTION|REPAIR|REPLACEMENT)$')
-    scheduled_date: datetime
-    assigned_technician_id: Optional[int] = None
-    priority: str = Field("NORMAL", pattern=r'^(LOW|NORMAL|HIGH|URGENT)$')
-    estimated_duration_minutes: Optional[int] = Field(None, gt=0)
-    notes: Optional[str] = None
+    station_id: int
+    title: str
+    description: Optional[str] = None
+    start_time: datetime
+    end_time: datetime
+    duration_minutes: Optional[int] = None
+    maintenance_type: str = "preventive"
+    status: str = "scheduled"
+    recurrence_rule: Optional[str] = None
+    assigned_to: Optional[int] = None
+
+class MaintenanceScheduleUpdate(BaseModel):
+    """Update maintenance schedule"""
+    station_id: Optional[int] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    duration_minutes: Optional[int] = None
+    maintenance_type: Optional[str] = None
+    status: Optional[str] = None
+    recurrence_rule: Optional[str] = None
+    assigned_to: Optional[int] = None
 
 class MaintenanceRecordCreate(BaseModel):
     """Create maintenance record"""
-    battery_id: int
-    maintenance_type: str = Field(..., pattern=r'^(ROUTINE|INSPECTION|REPAIR|REPLACEMENT|EMERGENCY)$')
-    performed_by: int
+    schedule_id: Optional[int] = None
+    station_id: Optional[int] = None
+   # performed_by: int
+    status: str = "completed"
+    checklist_result: Optional[Dict[str, bool]] = None
+    notes: Optional[str] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    
+    # Legacy fields
+    battery_id: Optional[int] = None
+    entity_type: Optional[str] = Field("station", pattern=r'^(battery|station)$')
+    #entity_id: Optional[int] = None
+    template_id: Optional[int] = None
+    maintenance_type: str = Field("preventive", pattern=r'^(ROUTINE|INSPECTION|REPAIR|REPLACEMENT|EMERGENCY|preventive)$')
     issues_found: Optional[str] = None
-    actions_taken: str = Field(..., min_length=10)
+    actions_taken: Optional[str] = None
     parts_replaced: Optional[List[str]] = None
-    cost: Optional[float] = Field(None, ge=0)
+    #checklist_submission: Optional[List[Dict]] = None # Filled checklist
+    #cost: Optional[float] = Field(None, ge=0)
     next_maintenance_date: Optional[datetime] = None
-    battery_health_after: Optional[float] = Field(None, ge=0, le=100)
+    #battery_health_after: Optional[float] = None
 
 class StationDowntimeCreate(BaseModel):
     """Report station downtime"""
@@ -53,37 +110,63 @@ class BatteryHealthCheckRequest(BaseModel):
 class MaintenanceScheduleResponse(BaseModel):
     """Maintenance schedule response"""
     id: int
-    battery_id: int
-    battery_serial: Optional[str]
-    maintenance_type: str
-    scheduled_date: datetime
-    assigned_technician_id: Optional[int]
-    technician_name: Optional[str]
-    priority: str
+    station_id: Optional[int] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    duration_minutes: Optional[int] = None
+    maintenance_type: Optional[str] = None
     status: str
-    estimated_duration_minutes: Optional[int]
-    notes: Optional[str]
+    recurrence_rule: Optional[str] = None
+    assigned_to: Optional[int] = None
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
+    model_config = ConfigDict(from_attributes=True)
+
+class CalendarViewResponse(BaseModel):
+    """Calendar view response"""
+    id: int
+    station_id: Optional[int] = None
+    title: Optional[str] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    status: str
+    assigned_to: Optional[int] = None
+    
     model_config = ConfigDict(from_attributes=True)
 
 class MaintenanceRecordResponse(BaseModel):
     """Maintenance record response"""
     id: int
-    battery_id: int
-    battery_serial: Optional[str]
-    maintenance_type: str
-    performed_by: int
-    technician_name: Optional[str]
+    schedule_id: Optional[int] = None
+    station_id: Optional[int] = None
+   # performed_by: int
+    status: str
+    checklist_result: Optional[Dict[str, bool]] = None
+    notes: Optional[str] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    
+    # Legacy fields
+    entity_type: Optional[str] = None
+   # entity_id: Optional[int] = None
+    battery_id: Optional[int] = None
+    template_id: Optional[int] = None
+    template_name: Optional[str] = None
+    maintenance_type: Optional[str] = None
+    technician_name: Optional[str] = None
     performed_at: datetime
-    issues_found: Optional[str]
-    actions_taken: str
-    parts_replaced: Optional[List[str]]
-    cost: Optional[float]
-    duration_minutes: Optional[int]
-    next_maintenance_date: Optional[datetime]
-    battery_health_before: Optional[float]
-    battery_health_after: Optional[float]
+    issues_found: Optional[str] = None
+    actions_taken: Optional[str] = None
+    parts_replaced: Optional[List[str]] = None
+    #checklist_submission: Optional[List[Dict]] = None
+    #cost: Optional[float] = None
+    duration_minutes: Optional[int] = None
+    next_maintenance_date: Optional[datetime] = None
+   # battery_health_before: Optional[float] = None
+    #battery_health_after: Optional[float] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -142,3 +225,11 @@ class MaintenanceHistoryResponse(BaseModel):
     upcoming_schedules: List[MaintenanceScheduleResponse]
 
 
+class OverdueAlertResponse(BaseModel):
+    """Alert response for overdue scheduled tasks"""
+    id: int
+    station_id: int
+    title: str
+    scheduled_time: datetime
+    status: str
+    delay_minutes: int

@@ -60,6 +60,7 @@ from app.models.warehouse import Warehouse
 
 # Stations & Monitoring
 from app.models.station import Station, StationImage, StationSlot, StationStatus
+from app.models.station_camera import StationCamera
 from app.models.station_heartbeat import StationHeartbeat
 from app.models.alert import Alert
 from app.models.maintenance import MaintenanceSchedule, MaintenanceRecord, StationDowntime
@@ -74,6 +75,8 @@ from app.models.battery_catalog import BatteryCatalog, BatterySpec, BatteryBatch
 from app.models.battery_health_log import BatteryHealthLog
 from app.models.stock import Stock
 from app.models.stock_movement import StockMovement
+from app.models.indent import Indent, IndentItem, IndentStatus
+from app.models.grn import GRN, GRNItem, GRNStatus
 
 # New critical models
 from app.models.membership import UserMembership
@@ -122,6 +125,7 @@ from app.models.batch_job import BatchJob, JobExecution
 # Security & Sessions
 from app.models.otp import OTP
 from app.models.two_factor_auth import TwoFactorAuth
+from app.models.oauth import BlacklistedToken
 from app.models.session import UserSession
 from app.models.login_history import LoginHistory
 from app.models.favorite import Favorite
@@ -147,3 +151,6 @@ from app.models.staff import StaffProfile
 from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
 from app.models.driver_profile import DriverProfile
 from app.models.vendor import Vendor
+
+# Promotional Campaign Engine
+from app.models.campaign import Campaign, CampaignTarget, CampaignSend

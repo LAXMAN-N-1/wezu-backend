@@ -1,9 +1,9 @@
+import uuid
 from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
 
-import uuid
 
 if TYPE_CHECKING:
     from app.models.dealer import DealerProfile
@@ -11,6 +11,7 @@ if TYPE_CHECKING:
     from app.models.battery import Battery
     from app.models.location import Zone
     from app.models.review import Review
+    from app.models.station_camera import StationCamera
 
 class StationStatus(str, Enum):
     OPERATIONAL = "OPERATIONAL"
@@ -71,6 +72,7 @@ class Station(SQLModel, table=True):
     # Relationships
     slots: List["StationSlot"] = Relationship(back_populates="station")
     images: List["StationImage"] = Relationship(back_populates="station")
+    cameras: List["StationCamera"] = Relationship(back_populates="station")
     
     zone: Optional["Zone"] = Relationship(back_populates="stations")
     dealer: Optional["DealerProfile"] = Relationship(back_populates="stations")

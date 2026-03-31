@@ -98,3 +98,50 @@ def get_station_charging_queue(
         capacity=station.total_slots,
         current_queue=queue
     )
+
+from app.schemas.station_camera import StationCameraCreate, StationCameraUpdate, StationCameraResponse
+from app.services.station_camera_service import StationCameraService
+
+@router.get("/{station_id}/cameras", response_model=List[StationCameraResponse])
+def get_cameras(
+    station_id: int,
+    session: Session = Depends(deps.get_db),
+    current_user: Any = Depends(get_current_user)
+):
+    """Get all cameras for a station."""
+    service = StationCameraService(session)
+    return service.get_cameras_by_station(station_id)
+
+@router.post("/{station_id}/cameras", response_model=StationCameraResponse)
+def create_camera(
+    station_id: int,
+    camera_in: StationCameraCreate,
+    session: Session = Depends(deps.get_db),
+    current_user: Any = Depends(get_current_user)
+):
+    """Add a new RTSP camera to a station."""
+    service = StationCameraService(session)
+    return service.create_camera(station_id, camera_in)
+
+@router.put("/{station_id}/cameras/{camera_id}", response_model=StationCameraResponse)
+def update_camera(
+    station_id: int,
+    camera_id: int,
+    camera_in: StationCameraUpdate,
+    session: Session = Depends(deps.get_db),
+    current_user: Any = Depends(get_current_user)
+):
+    """Update a specific camera's stream details."""
+    service = StationCameraService(session)
+    return service.update_camera(station_id, camera_id, camera_in)
+
+@router.delete("/{station_id}/cameras/{camera_id}")
+def delete_camera(
+    station_id: int,
+    camera_id: int,
+    session: Session = Depends(deps.get_db),
+    current_user: Any = Depends(get_current_user)
+):
+    """Delete a camera from a station."""
+    service = StationCameraService(session)
+    return service.delete_camera(station_id, camera_id)

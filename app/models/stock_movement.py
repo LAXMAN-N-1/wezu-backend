@@ -12,6 +12,7 @@ class StockTransactionType(str, Enum):
     ADJUSTMENT_SUB = "ADJUSTMENT_SUB"
     DAMAGED = "DAMAGED"
     RETURN = "RETURN"
+    INDENT_DISPATCH = "INDENT_DISPATCH"
 
 class StockMovementDirection(str, Enum):
     IN = "IN"

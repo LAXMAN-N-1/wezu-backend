@@ -1,6 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from datetime import datetime, time
-from typing import Optional
+from typing import Optional, List
 
 class NotificationResponse(BaseModel):
     id: int
@@ -73,3 +73,31 @@ class AdminNotificationSendRequest(BaseModel):
 
 class UnreadCountResponse(BaseModel):
     unread_count: int
+
+
+# --- Email Notification Schemas ---
+
+class EmailAttachmentRequest(BaseModel):
+    """A single file attachment, encoded as base64."""
+    filename: str               # e.g. "report.pdf"
+    content_base64: str         # base64-encoded file bytes
+    mime_type: str = "application/octet-stream"
+
+
+class SendEmailRequest(BaseModel):
+    """Request body for POST /notifications/send-email."""
+    to: List[EmailStr]                          # one or more recipients
+    subject: str
+    body_html: str                              # HTML email body
+    cc: List[EmailStr] = []
+    bcc: List[EmailStr] = []
+    attachments: List[EmailAttachmentRequest] = []
+
+
+class SendEmailResponse(BaseModel):
+    """Response body for POST /notifications/send-email."""
+    success: bool
+    message: str
+    recipients: List[str]
+    attachment_count: int
+

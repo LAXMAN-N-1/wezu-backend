@@ -1,14 +1,18 @@
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from datetime import datetime
 
+if TYPE_CHECKING:
+    from app.models.dealer import DealerProfile
+    from app.models.battery_catalog import BatteryCatalog
 class DealerInventory(SQLModel, table=True):
     __tablename__ = "dealer_inventories"
     __table_args__ = {"schema": "dealers"}
     """Track dealer-specific battery inventory"""
     id: Optional[int] = Field(default=None, primary_key=True)
     dealer_id: int = Field(foreign_key="dealers.dealer_profiles.id")
-    battery_model: str  # e.g., "Lithium-X1", "Lead-Acid-Y2"
+    product_id: int = Field(foreign_key="inventory.battery_catalog.id", index=True)
+    battery_model: Optional[str] = None  # Legacy, or cached model name
     
     quantity_available: int = Field(default=0)
     quantity_reserved: int = Field(default=0)  # Reserved for pending orders
@@ -23,6 +27,7 @@ class DealerInventory(SQLModel, table=True):
     
     # Relationships
     dealer: "DealerProfile" = Relationship()
+    catalog: Optional["BatteryCatalog"] = Relationship()
     transactions: list["InventoryTransaction"] = Relationship(back_populates="inventory")
 
 class InventoryTransaction(SQLModel, table=True):

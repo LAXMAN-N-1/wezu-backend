@@ -1,10 +1,10 @@
+import uuid
 from datetime import datetime
 from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
 from sqlalchemy import Column, JSON
 from sqlmodel import Column as SQLColumn
-import uuid
 
 if TYPE_CHECKING:
     from app.models.battery_catalog import BatteryCatalog, BatterySpec, BatteryBatch

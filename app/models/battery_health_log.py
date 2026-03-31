@@ -1,3 +1,4 @@
+import uuid
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
 from datetime import datetime
@@ -5,7 +6,7 @@ from datetime import datetime
 class BatteryHealthLog(SQLModel, table=True):
     __table_args__ = {"schema": "inventory"}
     id: Optional[int] = Field(default=None, primary_key=True)
-    battery_id: int = Field(foreign_key="inventory.batteries.id")
+    battery_id: Optional[uuid.UUID] = Field(foreign_key="inventory.batteries.id")
     
     charge_percentage: float
     voltage: float

@@ -1,7 +1,7 @@
+import uuid
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
 from datetime import datetime
-import uuid
 
 class StationStockConfig(SQLModel, table=True):
     __tablename__ = "station_stock_configs" # type: ignore

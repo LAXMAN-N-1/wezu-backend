@@ -1,3 +1,4 @@
+import uuid
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
 from datetime import datetime
@@ -13,7 +14,7 @@ class RentalEvent(SQLModel, table=True):
     # Details
     description: Optional[str] = None
     station_id: Optional[int] = Field(default=None, foreign_key="stations.stations.id")
-    battery_id: Optional[int] = Field(default=None, foreign_key="inventory.batteries.id")
+    battery_id: Optional[uuid.UUID] = Field(default=None, foreign_key="inventory.batteries.id")
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
     

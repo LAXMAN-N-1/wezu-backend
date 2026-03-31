@@ -1,9 +1,9 @@
+import uuid
 from datetime import datetime
 from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
 
-import uuid
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -71,7 +71,7 @@ class Purchase(SQLModel, table=True):
     __table_args__ = {"schema": "rentals"}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="core.users.id", index=True)
-    battery_id: int = Field(foreign_key="inventory.batteries.id", index=True)
+    battery_id: Optional[uuid.UUID] = Field(foreign_key="inventory.batteries.id", index=True)
     amount: float
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 

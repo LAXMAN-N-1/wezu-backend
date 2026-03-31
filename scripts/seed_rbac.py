@@ -132,7 +132,7 @@ def seed_permissions_rbac():
         print("Seeding Permission-based RBAC...")
         
         # Ensure tables exist (temporary dev convenience)
-        SQLModel.metadata.create_all(engine)
+        # SQLModel.metadata.create_all(engine)
         
         # 1. Define Permissions
         # Schema: (module, action, description)
@@ -255,13 +255,17 @@ def seed_permissions_rbac():
         print("Permission-based RBAC Seeding Complete!")
 
 if __name__ == "__main__":
+    print("STARTING seed_rbac.py...")
     # Execute both seeding logic
     try:
+        print("calling seed_permissions_rbac()...")
         seed_permissions_rbac()
     except Exception as e:
         print(f"Error seeding permissions RBAC: {e}")
-        
+
     try:
+        print("calling seed_menu_rbac()...")
         seed_menu_rbac()
     except Exception as e:
         print(f"Error seeding menu RBAC: {e}")
+    print("FINISHED seed_rbac.py")

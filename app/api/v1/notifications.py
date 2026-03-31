@@ -1,14 +1,86 @@
+import base64
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 from typing import List
 from app.api import deps
 from app.models.user import User
-from app.schemas.notification import NotificationResponse
+from app.schemas.notification import (
+    NotificationResponse,
+    SendEmailRequest,
+    SendEmailResponse,
+)
 from app.services.notification_service import NotificationService
+from app.services.email_service import EmailService, EmailAttachment
 
 router = APIRouter()
 
+
+# ---------------------------------------------------------------------------
+# Email (Reports / Maps via Email with Attachments)
+# ---------------------------------------------------------------------------
+
+@router.post("/send-email", response_model=SendEmailResponse, summary="Send email with attachments")
+async def send_email(
+    request: SendEmailRequest,
+    current_user: User = Depends(deps.get_current_user),
+):
+    """
+    Send an email (with optional attachments) to one or more recipients.
+
+    Useful for sharing reports, maps, and generated documents.
+
+    - **to**: List of recipient email addresses.
+    - **subject**: Email subject line.
+    - **body_html**: HTML body content.
+    - **cc / bcc**: Optional CC / BCC recipients.
+    - **attachments**: Optional list of files encoded as base64.
+      Each attachment needs a `filename`, `content_base64`, and optionally a `mime_type`.
+
+    Returns success status and a count of attachments sent.
+    """
+    # Decode base64 attachments from request into EmailAttachment objects
+    decoded_attachments: list[EmailAttachment] = []
+    for att in request.attachments:
+        try:
+            raw_bytes = base64.b64decode(att.content_base64)
+        except Exception:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid base64 content for attachment '{att.filename}'"
+            )
+        decoded_attachments.append(
+            EmailAttachment(
+                filename=att.filename,
+                content=raw_bytes,
+                mime_type=att.mime_type,
+            )
+        )
+
+    success = EmailService.send_email_with_attachments(
+        to_emails=[str(addr) for addr in request.to],
+        subject=request.subject,
+        html_content=request.body_html,
+        attachments=decoded_attachments,
+        cc=[str(addr) for addr in request.cc],
+        bcc=[str(addr) for addr in request.bcc],
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to send email. Please check your SendGrid configuration."
+        )
+
+    return SendEmailResponse(
+        success=True,
+        message="Email sent successfully",
+        recipients=[str(addr) for addr in request.to],
+        attachment_count=len(decoded_attachments),
+    )
+
+
 @router.get("/my", response_model=List[NotificationResponse])
+
 async def read_notifications(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),

@@ -54,4 +54,5 @@ qrcode[pil]
 joblib
 numpy>=1.24.0
 scikit-learn
+python-dateutil
 pandas
