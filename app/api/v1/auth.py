@@ -1238,11 +1238,7 @@ async def verify_security_question_route(
 class AdminLoginRequest(BaseModel):
     username: str  # email
     password: str
-from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select
 from sqlalchemy import func
-
-router = APIRouter()
 
 @router.post("/admin/login")
 async def admin_login(

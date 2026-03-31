@@ -14,8 +14,6 @@ class PermissionBase(BaseModel):
     description: Optional[str] = None
     model_config = ConfigDict(from_attributes=True)
 
-PermissionRead = PermissionResponse
-
 
 class PermissionCreate(BaseModel):
     slug: str
@@ -86,9 +84,11 @@ class PermissionResponse(BaseModel):
     module: str
     action: str
     description: Optional[str] = None
-    permissions: Optional[List[PermissionResponse]] = []
+    permissions: Optional[List["PermissionResponse"]] = []
     permission_count: int = 0
     model_config = ConfigDict(from_attributes=True)
+
+PermissionRead = PermissionResponse
 
 class RoleRead(RoleBase):
     id: int
@@ -97,6 +97,7 @@ class RoleRead(RoleBase):
     permission_count: Optional[int] = 0
     model_config = ConfigDict(from_attributes=True)
 
+RoleResponse = RoleRead
 
 class RoleDetail(RoleResponse):
     user_count: int = 0

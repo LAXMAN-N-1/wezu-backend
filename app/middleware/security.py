@@ -11,15 +11,15 @@ class SecureHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
 
         # Relax CSP for Swagger UI docs pages so CDN JS/CSS can load
-        if request.url.path in ("/docs", "/redoc", "/api/v1/openapi.json"):
+        if request.url.path in ("/docs", "/redoc", "/api/v1/openapi.json", "/"):
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
-                "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
-                "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; "
-                "img-src 'self' data: https://cdnjs.cloudflare.com; "
-                "font-src 'self' https://cdnjs.cloudflare.com;"
+                "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; "
+                "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com; "
+                "img-src 'self' data: https://fastapi.tiangolo.com https://cdnjs.cloudflare.com; "
+                "font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com;"
             )
         else:
             response.headers["Content-Security-Policy"] = "default-src 'self'"
-
+        
         return response

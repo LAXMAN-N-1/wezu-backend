@@ -87,6 +87,8 @@ from app.models.i18n import Translation
 from app.models.branch import Branch
 from app.models.organization import Organization, OrganizationSocialLink
 from app.models.warehouse import Warehouse
+from app.models.stock import Stock
+from app.models.stock_movement import StockMovement
 
 # System & Other
 from app.models.otp import OTP
