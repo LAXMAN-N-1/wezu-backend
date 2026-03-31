@@ -66,6 +66,17 @@ def get_station_metrics(
     dealer_id = _get_dealer_id(db, current_user.id)
     return DealerAnalyticsService.get_station_metrics(db, dealer_id)
 
+@router.get("/comparison")
+def get_comparison(
+    period: str = Query("daily", description="daily, weekly, or monthly"),
+    periods: int = Query(7, ge=2, le=30),
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Compare current vs previous period trends."""
+    dealer_id = _get_dealer_id(db, current_user.id)
+    return DealerAnalyticsService.get_comparison_trends(db, dealer_id, period, periods)
+
 @router.get("/revenue-breakdown")
 def get_revenue_breakdown(
     period: str = "month",

@@ -2,6 +2,8 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 
+import csv
+import io
 from sqlmodel import Session, select, func, col, desc
 
 from app.models.rental import Rental
@@ -22,6 +24,10 @@ class DealerLedgerService:
         end_date: Optional[datetime] = None,
         txn_types: Optional[List[str]] = None,
         station_id: Optional[int] = None,
+        search: Optional[str] = None,
+        amount_min: Optional[float] = None,
+        amount_max: Optional[float] = None,
+        status_types: Optional[List[str]] = None,
         limit: int = 50,
         skip: int = 0
     ) -> LedgerResponse:
@@ -45,6 +51,29 @@ class DealerLedgerService:
                 r_query = r_query.where(Rental.created_at >= start_date)
             if end_date:
                 r_query = r_query.where(Rental.created_at <= end_date)
+            if amount_min is not None:
+                r_query = r_query.where(Rental.total_amount >= amount_min)
+            if amount_max is not None:
+                r_query = r_query.where(Rental.total_amount <= amount_max)
+            if status_types:
+                # Map standard statuses to Rental status
+                rental_statuses = []
+                for s in status_types:
+                    if s == 'completed': rental_statuses.append("completed")
+                    if s == 'pending': rental_statuses.append("active")
+                    # Failed/refunded handling could be added here
+                if rental_statuses:
+                    r_query = r_query.where(col(Rental.status).in_(rental_statuses))
+            
+            if search:
+                # Search by TXN-R{id} or user info (simplified for now to rental/battery ID)
+                search_term = search.lower().replace('txn-r', '').replace('bat-', '')
+                try:
+                    search_id = int(search_term)
+                    r_query = r_query.where((Rental.id == search_id) | (Rental.battery_id == search_id))
+                except ValueError:
+                    # If it's a string, we would need to join User table to search names.
+                    r_query = r_query.join(User).where(col(User.full_name).ilike(f"%{search}%"))
                 
             rentals = db.exec(r_query.order_by(desc(Rental.created_at)).offset(skip).limit(limit)).all()
             
@@ -85,6 +114,25 @@ class DealerLedgerService:
                 c_query = c_query.where(CommissionLog.created_at >= start_date)
             if end_date:
                 c_query = c_query.where(CommissionLog.created_at <= end_date)
+            if amount_min is not None:
+                c_query = c_query.where(CommissionLog.amount >= amount_min)
+            if amount_max is not None:
+                c_query = c_query.where(CommissionLog.amount <= amount_max)
+            if status_types:
+                comm_statuses = []
+                for s in status_types:
+                    if s == 'completed': comm_statuses.append('paid')
+                    if s == 'pending': comm_statuses.append('pending')
+                if comm_statuses:
+                    c_query = c_query.where(col(CommissionLog.status).in_(comm_statuses))
+                    
+            if search:
+                search_term = search.lower().replace('txn-c', '')
+                try:
+                    search_id = int(search_term)
+                    c_query = c_query.where(CommissionLog.id == search_id)
+                except ValueError:
+                    pass # Custom text search on commissions lacks obvious string fields, omit for now
                 
             commissions = db.exec(c_query.order_by(desc(CommissionLog.created_at)).offset(skip).limit(limit)).all()
             
@@ -108,6 +156,43 @@ class DealerLedgerService:
         total_amount = sum(e.amount for e in paginated_entries)
 
         return LedgerResponse(data=paginated_entries, total=total_count, total_amount=total_amount)
+
+    @staticmethod
+    def generate_ledger_csv(
+        db: Session,
+        dealer_id: int,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        txn_types: Optional[List[str]] = None,
+        station_id: Optional[int] = None,
+        search: Optional[str] = None,
+        amount_min: Optional[float] = None,
+        amount_max: Optional[float] = None,
+        status_types: Optional[List[str]] = None,
+    ) -> str:
+        # Re-use the query mechanism, but fetch universally
+        ledger = DealerLedgerService.get_ledger_entries(
+            db, dealer_id, start_date, end_date, txn_types, station_id, 
+            search, amount_min, amount_max, status_types, limit=10000, skip=0
+        )
+        
+        output = io.StringIO()
+        writer = csv.writer(output)
+        # Headers matching UI Column needs
+        writer.writerow(["Date & Time", "TXN ID", "Type", "Reference ID", "Station", "Amount", "Status"])
+        
+        for e in ledger.data:
+            writer.writerow([
+                e.date.strftime("%Y-%m-%d %H:%M:%S"),
+                e.transaction_id,
+                e.type,
+                e.battery_id or "-",
+                e.station_name or "-",
+                f"{e.amount:.2f}",
+                e.status
+            ])
+            
+        return output.getvalue()
 
     @staticmethod
     def get_ledger_detail(db: Session, dealer_id: int, entry_id: str) -> LedgerDetailResponse:

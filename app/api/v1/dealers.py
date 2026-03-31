@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Body, Response
 from sqlmodel import Session, select
 from typing import List, Optional, Any
 from datetime import datetime
@@ -148,6 +148,10 @@ def get_dealer_transactions(
     end_date: Optional[datetime] = None,
     txn_types: Optional[str] = None, # comma separated
     station_id: Optional[int] = None,
+    search: Optional[str] = None,
+    amount_min: Optional[float] = None,
+    amount_max: Optional[float] = None,
+    status_types: Optional[str] = None, # comma separated
     limit: int = 50,
     skip: int = 0,
     current_user: User = Depends(get_current_user),
@@ -159,6 +163,7 @@ def get_dealer_transactions(
         raise HTTPException(status_code=404, detail="Not a dealer")
     
     type_list = txn_types.split(",") if txn_types else None
+    status_list = [s.strip().lower() for s in status_types.split(",")] if status_types else None
     
     ledger = DealerLedgerService.get_ledger_entries(
         db=session,
@@ -167,10 +172,54 @@ def get_dealer_transactions(
         end_date=end_date,
         txn_types=type_list,
         station_id=station_id,
+        search=search,
+        amount_min=amount_min,
+        amount_max=amount_max,
+        status_types=status_list,
         limit=limit,
         skip=skip
     )
     return DataResponse(success=True, data=ledger)
+
+@router.get("/me/transactions/export")
+def export_dealer_transactions(
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    txn_types: Optional[str] = None, # comma separated
+    station_id: Optional[int] = None,
+    search: Optional[str] = None,
+    amount_min: Optional[float] = None,
+    amount_max: Optional[float] = None,
+    status_types: Optional[str] = None, # comma separated
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
+):
+    """Dealer: Export unified ledger of rentals, commissions, etc. as CSV"""
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Not a dealer")
+    
+    type_list = txn_types.split(",") if txn_types else None
+    status_list = [s.strip().lower() for s in status_types.split(",")] if status_types else None
+    
+    csv_str = DealerLedgerService.generate_ledger_csv(
+        db=session,
+        dealer_id=profile.id,
+        start_date=start_date,
+        end_date=end_date,
+        txn_types=type_list,
+        station_id=station_id,
+        search=search,
+        amount_min=amount_min,
+        amount_max=amount_max,
+        status_types=status_list
+    )
+    
+    return Response(
+        content=csv_str,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=dealer_transactions.csv"}
+    )
 
 @router.get("/me/transactions/{txn_id}", response_model=DataResponse[LedgerDetailResponse])
 def get_dealer_transaction_details(
@@ -392,3 +441,34 @@ def update_dealer_promotion(
         return DataResponse(success=True, data={"id": promo.id, "is_active": promo.is_active})
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+@router.get("/me/bank-account", response_model=DataResponse[dict])
+def get_bank_account(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
+):
+    """Dealer: get verified bank account details for payouts"""
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Not a dealer")
+    return DataResponse(success=True, data={"bank_details": profile.bank_details or {}})
+
+@router.post("/me/bank-account", response_model=DataResponse[dict])
+def update_bank_account(
+    request: dict = Body(...),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db)
+):
+    """Dealer: submit or update bank details"""
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Not a dealer")
+    
+    # Inject verified status default
+    request["verified"] = False
+    
+    profile.bank_details = request
+    session.add(profile)
+    session.commit()
+    
+    return DataResponse(success=True, data={"message": "Bank account updated", "bank_details": request})
