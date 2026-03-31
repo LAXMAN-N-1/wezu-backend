@@ -12,6 +12,30 @@ from app.schemas import rbac as rbac_schema
 
 router = APIRouter()
 
+def _resolve_assigned_by_admin_id(db: Session, current_user: Any) -> Optional[int]:
+    """
+    Resolve a valid admin_users.id for RBAC assignment metadata.
+
+    user_roles.assigned_by points to admin_users.id, but current auth dependencies
+    return app.models.user.User. If there is no matching AdminUser row, return None
+    so role assignment does not fail with a FK error.
+    """
+    current_user_id = getattr(current_user, "id", None)
+    if current_user_id is not None:
+        admin_by_id = db.get(AdminUser, current_user_id)
+        if admin_by_id:
+            return admin_by_id.id
+
+    current_user_email = getattr(current_user, "email", None)
+    if isinstance(current_user_email, str) and current_user_email.strip():
+        admin_by_email = db.exec(
+            select(AdminUser).where(func.lower(AdminUser.email) == current_user_email.strip().lower())
+        ).first()
+        if admin_by_email:
+            return admin_by_email.id
+
+    return None
+
 @router.get("/roles", response_model=List[rbac_schema.RoleRead])
 def read_roles(
     skip: int = 0,
@@ -461,6 +485,8 @@ def bulk_assign_roles(
     success_count = 0
     fail_count = 0
     
+    assigned_by_admin_id = _resolve_assigned_by_admin_id(db, current_user)
+
     for uid in assignment.user_ids:
         try:
             user = db.get(User, uid)
@@ -468,6 +494,11 @@ def bulk_assign_roles(
                 results.append(rbac_schema.BulkAssignmentResult(user_id=uid, success=False, message="User not found"))
                 fail_count += 1
                 continue
+
+            # Single-role compatibility: keep primary role on users.role_id in sync.
+            if user.role_id != role.id:
+                user.role_id = role.id
+                db.add(user)
                 
             # Check existing
             existing_link = db.exec(
@@ -484,21 +515,21 @@ def bulk_assign_roles(
                 new_link = UserRole(
                     user_id=uid,
                     role_id=role.id,
-                    assigned_by=current_user.id,
+                    assigned_by=assigned_by_admin_id,
                     effective_from=datetime.now(UTC)
                 )
                 db.add(new_link)
-                # Invalidate Session
-                AuthService.revoke_all_user_sessions(db, uid)
-                     
                 results.append(rbac_schema.BulkAssignmentResult(user_id=uid, success=True, message="Assigned successfully"))
                 success_count += 1
+
+            # Commit per user so one failure does not fail the entire batch.
+            db.commit()
+            AuthService.revoke_all_user_sessions(db, uid)
                 
         except Exception as e:
+            db.rollback()
             results.append(rbac_schema.BulkAssignmentResult(user_id=uid, success=False, message=str(e)))
             fail_count += 1
-            
-    db.commit()
     
     return rbac_schema.BulkRoleAssignResponse(
         total_requested=len(assignment.user_ids),
@@ -669,6 +700,8 @@ def transfer_role_assignment(
     if target_link:
         raise HTTPException(status_code=400, detail="Target user already has this role")
 
+    assigned_by_admin_id = _resolve_assigned_by_admin_id(db, current_user)
+
     try:
         # --- Transaction Start ---
         
@@ -679,11 +712,23 @@ def transfer_role_assignment(
         new_link = UserRole(
             user_id=target_user.id,
             role_id=role.id,
-            assigned_by=current_user.id,
+            assigned_by=assigned_by_admin_id,
             notes=f"Transferred from User {source_user_id}. Reason: {transfer_req.reason or 'No reason provided'}"
         )
         db.add(new_link)
-        db.flush() 
+        db.flush()
+
+        # Single-role compatibility for login/auth checks.
+        target_user.role_id = role.id
+        db.add(target_user)
+        if source_user.role_id == role.id:
+            replacement_link = db.exec(
+                select(UserRole)
+                .where(UserRole.user_id == source_user_id)
+                .where(UserRole.role_id != role.id)
+            ).first()
+            source_user.role_id = replacement_link.role_id if replacement_link else None
+            db.add(source_user)
         
         # C. Audit Logs
         db.add(AuditLog(
@@ -747,6 +792,13 @@ def assign_roles_to_user(
     if not role:
         raise HTTPException(status_code=404, detail="Role not found")
         
+    assigned_by_admin_id = _resolve_assigned_by_admin_id(db, current_user)
+
+    # Single-role compatibility: keep primary role on users.role_id in sync.
+    if user.role_id != role.id:
+        user.role_id = role.id
+        db.add(user)
+
     # 2. Check/Create Assignment
     # Check if assignment already exists
     existing_link = db.exec(
@@ -757,7 +809,8 @@ def assign_roles_to_user(
     
     if existing_link:
         # Update existing
-        existing_link.assigned_by = current_user.id
+        if assigned_by_admin_id is not None:
+            existing_link.assigned_by = assigned_by_admin_id
         existing_link.notes = assignment.notes
         if assignment.expires_at:
             existing_link.expires_at = assignment.expires_at
@@ -770,7 +823,7 @@ def assign_roles_to_user(
         new_link = UserRole(
             user_id=user_id,
             role_id=assignment.role_id,
-            assigned_by=current_user.id,
+            assigned_by=assigned_by_admin_id,
             notes=assignment.notes,
             effective_from=assignment.effective_from or datetime.now(UTC),
             expires_at=assignment.expires_at
@@ -841,6 +894,18 @@ def remove_role_from_user(
         
     # 4. Remove Assignment
     db.delete(link)
+    db.flush()
+
+    # Single-role compatibility: if removing primary role, move to remaining role (if any).
+    if user.role_id == role_id:
+        replacement_link = db.exec(
+            select(UserRole)
+            .where(UserRole.user_id == user_id)
+            .where(UserRole.role_id != role_id)
+        ).first()
+        user.role_id = replacement_link.role_id if replacement_link else None
+        db.add(user)
+
     db.commit()
     db.refresh(user)
     
