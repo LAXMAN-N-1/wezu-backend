@@ -148,6 +148,10 @@ def get_dealer_transactions(
     end_date: Optional[datetime] = None,
     txn_types: Optional[str] = None, # comma separated
     station_id: Optional[int] = None,
+    search: Optional[str] = None,
+    amount_min: Optional[float] = None,
+    amount_max: Optional[float] = None,
+    status_types: Optional[str] = None, # comma separated
     limit: int = 50,
     skip: int = 0,
     current_user: User = Depends(get_current_user),
@@ -159,6 +163,7 @@ def get_dealer_transactions(
         raise HTTPException(status_code=404, detail="Not a dealer")
     
     type_list = txn_types.split(",") if txn_types else None
+    status_list = [s.strip().lower() for s in status_types.split(",")] if status_types else None
     
     ledger = DealerLedgerService.get_ledger_entries(
         db=session,
@@ -167,6 +172,10 @@ def get_dealer_transactions(
         end_date=end_date,
         txn_types=type_list,
         station_id=station_id,
+        search=search,
+        amount_min=amount_min,
+        amount_max=amount_max,
+        status_types=status_list,
         limit=limit,
         skip=skip
     )

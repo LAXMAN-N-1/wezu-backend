@@ -22,6 +22,10 @@ class DealerLedgerService:
         end_date: Optional[datetime] = None,
         txn_types: Optional[List[str]] = None,
         station_id: Optional[int] = None,
+        search: Optional[str] = None,
+        amount_min: Optional[float] = None,
+        amount_max: Optional[float] = None,
+        status_types: Optional[List[str]] = None,
         limit: int = 50,
         skip: int = 0
     ) -> LedgerResponse:
@@ -45,6 +49,29 @@ class DealerLedgerService:
                 r_query = r_query.where(Rental.created_at >= start_date)
             if end_date:
                 r_query = r_query.where(Rental.created_at <= end_date)
+            if amount_min is not None:
+                r_query = r_query.where(Rental.total_amount >= amount_min)
+            if amount_max is not None:
+                r_query = r_query.where(Rental.total_amount <= amount_max)
+            if status_types:
+                # Map standard statuses to Rental status
+                rental_statuses = []
+                for s in status_types:
+                    if s == 'completed': rental_statuses.append("completed")
+                    if s == 'pending': rental_statuses.append("active")
+                    # Failed/refunded handling could be added here
+                if rental_statuses:
+                    r_query = r_query.where(col(Rental.status).in_(rental_statuses))
+            
+            if search:
+                # Search by TXN-R{id} or user info (simplified for now to rental/battery ID)
+                search_term = search.lower().replace('txn-r', '').replace('bat-', '')
+                try:
+                    search_id = int(search_term)
+                    r_query = r_query.where((Rental.id == search_id) | (Rental.battery_id == search_id))
+                except ValueError:
+                    # If it's a string, we would need to join User table to search names.
+                    r_query = r_query.join(User).where(col(User.full_name).ilike(f"%{search}%"))
                 
             rentals = db.exec(r_query.order_by(desc(Rental.created_at)).offset(skip).limit(limit)).all()
             
@@ -85,6 +112,25 @@ class DealerLedgerService:
                 c_query = c_query.where(CommissionLog.created_at >= start_date)
             if end_date:
                 c_query = c_query.where(CommissionLog.created_at <= end_date)
+            if amount_min is not None:
+                c_query = c_query.where(CommissionLog.amount >= amount_min)
+            if amount_max is not None:
+                c_query = c_query.where(CommissionLog.amount <= amount_max)
+            if status_types:
+                comm_statuses = []
+                for s in status_types:
+                    if s == 'completed': comm_statuses.append('paid')
+                    if s == 'pending': comm_statuses.append('pending')
+                if comm_statuses:
+                    c_query = c_query.where(col(CommissionLog.status).in_(comm_statuses))
+                    
+            if search:
+                search_term = search.lower().replace('txn-c', '')
+                try:
+                    search_id = int(search_term)
+                    c_query = c_query.where(CommissionLog.id == search_id)
+                except ValueError:
+                    pass # Custom text search on commissions lacks obvious string fields, omit for now
                 
             commissions = db.exec(c_query.order_by(desc(CommissionLog.created_at)).offset(skip).limit(limit)).all()
             
