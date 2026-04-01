@@ -34,8 +34,8 @@ services:
     ports:
       # Shared VPS pattern: keep app private on localhost and route by host nginx.
       - "${API_BIND_HOST:-127.0.0.1}:${API_HOST_PORT:-18081}:8000"
-    env_file:
-      - .env.production
+    # In Coolify/production, inject env vars from platform UI.
+    # Keep compose free of fixed DATABASE_URL so external Neon DB is authoritative.
     environment:
       # Keep DATABASE_URL / REDIS_URL out of compose-level environment
       # so platforms like Coolify can manage/delete them directly.
@@ -62,13 +62,13 @@ services:
     networks:
       - wezu_net
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_healthy
 
   # Primary Database
   db:
+    # Opt-in only for local development. Not started in normal deployments.
+    profiles: ["local-db"]
     image: postgres:15-alpine
     restart: "on-failure:5"
     init: true
