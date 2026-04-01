@@ -690,6 +690,34 @@ class SeedRuntime:
         use_conflict_target = self.can_conflict_on(schema, table_name, key_columns)
         for index, row in enumerate(rows):
             prepared = self.complete_row(conn, schema, table_name, row, index)
+            # Skip rows that cannot satisfy key columns (common in mixed-schema
+            # environments where referenced entities live in another schema).
+            if key_columns and any(prepared.get(column) is None for column in key_columns):
+                print(
+                    f"WARN skipping row for {schema}.{table_name}: "
+                    f"null key column(s) {key_columns}"
+                )
+                continue
+
+            # Defensive guard: don't try inserting rows that are missing required
+            # non-nullable values with no defaults.
+            missing_required: list[str] = []
+            for column in table.columns:
+                if column.primary_key and column.autoincrement:
+                    continue
+                if column.nullable:
+                    continue
+                has_default = column.default is not None or column.server_default is not None
+                value = prepared.get(column.name)
+                if value is None and not has_default:
+                    missing_required.append(column.name)
+            if missing_required:
+                print(
+                    f"WARN skipping row for {schema}.{table_name}: "
+                    f"missing required columns {missing_required}"
+                )
+                continue
+
             if key_columns and not use_conflict_target:
                 existing = self.sample_by_keys(conn, schema, table_name, key_columns, prepared)
                 if existing is not None:
