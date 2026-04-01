@@ -37,8 +37,8 @@ services:
     env_file:
       - .env.production
     environment:
-      - DATABASE_URL=postgresql://wezu:wezupassword@db/wezu_prod
-      - REDIS_URL=redis://redis:6379/0
+      # Keep DATABASE_URL / REDIS_URL out of compose-level environment
+      # so platforms like Coolify can manage/delete them directly.
       - GUNICORN_WORKERS=1
       - DB_POOL_SIZE=3
       - DB_MAX_OVERFLOW=3
