@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 1800
     DB_POOL_PRE_PING: bool = True
+    DB_POOL_USE_LIFO: bool = True
     
     # Redis (Sessions & Caching)
     REDIS_URL: str # No default allowed, must be provided in env
@@ -119,6 +120,7 @@ class Settings(BaseSettings):
     DB_INIT_ON_STARTUP: bool = False
     SCHEDULER_ENABLED: bool = True
     SCHEDULER_TIMEZONE: str = "Asia/Kolkata"
+    AUDIT_REQUEST_LOGGING_ENABLED: bool = False
     
     # Monitoring & Logging
     LOG_LEVEL: str = "INFO"

@@ -137,7 +137,8 @@ add_exception_handlers(app)
 app.add_middleware(RBACMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(SecureHeadersMiddleware)
-app.add_middleware(AuditMiddleware)
+if settings.AUDIT_REQUEST_LOGGING_ENABLED:
+    app.add_middleware(AuditMiddleware)
 if settings.ENABLE_TRUSTED_HOST_MIDDLEWARE:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
 

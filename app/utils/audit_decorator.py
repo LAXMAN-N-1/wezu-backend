@@ -68,9 +68,9 @@ def _write_log(
     target_id_param: Optional[str],
 ):
     """Write the audit log entry, swallowing errors to never break the endpoint."""
+    db: Optional[Session] = None
+    own_session = False
     try:
-        from app.core.database import get_db
-
         # Extract user info
         user_id = None
         current_user = kwargs.get("current_user")
@@ -93,15 +93,13 @@ def _write_log(
                 pass
 
         # Get DB session
-        db: Optional[Session] = kwargs.get("db") or kwargs.get("session")
+        db = kwargs.get("db") or kwargs.get("session")
         if db is None:
             # Fallback: create a new session
             from app.core.database import engine
 
             db = Session(engine)
             own_session = True
-        else:
-            own_session = False
 
         log = AuditLog(
             user_id=user_id,
@@ -114,11 +112,16 @@ def _write_log(
         db.add(log)
         db.commit()
 
-        if own_session:
-            db.close()
-
         logger.info(
             f"Audit: {action_type} on {resource_type} by user {user_id} from {ip_address}"
         )
     except Exception as e:
+        if db is not None:
+            try:
+                db.rollback()
+            except Exception:
+                pass
         logger.error(f"Failed to write audit log: {e}")
+    finally:
+        if own_session and db is not None:
+            db.close()
