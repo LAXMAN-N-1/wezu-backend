@@ -45,6 +45,7 @@ class DealerProfile(SQLModel, table=True):
     # Global Settings Defaults
     global_station_defaults: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     global_inventory_rules: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
+    global_rental_settings: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     holiday_calendar: Optional[List[Dict]] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
     is_active: bool = Field(default=False)

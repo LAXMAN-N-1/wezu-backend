@@ -44,7 +44,8 @@ from app.api.v1 import (
     dealer_portal_customers, dealer_portal_settings, dealer_onboarding, 
     dealer_documents, dealer_portal_roles, dealer_portal_users, 
     dealer_analytics, dealer_campaigns, dealer_stations, drivers, catalog,
-    admin_invoices, admin_financial_reports, admin_audit, admin_rbac, admin_users
+    admin_invoices, admin_financial_reports, admin_audit, admin_rbac, admin_users,
+    admin_dealers
 )
 from app.api.v1.admin import (
     support as admin_support, faqs as admin_faqs, analytics as admin_analytics, 
@@ -294,6 +295,7 @@ app.include_router(admin_rbac.router, prefix=f"{admin_api}/rbac", tags=["Admin: 
 app.include_router(admin_legal.router, prefix=f"{admin_api}/legal", tags=["Admin: Legal"], dependencies=admin_deps)
 app.include_router(admin_banners.router, prefix=f"{admin_api}/banners", tags=["Admin: Banners"], dependencies=admin_deps)
 app.include_router(admin_blogs.router, prefix=f"{admin_api}/blogs", tags=["Admin: Blogs"], dependencies=admin_deps)
+app.include_router(admin_dealers.router, prefix=f"{admin_api}/dealers", tags=["Admin: Dealers"], dependencies=admin_deps)
 
 # ----------------------------
 # API V1 - Dealer Endpoints

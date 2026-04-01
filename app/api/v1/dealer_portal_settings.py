@@ -67,6 +67,17 @@ class NotificationPrefsRequest(BaseModel):
     ticket_push: bool = True
 
 
+class RentalSettingsRequest(BaseModel):
+    daily_rate: Optional[float] = None
+    security_deposit: Optional[float] = None
+    late_fee_hourly: Optional[float] = None
+    grace_period_hours: Optional[int] = None
+    allow_extension: Optional[bool] = None
+    allow_pause: Optional[bool] = None
+    max_concurrent_rentals: Optional[int] = None
+    min_battery_checkout: Optional[int] = None
+
+
 # ── Profile ──────────────────────────────────────────────
 
 @router.get("/profile")
@@ -447,3 +458,42 @@ def update_holiday_calendar(
     db.add(dealer)
     db.commit()
     return {"message": "Holiday calendar updated"}
+
+
+@router.get("/rental-settings")
+def get_rental_settings(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get global rental settings for the dealer."""
+    dealer = db.exec(
+        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
+    ).first()
+    if not dealer:
+        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    return dealer.global_rental_settings or {}
+
+
+@router.patch("/rental-settings")
+def update_rental_settings(
+    data: RentalSettingsRequest,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Update global rental settings."""
+    dealer = db.exec(
+        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
+    ).first()
+    if not dealer:
+        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    
+    current_settings = dealer.global_rental_settings or {}
+    
+    update_data = data.dict(exclude_unset=True)
+    current_settings.update(update_data)
+    
+    dealer.global_rental_settings = current_settings
+    
+    db.add(dealer)
+    db.commit()
+    return {"message": "Rental settings updated"}
