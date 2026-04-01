@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any, Optional
 from urllib.parse import urlparse
 
@@ -133,6 +134,8 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     ENVIRONMENT: str = "production"
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    CORS_ALLOW_LOCALHOST: bool = True
+    CORS_LOCALHOST_ORIGIN_REGEX: str = r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$"
     ADMIN_FRONTEND_ORIGIN: Optional[str] = "https://admin.powerfrill.com"
     ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1", "[::1]", "testserver"]
     ENABLE_TRUSTED_HOST_MIDDLEWARE: bool = False
@@ -172,6 +175,7 @@ class Settings(BaseSettings):
             frontend_origin = self.ADMIN_FRONTEND_ORIGIN.rstrip("/")
             if frontend_origin and frontend_origin not in self.CORS_ORIGINS:
                 self.CORS_ORIGINS.append(frontend_origin)
+        self.CORS_ORIGINS = [origin.rstrip("/") for origin in self.CORS_ORIGINS if origin]
 
         if self.API_PUBLIC_BASE_URL:
             parsed = urlparse(self.API_PUBLIC_BASE_URL)
@@ -185,5 +189,24 @@ class Settings(BaseSettings):
             self.MEDIA_BASE_URL = f"{self.API_PUBLIC_BASE_URL.rstrip('/')}/uploads"
 
         return self
+
+    def is_origin_allowed(self, origin: str) -> bool:
+        if not origin:
+            return False
+        normalized_origin = origin.rstrip("/")
+        if not normalized_origin:
+            return False
+        if "*" in self.CORS_ORIGINS or normalized_origin in self.CORS_ORIGINS:
+            return True
+        if self.CORS_ALLOW_LOCALHOST:
+            try:
+                return re.match(self.CORS_LOCALHOST_ORIGIN_REGEX, normalized_origin) is not None
+            except re.error:
+                return False
+        return False
+
+    @property
+    def cors_allow_origin_regex(self) -> Optional[str]:
+        return self.CORS_LOCALHOST_ORIGIN_REGEX if self.CORS_ALLOW_LOCALHOST else None
 
 settings = Settings()

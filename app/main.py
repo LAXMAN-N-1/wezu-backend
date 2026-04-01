@@ -2,7 +2,6 @@ import traceback
 import sys
 import ssl
 import asyncio
-import json
 from contextlib import asynccontextmanager
 from app.core.logging import setup_logging, get_logger
 
@@ -76,27 +75,10 @@ if settings.SENTRY_DSN:
 
 logger = get_logger(__name__)
 
-
-def _normalized_cors_origins() -> list[str]:
-    allowed_origins = settings.CORS_ORIGINS
-    if isinstance(allowed_origins, str):
-        try:
-            parsed = json.loads(allowed_origins)
-            if isinstance(parsed, list):
-                allowed_origins = parsed
-            else:
-                allowed_origins = [allowed_origins]
-        except Exception:
-            allowed_origins = [allowed_origins]
-    return [origin.rstrip("/") for origin in (allowed_origins or [])]
-
-
 def _cors_headers_for_origin(origin: str) -> dict[str, str]:
     if not origin:
         return {}
-    allowed_origins = _normalized_cors_origins()
-    normalized_origin = origin.rstrip("/")
-    if "*" in allowed_origins or normalized_origin in allowed_origins:
+    if settings.is_origin_allowed(origin):
         return {
             "Access-Control-Allow-Origin": origin,
             "Access-Control-Allow-Credentials": "true",
@@ -188,6 +170,7 @@ app.add_middleware(TrustedProxyHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS if settings.ENVIRONMENT == "production" else ["*"],
+    allow_origin_regex=settings.cors_allow_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
