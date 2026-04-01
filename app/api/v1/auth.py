@@ -22,7 +22,7 @@ import logging
 import re
 from typing import Any, List, Optional
 from datetime import datetime, UTC, timedelta
-from jose import jwt, JWTError
+from jose import jwt, JWTError, ExpiredSignatureError
 import uuid
 from app.middleware.rate_limit import limiter
 from app.repositories.user_repository import user_repository
@@ -664,54 +664,67 @@ async def refresh_token(
     request: Request,
     db: Session = Depends(get_session)
 ):
+    auth_headers = {"WWW-Authenticate": "Bearer"}
     try:
         # Validate Session first
         session = AuthService.validate_session(db, refresh_data.refresh_token, is_refresh=True)
         if not session:
-             raise HTTPException(status_code=401, detail="Session expired or invalid")
-             
-        payload = jwt.decode(
-            refresh_data.refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-        )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="token_invalid",
+                headers=auth_headers,
+            )
+        payload = jwt.decode(refresh_data.refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         if payload.get("type") != "refresh":
-            raise HTTPException(status_code=401, detail="Invalid token type")
-        
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="token_invalid",
+                headers=auth_headers,
+            )
+
         user_id = payload.get("sub")
-        user = db.get(User, user_id)
+        user = db.get(User, int(user_id)) if user_id else None
         if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        
-        access_token = create_access_token(subject=user.id, extra_claims={"sid": old_jti}) # Access token tied to SAME session?
-        # WAIT: refresh rotates the token. New refresh token = NEW JTI.
-        # But session ID (db primary key) stays same?
-        # UserSession.token_id is updated to new JTI.
-        # So we should use NEW JTI.
-        
-        new_jti = str(uuid.uuid4())
-        refresh_token = create_refresh_token(subject=user.id, jti=new_jti)
-        access_token = create_access_token(subject=user.id, extra_claims={"sid": new_jti})
-        
-        # Revoke old session and create new one (Session Rotation)
-        AuthService.revoke_session(db, refresh_data.refresh_token)
-        AuthService.create_user_session(
-            db, 
-            user.id, 
-            new_refresh_token, 
-            ip_address=session.ip_address,
-            user_agent=session.user_agent
-        )
-        
-        # Update Session (Rotation)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="token_invalid",
+                headers=auth_headers,
+            )
+
         old_jti = payload.get("jti")
-        # Update session with new token info
-        AuthService.update_user_session(db, old_jti, refresh_token, request)
-        
-        return Token(access_token=access_token, refresh_token=refresh_token)
+        new_jti = str(uuid.uuid4())
+        new_refresh_token = create_refresh_token(subject=user.id, jti=new_jti)
+        access_token = create_access_token(subject=user.id, extra_claims={"sid": new_jti})
+
+        # Rotate session token where possible; fallback to create a new session.
+        if old_jti:
+            AuthService.update_user_session(db, old_jti, new_refresh_token, request)
+        else:
+            AuthService.revoke_session(db, refresh_data.refresh_token)
+            AuthService.create_user_session(db, user.id, new_refresh_token, request, token_jti=new_jti)
+
+        return Token(access_token=access_token, refresh_token=new_refresh_token, user=user)
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="token_expired",
+            headers=auth_headers,
+        )
     except JWTError:
-        raise HTTPException(status_code=401, detail="Could not validate credentials")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="token_invalid",
+            headers=auth_headers,
+        )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"AUTHENTICATION_ERROR: Unexpected refresh failure: {str(e)}")
-        raise HTTPException(status_code=401, detail="Could not validate credentials")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="token_invalid",
+            headers=auth_headers,
+        )
 
 @router.post("/logout")
 async def logout(

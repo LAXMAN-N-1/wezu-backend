@@ -2,20 +2,21 @@ import traceback
 import sys
 import ssl
 import asyncio
+import json
 from contextlib import asynccontextmanager
 from app.core.logging import setup_logging, get_logger
 
 # Initialize structured logging globally
 setup_logging()
 
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
-from slowapi.errors import RateLimitExceeded
-from slowapi import _rate_limit_exceeded_handler
 
 from app.core.config import settings
 from app.db.session import engine
@@ -74,6 +75,43 @@ if settings.SENTRY_DSN:
 
 logger = get_logger(__name__)
 
+
+def _normalized_cors_origins() -> list[str]:
+    allowed_origins = settings.CORS_ORIGINS
+    if isinstance(allowed_origins, str):
+        try:
+            parsed = json.loads(allowed_origins)
+            if isinstance(parsed, list):
+                allowed_origins = parsed
+            else:
+                allowed_origins = [allowed_origins]
+        except Exception:
+            allowed_origins = [allowed_origins]
+    return [origin.rstrip("/") for origin in (allowed_origins or [])]
+
+
+def _cors_headers_for_origin(origin: str) -> dict[str, str]:
+    if not origin:
+        return {}
+    allowed_origins = _normalized_cors_origins()
+    normalized_origin = origin.rstrip("/")
+    if "*" in allowed_origins or normalized_origin in allowed_origins:
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Vary": "Origin",
+        }
+    return {}
+
+
+class CORSErrorMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        origin = request.headers.get("origin", "")
+        for key, value in _cors_headers_for_origin(origin).items():
+            response.headers[key] = value
+        return response
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Start background scheduler and connections on startup"""
@@ -131,7 +169,6 @@ app = FastAPI(
 # Middlewares & Global Config
 # ----------------------------
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 add_exception_handlers(app)
 
 app.add_middleware(RBACMiddleware)
@@ -154,6 +191,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Keep as the outermost middleware so even error responses include CORS headers.
+app.add_middleware(CORSErrorMiddleware)
+
+
+@app.options("/{full_path:path}", include_in_schema=False)
+async def global_options_handler(full_path: str, request: Request):
+    origin = request.headers.get("origin", "")
+    headers = {
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Origin, X-Requested-With",
+        "Access-Control-Max-Age": "600",
+    }
+    headers.update(_cors_headers_for_origin(origin))
+    return Response(status_code=200, headers=headers)
 
 # ----------------------------
 # System & Health

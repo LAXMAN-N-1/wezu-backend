@@ -1,7 +1,7 @@
 from typing import Generator, Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
+from jose import jwt, JWTError, ExpiredSignatureError
 from pydantic import ValidationError
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
@@ -15,29 +15,38 @@ from app.models.oauth import BlacklistedToken
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/auth/token",
-    description="Please enter your **Email** address (e.g., admin@wezu.com) in the **username** field below."
+    description="Please enter your **Email** address (e.g., admin@wezu.com) in the **username** field below.",
+    auto_error=False,
 )
 
 def get_current_user(
     db: Session = Depends(get_db),
-    token: str = Depends(oauth2_scheme)
+    token: Optional[str] = Depends(oauth2_scheme)
 ) -> User:
-    if not token or token.lower() in ["bearer null", "bearer undefined", "null", "undefined"]:
+    if not token or token.lower() in ["null", "undefined"]:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Valid token required",
+            detail="token_missing",
+            headers={"WWW-Authenticate": "Bearer"},
         )
     try:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
         token_data = TokenPayload(**payload)
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="token_expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     except (JWTError, ValidationError) as e:
         import logging
         logging.error(f"AUTHENTICATION_ERROR: JWT/Validation failure: {str(e)} | Token provided: {token[:10]}...")
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Could not validate credentials: {str(e)}",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="token_invalid",
+            headers={"WWW-Authenticate": "Bearer"},
         )
     
     # Check if token is blacklisted
@@ -45,7 +54,8 @@ def get_current_user(
     if blacklisted:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has been revoked",
+            detail="token_invalid",
+            headers={"WWW-Authenticate": "Bearer"},
         )
         
     # --- SESSION VERIFICATION ---
@@ -63,13 +73,15 @@ def get_current_user(
             # Valid token but no session = Unauthorized (Revoked)
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Session not found or expired",
+                detail="token_invalid",
+                headers={"WWW-Authenticate": "Bearer"},
             )
             
         if not user_session.is_active:
              raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Session has been revoked",
+                detail="token_invalid",
+                headers={"WWW-Authenticate": "Bearer"},
             )
             
         # Update last_active_at (optional, but good for tracking)
@@ -84,14 +96,21 @@ def get_current_user(
     user = db.exec(select(User).where(User.id == int(token_data.sub)).options(selectinload(User.role))).first()
     
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    if user.is_deleted:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Account has been deleted"
+            detail="token_invalid",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if user.is_deleted:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="insufficient_permissions",
         )
     if not user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="insufficient_permissions",
+        )
         
     # Global Logout Check
     if getattr(user, "last_global_logout_at", None):
@@ -105,7 +124,8 @@ def get_current_user(
             if token_issued_at < user.last_global_logout_at:
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Session expired (Logged out from all devices)",
+                    detail="token_invalid",
+                    headers={"WWW-Authenticate": "Bearer"},
                 )
     
     return user
@@ -115,7 +135,8 @@ def get_current_active_superuser(
 ) -> User:
     if not current_user.is_superuser:
         raise HTTPException(
-            status_code=400, detail="The user doesn't have enough privileges"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="insufficient_permissions",
         )
     return current_user
 
@@ -125,7 +146,8 @@ def get_current_active_admin(
     from app.models.user import UserType
     if not (current_user.is_superuser or current_user.user_type == UserType.ADMIN):
         raise HTTPException(
-            status_code=403, detail="The user doesn't have enough privileges (Admin required)"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="insufficient_permissions",
         )
     return current_user
 
@@ -151,7 +173,7 @@ def check_permission(menu_name: str, permission_type: str = "view"):
         if not rbac_service.check_menu_access(db, current_user.role_id, menu_name, permission_type):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions: {permission_type} on {menu_name}"
+                detail="insufficient_permissions",
             )
         
         return current_user
@@ -178,7 +200,7 @@ def require_role(role_name: str):
         if role_name not in user_role_names:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Role '{role_name}' required"
+                detail="insufficient_permissions",
             )
         return current_user
     
@@ -199,7 +221,7 @@ def require_permission(permission_slug: str):
         if not current_user.has_permission(permission_slug):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permission '{permission_slug}' required"
+                detail="insufficient_permissions",
             )
         return current_user
     
@@ -218,7 +240,7 @@ def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
     if RoleEnum.ADMIN.value not in user_role_names:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges required"
+            detail="insufficient_permissions",
         )
     return current_user
 
@@ -233,7 +255,7 @@ def get_current_dealer(current_user: User = Depends(get_current_user)) -> User:
     if RoleEnum.DEALER.value not in user_role_names:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Dealer privileges required"
+            detail="insufficient_permissions",
         )
     return current_user
 
@@ -248,7 +270,7 @@ def get_current_driver(current_user: User = Depends(get_current_user)) -> User:
     if RoleEnum.DRIVER.value not in user_role_names:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Driver privileges required"
+            detail="insufficient_permissions",
         )
     return current_user
 
@@ -263,7 +285,7 @@ def get_current_customer(current_user: User = Depends(get_current_user)) -> User
     if RoleEnum.CUSTOMER.value not in user_role_names:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Customer privileges required"
+            detail="insufficient_permissions",
         )
     return current_user
 
@@ -284,7 +306,8 @@ def get_current_active_superuser(
 ) -> User:
     if not current_user.is_superuser:
         raise HTTPException(
-            status_code=400, detail="The user doesn't have enough privileges"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="insufficient_permissions",
         )
     return current_user
 
@@ -294,7 +317,8 @@ def get_current_active_admin(
     from app.models.user import UserType
     if not (current_user.is_superuser or current_user.user_type == UserType.ADMIN):
         raise HTTPException(
-            status_code=403, detail="The user doesn't have enough privileges (Admin required)"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="insufficient_permissions",
         )
     return current_user
 
@@ -320,7 +344,7 @@ def check_permission(menu_name: str, permission_type: str = "view"):
         if not rbac_service.check_menu_access(db, current_user.role_id, menu_name, permission_type):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions: {permission_type} on {menu_name}"
+                detail="insufficient_permissions",
             )
         
         return current_user
@@ -347,7 +371,7 @@ def require_role(role_name: str):
         if role_name not in user_role_names:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Role '{role_name}' required"
+                detail="insufficient_permissions",
             )
         return current_user
     
@@ -368,7 +392,7 @@ def require_permission(permission_slug: str):
         if not current_user.has_permission(permission_slug):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permission '{permission_slug}' required"
+                detail="insufficient_permissions",
             )
         return current_user
     
@@ -387,7 +411,7 @@ def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
     if RoleEnum.ADMIN.value not in user_role_names:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges required"
+            detail="insufficient_permissions",
         )
     return current_user
 
@@ -402,7 +426,7 @@ def get_current_dealer(current_user: User = Depends(get_current_user)) -> User:
     if RoleEnum.DEALER.value not in user_role_names:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Dealer privileges required"
+            detail="insufficient_permissions",
         )
     return current_user
 
@@ -417,7 +441,7 @@ def get_current_driver(current_user: User = Depends(get_current_user)) -> User:
     if RoleEnum.DRIVER.value not in user_role_names:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Driver privileges required"
+            detail="insufficient_permissions",
         )
     return current_user
 
@@ -432,7 +456,7 @@ def get_current_customer(current_user: User = Depends(get_current_user)) -> User
     if RoleEnum.CUSTOMER.value not in user_role_names:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Customer privileges required"
+            detail="insufficient_permissions",
         )
     return current_user
 

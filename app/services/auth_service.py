@@ -3,7 +3,7 @@ from google.auth.transport import requests
 from app.core.config import settings
 from app.core.proxy import get_client_ip
 from fastapi import HTTPException, status, Request
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 class AuthService:
     @staticmethod
@@ -332,6 +332,94 @@ class AuthService:
             return AuthService.create_user_session(
                 db, user_id, new_refresh_token, request, token_jti=new_token_jti
             )
+
+    @staticmethod
+    def validate_session(db: Session, token: str, is_refresh: bool = False):
+        """
+        Validate a token against active UserSession records.
+        For refresh tokens, also verifies refresh token hash matches stored value.
+        """
+        from datetime import datetime, UTC
+        from jose import jwt, JWTError
+        import hashlib
+        from app.models.session import UserSession
+
+        if not token:
+            return None
+
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        except JWTError:
+            return None
+
+        token_type = payload.get("type")
+        if is_refresh and token_type != "refresh":
+            return None
+
+        token_id = payload.get("jti") if is_refresh else payload.get("sid")
+        if not token_id:
+            return None
+
+        session = db.exec(
+            select(UserSession)
+            .where(UserSession.token_id == token_id)
+            .where(UserSession.is_active == True)
+        ).first()
+        if not session:
+            return None
+
+        if getattr(session, "is_revoked", False):
+            return None
+
+        if session.expires_at and session.expires_at < datetime.now(UTC):
+            session.is_active = False
+            session.is_revoked = True
+            session.revoked_at = datetime.now(UTC)
+            db.add(session)
+            db.commit()
+            return None
+
+        if is_refresh and session.refresh_token_hash:
+            token_hash = hashlib.sha256(token.encode()).hexdigest()
+            if token_hash != session.refresh_token_hash:
+                return None
+
+        return session
+
+    @staticmethod
+    def revoke_session(db: Session, token: str) -> bool:
+        """
+        Revoke a session identified by token jti/sid.
+        Returns True if a session was found and revoked.
+        """
+        from datetime import datetime, UTC
+        from jose import jwt, JWTError
+        from app.models.session import UserSession
+
+        if not token:
+            return False
+
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        except JWTError:
+            return False
+
+        token_id = payload.get("jti") or payload.get("sid")
+        if not token_id:
+            return False
+
+        session = db.exec(
+            select(UserSession).where(UserSession.token_id == token_id)
+        ).first()
+        if not session:
+            return False
+
+        session.is_active = False
+        session.is_revoked = True
+        session.revoked_at = datetime.now(UTC)
+        db.add(session)
+        db.commit()
+        return True
 
     @staticmethod
     def revoke_all_user_sessions(db: Session, user_id: int):
