@@ -2,7 +2,7 @@
 Dealer Portal Settings — Profile update, notification preferences,
 bank account, and notifications list.
 """
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
 from pydantic import BaseModel, EmailStr
