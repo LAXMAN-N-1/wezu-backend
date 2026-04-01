@@ -358,6 +358,22 @@ def safe_dict(value: dict[str, Any]) -> dict[str, Any]:
     return dict(value)
 
 
+def resolve_user_ids(user_ids: dict[str, Any], emails: list[str], label: str) -> list[int]:
+    resolved: list[int] = []
+    missing: list[str] = []
+    for email in emails:
+        user_id = user_ids.get(email)
+        if user_id is None:
+            missing.append(email)
+            continue
+        resolved.append(user_id)
+    if missing:
+        sample = ", ".join(missing[:5])
+        suffix = "..." if len(missing) > 5 else ""
+        print(f"WARN missing user ids for {label}: {sample}{suffix}")
+    return resolved
+
+
 @dataclass
 class Resolver:
     label: str
@@ -690,6 +706,34 @@ class SeedRuntime:
         use_conflict_target = self.can_conflict_on(schema, table_name, key_columns)
         for index, row in enumerate(rows):
             prepared = self.complete_row(conn, schema, table_name, row, index)
+            # Skip rows that cannot satisfy key columns (common in mixed-schema
+            # environments where referenced entities live in another schema).
+            if key_columns and any(prepared.get(column) is None for column in key_columns):
+                print(
+                    f"WARN skipping row for {schema}.{table_name}: "
+                    f"null key column(s) {key_columns}"
+                )
+                continue
+
+            # Defensive guard: don't try inserting rows that are missing required
+            # non-nullable values with no defaults.
+            missing_required: list[str] = []
+            for column in table.columns:
+                if column.primary_key and column.autoincrement:
+                    continue
+                if column.nullable:
+                    continue
+                has_default = column.default is not None or column.server_default is not None
+                value = prepared.get(column.name)
+                if value is None and not has_default:
+                    missing_required.append(column.name)
+            if missing_required:
+                print(
+                    f"WARN skipping row for {schema}.{table_name}: "
+                    f"missing required columns {missing_required}"
+                )
+                continue
+
             if key_columns and not use_conflict_target:
                 existing = self.sample_by_keys(conn, schema, table_name, key_columns, prepared)
                 if existing is not None:
@@ -1500,16 +1544,23 @@ def seed_stations_inventory(runtime: SeedRuntime, conn: Connection, resolver: Re
     print(f"   [battery_batches] seeding {len(batch_rows)} rows...")
     runtime.ensure_rows(conn, batches_schema, "battery_batches", ("batch_number",), batch_rows)
 
-    customer_ids = [ctx["user_ids"][email] for email in ctx["customer_emails"]]
+    customer_ids = resolve_user_ids(ctx["user_ids"], ctx["customer_emails"], "customer_emails")
     station_id_list = [station_ids[row["name"]] for row in station_rows if row["name"] in station_ids]
+    if not station_id_list:
+        print("WARN no station ids resolved; skipping station-linked battery/inventory seed")
+        ctx["station_ids"] = station_ids
+        ctx["station_id_list"] = []
+        ctx["battery_ids"] = {}
+        ctx["catalog_ids"] = catalog_ids
+        return
 
     battery_rows = []
     for index in range(1, 51):
         sku = BATT_CATALOG[(index - 1) % len(BATT_CATALOG)]
         station_id = station_id_list[(index - 1) % len(station_id_list)]
-        rented = index % 8 == 0
+        rented = index % 8 == 0 and bool(customer_ids)
         status = "RENTED" if rented else ("CHARGING" if index % 6 == 0 else ("MAINTENANCE" if index % 11 == 0 else "AVAILABLE"))
-        current_user_id = customer_ids[(index - 1) % len(customer_ids)] if rented else None
+        current_user_id = customer_ids[(index - 1) % len(customer_ids)] if rented and customer_ids else None
         battery_rows.append(
             {
                 "serial_number": f"WZ-SEED-BAT-{index:03d}",
@@ -1888,7 +1939,24 @@ def seed_finance_and_rentals(runtime: SeedRuntime, conn: Connection, resolver: R
     commission_schema = resolver.schema_for("commissions")
 
     user_ids = ctx["user_ids"]
-    customer_ids = [user_ids[email] for email in ctx["customer_emails"]]
+    customer_ids = resolve_user_ids(user_ids, ctx["customer_emails"], "customer_emails")
+    if not customer_ids:
+        customer_ids = [user_id for user_id in user_ids.values() if user_id is not None]
+        if customer_ids:
+            print("WARN customer_ids empty from customer_emails; falling back to all known users")
+        else:
+            print("WARN skipping finance/rentals seed: no user ids available")
+            ctx["wallet_by_user"] = {}
+            ctx["rental_ids"] = []
+            ctx["transaction_id_by_ref"] = {}
+            return
+    station_id_list = ctx.get("station_id_list", [])
+    if not station_id_list:
+        print("WARN skipping finance/rentals seed: no station ids available")
+        ctx["wallet_by_user"] = {}
+        ctx["rental_ids"] = []
+        ctx["transaction_id_by_ref"] = {}
+        return
 
     wallet_rows = []
     for index, user_id in enumerate(user_ids.values(), start=1):
@@ -1911,7 +1979,7 @@ def seed_finance_and_rentals(runtime: SeedRuntime, conn: Connection, resolver: R
 
     withdrawal_rows = []
     for index, email in enumerate(ctx["dealer_emails"][:3], start=1):
-        wallet_id = wallet_by_user.get(user_ids[email])
+        wallet_id = wallet_by_user.get(user_ids.get(email))
         withdrawal_rows.append(
             {
                 "wallet_id": wallet_id,
@@ -1929,8 +1997,8 @@ def seed_finance_and_rentals(runtime: SeedRuntime, conn: Connection, resolver: R
         customer_id = customer_ids[(index - 1) % len(customer_ids)]
         battery_key = f"WZ-SEED-BAT-{index:03d}"
         battery_id = ctx["battery_ids"].get(battery_key)
-        start_station_id = ctx["station_id_list"][(index - 1) % len(ctx["station_id_list"])]
-        end_station_id = ctx["station_id_list"][index % len(ctx["station_id_list"])]
+        start_station_id = station_id_list[(index - 1) % len(station_id_list)]
+        end_station_id = station_id_list[index % len(station_id_list)]
         start_time = dt(days=-(index + 2))
         expected_end = start_time + timedelta(days=3)
         completed = index <= 20
@@ -1962,6 +2030,12 @@ def seed_finance_and_rentals(runtime: SeedRuntime, conn: Connection, resolver: R
     runtime.ensure_rows(conn, rentals_schema, "rentals", ("user_id", "battery_id", "start_time"), rental_rows)
 
     rental_ids: list[int] = runtime.fetch_ids(conn, rentals_schema, "rentals")
+    if not rental_ids:
+        print("WARN rentals not seeded; skipping dependent finance/rental artifacts")
+        ctx["wallet_by_user"] = wallet_by_user
+        ctx["rental_ids"] = []
+        ctx["transaction_id_by_ref"] = {}
+        return
     rental_rows_by_id = dict(zip(rental_ids[: len(rental_rows)], rental_rows))
 
     rental_event_rows = []
@@ -2018,8 +2092,8 @@ def seed_finance_and_rentals(runtime: SeedRuntime, conn: Connection, resolver: R
     for index, email in enumerate(ctx["customer_emails"][:10], start=1):
         swap_pref_rows.append(
             {
-                "user_id": user_ids[email],
-                "favorite_station_ids": f"[{ctx['station_id_list'][0]}]",
+                "user_id": user_ids.get(email),
+                "favorite_station_ids": f"[{station_id_list[0]}]",
                 "blacklisted_station_ids": "[]",
                 "preferred_swap_time": "evening",
                 "max_acceptable_distance_km": 8.0 + (index % 3),
@@ -2033,7 +2107,7 @@ def seed_finance_and_rentals(runtime: SeedRuntime, conn: Connection, resolver: R
     swap_suggestion_rows = []
     for index, rental_id in enumerate(rental_ids[:10], start=1):
         row = rental_rows_by_id[rental_id]
-        station_choice = ctx["station_id_list"][(index + 1) % len(ctx["station_id_list"])]
+        station_choice = station_id_list[(index + 1) % len(station_id_list)]
         swap_suggestion_rows.append(
             {
                 "user_id": row["user_id"],
@@ -2125,7 +2199,7 @@ def seed_finance_and_rentals(runtime: SeedRuntime, conn: Connection, resolver: R
                 "payment_status": "PAID",
                 "payment_transaction_id": payment_id_by_order.get(f"order_seed_{index:04d}"),
                 "reason": "Customer requested weekend extension",
-                "approved_by": user_ids[ADMIN_BLUEPRINTS[1]["email"]],
+                "approved_by": user_ids.get(ADMIN_BLUEPRINTS[1]["email"]),
                 "approved_at": dt(days=-1),
                 "created_at": dt(days=-2),
                 "updated_at": dt(days=-1),
@@ -2150,7 +2224,7 @@ def seed_finance_and_rentals(runtime: SeedRuntime, conn: Connection, resolver: R
                 "total_pause_cost": 80.0,
                 "battery_returned_to_station_id": base_row["start_station_id"],
                 "battery_returned_at": dt(days=-3),
-                "approved_by": user_ids[ADMIN_BLUEPRINTS[1]["email"]],
+                "approved_by": user_ids.get(ADMIN_BLUEPRINTS[1]["email"]),
                 "approved_at": dt(days=-3),
                 "created_at": dt(days=-4),
                 "updated_at": dt(days=-3),
@@ -2162,7 +2236,7 @@ def seed_finance_and_rentals(runtime: SeedRuntime, conn: Connection, resolver: R
     for index in range(1, 6):
         purchase_rows.append(
             {
-                "user_id": customer_ids[index - 1],
+                "user_id": customer_ids[(index - 1) % len(customer_ids)],
                 "battery_id": ctx["battery_ids"].get(f"WZ-SEED-BAT-{40 + index:03d}"),
                 "amount": 30000.0 + (index * 2500),
                 "timestamp": dt(days=-25 + index),
@@ -2239,7 +2313,7 @@ def seed_finance_and_rentals(runtime: SeedRuntime, conn: Connection, resolver: R
                 "supporting_documents": '["https://seed.wezu.energy/waiver/doc.pdf"]',
                 "status": "APPROVED" if index % 2 else "PENDING",
                 "approved_waiver_amount": 50.0 if index % 2 else None,
-                "reviewed_by": user_ids[ADMIN_BLUEPRINTS[1]["email"]],
+                "reviewed_by": user_ids.get(ADMIN_BLUEPRINTS[1]["email"]),
                 "reviewed_at": dt(days=-1) if index % 2 else None,
                 "admin_notes": "Approved as goodwill credit",
                 "created_at": dt(days=-1),
@@ -2310,7 +2384,7 @@ def seed_finance_and_rentals(runtime: SeedRuntime, conn: Connection, resolver: R
     for index, blueprint in enumerate(DEALER_BLUEPRINTS, start=1):
         commission_cfg_rows.append(
             {
-                "dealer_id": user_ids[blueprint["email"]],
+                "dealer_id": user_ids.get(blueprint["email"]),
                 "vendor_id": vendor_ids.get(vendor_email_rows[(index - 1) % len(vendor_email_rows)]),
                 "transaction_type": "rental",
                 "percentage": 12.0,
@@ -2330,7 +2404,7 @@ def seed_finance_and_rentals(runtime: SeedRuntime, conn: Connection, resolver: R
 
     commission_tier_rows = []
     for blueprint in DEALER_BLUEPRINTS[:3]:
-        cfg_id = cfg_by_dealer.get(user_ids[blueprint["email"]])
+        cfg_id = cfg_by_dealer.get(user_ids.get(blueprint["email"]))
         commission_tier_rows.extend(
             [
                 {"config_id": cfg_id, "min_volume": 0, "max_volume": 49, "percentage": 10.0, "flat_fee": 0.0, "created_at": dt(days=-60)},
@@ -2344,7 +2418,7 @@ def seed_finance_and_rentals(runtime: SeedRuntime, conn: Connection, resolver: R
         commission_log_rows.append(
             {
                 "transaction_id": transaction_id_by_ref.get(f"txn_seed_{index:04d}"),
-                "dealer_id": user_ids[DEALER_BLUEPRINTS[(index - 1) % len(DEALER_BLUEPRINTS)]["email"]],
+                "dealer_id": user_ids.get(DEALER_BLUEPRINTS[(index - 1) % len(DEALER_BLUEPRINTS)]["email"]),
                 "vendor_id": vendor_ids.get(vendor_email_rows[(index - 1) % len(vendor_email_rows)]),
                 "amount": 75.0 + (index * 10),
                 "status": "paid" if index <= 5 else "pending",
@@ -2479,9 +2553,21 @@ def seed_catalog_orders_logistics(runtime: SeedRuntime, conn: Connection, resolv
         address_by_user = {row[0]: row[1] for row in conn.execute(select(address_table.c.user_id, address_table.c.id).where(address_table.c.is_default.is_(True)))}
 
     order_rows = []
-    customer_ids = [ctx["user_ids"][email] for email in ctx["customer_emails"]]
+    customer_ids = resolve_user_ids(ctx["user_ids"], ctx["customer_emails"], "customer_emails")
+    if not customer_ids:
+        customer_ids = [user_id for user_id in ctx["user_ids"].values() if user_id is not None]
+        if customer_ids:
+            print("WARN customer_ids empty from customer_emails; falling back to all known users")
+        else:
+            print("WARN skipping catalog/orders/logistics seed: no user ids available")
+            return
+    station_id_list = ctx.get("station_id_list", [])
+    if not station_id_list:
+        print("WARN skipping catalog/orders/logistics seed: no station ids available")
+        return
+    rental_ids = ctx.get("rental_ids", [])
     for index in range(1, 11):
-        user_id = customer_ids[index - 1]
+        user_id = customer_ids[(index - 1) % len(customer_ids)]
         city_info = CITY_BLUEPRINTS[(index - 1) % len(CITY_BLUEPRINTS)]
         subtotal = 3000.0 + (index * 150)
         tax = round(subtotal * 0.18, 2)
@@ -2605,7 +2691,7 @@ def seed_catalog_orders_logistics(runtime: SeedRuntime, conn: Connection, resolv
 
     ecommerce_order_rows = []
     for index in range(1, 6):
-        user_id = customer_ids[index - 1]
+        user_id = customer_ids[(index - 1) % len(customer_ids)]
         ecommerce_order_rows.append(
             {
                 "user_id": user_id,
@@ -2638,11 +2724,11 @@ def seed_catalog_orders_logistics(runtime: SeedRuntime, conn: Connection, resolv
     driver_schema = resolver.schema_for("driver_profiles")
     driver_table = runtime.table(driver_schema, "driver_profiles", conn=conn) if driver_schema and runtime.has_table(driver_schema, "driver_profiles") else None
     driver_ids = list(conn.execute(select(driver_table.c.id).order_by(driver_table.c.id)).scalars()) if driver_table is not None else []
-    logistics_user_ids = [ctx["user_ids"][email] for email in ctx["logistics_emails"]]
+    logistics_user_ids = resolve_user_ids(ctx["user_ids"], ctx["logistics_emails"], "logistics_emails")
 
     return_rows = []
     for index, order_id in enumerate(ecommerce_order_ids[:3], start=1):
-        user_id = customer_ids[index - 1]
+        user_id = customer_ids[(index - 1) % len(customer_ids)]
         return_rows.append(
             {
                 "order_id": order_id,
@@ -2671,7 +2757,7 @@ def seed_catalog_orders_logistics(runtime: SeedRuntime, conn: Connection, resolv
                 "destination_address": f"{index} Seed Delivery Lane",
                 "destination_lat": city_info["lat"] + 0.01,
                 "destination_lng": city_info["lng"] + 0.01,
-                "assigned_driver_id": logistics_user_ids[(index - 1) % len(logistics_user_ids)],
+                "assigned_driver_id": logistics_user_ids[(index - 1) % len(logistics_user_ids)] if logistics_user_ids else None,
                 "battery_ids_json": "[1,2]" if index > 7 else "[]",
                 "scheduled_at": dt(days=-8 + index),
                 "started_at": dt(days=-8 + index, hours=1),
@@ -2772,7 +2858,7 @@ def seed_catalog_orders_logistics(runtime: SeedRuntime, conn: Connection, resolv
         manifest_rows.append(
             {
                 "manifest_number": f"MAN-SEED-{index:04d}",
-                "driver_id": logistics_user_ids[(index - 1) % len(logistics_user_ids)],
+                "driver_id": logistics_user_ids[(index - 1) % len(logistics_user_ids)] if logistics_user_ids else None,
                 "vehicle_id": f"VEH-SEED-{index:04d}",
                 "status": "active" if index == 1 else "assigned",
                 "created_at": dt(days=-3),
@@ -2790,7 +2876,7 @@ def seed_catalog_orders_logistics(runtime: SeedRuntime, conn: Connection, resolv
                 "from_location_type": "warehouse",
                 "from_location_id": 1,
                 "to_location_type": "station",
-                "to_location_id": ctx["station_id_list"][(index - 1) % len(ctx["station_id_list"])],
+                "to_location_id": station_id_list[(index - 1) % len(station_id_list)],
                 "status": "received" if index <= 2 else "in_transit",
                 "manifest_id": manifest_ids.get("MAN-SEED-0001"),
                 "created_at": dt(days=-3 + index),
@@ -2805,7 +2891,7 @@ def seed_catalog_orders_logistics(runtime: SeedRuntime, conn: Connection, resolv
             {
                 "return_request_id": return_id,
                 "inspection_date": dt(days=-1),
-                "inspector_id": logistics_user_ids[(index - 1) % len(logistics_user_ids)],
+                "inspector_id": logistics_user_ids[(index - 1) % len(logistics_user_ids)] if logistics_user_ids else None,
                 "condition": "GOOD",
                 "notes": "Item inspected and approved for refund",
             }
@@ -2830,8 +2916,8 @@ def seed_catalog_orders_logistics(runtime: SeedRuntime, conn: Connection, resolv
     for index in range(1, 6):
         referral_rows.append(
             {
-                "referrer_id": customer_ids[index - 1],
-                "referred_user_id": customer_ids[index],
+                "referrer_id": customer_ids[(index - 1) % len(customer_ids)],
+                "referred_user_id": customer_ids[index % len(customer_ids)],
                 "referral_code": f"REF-SEED-{index:04d}",
                 "status": "completed",
                 "reward_amount": 100.0,
@@ -2842,7 +2928,11 @@ def seed_catalog_orders_logistics(runtime: SeedRuntime, conn: Connection, resolv
     runtime.ensure_rows(conn, referral_schema, "referrals", ("referral_code",), referral_rows)
 
     favorite_rows = [
-        {"user_id": customer_ids[index - 1], "station_id": ctx["station_id_list"][index - 1], "created_at": dt(days=-10 + index)}
+        {
+            "user_id": customer_ids[(index - 1) % len(customer_ids)],
+            "station_id": station_id_list[(index - 1) % len(station_id_list)],
+            "created_at": dt(days=-10 + index),
+        }
         for index in range(1, 6)
     ]
     runtime.ensure_rows(conn, favorite_schema, "favorites", ("user_id", "station_id"), favorite_rows)
@@ -2852,9 +2942,9 @@ def seed_catalog_orders_logistics(runtime: SeedRuntime, conn: Connection, resolv
         review_rows.append(
             {
                 "user_id": customer_ids[(index - 1) % len(customer_ids)],
-                "station_id": ctx["station_id_list"][(index - 1) % len(ctx["station_id_list"])],
+                "station_id": station_id_list[(index - 1) % len(station_id_list)],
                 "battery_id": ctx["battery_ids"].get(f"WZ-SEED-BAT-{index:03d}"),
-                "rental_id": ctx["rental_ids"][(index - 1) % len(ctx["rental_ids"])],
+                "rental_id": rental_ids[(index - 1) % len(rental_ids)] if rental_ids else None,
                 "rating": 4 if index % 3 else 5,
                 "comment": "Swap flow was quick and station staff were helpful.",
                 "response_from_station": "Thanks for the feedback.",
@@ -2873,7 +2963,7 @@ def seed_catalog_orders_logistics(runtime: SeedRuntime, conn: Connection, resolv
     for index in range(1, 6):
         feedback_rows.append(
             {
-                "user_id": customer_ids[index - 1],
+                "user_id": customer_ids[(index - 1) % len(customer_ids)],
                 "rating": 4 if index % 2 else 5,
                 "nps_score": 8 + (index % 2),
                 "category": "battery_swap",
@@ -2899,14 +2989,14 @@ def seed_catalog_orders_logistics(runtime: SeedRuntime, conn: Connection, resolv
                 "filters_applied": '{"rating":4}',
                 "results_count": 5,
                 "results_shown": 5,
-                "clicked_result_id": ctx["station_id_list"][(index - 1) % len(ctx["station_id_list"])],
+                "clicked_result_id": station_id_list[(index - 1) % len(station_id_list)],
                 "clicked_result_type": "STATION",
                 "clicked_result_position": 1,
                 "time_to_click_seconds": 12,
                 "led_to_rental": index <= 4,
                 "led_to_purchase": False,
                 "led_to_swap": index <= 6,
-                "conversion_id": ctx["rental_ids"][(index - 1) % len(ctx["rental_ids"])],
+                "conversion_id": rental_ids[(index - 1) % len(rental_ids)] if rental_ids else None,
                 "conversion_type": "RENTAL",
                 "device_type": "MOBILE",
                 "platform": "Android",
@@ -2976,14 +3066,22 @@ def seed_support_content_analytics(runtime: SeedRuntime, conn: Connection, resol
     revenue_schema = resolver.schema_for("revenue_reports")
 
     user_ids = ctx["user_ids"]
-    customer_ids = [user_ids[email] for email in ctx["customer_emails"]]
+    customer_ids = resolve_user_ids(user_ids, ctx["customer_emails"], "customer_emails")
+    if not customer_ids:
+        customer_ids = [user_id for user_id in user_ids.values() if user_id is not None]
+        if customer_ids:
+            print("WARN customer_ids empty from customer_emails; falling back to all known users")
+        else:
+            print("WARN skipping support/content/analytics seed: no user ids available")
+            return
+    station_id_list = ctx.get("station_id_list", [])
 
     kyc_record_rows = []
     kyc_doc_rows = []
     kyc_request_rows = []
-    verifier_id = user_ids[ADMIN_BLUEPRINTS[0]["email"]]
+    verifier_id = user_ids.get(ADMIN_BLUEPRINTS[0]["email"])
     for index, email in enumerate(ctx["customer_emails"][:10], start=1):
-        user_id = user_ids[email]
+        user_id = user_ids.get(email)
         kyc_record_rows.append(
             {
                 "user_id": user_id,
@@ -3045,7 +3143,7 @@ def seed_support_content_analytics(runtime: SeedRuntime, conn: Connection, resol
         support_rows.append(
             {
                 "user_id": customer_ids[(index - 1) % len(customer_ids)],
-                "assigned_to": user_ids[ctx["support_emails"][(index - 1) % len(ctx["support_emails"])]],
+                "assigned_to": user_ids.get(ctx["support_emails"][(index - 1) % len(ctx["support_emails"])]),
                 "subject": subject,
                 "description": f"Seed support ticket for: {subject}.",
                 "status": "OPEN" if index > 6 else "RESOLVED",
@@ -3072,7 +3170,7 @@ def seed_support_content_analytics(runtime: SeedRuntime, conn: Connection, resol
                 },
                 {
                     "ticket_id": ticket_id,
-                    "sender_id": user_ids[ctx["support_emails"][(index - 1) % len(ctx["support_emails"])]],
+                    "sender_id": user_ids.get(ctx["support_emails"][(index - 1) % len(ctx["support_emails"])]),
                     "message": "Support reviewed the case and provided a next action.",
                     "is_internal_note": index % 4 == 0,
                     "created_at": dt(days=-10 + index),
@@ -3086,7 +3184,7 @@ def seed_support_content_analytics(runtime: SeedRuntime, conn: Connection, resol
         chat_rows.append(
             {
                 "user_id": user_id,
-                "assigned_agent_id": user_ids[ctx["support_emails"][(index - 1) % len(ctx["support_emails"])]],
+                "assigned_agent_id": user_ids.get(ctx["support_emails"][(index - 1) % len(ctx["support_emails"])]),
                 "status": "CLOSED" if index <= 3 else "ACTIVE",
                 "created_at": dt(days=-5 + index),
                 "updated_at": dt(days=-1),
@@ -3100,7 +3198,7 @@ def seed_support_content_analytics(runtime: SeedRuntime, conn: Connection, resol
         chat_message_rows.extend(
             [
                 {"session_id": chat_id, "sender_id": customer_ids[(index - 1) % len(customer_ids)], "message": "Need help with station availability.", "created_at": dt(days=-4 + index)},
-                {"session_id": chat_id, "sender_id": user_ids[ctx["support_emails"][(index - 1) % len(ctx["support_emails"])]], "message": "Nearest stations with stock were shared.", "created_at": dt(days=-4 + index, hours=1)},
+                {"session_id": chat_id, "sender_id": user_ids.get(ctx["support_emails"][(index - 1) % len(ctx["support_emails"])]), "message": "Nearest stations with stock were shared.", "created_at": dt(days=-4 + index, hours=1)},
             ]
         )
     runtime.ensure_rows(conn, chat_message_schema, "chat_messages", ("session_id", "sender_id", "created_at"), chat_message_rows)
@@ -3109,7 +3207,7 @@ def seed_support_content_analytics(runtime: SeedRuntime, conn: Connection, resol
     for index in range(1, 16):
         audit_rows.append(
             {
-                "user_id": user_ids[ADMIN_BLUEPRINTS[(index - 1) % len(ADMIN_BLUEPRINTS)]["email"]],
+                "user_id": user_ids.get(ADMIN_BLUEPRINTS[(index - 1) % len(ADMIN_BLUEPRINTS)]["email"]),
                 "action": "UPDATE",
                 "resource_type": "battery" if index % 2 else "station",
                 "resource_id": str(index),
@@ -3145,7 +3243,7 @@ def seed_support_content_analytics(runtime: SeedRuntime, conn: Connection, resol
 
     alert_rows = [
         {
-            "station_id": ctx["station_id_list"][0],
+            "station_id": station_id_list[0] if station_id_list else None,
             "alert_type": "PERFORMANCE",
             "severity": "MEDIUM",
             "message": "Charging throughput dipped below baseline during peak hour.",
@@ -3239,7 +3337,7 @@ def seed_support_content_analytics(runtime: SeedRuntime, conn: Connection, resol
     runtime.ensure_rows(conn, media_schema, "media_assets", ("file_name",), media_rows)
 
     demand_rows = []
-    for index, station_id in enumerate(ctx["station_id_list"][:5], start=1):
+    for index, station_id in enumerate(station_id_list[:5], start=1):
         demand_rows.append(
             {
                 "forecast_type": "station",
@@ -3268,7 +3366,7 @@ def seed_support_content_analytics(runtime: SeedRuntime, conn: Connection, resol
     for index, email in enumerate(ctx["customer_emails"][:8], start=1):
         churn_rows.append(
             {
-                "user_id": user_ids[email],
+                "user_id": user_ids.get(email),
                 "churn_probability": 0.12 + (index * 0.05),
                 "churn_risk_level": "LOW" if index <= 3 else ("MEDIUM" if index <= 6 else "HIGH"),
                 "days_since_last_activity": index * 3,
@@ -3295,7 +3393,7 @@ def seed_support_content_analytics(runtime: SeedRuntime, conn: Connection, resol
     runtime.ensure_rows(conn, churn_schema, "churn_predictions", ("user_id", "prediction_date"), churn_rows)
 
     pricing_rows = []
-    for index, station_id in enumerate(ctx["station_id_list"][:5], start=1):
+    for index, station_id in enumerate(station_id_list[:5], start=1):
         pricing_rows.append(
             {
                 "recommendation_type": "swap_fee",
@@ -3328,7 +3426,7 @@ def seed_support_content_analytics(runtime: SeedRuntime, conn: Connection, resol
     fraud_rows = []
     blacklist_rows = []
     for index, email in enumerate(ctx["customer_emails"][:5], start=1):
-        user_id = user_ids[email]
+        user_id = user_ids.get(email)
         risk_rows.append(
             {
                 "user_id": user_id,

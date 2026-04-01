@@ -6,7 +6,7 @@ from app.core.config import settings
 # If using a Neon/PgBouncer pooler, NullPool is safer to prevent conflict with server-side pooling
 engine_kwargs = {
     "echo": settings.SQLALCHEMY_ECHO,
-    "pool_pre_ping": True,
+    "pool_pre_ping": settings.DB_POOL_PRE_PING,
 }
 
 if settings.DATABASE_URL.startswith("sqlite"):
@@ -22,6 +22,7 @@ else:
         "max_overflow": settings.DB_MAX_OVERFLOW,
         "pool_timeout": settings.DB_POOL_TIMEOUT,
         "pool_recycle": settings.DB_POOL_RECYCLE,
+        "pool_use_lifo": settings.DB_POOL_USE_LIFO,
     })
 
 engine = create_engine(settings.DATABASE_URL, **engine_kwargs)
@@ -40,4 +41,3 @@ def get_db():
     """Dependency for FastAPI endpoints"""
     with Session(engine) as session:
         yield session
-

@@ -44,6 +44,10 @@ class AuditService:
             db.add(log)
             db.commit()
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             logger.error(f"Failed to write audit log: {e}")
 
     async def log_event(
@@ -71,6 +75,10 @@ class AuditService:
                 db.add(log)
                 db.commit()
             except Exception as e:
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
                 logger.error(f"Failed to log event: {e}")
 
     async def log_security_event(self, user_id: int, event: str, metadata: Dict[str, Any]):
@@ -107,6 +115,10 @@ class AuditService:
             if severity == "critical":
                 logger.critical(f"SECURITY ALERT: {event_type} from {source_ip}")
         except Exception as e:
+            try:
+                db.rollback()
+            except Exception:
+                pass
             logger.error(f"Failed to write security event: {e}")
 
     async def get_logs(self, user_id: int = None, page: int = 1, limit: int = 20):
@@ -199,4 +211,3 @@ class AuditService:
         ]
 
 audit_service = AuditService()
-

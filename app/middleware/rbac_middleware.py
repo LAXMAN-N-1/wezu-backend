@@ -4,7 +4,7 @@ from app.api.deps import get_current_user
 from app.models.roles import RoleEnum
 from app.core.database import engine
 from fastapi.security import OAuth2PasswordBearer
-from jose import jwt, JWTError
+from jose import jwt, JWTError, ExpiredSignatureError
 from app.core.config import settings
 from app.models.user import User
 from app.schemas.user import TokenPayload
@@ -61,11 +61,16 @@ class RBACMiddleware(BaseHTTPMiddleware):
                             elif RoleEnum.CUSTOMER.value in role_names:
                                 request.state.user_role = RoleEnum.CUSTOMER
                                 
+            except ExpiredSignatureError:
+                # Middleware is non-blocking, but keep explicit diagnostics.
+                request.state.auth_error = "token_expired"
+                logger.warning("RBAC middleware token decode failed: token_expired")
+            except JWTError:
+                request.state.auth_error = "token_invalid"
+                logger.warning("RBAC middleware token decode failed: token_invalid")
             except Exception as e:
-                # Middleware shouldn't crash the request on bad tokens if endpoints don't strictly require it.
-                # Endpoints that DO require it will fail in their Depends() injection.
-                logger.debug(f"Middleware JWT extraction failed: {e}")
-                pass
+                request.state.auth_error = "token_invalid"
+                logger.warning(f"RBAC middleware token decode failed: token_invalid ({e})")
                 
         response = await call_next(request)
         return response

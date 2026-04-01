@@ -1,6 +1,9 @@
-from pydantic import ConfigDict
+import json
+from typing import Any, Optional
+from urllib.parse import urlparse
+
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "WEZU Energy"
@@ -14,6 +17,7 @@ class Settings(BaseSettings):
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 1800
     DB_POOL_PRE_PING: bool = True
+    DB_POOL_USE_LIFO: bool = True
     
     # Redis (Sessions & Caching)
     REDIS_URL: str # No default allowed, must be provided in env
@@ -116,6 +120,7 @@ class Settings(BaseSettings):
     DB_INIT_ON_STARTUP: bool = False
     SCHEDULER_ENABLED: bool = True
     SCHEDULER_TIMEZONE: str = "Asia/Kolkata"
+    AUDIT_REQUEST_LOGGING_ENABLED: bool = False
     
     # Monitoring & Logging
     LOG_LEVEL: str = "INFO"
@@ -128,6 +133,13 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     ENVIRONMENT: str = "production"
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    ADMIN_FRONTEND_ORIGIN: Optional[str] = "https://admin.powerfrill.com"
+    ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1", "[::1]", "testserver"]
+    ENABLE_TRUSTED_HOST_MIDDLEWARE: bool = False
+    TRUST_X_FORWARDED_HOST: bool = True
+    FORWARDED_ALLOW_IPS: list[str] = ["127.0.0.1/32", "::1/128", "172.16.0.0/12"]
+    API_PUBLIC_BASE_URL: Optional[str] = None
+    MEDIA_BASE_URL: Optional[str] = None
     
     # Customer Support
     SUPPORT_EMAIL: str = "support@wezu.com"
@@ -138,5 +150,40 @@ class Settings(BaseSettings):
         extra="ignore",
         case_sensitive=False
     )
+
+    @field_validator("CORS_ORIGINS", "ALLOWED_HOSTS", "FORWARDED_ALLOW_IPS", mode="before")
+    @classmethod
+    def _parse_list_env(cls, value: Any) -> Any:
+        if not isinstance(value, str):
+            return value
+        text = value.strip()
+        if not text:
+            return []
+        if text.startswith("["):
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                pass
+        return [item.strip() for item in text.split(",") if item.strip()]
+
+    @model_validator(mode="after")
+    def _normalize_public_urls(self) -> "Settings":
+        if self.ADMIN_FRONTEND_ORIGIN:
+            frontend_origin = self.ADMIN_FRONTEND_ORIGIN.rstrip("/")
+            if frontend_origin and frontend_origin not in self.CORS_ORIGINS:
+                self.CORS_ORIGINS.append(frontend_origin)
+
+        if self.API_PUBLIC_BASE_URL:
+            parsed = urlparse(self.API_PUBLIC_BASE_URL)
+            if parsed.hostname:
+                host = parsed.hostname.lower()
+                allowed_hosts = [entry.lower() for entry in self.ALLOWED_HOSTS]
+                if host not in allowed_hosts:
+                    self.ALLOWED_HOSTS.append(host)
+
+        if not self.MEDIA_BASE_URL and self.API_PUBLIC_BASE_URL:
+            self.MEDIA_BASE_URL = f"{self.API_PUBLIC_BASE_URL.rstrip('/')}/uploads"
+
+        return self
 
 settings = Settings()

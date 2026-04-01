@@ -241,59 +241,6 @@ def get_customers_list(
     return {"data": data, "total": len(data)}
 
 
-@router.get("/tickets")
-def get_dealer_tickets(
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-) -> Any:
-    """Get support tickets relevant to the dealer (their own and from customers of their stations)."""
-    dealer = _get_dealer(db, current_user.id)
-    
-    # 1. Dealer's own tickets
-    dealer_tickets = db.exec(
-        select(SupportTicket).where(SupportTicket.user_id == current_user.id)
-    ).all()
-    
-    # 2. Customers tickets
-    user_ids_statement = (
-        select(User.id)
-        .join(Rental, Rental.user_id == User.id)
-        .join(Station, Rental.start_station_id == Station.id)
-        .where(Station.dealer_id == dealer.id)
-        .distinct()
-    )
-    customer_ids = db.exec(user_ids_statement).all()
-    
-    customer_tickets = []
-    if customer_ids:
-        customer_tickets = db.exec(
-            select(SupportTicket).where(SupportTicket.user_id.in_(customer_ids))
-        ).all()
-        
-    # Merge and deduplicate
-    all_tickets = {t.id: t for t in dealer_tickets + customer_tickets}.values()
-    
-    # Sort by recent first
-    sorted_tickets = sorted(all_tickets, key=lambda tx: tx.created_at, reverse=True)
-    
-    data = []
-    for t in sorted_tickets:
-        user = db.get(User, t.user_id)
-        customer_name = user.full_name if user and user.full_name else (user.email.split('@')[0] if user and user.email else "Unknown")
-        
-        data.append({
-            "id": f"TKT-{t.id:03d}",
-            "subject": t.subject,
-            "customer": customer_name,
-            "priority": t.priority.value.capitalize(),
-            "status": t.status.value.capitalize(),
-            "created_at": str(t.created_at),
-            "is_critical": t.priority.value == "critical",
-            "is_resolved": t.status.value in ("resolved", "closed")
-        })
-        
-    return {"data": data, "total": len(data)}
-
 @router.get("/campaigns")
 def get_dealer_campaigns(
     db: Session = Depends(get_session),
@@ -350,46 +297,6 @@ def get_dealer_profile_details(
     """Get the dealer's profile details."""
     dealer = _get_dealer(db, current_user.id)
     return {"data": dealer.dict(), "success": True}
-
-@router.get("/users")
-def get_dealer_users(
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-) -> Any:
-    """Mock endpoint for Dealer Staff Users."""
-    dealer = _get_dealer(db, current_user.id)
-    
-    mock_users = [
-        {
-            "id": "USR-101",
-            "name": current_user.full_name or "Dealer Admin",
-            "email": current_user.email,
-            "role": "Owner",
-            "status": "Active",
-            "last_active": "Just now",
-            "avatar": None
-        },
-        {
-            "id": "USR-102",
-            "name": "Station Manager A",
-            "email": "manager_a@wezu.com",
-            "role": "Manager",
-            "status": "Active",
-            "last_active": "2 hours ago",
-            "avatar": None
-        },
-        {
-            "id": "USR-103",
-            "name": "Support Agent",
-            "email": "support1@wezu.com",
-            "role": "Staff",
-            "status": "Inactive",
-            "last_active": "5 days ago",
-            "avatar": None
-        }
-    ]
-    return {"data": mock_users, "total": len(mock_users)}
-
 
 # ── Documents ────────────────────────────────────────────────
 

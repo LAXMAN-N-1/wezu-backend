@@ -1,28 +1,4 @@
 services:
-  # The WEZU Frontend Load Balancer
-  nginx:
-    image: nginx:alpine
-    # Keep nginx opt-in on shared VPS hosts where system nginx owns :80/:443.
-    profiles: ["edge"]
-    restart: "on-failure:5"
-    init: true
-    cpus: "0.25"
-    mem_limit: 64m
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      api:
-        condition: service_healthy
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - wezu_net
-
   # The WEZU Backend Application
   api:
     build: .
@@ -30,20 +6,21 @@ services:
     init: true
     stop_grace_period: 30s
     cpus: "0.75"
-    mem_limit: 512m
-    ports:
-      # Shared VPS pattern: keep app private on localhost and route by host nginx.
-      - "${API_BIND_HOST:-127.0.0.1}:${API_HOST_PORT:-18081}:8000"
-    env_file:
-      - .env.production
+    expose:
+      - "8000"
+    # In Coolify/production, inject env vars from platform UI.
+    # Keep compose free of fixed DATABASE_URL so external Neon DB is authoritative.
     environment:
-      - DATABASE_URL=postgresql://wezu:wezupassword@db/wezu_prod
-      - REDIS_URL=redis://redis:6379/0
-      - GUNICORN_WORKERS=1
-      - DB_POOL_SIZE=3
-      - DB_MAX_OVERFLOW=3
+      # Keep DATABASE_URL / REDIS_URL out of compose-level environment
+      # so platforms like Coolify can manage/delete them directly.
+      - GUNICORN_WORKERS=2
+      - GUNICORN_TIMEOUT=120
+      - GUNICORN_GRACEFUL_TIMEOUT=45
+      - DB_POOL_SIZE=5
+      - DB_MAX_OVERFLOW=5
       - DB_POOL_TIMEOUT=30
       - DB_POOL_RECYCLE=1800
+      - AUDIT_REQUEST_LOGGING_ENABLED=false
       - DB_INIT_ON_STARTUP=false
       - RUN_BACKGROUND_TASKS=false
       - SCHEDULER_ENABLED=false
@@ -62,18 +39,17 @@ services:
     networks:
       - wezu_net
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_healthy
 
   # Primary Database
   db:
+    # Opt-in only for local development. Not started in normal deployments.
+    profiles: ["local-db"]
     image: postgres:15-alpine
     restart: "on-failure:5"
     init: true
     cpus: "0.75"
-    mem_limit: 384m
     environment:
       POSTGRES_USER: wezu
       POSTGRES_PASSWORD: wezupassword
@@ -100,7 +76,6 @@ services:
     restart: "on-failure:5"
     init: true
     cpus: "0.25"
-    mem_limit: 128m
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
