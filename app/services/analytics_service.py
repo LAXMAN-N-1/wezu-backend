@@ -402,7 +402,7 @@ class AnalyticsService:
         }
 
     @staticmethod
-    def get_trends(db: Session, period: str = "daily") -> List[Dict[str, Any]]:
+    def get_trends(db: Session, period: str = "daily") -> Dict[str, Any]:
         """Time-series trend data for revenue, rentals, active users, and battery health."""
         from app.models.battery_health import BatteryHealthSnapshot
         from app.models.user import User
@@ -531,15 +531,12 @@ class AnalyticsService:
             select(Rental).where(Rental.created_at >= lookback)
         ).all()
 
-        # Session / rental efficiency optimization
-        avg_duration_stmt = select(func.avg(
-            (func.extract('epoch', Rental.end_time) - func.extract('epoch', Rental.start_time)) / 60
-        )).where(
-            Rental.status == RentalStatus.COMPLETED,
-            Rental.end_time.is_not(None),
-            Rental.created_at >= lookback,
-        )
-        avg_session = db.exec(avg_duration_stmt).one() or 0.0
+        durations = [
+            (r.end_time - r.start_time).total_seconds() / 60
+            for r in rentals
+            if r.start_time and r.end_time
+        ]
+        avg_session = round(sum(durations) / len(durations), 2) if durations else 0.0
 
         distinct_users = {r.user_id for r in rentals}
         avg_rentals_per_user = round(len(rentals) / len(distinct_users), 2) if distinct_users else 0.0
@@ -592,15 +589,23 @@ class AnalyticsService:
         """Recent activity across rentals, payments, and support events."""
         from app.models.support import SupportTicket
 
+        def _enum_text(value: Any, fallback: str = "unknown") -> str:
+            if value is None:
+                return fallback
+            if hasattr(value, "value"):
+                return str(value.value)
+            return str(value)
+
         activities: List[Dict[str, Any]] = []
 
         rentals = db.exec(
             select(Rental).order_by(Rental.created_at.desc()).limit(limit * 2)
         ).all()
         for r in rentals:
+            rental_status = _enum_text(r.status)
             activities.append(
                 {
-                    "title": "Rental Started" if r.status == RentalStatus.ACTIVE else f"Rental {r.status.value}",
+                    "title": "Rental Started" if r.status == RentalStatus.ACTIVE else f"Rental {rental_status}",
                     "description": f"User {r.user_id} at station {r.start_station_id}",
                     "time": r.created_at.strftime("%b %d, %H:%M"),
                     "type": "rental",
@@ -637,15 +642,17 @@ class AnalyticsService:
             select(SupportTicket).order_by(SupportTicket.created_at.desc()).limit(limit)
         ).all()
         for ticket in tickets:
+            priority = _enum_text(ticket.priority)
+            severity = "critical" if priority in {"high", "critical"} else "medium"
             activities.append(
                 {
                     "title": f"Support: {ticket.subject}",
-                    "description": f"Priority {ticket.priority.value}",
+                    "description": f"Priority {priority}",
                     "time": ticket.created_at.strftime("%b %d, %H:%M"),
                     "type": "alert",
-                    "severity": "critical" if ticket.priority.value in ["high", "critical"] else "medium",
+                    "severity": severity,
                     "timestamp": ticket.created_at,
-                    "details": {"ticket_id": ticket.id, "status": ticket.status.value},
+                    "details": {"ticket_id": ticket.id, "status": _enum_text(ticket.status)},
                 }
             )
 
@@ -701,6 +708,7 @@ class AnalyticsService:
                     Rental.created_at >= datetime.now(UTC) - timedelta(days=7),
                 )
                 .group_by(func.date(Rental.created_at))
+                .order_by(func.date(Rental.created_at))
             )
             spark = [int(row) for row in db.exec(spark_stmt).all()]
 

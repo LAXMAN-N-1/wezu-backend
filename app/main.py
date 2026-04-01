@@ -138,6 +138,14 @@ app.add_middleware(RBACMiddleware)
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(SecureHeadersMiddleware)
 app.add_middleware(AuditMiddleware)
+if settings.ENABLE_TRUSTED_HOST_MIDDLEWARE:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
+
+# Must run before TrustedHostMiddleware to rewrite Host from trusted proxy headers.
+# In Starlette, the most recently added middleware runs first.
+app.add_middleware(TrustedProxyHeadersMiddleware)
+
+# Keep CORS outermost so proxy/host/auth errors still include CORS headers.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS if settings.ENVIRONMENT == "production" else ["*"],
@@ -145,9 +153,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
-# Must run before TrustedHostMiddleware to rewrite Host from trusted proxy headers.
-app.add_middleware(TrustedProxyHeadersMiddleware)
 
 # ----------------------------
 # System & Health

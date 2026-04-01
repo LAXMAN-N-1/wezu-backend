@@ -132,6 +132,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "production"
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
     ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1", "[::1]", "testserver"]
+    ENABLE_TRUSTED_HOST_MIDDLEWARE: bool = False
     TRUST_X_FORWARDED_HOST: bool = True
     FORWARDED_ALLOW_IPS: list[str] = ["127.0.0.1/32", "::1/128", "172.16.0.0/12"]
     API_PUBLIC_BASE_URL: Optional[str] = None

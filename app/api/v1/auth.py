@@ -881,21 +881,6 @@ async def select_role(
         permissions=permissions,
         menu=menu_data
     )
-# ===== NEW MISSING ENDPOINTS =====
-
-@router.post("/logout")
-async def logout(
-    current_user: User = Depends(deps.get_current_user),
-    token: str = Depends(deps.oauth2_scheme),
-    db: Session = Depends(get_session)
-):
-    """Logout user - invalidate tokens"""
-    TokenService.blacklist_token(db, token)
-    logger.info(f"User {current_user.id} logged out and token blacklisted")
-    AuditLogger.log_event(db, current_user.id, "LOGOUT", "AUTH")
-    return {"message": "Logged out successfully"}
-
-
 @router.post("/logout-all")
 async def logout_all(
     current_user: User = Depends(deps.get_current_user),

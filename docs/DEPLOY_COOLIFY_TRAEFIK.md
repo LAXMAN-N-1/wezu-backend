@@ -5,7 +5,7 @@ This backend is configured for Coolify/Traefik ingress.
 - No direct host port publishing from the app container.
 - Backend listens on `0.0.0.0:8000` inside Docker.
 - Traefik routes domain traffic to the service.
-- Strict host validation stays enabled.
+- Strict host validation is optional and should be enabled only after host values are verified.
 
 ## 1. Coolify Service Setup
 
@@ -30,6 +30,7 @@ REDIS_URL=redis://redis:6379/0
 ALLOWED_HOSTS=api1.powerfrill.com
 CORS_ORIGINS=https://app.powerfrill.com,https://admin.powerfrill.com
 
+ENABLE_TRUSTED_HOST_MIDDLEWARE=true
 TRUST_X_FORWARDED_HOST=true
 FORWARDED_ALLOW_IPS=127.0.0.1/32,::1/128,172.16.0.0/12
 
@@ -44,7 +45,7 @@ MQTT_ENABLED=false
 
 Notes:
 - Keep `DATABASE_URL` pointed to Neon if Neon is your source of truth.
-- `ALLOWED_HOSTS` must include every public API hostname routed by Traefik.
+- If `ENABLE_TRUSTED_HOST_MIDDLEWARE=true`, `ALLOWED_HOSTS` must include every public API hostname routed by Traefik.
 - `CORS_ORIGINS` must include exact frontend origins (scheme + host).
 - `FORWARDED_ALLOW_IPS` should include the proxy network CIDRs that can reach this container.
 
@@ -80,6 +81,7 @@ Expected:
 ## 6. Troubleshooting
 
 If you see `Invalid host header`:
+- Temporarily set `ENABLE_TRUSTED_HOST_MIDDLEWARE=false` to restore traffic while you validate host/proxy settings.
 - Ensure domain is present in `ALLOWED_HOSTS`.
 - Ensure Traefik forwards `X-Forwarded-Host`.
 - Ensure proxy source subnet is in `FORWARDED_ALLOW_IPS`.
