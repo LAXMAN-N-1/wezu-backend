@@ -1,6 +1,7 @@
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import Request
 from app.services.audit_service import audit_service
+from app.core.proxy import get_client_ip
 import time
 
 class AuditMiddleware(BaseHTTPMiddleware):
@@ -46,7 +47,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 action=request.method,
                 status="success" if response.status_code < 400 else "failure",
                 metadata=metadata,
-                ip_address=request.client.host if request.client else None
+                ip_address=get_client_ip(request)
             )
         )
         

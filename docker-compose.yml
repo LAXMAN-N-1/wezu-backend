@@ -1,28 +1,4 @@
 services:
-  # The WEZU Frontend Load Balancer
-  nginx:
-    image: nginx:alpine
-    # Keep nginx opt-in on shared VPS hosts where system nginx owns :80/:443.
-    profiles: ["edge"]
-    restart: "on-failure:5"
-    init: true
-    cpus: "0.25"
-    mem_limit: 64m
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      api:
-        condition: service_healthy
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - wezu_net
-
   # The WEZU Backend Application
   api:
     build: .
@@ -31,9 +7,8 @@ services:
     stop_grace_period: 30s
     cpus: "0.75"
     mem_limit: 512m
-    ports:
-      # Shared VPS pattern: keep app private on localhost and route by host nginx.
-      - "${API_BIND_HOST:-127.0.0.1}:${API_HOST_PORT:-18081}:8000"
+    expose:
+      - "8000"
     # In Coolify/production, inject env vars from platform UI.
     # Keep compose free of fixed DATABASE_URL so external Neon DB is authoritative.
     environment:

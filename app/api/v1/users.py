@@ -26,6 +26,7 @@ from app.schemas.dashboard import DashboardConfigResponse
 from app.services.audit_service import audit_service
 from app.services.analytics_service import AnalyticsService
 from app.services.membership_service import MembershipService
+from app.core.proxy import get_client_ip
 import os
 import shutil
 import json
@@ -1606,7 +1607,7 @@ async def get_my_sessions(
     
     # Identify current session roughly by IP/UA if possible, or JTI if we had it in request state
     # Ideally we'd compare JTI, but basic matching:
-    current_ip = request.client.host if request.client else None
+    current_ip = get_client_ip(request)
     current_ua = request.headers.get("user-agent")
     
     response = []

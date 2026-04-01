@@ -11,6 +11,7 @@ from app.services.otp_service import OTPService
 from app.services.fraud_service import FraudService
 from app.services.token_service import TokenService
 from app.core.security import create_access_token, create_refresh_token, get_password_hash, verify_password
+from app.core.proxy import get_client_ip
 from app.schemas.user import TokenPayload
 from app.core.config import settings
 from app.api import deps
@@ -173,7 +174,7 @@ async def _process_login(username: str, password: str, db: Session, request: Req
 
     if not user or not verify_password(password, user.hashed_password):
         # Extract IP and User-Agent
-        ip_address = request.client.host if request.client else None
+        ip_address = get_client_ip(request)
         user_agent = request.headers.get("user-agent")
         AuditLogger.log_event(
             db, 
@@ -195,7 +196,7 @@ async def _process_login(username: str, password: str, db: Session, request: Req
     refresh_token = create_refresh_token(subject=user.id, jti=token_jti)
     
     # Audit log success
-    ip_address = request.client.host if request.client else None
+    ip_address = get_client_ip(request)
     user_agent = request.headers.get("user-agent")
     AuditLogger.log_event(db, user.id, "LOGIN", "AUTH", ip_address=ip_address, user_agent=user_agent)
     
@@ -210,7 +211,7 @@ async def _process_login(username: str, password: str, db: Session, request: Req
         from app.models.login_history import LoginHistory
         login_record = LoginHistory(
             user_id=user.id,
-            ip_address=request.client.host,
+            ip_address=get_client_ip(request),
             user_agent=request.headers.get("user-agent", "Unknown"),
             device_type="web" if "Mozilla" in request.headers.get("user-agent", "") else "mobile",
             status="success"
@@ -373,10 +374,7 @@ async def verify_registration_otp(
         # (Already generated above)
             
         user_agent = request.headers.get("user-agent", "unknown")
-        ip_address = request.client.host if request.client else "unknown"
-        forwarded = request.headers.get("x-forwarded-for")
-        if forwarded:
-            ip_address = forwarded.split(",")[0]
+        ip_address = get_client_ip(request)
             
         device_type = "mobile" if "mobile" in user_agent.lower() else "web"
         

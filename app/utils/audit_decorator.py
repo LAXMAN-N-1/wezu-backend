@@ -17,6 +17,7 @@ from fastapi import Request
 from sqlmodel import Session
 
 from app.models.audit_log import AuditLog
+from app.core.proxy import get_client_ip
 
 logger = logging.getLogger("wezu_audit")
 
@@ -80,7 +81,7 @@ def _write_log(
         ip_address = None
         user_agent = None
         if request:
-            ip_address = request.client.host if request.client else None
+            ip_address = get_client_ip(request)
             user_agent = request.headers.get("user-agent", "")
 
         # Extract target ID

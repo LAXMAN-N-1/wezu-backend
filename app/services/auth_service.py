@@ -1,6 +1,7 @@
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from app.core.config import settings
+from app.core.proxy import get_client_ip
 from fastapi import HTTPException, status, Request
 from sqlmodel import Session
 
@@ -189,10 +190,7 @@ class AuthService:
             if not user_agent:
                 user_agent = request.headers.get("user-agent", "unknown")
             if not ip_address:
-                ip_address = request.client.host if request.client else "unknown"
-                forwarded = request.headers.get("x-forwarded-for")
-                if forwarded:
-                    ip_address = forwarded.split(",")[0]
+                ip_address = get_client_ip(request)
         
         # Default fallbacks
         if not user_agent: user_agent = "unknown"
@@ -323,7 +321,7 @@ class AuthService:
                  user_agent = request.headers.get("user-agent")
                  if user_agent: session.user_agent = user_agent
                  
-                 ip_address = request.client.host if request.client else None
+                 ip_address = get_client_ip(request)
                  if ip_address: session.ip_address = ip_address
             
             db.add(session)

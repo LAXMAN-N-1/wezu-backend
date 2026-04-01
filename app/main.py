@@ -11,6 +11,7 @@ setup_logging()
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from slowapi.errors import RateLimitExceeded
@@ -22,6 +23,7 @@ from app.api import deps
 from app.middleware.rate_limit import limiter
 from app.middleware.audit import AuditMiddleware
 from app.middleware.security import SecureHeadersMiddleware
+from app.middleware.proxy_headers import TrustedProxyHeadersMiddleware
 from app.middleware.rbac_middleware import RBACMiddleware
 from app.api.errors.handlers import add_exception_handlers
 from app.workers import start_scheduler, stop_scheduler
@@ -143,6 +145,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
+# Must run before TrustedHostMiddleware to rewrite Host from trusted proxy headers.
+app.add_middleware(TrustedProxyHeadersMiddleware)
 
 # ----------------------------
 # System & Health
@@ -166,6 +171,11 @@ async def health_check():
         "environment": settings.ENVIRONMENT,
         "version": "1.0.0"
     }
+
+
+@app.get("/ready", tags=["System"])
+async def readiness_check():
+    return await health_check()
 
 @app.get("/", tags=["System"])
 async def root():
