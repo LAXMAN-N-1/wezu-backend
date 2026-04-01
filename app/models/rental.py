@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from app.models.battery import Battery
     from app.models.station import Station
     from app.models.swap import SwapSession
-    from app.models.finance.transaction import Transaction
+    from app.models.financial import Transaction
     from app.models.rental_event import RentalEvent
 
 class RentalStatus(str, Enum):
@@ -22,7 +22,6 @@ class RentalStatus(str, Enum):
 
 class Rental(SQLModel, table=True):
     __tablename__ = "rentals"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     
     # Core References
@@ -68,7 +67,6 @@ class Rental(SQLModel, table=True):
 
 class Purchase(SQLModel, table=True):
     __tablename__ = "purchases"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True)
     battery_id: int = Field(foreign_key="batteries.id", index=True)

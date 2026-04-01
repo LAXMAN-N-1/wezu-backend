@@ -5,7 +5,6 @@ import uuid
 
 class IoTDevice(SQLModel, table=True):
     __tablename__ = "iot_devices"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     device_id: str = Field(unique=True, index=True) # Hardware Serial / MAC / UUID
     device_type: str = Field(default="tracker_v1")
@@ -31,7 +30,6 @@ class IoTDevice(SQLModel, table=True):
 
 class DeviceCommand(SQLModel, table=True):
     __tablename__ = "device_commands"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     device_id: int = Field(foreign_key="iot_devices.id")
     
@@ -51,7 +49,6 @@ class DeviceCommand(SQLModel, table=True):
 
 class FirmwareUpdate(SQLModel, table=True):
     __tablename__ = "firmware_updates"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     version: str
     file_url: str

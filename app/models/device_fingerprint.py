@@ -7,7 +7,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 class DeviceFingerprint(SQLModel, table=True):
     __tablename__ = "device_fingerprints"
-    # __table_args__ = {"schema": "public"}
     """Track unique device characteristics for fraud detection"""
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: Optional[int] = Field(default=None, foreign_key="users.id")
@@ -57,7 +56,6 @@ class DeviceFingerprint(SQLModel, table=True):
 
 class DuplicateAccount(SQLModel, table=True):
     __tablename__ = "duplicate_accounts"
-    # __table_args__ = {"schema": "public"}
     """Link potentially duplicate accounts"""
     id: Optional[int] = Field(default=None, primary_key=True)
     

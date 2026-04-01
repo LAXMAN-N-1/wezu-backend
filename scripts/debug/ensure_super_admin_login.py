@@ -1,3 +1,4 @@
+import os
 from datetime import datetime, UTC
 
 from sqlalchemy import create_engine
@@ -10,7 +11,7 @@ from app.models.user import User, UserStatus, UserType
 
 
 EMAIL = "laxmanlaxman1629@gmail.com"
-PASSWORD = "laxman123"
+PASSWORD = os.environ.get("SEED_ADMIN_PASSWORD", "ChangeMe!Seed2026")
 
 
 def main() -> None:

@@ -5,7 +5,6 @@ import uuid
 
 class StationStockConfig(SQLModel, table=True):
     __tablename__ = "station_stock_configs" # type: ignore
-    # __table_args__ = {"schema": "public"}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     station_id: int = Field(foreign_key="stations.id", unique=True, index=True)
@@ -20,7 +19,6 @@ class StationStockConfig(SQLModel, table=True):
 
 class ReorderRequest(SQLModel, table=True):
     __tablename__ = "reorder_requests" # type: ignore
-    # __table_args__ = {"schema": "public"}
 
     id: int = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
     station_id: int = Field(foreign_key="stations.id", index=True)
@@ -34,7 +32,6 @@ class ReorderRequest(SQLModel, table=True):
 
 class StockAlertDismissal(SQLModel, table=True):
     __tablename__ = "stock_alert_dismissals" # type: ignore
-    # __table_args__ = {"schema": "public"}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     station_id: int = Field(foreign_key="stations.id", index=True)

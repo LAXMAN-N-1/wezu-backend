@@ -75,25 +75,21 @@ if settings.SENTRY_DSN:
 
 logger = get_logger(__name__)
 
-def _cors_headers_for_origin(origin: str) -> dict[str, str]:
-    if not origin:
-        return {}
-    if settings.is_origin_allowed(origin):
-        return {
-            "Access-Control-Allow-Origin": origin,
-            "Access-Control-Allow-Credentials": "true",
-            "Vary": "Origin",
-        }
-    return {}
+from app.utils.cors import normalized_cors_origins, cors_headers_for_origin
+
+# Aliases for backward-compat within this module
+_normalized_cors_origins = normalized_cors_origins
+_cors_headers_for_origin = cors_headers_for_origin
 
 
 class CORSErrorMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
         origin = request.headers.get("origin", "")
-        for key, value in _cors_headers_for_origin(origin).items():
+        for key, value in cors_headers_for_origin(origin).items():
             response.headers[key] = value
         return response
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -107,12 +103,20 @@ async def lifespan(app: FastAPI):
 
     if settings.DB_INIT_ON_STARTUP:
         try:
-            logger.info("Initializing database schema (DB_INIT_ON_STARTUP is True)...")
-            from app.db.session import init_db
-            init_db()
-            logger.info("Database schema initialization complete.")
+            logger.info("Running Alembic migrations (DB_INIT_ON_STARTUP is True)...")
+            from alembic.config import Config as AlembicConfig
+            from alembic import command as alembic_command
+            alembic_cfg = AlembicConfig("alembic.ini")
+            alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+            alembic_command.upgrade(alembic_cfg, "head")
+            logger.info("Alembic migrations complete.")
         except Exception:
-            logger.exception("DB init on startup failed; continuing")
+            logger.exception("Alembic migration on startup failed; falling back to create_all")
+            try:
+                from app.db.session import init_db
+                init_db()
+            except Exception:
+                logger.exception("Fallback create_all also failed")
 
     if settings.RUN_BACKGROUND_TASKS:
         logger.info("Starting background tasks...")
@@ -199,6 +203,10 @@ async def health_check():
     """Deep health check for database and basic connectivity"""
     from sqlalchemy import text
     db_ok = False
+    redis_ok = False
+    mongo_ok = False
+
+    # PostgreSQL check
     try:
         from app.db.session import SessionLocal
         with SessionLocal() as db:
@@ -207,11 +215,36 @@ async def health_check():
     except Exception as e:
         logger.error(f"Health check DB failure: {e}")
 
+    # Redis check
+    try:
+        import redis
+        r = redis.from_url(settings.REDIS_URL, socket_connect_timeout=2)
+        r.ping()
+        redis_ok = True
+    except Exception as e:
+        logger.error(f"Health check Redis failure: {e}")
+
+    # MongoDB check (non-critical)
+    try:
+        if settings.MONGODB_URL and settings.MONGODB_URL != "mongodb://localhost:27017":
+            from pymongo import MongoClient
+            client = MongoClient(settings.MONGODB_URL, serverSelectionTimeoutMS=2000)
+            client.admin.command("ping")
+            mongo_ok = True
+        else:
+            mongo_ok = None  # Not configured
+    except Exception as e:
+        logger.error(f"Health check MongoDB failure: {e}")
+
+    all_ok = db_ok and redis_ok and (mongo_ok is None or mongo_ok)
+
     return {
-        "status": "ok" if db_ok else "degraded",
+        "status": "ok" if all_ok else "degraded",
         "database": "online" if db_ok else "offline",
+        "redis": "online" if redis_ok else "offline",
+        "mongodb": "online" if mongo_ok else ("not_configured" if mongo_ok is None else "offline"),
         "environment": settings.ENVIRONMENT,
-        "version": "1.0.0"
+        "version": settings.APP_VERSION
     }
 
 
@@ -221,7 +254,7 @@ async def readiness_check():
 
 @app.get("/", tags=["System"])
 async def root():
-    return {"message": f"Welcome to {settings.PROJECT_NAME} API", "version": "1.0.0"}
+    return {"message": f"Welcome to {settings.PROJECT_NAME} API", "version": settings.APP_VERSION}
 
 # ----------------------------
 # API V1 - Customer Endpoints

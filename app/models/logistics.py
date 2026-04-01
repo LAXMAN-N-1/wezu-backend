@@ -23,7 +23,6 @@ class DeliveryStatus(str, Enum):
 
 class BatteryTransfer(SQLModel, table=True):
     __tablename__ = "battery_transfers"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     battery_id: int = Field(foreign_key="batteries.id")
@@ -45,7 +44,6 @@ class BatteryTransfer(SQLModel, table=True):
 
 class Manifest(SQLModel, table=True):
     __tablename__ = "manifests"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     manifest_number: str = Field(default_factory=lambda: f"MAN-{uuid.uuid4().hex[:8].upper()}", index=True, unique=True)
@@ -66,7 +64,6 @@ if TYPE_CHECKING:
     
 class DeliveryOrder(SQLModel, table=True):
     __tablename__ = "delivery_orders"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     

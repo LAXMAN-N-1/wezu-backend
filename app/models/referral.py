@@ -4,7 +4,6 @@ from datetime import datetime, UTC
 
 class Referral(SQLModel, table=True):
     __tablename__ = "referrals"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     referrer_id: int = Field(foreign_key="users.id")
     referred_user_id: Optional[int] = Field(default=None, foreign_key="users.id")

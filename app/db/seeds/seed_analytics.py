@@ -37,7 +37,7 @@ def seed_analytics_data():
                 user = User(
                     email=email,
                     full_name=f"Test User {i}",
-                    hashed_password=get_password_hash("password123"),
+                    hashed_password=get_password_hash(os.environ.get("SEED_ADMIN_PASSWORD", "ChangeMe!Seed2026")),
                     is_active=True,
                     created_at=datetime.now(UTC) - timedelta(days=created_days_ago) # Simulated creation date
                 )

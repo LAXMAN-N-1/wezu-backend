@@ -23,9 +23,38 @@ class RentalService:
         promo_id = None
         
         if promo_code:
-            # TODO: Implement PromoCode validation logic
-            pass
+            from app.models.promo_code import PromoCode
+            promo = db.exec(select(PromoCode).where(PromoCode.code == promo_code, PromoCode.is_active == True)).first()
             
+            if not promo:
+                raise HTTPException(status_code=400, detail="Invalid or inactive promo code")
+                
+            now = datetime.now(UTC)
+            # Ensure timezone awareness matches
+            valid_until = promo.valid_until.replace(tzinfo=UTC) if promo.valid_until and promo.valid_until.tzinfo is None else promo.valid_until
+            
+            if valid_until and valid_until < now:
+                raise HTTPException(status_code=400, detail="Promo code has expired")
+                
+            if promo.usage_limit > 0 and promo.usage_count >= promo.usage_limit:
+                raise HTTPException(status_code=400, detail="Promo code usage limit reached")
+                
+            if duration_days < promo.min_rental_days:
+                raise HTTPException(status_code=400, detail=f"Promo code requires minimum {promo.min_rental_days} rental days")
+                
+            if total_rent < promo.min_order_amount:
+                raise HTTPException(status_code=400, detail=f"Promo code requires minimum order amount of {promo.min_order_amount}")
+                
+            if promo.discount_percentage > 0:
+                calc_discount = total_rent * (promo.discount_percentage / 100.0)
+                if promo.max_discount_amount:
+                    calc_discount = min(calc_discount, promo.max_discount_amount)
+                discount = calc_discount
+            elif promo.discount_amount > 0:
+                discount = promo.discount_amount
+                
+            discount = min(discount, total_rent)
+            promo_id = promo.id
         return {
             "daily_rate": daily_rate,
             "duration_days": duration_days,

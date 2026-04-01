@@ -20,15 +20,59 @@ class DealerKYCService:
         db.commit()
 
     @staticmethod
-    async def _mock_s3_upload(file: UploadFile, prefix: str) -> str:
-        # Mocking S3 Upload and Encryption Check
-        allowed_types = ["application/pdf", "image/jpeg", "image/jpg"]
+    async def _upload_to_s3(file: UploadFile, prefix: str) -> str:
+        from app.core.config import settings
+        import uuid
+        import boto3
+        import logging
+        import os
         
-        # We need to correctly read the content type
-        if file.content_type not in allowed_types and not file.filename.lower().endswith(('.pdf', '.jpg', '.jpeg')):
-            raise ValueError(f"Invalid file type for {file.filename}. Only PDF and JPG are allowed.")
+        logger = logging.getLogger("wezu_storage")
+        allowed_types = ["application/pdf", "image/jpeg", "image/jpg", "image/png"]
+        
+        if file.content_type not in allowed_types and not file.filename.lower().endswith(('.pdf', '.jpg', '.jpeg', '.png')):
+            raise ValueError(f"Invalid file type for {file.filename}. Only PDF and images are allowed.")
             
-        return f"s3://encrypted-bucket/kyc/{prefix}_{file.filename}"
+        ext = file.filename.split('.')[-1] if '.' in file.filename else 'bin'
+        unique_filename = f"{prefix}_{uuid.uuid4().hex[:8]}.{ext}"
+        
+        bucket = getattr(settings, "AWS_BUCKET_NAME", None)
+        if bucket and settings.AWS_ACCESS_KEY_ID:
+            try:
+                s3_client = boto3.client(
+                    's3',
+                    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                    region_name=settings.AWS_REGION or 'ap-south-1'
+                )
+                
+                content = await file.read()
+                s3_client.put_object(
+                    Bucket=bucket,
+                    Key=f"kyc/{unique_filename}",
+                    Body=content,
+                    ContentType=file.content_type
+                )
+                
+                domain = getattr(settings, "AWS_S3_CUSTOM_DOMAIN", None)
+                if domain:
+                    return f"https://{domain}/kyc/{unique_filename}"
+                return f"https://{bucket}.s3.{settings.AWS_REGION or 'ap-south-1'}.amazonaws.com/kyc/{unique_filename}"
+            except Exception as e:
+                logger.error(f"S3_UPLOAD_ERROR: Failed to upload {file.filename}: {e}", exc_info=True)
+                raise ValueError(f"Failed to securely store document: {e}")
+        else:
+            # Fallback to local storage to prevent data loss when AWS is not configured
+            logger.warning("STORAGE_WARNING: S3 not configured. Using local fallback.")
+            upload_dir = getattr(settings, "LOCAL_STORAGE_PATH", "/tmp/wezu_uploads")
+            os.makedirs(f"{upload_dir}/kyc", exist_ok=True)
+            
+            file_path = f"{upload_dir}/kyc/{unique_filename}"
+            content = await file.read()
+            with open(file_path, "wb") as f:
+                f.write(content)
+                
+            return f"file://{file_path}"
 
     @staticmethod
     async def submit_documents(
@@ -46,9 +90,9 @@ class DealerKYCService:
         if existing and existing.application_state not in [KYCStateConfig.REJECTED, KYCStateConfig.REGISTRATION]:
             raise ValueError("KYC application already in progress.")
             
-        pan_url = await DealerKYCService._mock_s3_upload(pan_file, f"{user_id}_pan")
-        gst_url = await DealerKYCService._mock_s3_upload(gst_file, f"{user_id}_gst")
-        reg_url = await DealerKYCService._mock_s3_upload(reg_cert, f"{user_id}_reg")
+        pan_url = await DealerKYCService._upload_to_s3(pan_file, f"{user_id}_pan")
+        gst_url = await DealerKYCService._upload_to_s3(gst_file, f"{user_id}_gst")
+        reg_url = await DealerKYCService._upload_to_s3(reg_cert, f"{user_id}_reg")
         
         if existing:
             # Update existing

@@ -4,7 +4,6 @@ from datetime import datetime, UTC
 
 class RentalEvent(SQLModel, table=True):
     __tablename__ = "rental_events"
-    # __table_args__ = {"schema": "public", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     rental_id: int = Field(foreign_key="rentals.id")

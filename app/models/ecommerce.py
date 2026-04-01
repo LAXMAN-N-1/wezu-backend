@@ -4,7 +4,6 @@ from datetime import datetime, UTC
 
 class EcommerceProduct(SQLModel, table=True):
     __tablename__ = "ecommerce_products"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     sku: str = Field(unique=True, index=True)
@@ -21,7 +20,6 @@ class EcommerceProduct(SQLModel, table=True):
 
 class EcommerceOrder(SQLModel, table=True):
     __tablename__ = "ecommerce_orders"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id")
@@ -40,7 +38,6 @@ class EcommerceOrder(SQLModel, table=True):
 
 class EcommerceOrderItem(SQLModel, table=True):
     __tablename__ = "ecommerce_order_items"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     order_id: int = Field(foreign_key="ecommerce_orders.id")

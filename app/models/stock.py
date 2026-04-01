@@ -10,7 +10,6 @@ if TYPE_CHECKING:
 
 class Stock(SQLModel, table=True):
     __tablename__ = "stocks"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     warehouse_id: int = Field(foreign_key="warehouses.id", index=True)

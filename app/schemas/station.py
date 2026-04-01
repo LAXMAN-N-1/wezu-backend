@@ -9,12 +9,12 @@ class StationImageResponse(BaseModel):
 class StationBase(BaseModel):
     name: str
     address: str
+    city: Optional[str] = None
     latitude: float
     longitude: float
     status: str = "active"
     contact_phone: Optional[str] = None
-    contact_email: Optional[str] = None
-    opening_hours: Optional[str] = None
+    operating_hours: Optional[str] = None
     is_24x7: bool = False
     amenities: Optional[str] = None
     

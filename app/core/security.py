@@ -28,7 +28,7 @@ def create_access_token(subject: Union[str, Any], expires_delta: timedelta = Non
 def create_refresh_token(subject: Union[str, Any], jti: str = None) -> str:
     # This function can now be simplified or removed if create_access_token handles both
     # For now, keeping it as is, but it's redundant with the changes to create_access_token
-    expire = datetime.now(UTC) + timedelta(days=7) # Refresh token valid for 7 days
+    expire = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode = {
         "exp": expire, 
         "sub": str(subject), 

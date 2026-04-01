@@ -4,7 +4,6 @@ from datetime import datetime, UTC
 
 class VideoKYCSession(SQLModel, table=True):
     __tablename__ = "video_kyc_sessions"
-    # __table_args__ = {"schema": "public", "extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id")
     session_id: str = Field(unique=True, index=True) # ID from 3rd party provider

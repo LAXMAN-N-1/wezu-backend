@@ -1,39 +1,32 @@
+"""
+Check password hashes in the database.
+Uses DATABASE_URL from environment / .env — never hardcode credentials.
+"""
 import os
 import sys
 
-# Add the backend app to Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-import psycopg2
+from sqlmodel import Session, select
+from app.core.database import engine
 from app.core.security import verify_password
+from app.models.user import User
 
-db_url = "postgresql://neondb_owner:npg_8gj3tFVnBsoX@ep-cool-night-adhmotv8-pooler.c-2.us-east-1.aws.neon.tech/wezu?sslmode=require"
 
-try:
-    conn = psycopg2.connect(db_url)
-    cur = conn.cursor()
-    cur.execute("SELECT hashed_password FROM users WHERE email = 'dealer@wezu.com';")
-    pwd_row = cur.fetchone()
-    if pwd_row:
-        pwd = pwd_row[0]
-        test_pwds = ["password", "password123", "laxman123", "dealer123", "admin123"]
-        for p in test_pwds:
-            if verify_password(p, pwd):
-                print(f"MATCH FOUND for dealer@wezu.com: {p}")
-                break
-        else:
-            print("No matching password found among test passwords.")
-    else:
-        print("User not found.")
-        
-    cur.execute("SELECT hashed_password FROM users WHERE email = 'dealer_extra_1@wezutest.com';")
-    pwd_row = cur.fetchone()
-    if pwd_row:
-        pwd = pwd_row[0]
-        for p in test_pwds:
-            if verify_password(p, pwd):
-                print(f"MATCH FOUND for dealer_extra_1@wezutest.com: {p}")
-                break
-except Exception as e:
-    import traceback
-    traceback.print_exc()
+def check_password(email: str, test_passwords: list[str]):
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.email == email)).first()
+        if not user or not user.hashed_password:
+            print(f"User {email} not found or has no password.")
+            return
+
+        for p in test_passwords:
+            if verify_password(p, user.hashed_password):
+                print(f"MATCH FOUND for {email}: {p}")
+                return
+        print(f"No matching password found for {email}.")
+
+
+if __name__ == "__main__":
+    email = sys.argv[1] if len(sys.argv) > 1 else "admin@wezu.com"
+    check_password(email, ["password", "password123", "admin123"])

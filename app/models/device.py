@@ -4,7 +4,6 @@ from datetime import datetime, UTC
 
 class Device(SQLModel, table=True):
     __tablename__ = "devices"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id")
     fcm_token: str = Field(index=True)

@@ -10,7 +10,6 @@ if TYPE_CHECKING:
 
 class DeliveryAssignment(SQLModel, table=True):
     __tablename__ = "delivery_assignments"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     
     # Can be linked to an ecommerce order or a battery return

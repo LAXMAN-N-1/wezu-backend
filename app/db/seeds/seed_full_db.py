@@ -15,6 +15,9 @@ from datetime import datetime, UTC, timedelta
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+import os
+_SEED_PASSWORD = os.environ.get("SEED_ADMIN_PASSWORD", "ChangeMe!Seed2026")
+
 def seed_db():
     with Session(engine) as session:
         logger.info("🌱 Seeding Database...")
@@ -50,7 +53,7 @@ def seed_db():
                 email="admin@wezu.com",
                 phone_number="9999999999",
                 full_name="Super Admin",
-                hashed_password=get_password_hash("admin123"),
+                hashed_password=get_password_hash(_SEED_PASSWORD),
                 user_type=UserType.ADMIN,
                 is_superuser=True,
                 role_id=admin_role.id
@@ -65,7 +68,7 @@ def seed_db():
                 email="dealer@wezu.com",
                 phone_number="8888888888",
                 full_name="Hyderabad Dealer",
-                hashed_password=get_password_hash("dealer123"),
+                hashed_password=get_password_hash(_SEED_PASSWORD),
                 user_type=UserType.DEALER,
                 role_id=dealer_role.id
             )
@@ -79,7 +82,7 @@ def seed_db():
                 email="customer@wezu.com",
                 phone_number="9646852893",
                 full_name="Demo Customer",
-                hashed_password=get_password_hash("123456"),
+                hashed_password=get_password_hash(_SEED_PASSWORD),
                 user_type=UserType.CUSTOMER,
                 role_id=customer_role.id
             )

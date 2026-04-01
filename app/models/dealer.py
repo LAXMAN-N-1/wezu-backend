@@ -13,7 +13,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 class DealerProfile(SQLModel, table=True):
     __tablename__ = "dealer_profiles"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", unique=True)
     
@@ -65,7 +64,6 @@ class DealerProfile(SQLModel, table=True):
 
 class DealerDocument(SQLModel, table=True):
     __tablename__ = "dealer_documents"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     dealer_id: int = Field(foreign_key="dealer_profiles.id")
     document_type: str = Field(index=True) # gst, pan, registration, cancelled_cheque
@@ -83,7 +81,6 @@ class DealerDocument(SQLModel, table=True):
 
 class DealerApplication(SQLModel, table=True):
     __tablename__ = "dealer_applications"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     dealer_id: int = Field(foreign_key="dealer_profiles.id", unique=True)
     
@@ -116,7 +113,6 @@ class DealerApplication(SQLModel, table=True):
 
 class FieldVisit(SQLModel, table=True):
     __tablename__ = "field_visits"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     application_id: int = Field(foreign_key="dealer_applications.id")
     officer_id: int = Field(foreign_key="users.id") # Field Officer

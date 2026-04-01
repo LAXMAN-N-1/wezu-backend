@@ -4,6 +4,8 @@ import random
 from datetime import datetime, UTC, timedelta
 import uuid
 
+_SEED_PASSWORD = os.environ.get("SEED_ADMIN_PASSWORD", "ChangeMe!Seed2026")
+
 # Add the parent directory to sys.path to allow importing from app
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
@@ -51,7 +53,7 @@ def seed_data():
                     email=email,
                     phone_number=f"9000000{i:03d}",
                     full_name=f"Test Customer {i}",
-                    hashed_password=get_password_hash("password123"),
+                    hashed_password=get_password_hash(_SEED_PASSWORD),
                     user_type=UserType.CUSTOMER,
                     status=UserStatus.ACTIVE
                 )
@@ -78,7 +80,7 @@ def seed_data():
                         email=u_email,
                         phone_number=f"8000000{i:03d}",
                         full_name=f"Extra Dealer {i}",
-                        hashed_password=get_password_hash("password123"),
+                        hashed_password=get_password_hash(_SEED_PASSWORD),
                         user_type=UserType.DEALER,
                         status=UserStatus.ACTIVE
                      )

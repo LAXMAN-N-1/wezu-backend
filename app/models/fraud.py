@@ -7,7 +7,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 class RiskScore(SQLModel, table=True):
     __tablename__ = "risk_scores"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: Optional[int] = Field(default=None, foreign_key="users.id", unique=True)
     
@@ -18,7 +17,6 @@ class RiskScore(SQLModel, table=True):
     
 class FraudCheckLog(SQLModel, table=True):
     __tablename__ = "fraud_check_logs"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: Optional[int] = Field(default=None, foreign_key="users.id")
     
@@ -30,7 +28,6 @@ class FraudCheckLog(SQLModel, table=True):
 
 class Blacklist(SQLModel, table=True):
     __tablename__ = "blacklists"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     type: str # PHONE, EMAIL, IP, DEVICE_ID, PAN
     value: str = Field(index=True, unique=True)

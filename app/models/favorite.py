@@ -4,7 +4,6 @@ from datetime import datetime, UTC
 
 class Favorite(SQLModel, table=True):
     __tablename__ = "favorites"
-    # __table_args__ = {"schema": "public", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id")

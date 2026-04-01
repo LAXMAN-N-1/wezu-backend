@@ -1399,7 +1399,7 @@ async def update_user_status(
         resource_type="user",
         resource_id=str(user.id),
         details=f"Changed status from {old_status} to {new_status}. Reason: {status_update.reason}",
-        ip_address="0.0.0.0", # TODO: Extract from request
+        ip_address=get_client_ip(request),
         timestamp=datetime.now(UTC)
     )
     db.add(audit_log)
@@ -1577,7 +1577,7 @@ async def delete_user(
         resource_type="user",
         resource_id=str(user.id),
         details=f"Soft deleted user. Original Email: {original_email}",
-        ip_address="0.0.0.0",
+        ip_address=get_client_ip(request),
         timestamp=datetime.now(UTC)
     )
     db.add(audit_log)

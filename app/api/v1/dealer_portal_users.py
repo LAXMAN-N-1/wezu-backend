@@ -23,6 +23,8 @@ from app.schemas.dealer_user import (
     EmailCheckRequest, EmailCheckResponse, UserStats, SessionRead,
     LoginHistoryEntry, BulkActionRequest, BulkActionType, CredentialMode,
 )
+from app.services.email_service import EmailService
+from app.core.config import settings
 
 router = APIRouter()
 logger = logging.getLogger("dealer_portal_users")
@@ -202,9 +204,23 @@ def create_dealer_user(
         user.invite_sent_at = datetime.now(UTC)
         user.status = UserStatus.PENDING
 
-        # TODO: Send actual email with invite link containing token
-        logger.info(f"[INVITE] Token for {data.email}: {token}")
-        logger.info(f"[INVITE] Activation URL: /activate/{token}")
+        # Send actual email with invite link containing token
+        base_url = settings.ADMIN_FRONTEND_ORIGIN or "https://admin.powerfrill.com"
+        invite_link = f"{base_url}/activate/{token}"
+        
+        email_content = f"""
+            <h3>Welcome to Wezu Dealer Portal</h3>
+            <p>You have been invited to join the dealer team. Click the link below to activate your account and set your password:</p>
+            <p><a href="{invite_link}">{invite_link}</a></p>
+            <p>This link expires in {INVITE_TOKEN_EXPIRY_HOURS} hours.</p>
+        """
+        EmailService.send_email(
+            to_email=data.email,
+            subject="Invitation to join Wezu Dealer Portal",
+            content=email_content
+        )
+        
+        logger.info(f"[INVITE] Sent activation email to {data.email}")
 
     elif data.credential_mode == CredentialMode.MANUAL:
         if not data.password:
@@ -490,8 +506,22 @@ def reset_user_password(
         user.invite_token = token
         user.invite_token_expires = datetime.now(UTC) + timedelta(hours=1)
         db.add(user)
-        # TODO: Send reset email
-        logger.info(f"[RESET] Password reset token for {user.email}: {token}")
+        # Send reset email
+        base_url = settings.ADMIN_FRONTEND_ORIGIN or "https://admin.powerfrill.com"
+        reset_link = f"{base_url}/reset-password/{token}"
+        
+        email_content = f"""
+            <h3>Password Reset Request</h3>
+            <p>You requested a password reset. Click the link below to set a new password:</p>
+            <p><a href="{reset_link}">{reset_link}</a></p>
+            <p>This link expires in 1 hour.</p>
+        """
+        EmailService.send_email(
+            to_email=user.email,
+            subject="Wezu Dealer Portal - Password Reset",
+            content=email_content
+        )
+        logger.info(f"[RESET] Sent password reset email to {user.email}")
 
     _audit(db, current_user.id, dealer.id, AuditActionType.PASSWORD_RESET,
            target_id=user.id, details=f"Password reset ({data.mode}) for {user.email}")
@@ -523,8 +553,23 @@ def resend_invite(
     user.invite_sent_at = datetime.now(UTC)
     db.add(user)
 
-    # TODO: Send actual email
-    logger.info(f"[INVITE-RESEND] New token for {user.email}: {token}")
+    # Send actual email
+    base_url = settings.ADMIN_FRONTEND_ORIGIN or "https://admin.powerfrill.com"
+    invite_link = f"{base_url}/activate/{token}"
+    
+    email_content = f"""
+        <h3>Welcome to Wezu Dealer Portal (Reminder)</h3>
+        <p>You have been invited to join the dealer team. Click the link below to activate your account and set your password:</p>
+        <p><a href="{invite_link}">{invite_link}</a></p>
+        <p>This link expires in {INVITE_TOKEN_EXPIRY_HOURS} hours.</p>
+    """
+    EmailService.send_email(
+        to_email=user.email,
+        subject="Invitation to join Wezu Dealer Portal (Reminder)",
+        content=email_content
+    )
+    
+    logger.info(f"[INVITE-RESEND] Resent activation email to {user.email}")
 
     _audit(db, current_user.id, dealer.id, AuditActionType.USER_INVITE,
            target_id=user.id, details=f"Resent invitation to {user.email}")

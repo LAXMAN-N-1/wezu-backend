@@ -6,6 +6,8 @@ Run: cd backend && python scripts/seed_dealer_portal.py
 import os, sys, random, uuid
 from datetime import datetime, UTC, timedelta
 
+_SEED_PASSWORD = os.environ.get("SEED_ADMIN_PASSWORD", "ChangeMe!Seed2026")
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
@@ -51,7 +53,7 @@ def seed_all():
                 email="dealer@wezu.com",
                 phone_number="8888888888",
                 full_name="Laxman Kumar",
-                hashed_password=get_password_hash("password123"),
+                hashed_password=get_password_hash(_SEED_PASSWORD),
                 user_type=UserType.DEALER,
                 status=UserStatus.ACTIVE,
             )
@@ -101,7 +103,7 @@ def seed_all():
                     email=email,
                     phone_number=f"900000{i:04d}",
                     full_name=name,
-                    hashed_password=get_password_hash("password123"),
+                    hashed_password=get_password_hash(_SEED_PASSWORD),
                     user_type=UserType.CUSTOMER,
                     status=UserStatus.ACTIVE,
                 )

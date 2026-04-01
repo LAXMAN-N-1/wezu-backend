@@ -3,7 +3,6 @@ from typing import Optional
 from datetime import datetime, UTC
 
 class BatteryHealthLog(SQLModel, table=True):
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     battery_id: int = Field(foreign_key="batteries.id")
     

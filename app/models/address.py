@@ -7,7 +7,6 @@ from datetime import datetime, UTC
 
 class Address(SQLModel, table=True):
     __tablename__ = "addresses"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id")
     address_line1: Optional[str] = None

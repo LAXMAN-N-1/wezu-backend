@@ -65,7 +65,7 @@ def clean_and_setup_production():
             email="admin@wezu.com",
             phone_number="9154345918",
             full_name="System Admin",
-            hashed_password=get_password_hash("laxman123"),
+            hashed_password=get_password_hash(os.environ.get("SEED_ADMIN_PASSWORD", "ChangeMe!Seed2026")),
             user_type=UserType.ADMIN,
             status=UserStatus.ACTIVE,
             is_superuser=True
@@ -81,7 +81,7 @@ def clean_and_setup_production():
              email="admin@wezu.com",
              phone_number="9154345918",
              full_name="System Admin",
-             hashed_password=get_password_hash("laxman123"),
+             hashed_password=get_password_hash(os.environ.get("SEED_ADMIN_PASSWORD", "ChangeMe!Seed2026")),
              is_superuser=True,
              is_active=True
         )
@@ -101,7 +101,7 @@ def clean_and_setup_production():
             email="dealer@wezu.com",
             phone_number="9154345917", # Unique
             full_name="Laxman Dealer",
-            hashed_password=get_password_hash("laxman123"),
+            hashed_password=get_password_hash(os.environ.get("SEED_ADMIN_PASSWORD", "ChangeMe!Seed2026")),
             user_type=UserType.DEALER,
             status=UserStatus.ACTIVE
         )
@@ -134,7 +134,7 @@ def clean_and_setup_production():
             email="customer@wezu.com",
             phone_number="9154345916", # Unique
             full_name="Laxman Customer",
-            hashed_password=get_password_hash("laxman123"),
+            hashed_password=get_password_hash(os.environ.get("SEED_ADMIN_PASSWORD", "ChangeMe!Seed2026")),
             user_type=UserType.CUSTOMER,
             status=UserStatus.ACTIVE
         )

@@ -32,7 +32,6 @@ class TransactionStatus(str, Enum):
 
 class Transaction(SQLModel, table=True):
     __tablename__ = "transactions"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     
     user_id: int = Field(foreign_key="users.id", index=True)
@@ -63,7 +62,6 @@ class Transaction(SQLModel, table=True):
 
 class Wallet(SQLModel, table=True):
     __tablename__ = "wallets"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", unique=True, index=True)
     
@@ -82,7 +80,6 @@ class Wallet(SQLModel, table=True):
 
 class WalletWithdrawalRequest(SQLModel, table=True):
     __tablename__ = "wallet_withdrawal_requests"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     wallet_id: int = Field(foreign_key="wallets.id")
     amount: float

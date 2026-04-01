@@ -4,7 +4,6 @@ from datetime import datetime, UTC
 
 class Notification(SQLModel, table=True):
     __tablename__ = "notifications"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id")
     title: str

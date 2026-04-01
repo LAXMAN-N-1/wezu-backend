@@ -4,7 +4,6 @@ from datetime import datetime, UTC
 
 class Menu(SQLModel, table=True):
     __tablename__ = "menus"
-    # __table_args__ = {"schema": "public"}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True, nullable=False)

@@ -5,7 +5,6 @@ from app.models.location import Zone
 
 class Vendor(SQLModel, table=True):
     __tablename__ = "vendors"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -38,7 +37,6 @@ class Vendor(SQLModel, table=True):
 
 class VendorDocument(SQLModel, table=True):
     __tablename__ = "vendor_documents"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     vendor_id: int = Field(foreign_key="vendors.id")

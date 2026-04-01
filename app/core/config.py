@@ -9,6 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     PROJECT_NAME: str = "WEZU Energy"
     API_V1_STR: str = "/api/v1"
+    APP_VERSION: str = "1.0.0"
     
     # Database
     DATABASE_URL: str # No default allowed, must be provided in env
@@ -26,7 +27,7 @@ class Settings(BaseSettings):
     REDIS_CACHE_DB: int = 2
     
     # MongoDB (Audit Logs & Unstructured Data)
-    MONGODB_URL: str = "mongodb://localhost:27017"
+    MONGODB_URL: str # No default allowed, must be provided in env
     MONGODB_DB: str = "wezu_audit"
     
     # Security
@@ -36,7 +37,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     
     # Customer Authentication
-    GOOGLE_OAUTH_CLIENT_ID: str = "14021620854-19a577mtevqnvelpijimv1n856f2llbq.apps.googleusercontent.com"
+    GOOGLE_OAUTH_CLIENT_ID: Optional[str] = None  # Must be provided via env var
     GOOGLE_OAUTH_CLIENT_SECRET: Optional[str] = None
     APPLE_CLIENT_ID: Optional[str] = None
     APPLE_TEAM_ID: Optional[str] = None
@@ -146,7 +147,7 @@ class Settings(BaseSettings):
     
     # Customer Support
     SUPPORT_EMAIL: str = "support@wezu.com"
-    SUPPORT_PHONE: str = "+91-1234567890"
+    SUPPORT_PHONE: str = "+91-0000000000"  # Override via env
     
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -208,5 +209,22 @@ class Settings(BaseSettings):
     @property
     def cors_allow_origin_regex(self) -> Optional[str]:
         return self.CORS_LOCALHOST_ORIGIN_REGEX if self.CORS_ALLOW_LOCALHOST else None
+
+    @model_validator(mode="after")
+    def _validate_production_secrets(self) -> "Settings":
+        """Fail fast if critical secrets are placeholder values."""
+        _PLACEHOLDER_MARKERS = ["your-", "change-this", "CHANGEME", "xxxx", "placeholder"]
+
+        if any(marker in self.SECRET_KEY.lower() for marker in _PLACEHOLDER_MARKERS):
+            import warnings
+            msg = (
+                "SECRET_KEY contains a placeholder value! "
+                "Generate a proper key: python -c 'import secrets; print(secrets.token_urlsafe(64))'"
+            )
+            if self.ENVIRONMENT == "production":
+                raise ValueError(msg)
+            warnings.warn(msg, stacklevel=2)
+
+        return self
 
 settings = Settings()

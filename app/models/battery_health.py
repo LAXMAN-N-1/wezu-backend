@@ -51,7 +51,6 @@ class AlertSeverity(str, Enum):
 
 class BatteryHealthSnapshot(SQLModel, table=True):
     __tablename__ = "battery_health_snapshots"
-    # __table_args__ = {"schema": "public"}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     battery_id: int = Field(foreign_key="batteries.id", index=True)
@@ -69,7 +68,6 @@ class BatteryHealthSnapshot(SQLModel, table=True):
 
 class BatteryMaintenanceSchedule(SQLModel, table=True):
     __tablename__ = "battery_maintenance_schedules"
-    # __table_args__ = {"schema": "public"}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     battery_id: int = Field(foreign_key="batteries.id", index=True)
@@ -92,7 +90,6 @@ class BatteryMaintenanceSchedule(SQLModel, table=True):
 
 class BatteryHealthAlert(SQLModel, table=True):
     __tablename__ = "battery_health_alerts"
-    # __table_args__ = {"schema": "public"}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     battery_id: int = Field(foreign_key="batteries.id", index=True)

@@ -11,9 +11,7 @@ from sendgrid.helpers.mail import Mail
 class OTPService:
     @staticmethod
     def generate_otp(target: str, purpose: str = "registration", length: int = 6) -> str:
-        """Create an OTP. Only allow the static test code in non-production."""
-        if (settings.ENVIRONMENT != "production") and settings.DEBUG:
-            return "964056"
+        """Generate a random OTP code."""
         code = ''.join(random.choices(string.digits, k=length))
         return code
 
@@ -95,7 +93,7 @@ class OTPService:
             response = sg.send(message)
             return response.status_code
         except Exception as e:
-            print(f"Error sending email: {e}")
+            logger.error(f"Error sending email OTP: {e}")
             return None
 
     @staticmethod
@@ -112,8 +110,9 @@ class OTPService:
         else:
             formatted_phone = phone if phone.startswith("+") else f"+{phone}"
         
-        # Always log to console for development visibility
-        logger.info(f"OTP_CODE_FOR_{formatted_phone}: {code}")
+        # Only log OTP codes in development debug mode — NEVER in production
+        if settings.ENVIRONMENT == "development" and settings.DEBUG:
+            logger.debug(f"OTP_CODE_FOR_{formatted_phone}: {code}")
 
         if settings.SMS_PROVIDER == "twilio" and settings.TWILIO_ACCOUNT_SID:
             # If Verify Service SID is present, use Twilio Verify API (Recommended)
@@ -136,14 +135,15 @@ class OTPService:
                 return settings.ENVIRONMENT == "development" or settings.DEBUG
         
         # Placeholder for other providers
-        logger.info(f"DEBUG: [MOCK SMS] Sending SMS to {formatted_phone} with code {code}")
+        logger.info(f"DEBUG: [MOCK SMS] OTP sent to {formatted_phone} (code hidden)")
         return True
 
     @staticmethod
     def verify_otp(db: Session, target: str, code: str, purpose: str = "registration") -> bool:
-        # Mock OTP Bypass for Testing (only in non-prod)
-        if (settings.ENVIRONMENT != "production") and settings.DEBUG and code == "964056":
-             return True
+        # Optional test bypass via explicit env var (never in production)
+        _test_code = getattr(settings, 'OTP_TEST_BYPASS_CODE', None)
+        if _test_code and settings.ENVIRONMENT != "production" and code == _test_code:
+            return True
              
         from app.integrations.twilio import twilio_integration
         
@@ -160,7 +160,7 @@ class OTPService:
             # If Verify Service SID is present, check with Twilio Verify first
             if settings.SMS_PROVIDER == "twilio" and getattr(settings, "TWILIO_VERIFY_SERVICE_SID", None):
                 if twilio_integration.verify_code(formatted_target, code):
-                    print(f"INFO: OTP verified via Twilio Verify for {formatted_target}")
+                    logger.info(f"OTP verified via Twilio Verify for {formatted_target}")
                     return True
 
         # Find the active OTP for this target in our database

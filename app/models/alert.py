@@ -7,7 +7,6 @@ if TYPE_CHECKING:
 
 class Alert(SQLModel, table=True):
     __tablename__ = "alerts"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     station_id: Optional[int] = Field(default=None, foreign_key="stations.id", index=True)

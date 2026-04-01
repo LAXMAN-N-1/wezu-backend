@@ -8,14 +8,12 @@ from datetime import datetime, UTC
 from enum import Enum
 import sqlalchemy as sa
 
-from app.models.two_factor_auth import TwoFactorAuth
-
 if TYPE_CHECKING:
     from app.models.session import UserSession
     from app.models.financial import Wallet
     from app.models.location import Address
     from app.models.kyc import KYCDocument, KYCRecord
-    from app.models.iot import Device
+    from app.models.device import Device
     from app.models.vehicle import Vehicle
     from app.models.dealer import DealerProfile
     from app.models.driver_profile import DriverProfile
@@ -50,7 +48,6 @@ class KYCStatus(str, Enum):
 class User(SQLModel, table=True):
 
     __tablename__ = "users"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     

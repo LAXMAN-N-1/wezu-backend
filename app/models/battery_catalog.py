@@ -8,7 +8,6 @@ if TYPE_CHECKING:
 
 class BatteryCatalog(SQLModel, table=True):
     __tablename__ = "battery_catalog"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -51,7 +50,6 @@ BatterySpec = BatteryCatalog
 
 class BatteryBatch(SQLModel, table=True):
     __tablename__ = "battery_batches"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     batch_number: str = Field(unique=True, index=True)
     manufacturer: str

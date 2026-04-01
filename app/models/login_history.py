@@ -7,7 +7,6 @@ if TYPE_CHECKING:
 
 class LoginHistory(SQLModel, table=True):
     __tablename__ = "login_history"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True)
