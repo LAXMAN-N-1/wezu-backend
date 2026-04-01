@@ -133,6 +133,7 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     ENVIRONMENT: str = "production"
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    ADMIN_FRONTEND_ORIGIN: Optional[str] = "https://admin.powerfrill.com"
     ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1", "[::1]", "testserver"]
     ENABLE_TRUSTED_HOST_MIDDLEWARE: bool = False
     TRUST_X_FORWARDED_HOST: bool = True
@@ -167,6 +168,11 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _normalize_public_urls(self) -> "Settings":
+        if self.ADMIN_FRONTEND_ORIGIN:
+            frontend_origin = self.ADMIN_FRONTEND_ORIGIN.rstrip("/")
+            if frontend_origin and frontend_origin not in self.CORS_ORIGINS:
+                self.CORS_ORIGINS.append(frontend_origin)
+
         if self.API_PUBLIC_BASE_URL:
             parsed = urlparse(self.API_PUBLIC_BASE_URL)
             if parsed.hostname:
