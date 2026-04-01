@@ -8,7 +8,7 @@ from jose import jwt, JWTError, ExpiredSignatureError
 from app.core.config import settings
 from app.models.user import User
 from app.schemas.user import TokenPayload
-from sqlmodel import func, Session
+from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
 import logging
 
