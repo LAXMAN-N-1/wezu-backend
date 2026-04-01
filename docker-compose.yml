@@ -6,7 +6,6 @@ services:
     init: true
     stop_grace_period: 30s
     cpus: "0.75"
-    mem_limit: 512m
     expose:
       - "8000"
     # In Coolify/production, inject env vars from platform UI.
@@ -51,7 +50,6 @@ services:
     restart: "on-failure:5"
     init: true
     cpus: "0.75"
-    mem_limit: 384m
     environment:
       POSTGRES_USER: wezu
       POSTGRES_PASSWORD: wezupassword
@@ -78,7 +76,6 @@ services:
     restart: "on-failure:5"
     init: true
     cpus: "0.25"
-    mem_limit: 128m
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
