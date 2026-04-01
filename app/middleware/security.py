@@ -12,7 +12,8 @@ class SecureHeadersMiddleware(BaseHTTPMiddleware):
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
             "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-            "img-src 'self' https://fastapi.tiangolo.com data:;"
+            "img-src 'self' https://fastapi.tiangolo.com data:; "
+            "connect-src 'self' https://cdn.jsdelivr.net;"
         )
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         return response
