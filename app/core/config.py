@@ -177,6 +177,11 @@ class Settings(BaseSettings):
             if frontend_origin and frontend_origin not in self.CORS_ORIGINS:
                 self.CORS_ORIGINS.append(frontend_origin)
         self.CORS_ORIGINS = [origin.rstrip("/") for origin in self.CORS_ORIGINS if origin]
+        if "*" in self.CORS_ORIGINS:
+            raise ValueError(
+                "CORS_ORIGINS cannot contain '*' when allow_credentials=True. "
+                "Provide explicit frontend origins instead."
+            )
 
         if self.API_PUBLIC_BASE_URL:
             parsed = urlparse(self.API_PUBLIC_BASE_URL)

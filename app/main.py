@@ -75,11 +75,18 @@ if settings.SENTRY_DSN:
 
 logger = get_logger(__name__)
 
-from app.utils.cors import normalized_cors_origins, cors_headers_for_origin
+from app.utils.cors import cors_headers_for_origin
 
-# Aliases for backward-compat within this module
-_normalized_cors_origins = normalized_cors_origins
-_cors_headers_for_origin = cors_headers_for_origin
+CORS_ALLOWED_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+CORS_ALLOWED_HEADERS = [
+    "Authorization",
+    "Content-Type",
+    "Accept",
+    "Origin",
+    "X-Requested-With",
+    "X-Request-ID",
+    "X-Correlation-ID",
+]
 
 
 class CORSErrorMiddleware(BaseHTTPMiddleware):
@@ -170,29 +177,31 @@ if settings.ENABLE_TRUSTED_HOST_MIDDLEWARE:
 # In Starlette, the most recently added middleware runs first.
 app.add_middleware(TrustedProxyHeadersMiddleware)
 
-# Keep CORS outermost so proxy/host/auth errors still include CORS headers.
+# Keep error-header patching near the edge, then wrap everything with CORSMiddleware.
+app.add_middleware(CORSErrorMiddleware)
+
+# CORSMiddleware must be the outermost layer (added last) so OPTIONS preflight never
+# reaches auth middleware and CORS headers are consistently returned.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS if settings.ENVIRONMENT == "production" else ["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_origin_regex=settings.cors_allow_origin_regex,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=CORS_ALLOWED_METHODS,
+    allow_headers=CORS_ALLOWED_HEADERS,
+    expose_headers=["*"],
 )
-
-# Keep as the outermost middleware so even error responses include CORS headers.
-app.add_middleware(CORSErrorMiddleware)
 
 
 @app.options("/{full_path:path}", include_in_schema=False)
 async def global_options_handler(full_path: str, request: Request):
     origin = request.headers.get("origin", "")
     headers = {
-        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Origin, X-Requested-With",
+        "Access-Control-Allow-Methods": ", ".join(CORS_ALLOWED_METHODS),
+        "Access-Control-Allow-Headers": ", ".join(CORS_ALLOWED_HEADERS),
         "Access-Control-Max-Age": "600",
     }
-    headers.update(_cors_headers_for_origin(origin))
+    headers.update(cors_headers_for_origin(origin))
     return Response(status_code=200, headers=headers)
 
 # ----------------------------
