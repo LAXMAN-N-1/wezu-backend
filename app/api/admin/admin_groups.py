@@ -1,5 +1,8 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select, func
+from sqlalchemy import inspect as sa_inspect
 from typing import List
 from datetime import datetime, UTC
 
@@ -16,10 +19,32 @@ from app.schemas.admin_group import (
 from app.utils.runtime_cache import cached_call, invalidate_cache
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+_admin_group_membership_supported: bool | None = None
 
 
 def _invalidate_admin_group_cache() -> None:
     invalidate_cache("admin-groups")
+
+
+def _supports_admin_group_membership(db: Session) -> bool:
+    global _admin_group_membership_supported
+    if _admin_group_membership_supported is not None:
+        return _admin_group_membership_supported
+
+    try:
+        columns = {
+            column["name"]
+            for column in sa_inspect(db.get_bind()).get_columns("admin_users")
+        }
+        _admin_group_membership_supported = "admin_group_id" in columns
+    except Exception:
+        logger.exception("admin.groups.membership_schema_probe_failed")
+        _admin_group_membership_supported = False
+
+    if not _admin_group_membership_supported:
+        logger.warning("admin.groups.membership_schema_missing")
+    return _admin_group_membership_supported
 
 @router.get("/", response_model=List[AdminGroupWithCount])
 def read_admin_groups(
@@ -31,42 +56,62 @@ def read_admin_groups(
     Retrieve all admin groups, along with their active member counts.
     """
     def _load_groups() -> list[dict]:
-        rows = db.exec(
-            select(
-                AdminGroup.id,
-                AdminGroup.name,
-                AdminGroup.description,
-                AdminGroup.is_active,
-                AdminGroup.created_at,
-                AdminGroup.updated_at,
-                func.coalesce(func.count(AdminUser.id), 0),
-            )
-            .select_from(AdminGroup)
-            .join(AdminUser, AdminUser.admin_group_id == AdminGroup.id, isouter=True)
-            .group_by(
-                AdminGroup.id,
-                AdminGroup.name,
-                AdminGroup.description,
-                AdminGroup.is_active,
-                AdminGroup.created_at,
-                AdminGroup.updated_at,
-            )
+        if _supports_admin_group_membership(db):
+            rows = db.exec(
+                select(
+                    AdminGroup.id,
+                    AdminGroup.name,
+                    AdminGroup.description,
+                    AdminGroup.is_active,
+                    AdminGroup.created_at,
+                    AdminGroup.updated_at,
+                    func.coalesce(func.count(AdminUser.id), 0),
+                )
+                .select_from(AdminGroup)
+                .join(AdminUser, AdminUser.admin_group_id == AdminGroup.id, isouter=True)
+                .group_by(
+                    AdminGroup.id,
+                    AdminGroup.name,
+                    AdminGroup.description,
+                    AdminGroup.is_active,
+                    AdminGroup.created_at,
+                    AdminGroup.updated_at,
+                )
+                .order_by(AdminGroup.created_at.desc())
+                .offset(skip)
+                .limit(limit)
+            ).all()
+
+            return [
+                {
+                    "id": row[0],
+                    "name": row[1],
+                    "description": row[2],
+                    "is_active": row[3],
+                    "created_at": row[4],
+                    "updated_at": row[5],
+                    "member_count": row[6],
+                }
+                for row in rows
+            ]
+
+        groups = db.exec(
+            select(AdminGroup)
             .order_by(AdminGroup.created_at.desc())
             .offset(skip)
             .limit(limit)
         ).all()
-
         return [
             {
-                "id": row[0],
-                "name": row[1],
-                "description": row[2],
-                "is_active": row[3],
-                "created_at": row[4],
-                "updated_at": row[5],
-                "member_count": row[6],
+                "id": group.id,
+                "name": group.name,
+                "description": group.description,
+                "is_active": group.is_active,
+                "created_at": group.created_at,
+                "updated_at": group.updated_at,
+                "member_count": 0,
             }
-            for row in rows
+            for group in groups
         ]
 
     rows = cached_call(
@@ -149,8 +194,10 @@ def delete_admin_group(
         raise HTTPException(status_code=404, detail="Admin group not found")
         
     # Check if there are members
-    count_statement = select(func.count(AdminUser.id)).where(AdminUser.admin_group_id == group_id)
-    member_count = db.exec(count_statement).first() or 0
+    member_count = 0
+    if _supports_admin_group_membership(db):
+        count_statement = select(func.count(AdminUser.id)).where(AdminUser.admin_group_id == group_id)
+        member_count = db.exec(count_statement).first() or 0
     
     if member_count > 0:
         raise HTTPException(
