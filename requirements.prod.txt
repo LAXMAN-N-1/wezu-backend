@@ -11,8 +11,10 @@ email_validator==2.2.0
 fastapi==0.104.1
 firebase-admin==6.8.0
 fpdf2==2.8.5
-google-api-python-client==2.190.0
-google-auth>=2.29.0
+google-auth==2.49.0.dev0
+google-auth-httplib2==0.3.0
+google-auth-oauthlib==1.3.0
+googlemaps
 gunicorn==21.2.0
 httpx==0.27.2
 joblib==1.4.2

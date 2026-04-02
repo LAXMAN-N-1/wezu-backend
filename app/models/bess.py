@@ -14,6 +14,8 @@ class BessUnitStatus(str, Enum):
 
 class BessUnit(SQLModel, table=True):
     __tablename__ = "bess_units"
+    model_config = {"protected_namespaces": ()}
+    
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     location: str

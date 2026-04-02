@@ -213,8 +213,13 @@ def seed_all():
         # ── 5. Seed rentals (from dealer stations) ────────────────
         print("\n[5/10] Seeding rentals...")
         station_ids = [s.id for s in stations]
+        all_batteries = db.exec(select(Battery)).all()
+        if not all_batteries:
+            print("  ⚠ No batteries found — skipping rentals")
         rental_count = 0
         for i in range(35):
+            if not all_batteries:
+                break
             user = random.choice(customers)
             start_st = random.choice(stations)
             is_active = random.random() < 0.3
@@ -222,7 +227,7 @@ def seed_all():
 
             r = Rental(
                 user_id=user.id,
-                battery_id=None,
+                battery_id=random.choice(all_batteries).id,
                 start_station_id=start_st.id,
                 start_time=start_time,
                 expected_end_time=start_time + timedelta(hours=24),
