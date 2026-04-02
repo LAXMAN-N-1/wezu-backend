@@ -28,12 +28,28 @@ from app.services.analytics_service import AnalyticsService
 from app.services.membership_service import MembershipService
 from app.core.proxy import get_client_ip
 from app.api.deps import invalidate_user_token_cache
+from app.core.config import settings
+from app.utils.runtime_cache import cached_call, invalidate_cache
 import os
 import shutil
 import json
 from app.core.security import generate_totp_secret, verify_totp, generate_backup_codes, generate_qr_uri
 
 router = APIRouter()
+
+
+def _user_self_cache(user_id: int, key: str, call):
+    return cached_call(
+        "user-self",
+        user_id,
+        key,
+        ttl_seconds=settings.SESSION_CACHE_TTL_SECONDS,
+        call=call,
+    )
+
+
+def _invalidate_user_self_cache(user_id: int) -> None:
+    invalidate_cache("user-self", user_id)
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 @audit_log("CREATE_USER", "USER")
@@ -187,16 +203,17 @@ async def read_user_me(
     """
     Get current user's full profile.
     """
-    # Reload user with relationships
-    statement = select(User).where(User.id == current_user.id).options(
-        selectinload(User.role),
-        selectinload(User.wallet),
-        selectinload(User.staff_profile),
-        selectinload(User.user_profile)
-    )
-    user = db.exec(statement).first()
-    
-    return _build_user_profile_response(user, db)
+    def _load_profile() -> dict:
+        statement = select(User).where(User.id == current_user.id).options(
+            selectinload(User.role),
+            selectinload(User.wallet),
+            selectinload(User.staff_profile),
+            selectinload(User.user_profile)
+        )
+        user = db.exec(statement).first()
+        return _build_user_profile_response(user, db).model_dump(mode="json")
+
+    return _user_self_cache(current_user.id, "profile", _load_profile)
 
 @router.put("/me", response_model=UserProfileResponse)
 @audit_log("UPDATE_USER", "USER")
@@ -247,6 +264,7 @@ async def update_user_me(
     db.add(user)
     db.commit()
     db.refresh(user)
+    _invalidate_user_self_cache(current_user.id)
     
     # Reload for response
     statement = select(User).where(User.id == current_user.id).options(
@@ -319,7 +337,8 @@ async def upload_profile_picture(
     user.updated_at = datetime.now(UTC)
     db.add(user)
     db.commit()
-    
+    _invalidate_user_self_cache(current_user.id)
+
     return ProfilePictureResponse(url=file_url)
 
 
@@ -707,47 +726,49 @@ def get_notification_preferences(
     from app.models.notification_preference import NotificationPreference
     from sqlmodel import select
     
-    pref = db.exec(
-        select(NotificationPreference).where(NotificationPreference.user_id == current_user.id)
-    ).first()
-    
-    if not pref:
-        # Return defaults if no settings found
-        prefs = _get_default_notification_preferences()
-        return NotificationPreferencesResponse(
-            email=EmailPreferences(**prefs["email"]),
-            sms=SMSPreferences(**prefs["sms"]),
-            push=PushPreferences(**prefs["push"]),
-            quiet_hours=QuietHours(**prefs["quiet_hours"]),
-        )
+    def _load_preferences() -> dict:
+        pref = db.exec(
+            select(NotificationPreference).where(NotificationPreference.user_id == current_user.id)
+        ).first()
 
-    return NotificationPreferencesResponse(
-        email=EmailPreferences(
-            enabled=pref.email_enabled,
-            rental_confirmations=pref.transactional_email,
-            payment_receipts=pref.payment_email,
-            promotional=pref.promotional_email,
-            security_alerts=True
-        ),
-        sms=SMSPreferences(
-            enabled=pref.sms_enabled,
-            rental_confirmations=pref.transactional_sms,
-            payment_receipts=pref.payment_sms,
-            otp=True
-        ),
-        push=PushPreferences(
-            enabled=pref.push_enabled,
-            battery_available=pref.battery_alerts_push,
-            payment_reminders=pref.payment_push,
-            promotional=pref.promotional_push
-        ),
-        quiet_hours=QuietHours(
-            enabled=pref.quiet_hours_enabled,
-            start_time=pref.quiet_hours_start.strftime("%H:%M") if pref.quiet_hours_start else "22:00",
-            end_time=pref.quiet_hours_end.strftime("%H:%M") if pref.quiet_hours_end else "07:00",
-            timezone="UTC"
-        )
-    )
+        if not pref:
+            prefs = _get_default_notification_preferences()
+            return NotificationPreferencesResponse(
+                email=EmailPreferences(**prefs["email"]),
+                sms=SMSPreferences(**prefs["sms"]),
+                push=PushPreferences(**prefs["push"]),
+                quiet_hours=QuietHours(**prefs["quiet_hours"]),
+            ).model_dump(mode="json")
+
+        return NotificationPreferencesResponse(
+            email=EmailPreferences(
+                enabled=pref.email_enabled,
+                rental_confirmations=pref.transactional_email,
+                payment_receipts=pref.payment_email,
+                promotional=pref.promotional_email,
+                security_alerts=True
+            ),
+            sms=SMSPreferences(
+                enabled=pref.sms_enabled,
+                rental_confirmations=pref.transactional_sms,
+                payment_receipts=pref.payment_sms,
+                otp=True
+            ),
+            push=PushPreferences(
+                enabled=pref.push_enabled,
+                battery_available=pref.battery_alerts_push,
+                payment_reminders=pref.payment_push,
+                promotional=pref.promotional_push
+            ),
+            quiet_hours=QuietHours(
+                enabled=pref.quiet_hours_enabled,
+                start_time=pref.quiet_hours_start.strftime("%H:%M") if pref.quiet_hours_start else "22:00",
+                end_time=pref.quiet_hours_end.strftime("%H:%M") if pref.quiet_hours_end else "07:00",
+                timezone="UTC"
+            )
+        ).model_dump(mode="json")
+
+    return _user_self_cache(current_user.id, "notification-preferences", _load_preferences)
 
 
 @router.put("/me/notification-preferences", response_model=NotificationPreferencesResponse)
@@ -796,6 +817,7 @@ def update_notification_preferences(
             
     db.commit()
     db.refresh(pref)
+    _invalidate_user_self_cache(current_user.id)
     
     return NotificationPreferencesResponse(
         email=EmailPreferences(
