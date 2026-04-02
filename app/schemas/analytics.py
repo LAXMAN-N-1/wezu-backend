@@ -102,6 +102,8 @@ class StationAnalyticsResponse(BaseModel):
 
 class DemandForecastResponse(BaseModel):
     """Demand forecast response"""
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
     id: int
     forecast_date: date
     station_id: Optional[int]
@@ -117,10 +119,10 @@ class DemandForecastResponse(BaseModel):
     accuracy_score: Optional[float]
     generated_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
-
 class ChurnPredictionResponse(BaseModel):
     """Churn prediction response"""
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
     id: int
     user_id: int
     user_email: Optional[str]
@@ -132,8 +134,6 @@ class ChurnPredictionResponse(BaseModel):
     prediction_date: date
     model_version: str
     confidence_score: float
-
-    model_config = ConfigDict(from_attributes=True)
 
 class PricingRecommendationResponse(BaseModel):
     """Pricing recommendation response"""
