@@ -84,22 +84,33 @@ class AuthService:
             )
 
     @staticmethod
-    def get_permissions_for_role(db: Session, role_identifier: int | str) -> list[str]:
+    def get_permissions_for_role(
+        db_or_role_identifier: Session | int | str,
+        role_identifier: int | str | None = None,
+    ) -> list[str]:
         """
         Fetch permissions for a given role from the database.
         role_identifier can be role ID (int) or role name (str).
         """
         from app.models.rbac import Role, RolePermission, Permission
         from sqlmodel import select
-        
-        if isinstance(role_identifier, int):
-            statement = select(Permission.slug).join(RolePermission).where(RolePermission.role_id == role_identifier)
+
+        db: Session | None = None
+        if role_identifier is None:
+            role_identifier = db_or_role_identifier
         else:
-            statement = select(Permission.slug).join(RolePermission).join(Role).where(Role.name == role_identifier)
-            
-        perms = db.exec(statement).all()
-        
-        # Fallbacks for empty DB states just to ensure login works while seeding
+            db = db_or_role_identifier  # type: ignore[assignment]
+
+        perms: list[str] = []
+        if db is not None:
+            if isinstance(role_identifier, int):
+                statement = select(Permission.slug).join(RolePermission).where(RolePermission.role_id == role_identifier)
+            else:
+                statement = select(Permission.slug).join(RolePermission).join(Role).where(Role.name == role_identifier)
+
+            perms = list(db.exec(statement).all())
+
+        # Fallbacks for empty DB states or legacy callers without a DB session.
         if not perms and isinstance(role_identifier, str):
             fallback = {
                 "customer": ["profile:read:own", "stations:view:all", "rentals:create:own", "rentals:view:own", "wallet:view:own"],
@@ -110,22 +121,33 @@ class AuthService:
             }
             return fallback.get(role_identifier, [])
             
-        return list(perms)
+        return perms
 
     @staticmethod
-    def get_menu_for_role(db: Session, role_identifier: int | str) -> list[dict]:
+    def get_menu_for_role(
+        db_or_role_identifier: Session | int | str,
+        role_identifier: int | str | None = None,
+    ) -> list[dict]:
         from app.models.rbac import Role
         from app.models.role_right import RoleRight
         from app.models.menu import Menu
         from sqlmodel import select
-        
-        if isinstance(role_identifier, int):
-            statement = select(Menu).join(RoleRight, RoleRight.menu_id == Menu.id).where(RoleRight.role_id == role_identifier).order_by(Menu.menu_order)
+
+        db: Session | None = None
+        if role_identifier is None:
+            role_identifier = db_or_role_identifier
         else:
-            statement = select(Menu).join(RoleRight, RoleRight.menu_id == Menu.id).join(Role).where(Role.name == role_identifier).order_by(Menu.menu_order)
-            
-        menus = db.exec(statement).all()
-        
+            db = db_or_role_identifier  # type: ignore[assignment]
+
+        menus: list[Menu] = []
+        if db is not None:
+            if isinstance(role_identifier, int):
+                statement = select(Menu).join(RoleRight, RoleRight.menu_id == Menu.id).where(RoleRight.role_id == role_identifier).order_by(Menu.menu_order)
+            else:
+                statement = select(Menu).join(RoleRight, RoleRight.menu_id == Menu.id).join(Role).where(Role.name == role_identifier).order_by(Menu.menu_order)
+
+            menus = list(db.exec(statement).all())
+
         if not menus and isinstance(role_identifier, str):
             # Fallback
             if role_identifier == "customer":

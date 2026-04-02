@@ -104,16 +104,9 @@ def _invalidate_dealer_settings_cache(user_id: int) -> None:
     invalidate_cache("dealer-settings", user_id)
 
 
-# ── Profile ──────────────────────────────────────────────
-
-@router.get("/profile")
-def get_profile(
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-) -> Any:
-    """Get dealer profile."""
-    def _load_profile() -> dict[str, Any]:
-        dealer = _get_dealer_profile_or_404(db, current_user.id)
+def _get_dealer_profile_snapshot(db: Session, user_id: int) -> dict[str, Any]:
+    def _load_snapshot() -> dict[str, Any]:
+        dealer = _get_dealer_profile_or_404(db, user_id)
         return {
             "id": dealer.id,
             "user_id": dealer.user_id,
@@ -134,16 +127,34 @@ def get_profile(
             "city": dealer.city,
             "state": dealer.state,
             "pincode": dealer.pincode,
-            "bank_details": dealer.bank_details,
+            "bank_details": dealer.bank_details or {},
+            "global_station_defaults": dealer.global_station_defaults or {},
+            "global_inventory_rules": dealer.global_inventory_rules or {},
+            "holiday_calendar": dealer.holiday_calendar or [],
+            "global_rental_settings": dealer.global_rental_settings or {},
             "is_active": dealer.is_active,
             "created_at": str(dealer.created_at),
-            "full_name": current_user.full_name,
-            "email": current_user.email,
-            "phone": current_user.phone_number,
-            "profile_picture": current_user.profile_picture,
         }
 
-    return _dealer_settings_cache(current_user.id, "profile", _load_profile)
+    return _dealer_settings_cache(user_id, "dealer-profile-snapshot", _load_snapshot)
+
+
+# ── Profile ──────────────────────────────────────────────
+
+@router.get("/profile")
+def get_profile(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get dealer profile."""
+    dealer = _get_dealer_profile_snapshot(db, current_user.id)
+    return {
+        **dealer,
+        "full_name": current_user.full_name,
+        "email": current_user.email,
+        "phone": current_user.phone_number,
+        "profile_picture": current_user.profile_picture,
+    }
 
 
 @router.patch("/profile")
@@ -199,11 +210,8 @@ def get_bank_account(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Get current bank account details."""
-    return _dealer_settings_cache(
-        current_user.id,
-        "bank-account",
-        lambda: {"bank_details": _get_dealer_profile_or_404(db, current_user.id).bank_details or {}},
-    )
+    dealer = _get_dealer_profile_snapshot(db, current_user.id)
+    return {"bank_details": dealer["bank_details"]}
 
 
 # ── Notification Preferences ─────────────────────────────
@@ -377,11 +385,8 @@ def get_station_defaults(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Get global station defaults for the dealer."""
-    return _dealer_settings_cache(
-        current_user.id,
-        "station-defaults",
-        lambda: {"station_defaults": _get_dealer_profile_or_404(db, current_user.id).global_station_defaults or {}},
-    )
+    dealer = _get_dealer_profile_snapshot(db, current_user.id)
+    return {"station_defaults": dealer["global_station_defaults"]}
 
 
 @router.patch("/station-defaults")
@@ -409,11 +414,8 @@ def get_inventory_rules(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Get global inventory rule thresholds."""
-    return _dealer_settings_cache(
-        current_user.id,
-        "inventory-rules",
-        lambda: {"inventory_rules": _get_dealer_profile_or_404(db, current_user.id).global_inventory_rules or {}},
-    )
+    dealer = _get_dealer_profile_snapshot(db, current_user.id)
+    return {"inventory_rules": dealer["global_inventory_rules"]}
 
 
 @router.patch("/inventory-rules")
@@ -441,11 +443,8 @@ def get_holiday_calendar(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Get dealer's holiday calendar."""
-    return _dealer_settings_cache(
-        current_user.id,
-        "holiday-calendar",
-        lambda: {"holiday_calendar": _get_dealer_profile_or_404(db, current_user.id).holiday_calendar or []},
-    )
+    dealer = _get_dealer_profile_snapshot(db, current_user.id)
+    return {"holiday_calendar": dealer["holiday_calendar"]}
 
 
 @router.patch("/holiday-calendar")
@@ -470,11 +469,8 @@ def get_rental_settings(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Get global rental settings for the dealer."""
-    return _dealer_settings_cache(
-        current_user.id,
-        "rental-settings",
-        lambda: _get_dealer_profile_or_404(db, current_user.id).global_rental_settings or {},
-    )
+    dealer = _get_dealer_profile_snapshot(db, current_user.id)
+    return dealer["global_rental_settings"]
 
 
 @router.patch("/rental-settings")

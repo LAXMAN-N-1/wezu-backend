@@ -109,8 +109,20 @@ def _build_user_profile_response(user: User, db: Session = None) -> UserProfileR
     user_roles = [current_role]
     
     # Get permissions and menu for current role
-    permissions = AuthService.get_permissions_for_role(current_role) if current_role else []
-    menu = AuthService.get_menu_for_role(current_role) if current_role else []
+    if current_role:
+        permissions = (
+            AuthService.get_permissions_for_role(db, current_role)
+            if db is not None
+            else AuthService.get_permissions_for_role(current_role)
+        )
+        menu = (
+            AuthService.get_menu_for_role(db, current_role)
+            if db is not None
+            else AuthService.get_menu_for_role(current_role)
+        )
+    else:
+        permissions = []
+        menu = []
     
     # Get wallet balance (handle if wallet relationship not loaded but available in session?)
     # Ideally user.wallet should be loaded.
