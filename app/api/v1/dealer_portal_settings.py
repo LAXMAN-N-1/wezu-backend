@@ -10,10 +10,12 @@ from datetime import datetime, UTC
 
 from app.db.session import get_session
 from app.api.deps import get_current_user
+from app.core.config import settings
 from app.models.user import User
 from app.models.dealer import DealerProfile
 from app.models.notification import Notification
 from app.models.notification_preference import NotificationPreference
+from app.utils.runtime_cache import cached_call, invalidate_cache
 
 router = APIRouter()
 
@@ -78,6 +80,30 @@ class RentalSettingsRequest(BaseModel):
     min_battery_checkout: Optional[int] = None
 
 
+def _get_dealer_profile_or_404(db: Session, user_id: int) -> DealerProfile:
+    dealer = db.exec(
+        select(DealerProfile).where(DealerProfile.user_id == user_id)
+    ).first()
+    if not dealer:
+        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    return dealer
+
+
+def _dealer_settings_cache(user_id: int, key: str, call, *parts: Any) -> Any:
+    return cached_call(
+        "dealer-settings",
+        user_id,
+        key,
+        *parts,
+        ttl_seconds=settings.DEALER_PORTAL_CACHE_TTL_SECONDS,
+        call=call,
+    )
+
+
+def _invalidate_dealer_settings_cache(user_id: int) -> None:
+    invalidate_cache("dealer-settings", user_id)
+
+
 # ── Profile ──────────────────────────────────────────────
 
 @router.get("/profile")
@@ -86,44 +112,38 @@ def get_profile(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Get dealer profile."""
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
-    ).first()
-    if not dealer:
-        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    def _load_profile() -> dict[str, Any]:
+        dealer = _get_dealer_profile_or_404(db, current_user.id)
+        return {
+            "id": dealer.id,
+            "user_id": dealer.user_id,
+            "business_name": dealer.business_name,
+            "gst_number": dealer.gst_number,
+            "pan_number": dealer.pan_number,
+            "year_established": dealer.year_established,
+            "website_url": dealer.website_url,
+            "business_description": dealer.business_description,
+            "contact_person": dealer.contact_person,
+            "contact_email": dealer.contact_email,
+            "contact_phone": dealer.contact_phone,
+            "alternate_phone": dealer.alternate_phone,
+            "whatsapp_number": dealer.whatsapp_number,
+            "support_email": dealer.support_email,
+            "support_phone": dealer.support_phone,
+            "address_line1": dealer.address_line1,
+            "city": dealer.city,
+            "state": dealer.state,
+            "pincode": dealer.pincode,
+            "bank_details": dealer.bank_details,
+            "is_active": dealer.is_active,
+            "created_at": str(dealer.created_at),
+            "full_name": current_user.full_name,
+            "email": current_user.email,
+            "phone": current_user.phone_number,
+            "profile_picture": current_user.profile_picture,
+        }
 
-    return {
-        "id": dealer.id,
-        "user_id": dealer.user_id,
-        "business_name": dealer.business_name,
-        "gst_number": dealer.gst_number,
-        "pan_number": dealer.pan_number,
-        
-        "year_established": dealer.year_established,
-        "website_url": dealer.website_url,
-        "business_description": dealer.business_description,
-        
-        "contact_person": dealer.contact_person,
-        "contact_email": dealer.contact_email,
-        "contact_phone": dealer.contact_phone,
-        "alternate_phone": dealer.alternate_phone,
-        "whatsapp_number": dealer.whatsapp_number,
-        "support_email": dealer.support_email,
-        "support_phone": dealer.support_phone,
-        
-        "address_line1": dealer.address_line1,
-        "city": dealer.city,
-        "state": dealer.state,
-        "pincode": dealer.pincode,
-        
-        "bank_details": dealer.bank_details,
-        "is_active": dealer.is_active,
-        "created_at": str(dealer.created_at),
-        "full_name": current_user.full_name,
-        "email": current_user.email,
-        "phone": current_user.phone_number,
-        "profile_picture": current_user.profile_picture,
-    }
+    return _dealer_settings_cache(current_user.id, "profile", _load_profile)
 
 
 @router.patch("/profile")
@@ -133,11 +153,7 @@ def update_profile(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Update dealer profile fields."""
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
-    ).first()
-    if not dealer:
-        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    dealer = _get_dealer_profile_or_404(db, current_user.id)
 
     update_data = data.dict(exclude_unset=True, exclude_none=True)
     for key, value in update_data.items():
@@ -146,6 +162,7 @@ def update_profile(
     db.add(dealer)
     db.commit()
     db.refresh(dealer)
+    _invalidate_dealer_settings_cache(current_user.id)
 
     return {"message": "Profile updated", "id": dealer.id}
 
@@ -159,11 +176,7 @@ def update_bank_account(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Add/update bank account for commission settlements."""
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
-    ).first()
-    if not dealer:
-        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    dealer = _get_dealer_profile_or_404(db, current_user.id)
 
     dealer.bank_details = {
         "account_number": data.account_number,
@@ -175,6 +188,7 @@ def update_bank_account(
     }
     db.add(dealer)
     db.commit()
+    _invalidate_dealer_settings_cache(current_user.id)
 
     return {"message": "Bank account updated", "verified": False}
 
@@ -185,13 +199,11 @@ def get_bank_account(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Get current bank account details."""
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
-    ).first()
-    if not dealer:
-        raise HTTPException(status_code=404, detail="Dealer profile not found")
-
-    return {"bank_details": dealer.bank_details or {}}
+    return _dealer_settings_cache(
+        current_user.id,
+        "bank-account",
+        lambda: {"bank_details": _get_dealer_profile_or_404(db, current_user.id).bank_details or {}},
+    )
 
 
 # ── Notification Preferences ─────────────────────────────
@@ -202,34 +214,37 @@ def get_notification_preferences(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Get notification toggle preferences."""
-    prefs = db.exec(
-        select(NotificationPreference).where(
-            NotificationPreference.user_id == current_user.id
-        )
-    ).first()
+    def _load_preferences() -> dict[str, Any]:
+        prefs = db.exec(
+            select(NotificationPreference).where(
+                NotificationPreference.user_id == current_user.id
+            )
+        ).first()
 
-    if not prefs:
+        if not prefs:
+            return {
+                "notifications_enabled": True,
+                "push_enabled": True,
+                "email_enabled": True,
+                "sms_enabled": False,
+            }
+
         return {
-            "notifications_enabled": True,
-            "push_enabled": True,
-            "email_enabled": True,
-            "sms_enabled": False,
+            "notifications_enabled": prefs.notifications_enabled,
+            "push_enabled": prefs.push_enabled,
+            "email_enabled": prefs.email_enabled,
+            "sms_enabled": prefs.sms_enabled,
+            "battery_alerts_push": prefs.battery_alerts_push,
+            "battery_alerts_email": prefs.battery_alerts_email,
+            "rental_reminders_push": prefs.rental_reminders_push,
+            "rental_reminders_email": prefs.rental_reminders_email,
+            "payment_push": prefs.payment_push,
+            "payment_email": prefs.payment_email,
+            "maintenance_push": prefs.maintenance_push,
+            "maintenance_email": prefs.maintenance_email,
         }
 
-    return {
-        "notifications_enabled": prefs.notifications_enabled,
-        "push_enabled": prefs.push_enabled,
-        "email_enabled": prefs.email_enabled,
-        "sms_enabled": prefs.sms_enabled,
-        "battery_alerts_push": prefs.battery_alerts_push,
-        "battery_alerts_email": prefs.battery_alerts_email,
-        "rental_reminders_push": prefs.rental_reminders_push,
-        "rental_reminders_email": prefs.rental_reminders_email,
-        "payment_push": prefs.payment_push,
-        "payment_email": prefs.payment_email,
-        "maintenance_push": prefs.maintenance_push,
-        "maintenance_email": prefs.maintenance_email,
-    }
+    return _dealer_settings_cache(current_user.id, "notification-preferences", _load_preferences)
 
 
 @router.put("/notification-preferences")
@@ -256,6 +271,7 @@ def update_notification_preferences(
     prefs.updated_at = datetime.now(UTC)
     db.add(prefs)
     db.commit()
+    _invalidate_dealer_settings_cache(current_user.id)
 
     return {"message": "Notification preferences updated"}
 
@@ -361,12 +377,11 @@ def get_station_defaults(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Get global station defaults for the dealer."""
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
-    ).first()
-    if not dealer:
-        raise HTTPException(status_code=404, detail="Dealer profile not found")
-    return {"station_defaults": dealer.global_station_defaults or {}}
+    return _dealer_settings_cache(
+        current_user.id,
+        "station-defaults",
+        lambda: {"station_defaults": _get_dealer_profile_or_404(db, current_user.id).global_station_defaults or {}},
+    )
 
 
 @router.patch("/station-defaults")
@@ -376,11 +391,7 @@ def update_station_defaults(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Update global station defaults."""
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
-    ).first()
-    if not dealer:
-        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    dealer = _get_dealer_profile_or_404(db, current_user.id)
     
     current_defaults = dealer.global_station_defaults or {}
     current_defaults.update(data)
@@ -388,6 +399,7 @@ def update_station_defaults(
     
     db.add(dealer)
     db.commit()
+    _invalidate_dealer_settings_cache(current_user.id)
     return {"message": "Station defaults updated"}
 
 
@@ -397,12 +409,11 @@ def get_inventory_rules(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Get global inventory rule thresholds."""
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
-    ).first()
-    if not dealer:
-        raise HTTPException(status_code=404, detail="Dealer profile not found")
-    return {"inventory_rules": dealer.global_inventory_rules or {}}
+    return _dealer_settings_cache(
+        current_user.id,
+        "inventory-rules",
+        lambda: {"inventory_rules": _get_dealer_profile_or_404(db, current_user.id).global_inventory_rules or {}},
+    )
 
 
 @router.patch("/inventory-rules")
@@ -412,11 +423,7 @@ def update_inventory_rules(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Update global inventory rules."""
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
-    ).first()
-    if not dealer:
-        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    dealer = _get_dealer_profile_or_404(db, current_user.id)
     
     current_rules = dealer.global_inventory_rules or {}
     current_rules.update(data)
@@ -424,6 +431,7 @@ def update_inventory_rules(
     
     db.add(dealer)
     db.commit()
+    _invalidate_dealer_settings_cache(current_user.id)
     return {"message": "Inventory rules updated"}
 
 
@@ -433,12 +441,11 @@ def get_holiday_calendar(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Get dealer's holiday calendar."""
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
-    ).first()
-    if not dealer:
-        raise HTTPException(status_code=404, detail="Dealer profile not found")
-    return {"holiday_calendar": dealer.holiday_calendar or []}
+    return _dealer_settings_cache(
+        current_user.id,
+        "holiday-calendar",
+        lambda: {"holiday_calendar": _get_dealer_profile_or_404(db, current_user.id).holiday_calendar or []},
+    )
 
 
 @router.patch("/holiday-calendar")
@@ -448,15 +455,12 @@ def update_holiday_calendar(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Update holiday calendar (full replacement)."""
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
-    ).first()
-    if not dealer:
-        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    dealer = _get_dealer_profile_or_404(db, current_user.id)
     
     dealer.holiday_calendar = data
     db.add(dealer)
     db.commit()
+    _invalidate_dealer_settings_cache(current_user.id)
     return {"message": "Holiday calendar updated"}
 
 
@@ -466,12 +470,11 @@ def get_rental_settings(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Get global rental settings for the dealer."""
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
-    ).first()
-    if not dealer:
-        raise HTTPException(status_code=404, detail="Dealer profile not found")
-    return dealer.global_rental_settings or {}
+    return _dealer_settings_cache(
+        current_user.id,
+        "rental-settings",
+        lambda: _get_dealer_profile_or_404(db, current_user.id).global_rental_settings or {},
+    )
 
 
 @router.patch("/rental-settings")
@@ -481,11 +484,7 @@ def update_rental_settings(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Update global rental settings."""
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
-    ).first()
-    if not dealer:
-        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    dealer = _get_dealer_profile_or_404(db, current_user.id)
     
     current_settings = dealer.global_rental_settings or {}
     
@@ -496,4 +495,5 @@ def update_rental_settings(
     
     db.add(dealer)
     db.commit()
+    _invalidate_dealer_settings_cache(current_user.id)
     return {"message": "Rental settings updated"}

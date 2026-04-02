@@ -1,3 +1,7 @@
+from dataclasses import dataclass
+import hashlib
+from threading import Lock
+from time import monotonic
 from typing import Generator, Optional
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -16,6 +20,89 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
+@dataclass
+class _ValidatedToken:
+    user_id: int
+    sid: Optional[str]
+    issued_at: Optional[int]
+
+
+_auth_cache: dict[str, tuple[float, _ValidatedToken]] = {}
+_auth_cache_lock = Lock()
+_auth_user_index: dict[int, set[str]] = {}
+
+
+def _auth_cache_key(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _prune_auth_cache(now: float) -> None:
+    expired = [key for key, (expires_at, _) in _auth_cache.items() if expires_at <= now]
+    for key in expired:
+        _, cached = _auth_cache.pop(key, (0.0, None))
+        if cached:
+            user_keys = _auth_user_index.get(cached.user_id)
+            if user_keys:
+                user_keys.discard(key)
+                if not user_keys:
+                    _auth_user_index.pop(cached.user_id, None)
+
+
+def _store_validated_token(token: str, validated: _ValidatedToken) -> None:
+    ttl = settings.AUTH_TOKEN_CACHE_TTL_SECONDS
+    if ttl <= 0:
+        return
+    now = monotonic()
+    cache_key = _auth_cache_key(token)
+    with _auth_cache_lock:
+        _prune_auth_cache(now)
+        previous = _auth_cache.get(cache_key)
+        if previous:
+            prior_user = previous[1].user_id
+            user_keys = _auth_user_index.get(prior_user)
+            if user_keys:
+                user_keys.discard(cache_key)
+                if not user_keys:
+                    _auth_user_index.pop(prior_user, None)
+        _auth_cache[cache_key] = (now + ttl, validated)
+        _auth_user_index.setdefault(validated.user_id, set()).add(cache_key)
+
+
+def _get_validated_token(token: str) -> Optional[_ValidatedToken]:
+    ttl = settings.AUTH_TOKEN_CACHE_TTL_SECONDS
+    if ttl <= 0:
+        return None
+    now = monotonic()
+    cache_key = _auth_cache_key(token)
+    with _auth_cache_lock:
+        _prune_auth_cache(now)
+        cached = _auth_cache.get(cache_key)
+        if not cached or cached[0] <= now:
+            return None
+        return cached[1]
+
+
+def invalidate_token_cache(token: Optional[str]) -> None:
+    if not token:
+        return
+    cache_key = _auth_cache_key(token)
+    with _auth_cache_lock:
+        cached = _auth_cache.pop(cache_key, None)
+        if cached:
+            user_keys = _auth_user_index.get(cached[1].user_id)
+            if user_keys:
+                user_keys.discard(cache_key)
+                if not user_keys:
+                    _auth_user_index.pop(cached[1].user_id, None)
+
+
+def invalidate_user_token_cache(user_id: int) -> None:
+    with _auth_cache_lock:
+        cache_keys = _auth_user_index.pop(user_id, set())
+        for cache_key in cache_keys:
+            _auth_cache.pop(cache_key, None)
+
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/auth/token",
     description="Please enter your **Email** address (e.g., admin@wezu.com) in the **username** field below.",
@@ -32,70 +119,61 @@ def get_current_user(
             detail="token_missing",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    try:
-        payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-        )
-        token_data = TokenPayload(**payload)
-    except ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="token_expired",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except (JWTError, ValidationError) as e:
-        logger.warning("auth.token_decode_failed", extra={"error": str(e)})
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="token_invalid",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    # Check if token is blacklisted
-    blacklisted = db.exec(select(BlacklistedToken).where(BlacklistedToken.token == token)).first()
-    if blacklisted:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="token_invalid",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-        
-    # --- SESSION VERIFICATION ---
-    # Extract Session ID (sid) from token
-    # Access tokens should have 'sid' claim linking to UserSession.token_id
-    sid = payload.get("sid")
-    if sid:
-        from app.models.session import UserSession
-        # Verify session exists and is active
-        # We query by token_id (which is the JTI/SID)
-        user_session = db.exec(select(UserSession).where(UserSession.token_id == sid)).first()
-        
-        if not user_session:
-            # Session not found (maybe deleted?)
-            # Valid token but no session = Unauthorized (Revoked)
+    validated = _get_validated_token(token)
+    payload = None
+
+    if validated is None:
+        try:
+            payload = jwt.decode(
+                token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+            )
+            token_data = TokenPayload(**payload)
+        except ExpiredSignatureError:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="token_expired",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        except (JWTError, ValidationError) as e:
+            logger.warning("auth.token_decode_failed", extra={"error": str(e)})
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="token_invalid",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-            
-        if not user_session.is_active:
-             raise HTTPException(
+
+        blacklisted = db.exec(select(BlacklistedToken).where(BlacklistedToken.token == token)).first()
+        if blacklisted:
+            raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="token_invalid",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-            
-        # Update last_active_at (optional, but good for tracking)
-        # However, updating DB on every request can be heavy.
-        # Let's skip updating for now to avoid performance hit, 
-        # or only update if > 5 minutes passed? 
-        # For strict security, we just read.
+
+        sid = payload.get("sid")
+        if sid:
+            from app.models.session import UserSession
+            user_session = db.exec(select(UserSession).where(UserSession.token_id == sid)).first()
+            if not user_session or not user_session.is_active:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="token_invalid",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+
+        validated = _ValidatedToken(
+            user_id=int(token_data.sub),
+            sid=sid,
+            issued_at=payload.get("iat"),
+        )
+        _store_validated_token(token, validated)
+    else:
+        token_data = TokenPayload(sub=str(validated.user_id))
     
     # Check if we are using SQLModel (which uses .get) or pure SQLAlchemy
     # User model inherits from SQLModel, so we can use db.get(User, id) or query.
     # To be safe and consistent with typical patterns:
-    user = db.exec(select(User).where(User.id == int(token_data.sub)).options(selectinload(User.role))).first()
+    user = db.exec(select(User).where(User.id == validated.user_id).options(selectinload(User.role))).first()
     
     if not user:
         raise HTTPException(
@@ -117,7 +195,7 @@ def get_current_user(
     # Global Logout Check
     if getattr(user, "last_global_logout_at", None):
         # Get 'iat' (Issued At) from token
-        iat = payload.get("iat")
+        iat = validated.issued_at
         if iat:
             from datetime import datetime, UTC
             # Use UTC-aware timestamp for comparison
@@ -290,4 +368,3 @@ def get_current_customer(current_user: User = Depends(get_current_user)) -> User
             detail="insufficient_permissions",
         )
     return current_user
-

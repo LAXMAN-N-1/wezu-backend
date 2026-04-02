@@ -420,6 +420,8 @@ class AuthService:
         session.revoked_at = datetime.now(UTC)
         db.add(session)
         db.commit()
+        from app.api.deps import invalidate_token_cache
+        invalidate_token_cache(token)
         return True
 
     @staticmethod
@@ -451,4 +453,6 @@ class AuthService:
             db.add(s)
             
         db.commit()
+        from app.api.deps import invalidate_user_token_cache
+        invalidate_user_token_cache(user_id)
         return len(sessions)

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
+from sqlalchemy import case
 from typing import List, Optional
 from datetime import datetime, UTC
 from pydantic import BaseModel
@@ -7,11 +8,17 @@ from app.api import deps
 from app.models.user import User, UserStatus, UserType
 from app.schemas.user import UserResponse
 from app.core.database import get_db
+from app.core.config import settings
 from app.core.security import get_password_hash
 from app.models.rbac import Role
+from app.utils.runtime_cache import cached_call, invalidate_cache
 
 
 router = APIRouter()
+
+
+def _invalidate_admin_user_cache() -> None:
+    invalidate_cache("admin-users")
 
 
 class AdminUserCreateRequest(BaseModel):
@@ -83,6 +90,7 @@ def admin_create_user(
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    _invalidate_admin_user_cache()
 
     return {
         "id": new_user.id,
@@ -154,51 +162,63 @@ def list_users(
     db: Session = Depends(get_db),
 ):
     """List all users with pagination, search, and filters."""
-    statement = select(User).where(User.is_deleted == False)
+    def _load_users() -> dict:
+        statement = select(User).where(User.is_deleted == False)
 
-    if search:
-        statement = statement.where(
-            (User.full_name.ilike(f"%{search}%")) |
-            (User.email.ilike(f"%{search}%")) |
-            (User.phone_number.ilike(f"%{search}%"))
+        if search:
+            statement = statement.where(
+                (User.full_name.ilike(f"%{search}%")) |
+                (User.email.ilike(f"%{search}%")) |
+                (User.phone_number.ilike(f"%{search}%"))
+            )
+
+        if status:
+            statement = statement.where(User.status == status.lower())
+
+        if user_type:
+            statement = statement.where(User.user_type == user_type)
+
+        if kyc_status:
+            statement = statement.where(User.kyc_status == kyc_status)
+
+        total_count = db.exec(select(func.count()).select_from(statement.subquery())).one()
+        users = db.exec(statement.order_by(User.created_at.desc()).offset(skip).limit(limit)).all()
+
+        role_ids = {u.role_id for u in users if u.role_id}
+        role_map = (
+            {r.id: r.name for r in db.exec(select(Role).where(Role.id.in_(role_ids))).all()}
+            if role_ids else {}
         )
 
-    if status:
-        statement = statement.where(User.status == status.lower())
+        user_list = []
+        for u in users:
+            role_name = None
+            if u.role:
+                role_name = u.role.name
+            elif u.role_id:
+                role_name = role_map.get(u.role_id)
+            user_list.append(_serialize_user(u, role_name=role_name))
 
-    if user_type:
-        statement = statement.where(User.user_type == user_type)
+        return {
+            "items": user_list,
+            "total_count": total_count,
+            "page": skip // limit + 1 if limit > 0 else 1,
+            "page_size": limit,
+        }
 
-    if kyc_status:
-        statement = statement.where(User.kyc_status == kyc_status)
-
-    # Get total count
-    count_stmt = select(func.count()).select_from(statement.subquery())
-    total_count = db.exec(count_stmt).one()
-
-    # Paginate
-    statement = statement.order_by(User.created_at.desc()).offset(skip).limit(limit)
-    users = db.exec(statement).all()
-
-    role_ids = {u.role_id for u in users if u.role_id}
-    from app.models.rbac import Role
-    role_map = {r.id: r.name for r in db.exec(select(Role).where(Role.id.in_(role_ids))).all()} if role_ids else {}
-
-    user_list = []
-    for u in users:
-        role_name = None
-        if u.role:
-            role_name = u.role.name
-        elif u.role_id:
-            role_name = role_map.get(u.role_id)
-        user_list.append(_serialize_user(u, role_name=role_name))
-
-    return {
-        "items": user_list,
-        "total_count": total_count,
-        "page": skip // limit + 1 if limit > 0 else 1,
-        "page_size": limit,
-    }
+    return cached_call(
+        "admin-users",
+        "list",
+        current_user.id,
+        skip,
+        limit,
+        search or "",
+        status or "",
+        user_type or "",
+        kyc_status or "",
+        ttl_seconds=settings.USER_ADMIN_CACHE_TTL_SECONDS,
+        call=_load_users,
+    )
 
 
 @router.get("/summary")
@@ -207,25 +227,32 @@ def get_user_summary(
     db: Session = Depends(get_db),
 ):
     """Get user statistics for admin dashboard."""
-    total = db.exec(select(func.count()).where(User.is_deleted == False)).one()
-    active = db.exec(select(func.count()).where(
-        User.status == UserStatus.ACTIVE, User.is_deleted == False
-    )).one()
-    suspended = db.exec(select(func.count()).where(
-        User.status == UserStatus.SUSPENDED, User.is_deleted == False
-    )).one()
-    pending_verification = db.exec(select(func.count()).where(
-        User.status == UserStatus.PENDING_VERIFICATION, User.is_deleted == False
-    )).one()
-    
-    # Map to frontend expected keys
-    return {
-        "total_users": total,
-        "active_count": active,
-        "inactive_count": 0, # Assuming inactive is separate from suspended in some systems
-        "suspended_count": suspended,
-        "pending_count": pending_verification,
-    }
+    def _load_summary() -> dict:
+        total, active, suspended, pending_verification, inactive = db.exec(
+            select(
+                func.count(User.id),
+                func.coalesce(func.sum(case((User.status == UserStatus.ACTIVE, 1), else_=0)), 0),
+                func.coalesce(func.sum(case((User.status == UserStatus.SUSPENDED, 1), else_=0)), 0),
+                func.coalesce(func.sum(case((User.status == UserStatus.PENDING_VERIFICATION, 1), else_=0)), 0),
+                func.coalesce(func.sum(case((User.is_active == False, 1), else_=0)), 0),
+            ).where(User.is_deleted == False)
+        ).one()
+
+        return {
+            "total_users": total,
+            "active_count": active,
+            "inactive_count": inactive,
+            "suspended_count": suspended,
+            "pending_count": pending_verification,
+        }
+
+    return cached_call(
+        "admin-users",
+        "summary",
+        current_user.id,
+        ttl_seconds=settings.USER_ADMIN_CACHE_TTL_SECONDS,
+        call=_load_summary,
+    )
 
 
 @router.get("/suspended")
@@ -319,6 +346,7 @@ def update_user_detail(
     db.add(user)
     db.commit()
     db.refresh(user)
+    _invalidate_admin_user_cache()
 
     role_name = db.get(Role, user.role_id).name if user.role_id and db.get(Role, user.role_id) else None
     return _serialize_user(user, role_name=role_name)
@@ -344,6 +372,7 @@ def reset_user_password(
     user.updated_at = datetime.now(UTC)
     db.add(user)
     db.commit()
+    _invalidate_admin_user_cache()
     return {"status": "success", "message": "Password reset successful"}
 
 
@@ -373,6 +402,7 @@ def delete_user(
     user.updated_at = datetime.now(UTC)
     db.add(user)
     db.commit()
+    _invalidate_admin_user_cache()
     return {"status": "success", "message": f"User {user.full_name or user.email} deleted"}
 
 
@@ -392,6 +422,7 @@ def toggle_user_active(
     db.add(user)
     db.commit()
     db.refresh(user)
+    _invalidate_admin_user_cache()
     return {"status": "success", "is_active": user.is_active}
 
 
@@ -416,6 +447,7 @@ def suspend_user(
     db.add(user)
     db.commit()
     db.refresh(user)
+    _invalidate_admin_user_cache()
 
     return {
         "status": "success",
@@ -445,6 +477,7 @@ def reactivate_user(
     db.add(user)
     db.commit()
     db.refresh(user)
+    _invalidate_admin_user_cache()
 
     return {
         "status": "success",
@@ -470,4 +503,5 @@ def update_user_kyc_status(
     db.add(user)
     db.commit()
     db.refresh(user)
+    _invalidate_admin_user_cache()
     return {"status": "success", "kyc_status": user.kyc_status}

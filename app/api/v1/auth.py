@@ -844,15 +844,12 @@ async def logout_all(
     Invalidate ALL sessions for the current user.
     Updates 'last_global_logout_at' timestamp. Any token issued before this time will be rejected.
     """
-    current_user.last_global_logout_at = datetime.now(UTC)
-    # Merge into current session to avoid "already attached to session" error
-    # if current_user came from a different dependency session context
-    updated_user = db.merge(current_user)
-    db.add(updated_user)
-    db.commit()
-    
+    revoked_count = AuthService.revoke_all_user_sessions(db, current_user.id)
     logger.info(f"User {current_user.id} performed global logout")
-    return {"message": "Logged out from all devices successfully"}
+    return {
+        "message": "Logged out from all devices successfully",
+        "sessions_revoked": revoked_count,
+    }
 
 @router.post("/forgot-password")
 @limiter.limit("5/hour")

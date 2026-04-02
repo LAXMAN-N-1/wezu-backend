@@ -11,6 +11,7 @@ import logging
 
 from app.db.session import get_session
 from app.api import deps
+from app.api.deps import invalidate_user_token_cache
 from app.models.user import User, UserStatus, UserType
 from app.models.dealer import DealerProfile
 from app.models.rbac import Role
@@ -634,6 +635,7 @@ def terminate_all_sessions(
     _audit(db, current_user.id, dealer.id, AuditActionType.SESSION_TERMINATED,
            target_id=user.id, details=f"Terminated all {count} sessions for {user.email}")
     db.commit()
+    invalidate_user_token_cache(user.id)
 
     return {"success": True, "terminated": count}
 
@@ -662,6 +664,7 @@ def terminate_session(
     _audit(db, current_user.id, dealer.id, AuditActionType.SESSION_TERMINATED,
            target_id=user.id, details=f"Terminated session {session_id} for {user.email}")
     db.commit()
+    invalidate_user_token_cache(user.id)
 
     return {"success": True}
 

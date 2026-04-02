@@ -20,6 +20,7 @@ from app.schemas.user import (
 )
 
 from app.api import deps
+from app.api.deps import invalidate_user_token_cache
 from app.core.security import verify_password, get_password_hash
 
 router = APIRouter()
@@ -348,5 +349,6 @@ def revoke_session(
 
     db.add(session)
     db.commit()
+    invalidate_user_token_cache(current_user.id)
 
     return {"message": "Session revoked"}

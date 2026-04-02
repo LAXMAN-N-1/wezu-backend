@@ -130,7 +130,11 @@ class Settings(BaseSettings):
     LOG_REQUESTS: bool = True
     LOG_HEALTHCHECKS: bool = False
     LOG_SLOW_REQUEST_THRESHOLD_MS: int = 2000
+    AUTH_TOKEN_CACHE_TTL_SECONDS: int = 5
     ANALYTICS_CACHE_TTL_SECONDS: int = 30
+    DEALER_PORTAL_CACHE_TTL_SECONDS: int = 15
+    USER_ADMIN_CACHE_TTL_SECONDS: int = 15
+    SESSION_CACHE_TTL_SECONDS: int = 10
     SENTRY_DSN: Optional[str] = None
     SENTRY_ENVIRONMENT: str = "production"
     SENTRY_TRACES_SAMPLE_RATE: float = 0.1

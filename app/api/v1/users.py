@@ -27,6 +27,7 @@ from app.services.audit_service import audit_service
 from app.services.analytics_service import AnalyticsService
 from app.services.membership_service import MembershipService
 from app.core.proxy import get_client_ip
+from app.api.deps import invalidate_user_token_cache
 import os
 import shutil
 import json
@@ -1638,6 +1639,7 @@ async def revoke_session(
     session.is_active = False
     db.add(session)
     db.commit()
+    invalidate_user_token_cache(current_user.id)
     
     # Optional: Blacklist token if TokenService is available
     if session.token_id:
