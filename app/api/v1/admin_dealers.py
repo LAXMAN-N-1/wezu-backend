@@ -161,48 +161,6 @@ def get_dealer_stats(db: Session = Depends(deps.get_db)):
     }
 
 
-@router.get("/{dealer_id}")
-def get_dealer_detail(dealer_id: int, db: Session = Depends(deps.get_db)):
-    """Full dealer detail including profile, user, application, stations."""
-    dp = db.get(DealerProfile, dealer_id)
-    if not dp:
-        raise HTTPException(404, "Dealer not found")
-
-    user = db.get(User, dp.user_id)
-    result = _dealer_to_dict(dp, user)
-
-    # Application status
-    app = db.exec(select(DealerApplication).where(DealerApplication.dealer_id == dp.id)).first()
-    if app:
-        result["application"] = {
-            "id": app.id,
-            "current_stage": app.current_stage,
-            "risk_score": app.risk_score,
-            "status_history": app.status_history or [],
-            "created_at": app.created_at.isoformat() if app.created_at else None,
-        }
-
-    # Stations
-    stations = db.exec(select(Station).where(Station.dealer_id == dp.id)).all()
-    result["stations"] = [
-        {"id": s.id, "name": s.name, "status": s.status, "city": s.city}
-        for s in stations
-    ]
-
-    # Documents
-    docs = db.exec(select(DealerDocument).where(DealerDocument.dealer_id == dp.id)).all()
-    result["documents"] = [
-        {
-            "id": d.id, "document_type": d.document_type,
-            "status": d.status, "is_verified": d.is_verified,
-            "uploaded_at": d.uploaded_at.isoformat() if d.uploaded_at else None,
-        }
-        for d in docs
-    ]
-
-    return result
-
-
 @router.post("/create")
 def create_dealer(
     data: DealerCreateRequest,
@@ -554,3 +512,47 @@ def get_commission_stats(db: Session = Depends(deps.get_db)):
         "total_pending": float(total_pending),
         "active_configs": active_configs,
     }
+
+
+# Keep the dynamic dealer-id route after all static routes above. FastAPI route
+# matching is order-sensitive; declaring /{dealer_id} earlier causes static
+# paths like /applications or /kyc to be parsed as a dealer_id and return 422.
+@router.get("/{dealer_id}")
+def get_dealer_detail(dealer_id: int, db: Session = Depends(deps.get_db)):
+    """Full dealer detail including profile, user, application, stations."""
+    dp = db.get(DealerProfile, dealer_id)
+    if not dp:
+        raise HTTPException(404, "Dealer not found")
+
+    user = db.get(User, dp.user_id)
+    result = _dealer_to_dict(dp, user)
+
+    app = db.exec(select(DealerApplication).where(DealerApplication.dealer_id == dp.id)).first()
+    if app:
+        result["application"] = {
+            "id": app.id,
+            "current_stage": app.current_stage,
+            "risk_score": app.risk_score,
+            "status_history": app.status_history or [],
+            "created_at": app.created_at.isoformat() if app.created_at else None,
+        }
+
+    stations = db.exec(select(Station).where(Station.dealer_id == dp.id)).all()
+    result["stations"] = [
+        {"id": s.id, "name": s.name, "status": s.status, "city": s.city}
+        for s in stations
+    ]
+
+    docs = db.exec(select(DealerDocument).where(DealerDocument.dealer_id == dp.id)).all()
+    result["documents"] = [
+        {
+            "id": d.id,
+            "document_type": d.document_type,
+            "status": d.status,
+            "is_verified": d.is_verified,
+            "uploaded_at": d.uploaded_at.isoformat() if d.uploaded_at else None,
+        }
+        for d in docs
+    ]
+
+    return result
