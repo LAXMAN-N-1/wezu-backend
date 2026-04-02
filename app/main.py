@@ -20,6 +20,7 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from app.core.config import settings
 from app.db.session import engine
 from app.api import deps
+import app.models.all  # noqa: F401  Ensure all SQLModel classes are registered before first query.
 from app.middleware.rate_limit import limiter
 from app.middleware.audit import AuditMiddleware
 from app.middleware.security import SecureHeadersMiddleware
