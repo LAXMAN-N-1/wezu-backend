@@ -12,6 +12,9 @@ from app.models.user import User
 from app.models.role_right import RoleRight
 from app.schemas.user import TokenPayload
 from app.models.oauth import BlacklistedToken
+import logging
+
+logger = logging.getLogger(__name__)
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/auth/token",
@@ -41,8 +44,7 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     except (JWTError, ValidationError) as e:
-        import logging
-        logging.error(f"AUTHENTICATION_ERROR: JWT/Validation failure: {str(e)} | Token provided: {token[:10]}...")
+        logger.warning("auth.token_decode_failed", extra={"error": str(e)})
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="token_invalid",
@@ -288,5 +290,4 @@ def get_current_customer(current_user: User = Depends(get_current_user)) -> User
             detail="insufficient_permissions",
         )
     return current_user
-
 

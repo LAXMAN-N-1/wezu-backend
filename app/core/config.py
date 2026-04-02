@@ -126,6 +126,9 @@ class Settings(BaseSettings):
     
     # Monitoring & Logging
     LOG_LEVEL: str = "INFO"
+    LOG_ACCESS_LOGS: bool = True
+    LOG_REQUESTS: bool = True
+    LOG_HEALTHCHECKS: bool = False
     SENTRY_DSN: Optional[str] = None
     SENTRY_ENVIRONMENT: str = "production"
     SENTRY_TRACES_SAMPLE_RATE: float = 0.1

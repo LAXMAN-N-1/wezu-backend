@@ -66,13 +66,16 @@ class RBACMiddleware(BaseHTTPMiddleware):
             except ExpiredSignatureError:
                 # Middleware is non-blocking, but keep explicit diagnostics.
                 request.state.auth_error = "token_expired"
-                logger.warning("RBAC middleware token decode failed: token_expired")
+                logger.warning("rbac.token_decode_failed", extra={"auth_error": "token_expired"})
             except JWTError:
                 request.state.auth_error = "token_invalid"
-                logger.warning("RBAC middleware token decode failed: token_invalid")
+                logger.warning("rbac.token_decode_failed", extra={"auth_error": "token_invalid"})
             except Exception as e:
                 request.state.auth_error = "token_invalid"
-                logger.warning(f"RBAC middleware token decode failed: token_invalid ({e})")
+                logger.warning(
+                    "rbac.token_decode_failed",
+                    extra={"auth_error": "token_invalid", "error": str(e)},
+                )
                 
         response = await call_next(request)
         return response

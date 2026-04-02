@@ -1,51 +1,77 @@
 import logging
-import json
+import logging.config
 import sys
-from datetime import datetime
-from typing import Any, Dict
 
 import structlog
+
 from app.core.config import settings
 
-def setup_logging():
-    """
-    Configures structured JSON logging for production.
-    Uses structlog for high-performance, structured logging.
-    """
-    
-    # Processors for structlog
-    processors = [
+
+def _shared_processors() -> list[structlog.types.Processor]:
+    return [
         structlog.contextvars.merge_contextvars,
-        structlog.processors.add_log_level,
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.ExtraAdder(),
+        structlog.processors.TimeStamper(fmt="iso", utc=False),
+        structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
-        structlog.processors.TimeStamper(fmt="iso"),
     ]
 
+
+def setup_logging() -> None:
+    """
+    Configure stdlib logging and structlog so all logs end up on stdout/stderr
+    with request context attached. This is the only logging bootstrap path the
+    API should use.
+    """
+    shared_processors = _shared_processors()
+    renderer: structlog.types.Processor
     if settings.ENVIRONMENT == "production":
-        # JSON output for CloudWatch/ELK
-        processors.append(structlog.processors.JSONRenderer())
+        renderer = structlog.processors.JSONRenderer()
     else:
-        # Pretty console output for local development
-        processors.append(structlog.dev.ConsoleRenderer())
+        renderer = structlog.dev.ConsoleRenderer()
+
+    formatter = structlog.stdlib.ProcessorFormatter(
+        foreign_pre_chain=shared_processors,
+        processor=renderer,
+    )
+
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(formatter)
+
+    root_logger = logging.getLogger()
+    root_logger.handlers.clear()
+    root_logger.addHandler(handler)
+    root_logger.setLevel(getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO))
+
+    logging.captureWarnings(True)
 
     structlog.configure(
-        processors=processors,
-        logger_factory=structlog.PrintLoggerFactory(),
+        processors=shared_processors + [structlog.stdlib.ProcessorFormatter.wrap_for_formatter],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,
     )
 
-    # Bridge standard logging to structlog
-    logging.basicConfig(
-        format="%(message)s",
-        stream=sys.stdout,
-        level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
-    )
-    
-    # Silence chatty libraries
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
-    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
-    logging.getLogger("aiosqlite").setLevel(logging.WARNING)
+    access_log_level = logging.INFO if settings.LOG_ACCESS_LOGS else logging.WARNING
+    quiet_loggers = {
+        "uvicorn": logging.INFO,
+        "uvicorn.error": logging.INFO,
+        "uvicorn.access": access_log_level,
+        "gunicorn": logging.INFO,
+        "gunicorn.error": logging.INFO,
+        "gunicorn.access": access_log_level,
+        "sqlalchemy.engine": logging.INFO if settings.SQLALCHEMY_ECHO else logging.WARNING,
+        "aiosqlite": logging.WARNING,
+        "asyncio": logging.WARNING,
+    }
+    for logger_name, level in quiet_loggers.items():
+        library_logger = logging.getLogger(logger_name)
+        library_logger.handlers.clear()
+        library_logger.propagate = True
+        library_logger.setLevel(level)
 
-def get_logger(name: str):
-    """Utility to get a structured logger"""
+
+def get_logger(name: str) -> structlog.stdlib.BoundLogger:
     return structlog.get_logger(name)

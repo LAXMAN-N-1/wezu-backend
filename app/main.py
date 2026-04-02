@@ -25,6 +25,7 @@ from app.middleware.rate_limit import limiter
 from app.middleware.audit import AuditMiddleware
 from app.middleware.security import SecureHeadersMiddleware
 from app.middleware.proxy_headers import TrustedProxyHeadersMiddleware
+from app.middleware.request_logging import RequestLoggingMiddleware
 from app.middleware.rbac_middleware import RBACMiddleware
 from app.api.errors.handlers import add_exception_handlers
 from app.workers import start_scheduler, stop_scheduler
@@ -75,6 +76,13 @@ if settings.SENTRY_DSN:
     )
 
 logger = get_logger(__name__)
+logger.info(
+    "logging.initialized",
+    environment=settings.ENVIRONMENT,
+    log_level=settings.LOG_LEVEL,
+    log_access_logs=settings.LOG_ACCESS_LOGS,
+    log_requests=settings.LOG_REQUESTS,
+)
 
 from app.utils.cors import cors_headers_for_origin
 
@@ -173,6 +181,7 @@ if settings.AUDIT_REQUEST_LOGGING_ENABLED:
     app.add_middleware(AuditMiddleware)
 if settings.ENABLE_TRUSTED_HOST_MIDDLEWARE:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
+app.add_middleware(RequestLoggingMiddleware)
 
 # Must run before TrustedHostMiddleware to rewrite Host from trusted proxy headers.
 # In Starlette, the most recently added middleware runs first.

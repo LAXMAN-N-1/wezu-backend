@@ -36,7 +36,6 @@ from app.schemas.auth import (
 
 router = APIRouter()
 logger = logging.getLogger("wezu_auth")
-logging.basicConfig(level=logging.INFO)
 
 class UserCreate(BaseModel):
     email: Optional[EmailStr] = None
