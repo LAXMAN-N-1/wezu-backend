@@ -22,7 +22,7 @@ from app.models.rbac import Role, Permission
 from app.models.role_right import RoleRight
 from app.models.menu import Menu
 from app.models.user import User, UserStatus, UserType
-
+import app.models.all  # Force all models to load for SQLAlchemy mapping
 # --- PATCH FOR SQLITE JSONB COMPATIBILITY ---
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler

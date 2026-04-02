@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from datetime import datetime, UTC, timedelta
 from sqlalchemy import text
 from app.db.session import SessionLocal
+import app.models.all  # Fix mapper init issues in standalone scripts
 import random
 
 db = SessionLocal()

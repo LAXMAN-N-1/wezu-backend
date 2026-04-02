@@ -336,8 +336,8 @@ app.include_router(dealer_portal_tickets.router, prefix=f"{dealer_api}/portal/ti
 app.include_router(dealer_portal_roles.router, prefix=f"{dealer_api}/portal/roles", tags=["Dealer: Roles"], dependencies=dealer_deps)
 app.include_router(dealer_portal_users.router, prefix=f"{dealer_api}/portal/users", tags=["Dealer: Users"], dependencies=dealer_deps)
 app.include_router(dealer_portal_settings.router, prefix=f"{dealer_api}/portal/settings", tags=["Dealer: Settings"], dependencies=dealer_deps)
-app.include_router(dealer_portal_customers.router, prefix=f"{dealer_api}/analytics", tags=["Dealer: Customers"], dependencies=dealer_deps)
 app.include_router(dealer_analytics.router, prefix=f"{dealer_api}/analytics", tags=["Dealer: Analytics"], dependencies=dealer_deps)
+app.include_router(dealer_portal_customers.router, prefix=f"{dealer_api}/analytics", tags=["Dealer: Customers"], dependencies=dealer_deps)
 app.include_router(dealer_campaigns.router, prefix=f"{dealer_api}/campaigns", tags=["Dealer: Campaigns"], dependencies=dealer_deps)
 app.include_router(dealer_onboarding.router, prefix=f"{dealer_api}/onboarding", tags=["Dealer: Onboarding"], dependencies=dealer_deps)
 
