@@ -57,7 +57,7 @@ def upgrade() -> None:
     bind = op.get_bind()
     inspector = inspect(bind)
 
-    if "dealer_profiles" not in inspector.get_table_names():
+    if not inspector.has_table("dealer_profiles"):
         return
 
     existing_columns = {col["name"] for col in inspector.get_columns("dealer_profiles")}

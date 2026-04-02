@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from . import main, fraud, jobs, monitoring, users, rentals, finance, iot, batteries, stock, health, stations, kyc_admin, rbac_admin, dealers, cms, admin_groups, audit_trails, logistics, support, bess, notifications, settings, security
+from . import main, fraud, jobs, monitoring, users, rentals, finance, iot, batteries, stock, health, stations, kyc_admin, rbac_admin, cms, admin_groups, audit_trails, logistics, support, bess, notifications, settings, security
 
 router = APIRouter()
 router.include_router(main.router)
@@ -19,7 +19,8 @@ router.include_router(jobs.router, prefix="/jobs", tags=["Admin Jobs"])
 router.include_router(monitoring.router, prefix="/monitoring", tags=["Admin Monitoring"])
 router.include_router(kyc_admin.router, prefix="/kyc-docs", tags=["Admin KYC Documents"])
 router.include_router(rbac_admin.router, prefix="/rbac", tags=["Admin RBAC"])
-router.include_router(dealers.router, prefix="/dealers", tags=["Admin Dealers"])
+# Dealers are served by app.api.v1.admin_dealers and mounted directly in
+# app.main to avoid duplicate route registrations at /api/v1/admin/dealers.
 router.include_router(admin_groups.router, prefix="/groups", tags=["Admin Groups"])
 # Analytics is served by app.api.v1.admin.analytics to avoid duplicate route
 # registrations at /api/v1/admin/analytics.
