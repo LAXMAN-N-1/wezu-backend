@@ -129,6 +129,8 @@ class Settings(BaseSettings):
     LOG_ACCESS_LOGS: bool = True
     LOG_REQUESTS: bool = True
     LOG_HEALTHCHECKS: bool = False
+    LOG_SLOW_REQUEST_THRESHOLD_MS: int = 2000
+    ANALYTICS_CACHE_TTL_SECONDS: int = 30
     SENTRY_DSN: Optional[str] = None
     SENTRY_ENVIRONMENT: str = "production"
     SENTRY_TRACES_SAMPLE_RATE: float = 0.1

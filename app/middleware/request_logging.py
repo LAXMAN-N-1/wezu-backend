@@ -57,12 +57,16 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
         if settings.LOG_REQUESTS and (settings.LOG_HEALTHCHECKS or request.url.path != "/health"):
             log_fn = logger.info
+            event_name = "request.completed"
             if response.status_code >= 500:
                 log_fn = logger.error
+            elif duration_ms >= settings.LOG_SLOW_REQUEST_THRESHOLD_MS:
+                log_fn = logger.warning
+                event_name = "request.slow"
             elif response.status_code >= 400:
                 log_fn = logger.warning
             log_fn(
-                "request.completed",
+                event_name,
                 status_code=response.status_code,
                 duration_ms=duration_ms,
                 user_id=user_id,

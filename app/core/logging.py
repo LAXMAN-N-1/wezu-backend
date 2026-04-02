@@ -7,6 +7,22 @@ import structlog
 from app.core.config import settings
 
 
+class _HealthcheckAccessFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        if settings.LOG_HEALTHCHECKS:
+            return True
+        if record.name not in {"uvicorn.access", "gunicorn.access"}:
+            return True
+
+        path_hint = ""
+        args = getattr(record, "args", None)
+        if isinstance(args, tuple) and len(args) >= 3:
+            path_hint = str(args[2])
+
+        message = path_hint or record.getMessage()
+        return "/health" not in message and "/ready" not in message
+
+
 def _shared_processors() -> list[structlog.types.Processor]:
     return [
         structlog.contextvars.merge_contextvars,
@@ -39,6 +55,7 @@ def setup_logging() -> None:
 
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
+    handler.addFilter(_HealthcheckAccessFilter())
 
     root_logger = logging.getLogger()
     root_logger.handlers.clear()
