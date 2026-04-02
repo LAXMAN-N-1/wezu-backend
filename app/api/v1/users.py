@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Request, UploadFile, File, Form
 from sqlmodel import Session, select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict
 from datetime import datetime, UTC
@@ -205,10 +205,10 @@ async def read_user_me(
     """
     def _load_profile() -> dict:
         statement = select(User).where(User.id == current_user.id).options(
-            selectinload(User.role),
-            selectinload(User.wallet),
-            selectinload(User.staff_profile),
-            selectinload(User.user_profile)
+            joinedload(User.role),
+            joinedload(User.wallet),
+            joinedload(User.staff_profile),
+            joinedload(User.user_profile)
         )
         user = db.exec(statement).first()
         return _build_user_profile_response(user, db).model_dump(mode="json")
@@ -230,7 +230,11 @@ async def update_user_me(
     from datetime import datetime, UTC
     
     # Get fresh user with profile
-    user = db.exec(select(User).where(User.id == current_user.id).options(selectinload(User.user_profile))).first()
+    user = db.exec(
+        select(User)
+        .where(User.id == current_user.id)
+        .options(joinedload(User.user_profile))
+    ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -268,10 +272,10 @@ async def update_user_me(
     
     # Reload for response
     statement = select(User).where(User.id == current_user.id).options(
-        selectinload(User.role),
-        selectinload(User.wallet),
-        selectinload(User.staff_profile),
-        selectinload(User.user_profile)
+        joinedload(User.role),
+        joinedload(User.wallet),
+        joinedload(User.staff_profile),
+        joinedload(User.user_profile)
     )
     user = db.exec(statement).first()
     

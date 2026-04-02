@@ -8,7 +8,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError, ExpiredSignatureError
 from pydantic import ValidationError
 from sqlmodel import Session, select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload
 from app.core import security
 from app.core.config import settings
 from app.core.database import get_db
@@ -173,7 +173,11 @@ def get_current_user(
     # Check if we are using SQLModel (which uses .get) or pure SQLAlchemy
     # User model inherits from SQLModel, so we can use db.get(User, id) or query.
     # To be safe and consistent with typical patterns:
-    user = db.exec(select(User).where(User.id == validated.user_id).options(selectinload(User.role))).first()
+    user = db.exec(
+        select(User)
+        .where(User.id == validated.user_id)
+        .options(joinedload(User.role))
+    ).first()
     
     if not user:
         raise HTTPException(
