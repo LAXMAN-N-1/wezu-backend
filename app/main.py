@@ -304,7 +304,7 @@ app.include_router(screens.router, prefix=f"{v1_str}/screens", tags=["UI Config"
 # API V1 - Admin Endpoints
 # ----------------------------
 admin_api = f"{v1_str}/admin"
-admin_deps = [Depends(deps.get_current_active_superuser)]
+admin_deps = [Depends(deps.get_current_active_admin)]
 
 # Global Admin Router
 app.include_router(global_admin_router, prefix=admin_api, tags=["Admin: Core"], dependencies=admin_deps)
