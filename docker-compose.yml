@@ -5,7 +5,6 @@ services:
     restart: "on-failure:5"
     init: true
     stop_grace_period: 30s
-    cpus: "0.75"
     expose:
       - "8000"
     # In Coolify/production, inject env vars from platform UI.
@@ -13,7 +12,7 @@ services:
     environment:
       # Keep DATABASE_URL / REDIS_URL out of compose-level environment
       # so platforms like Coolify can manage/delete them directly.
-      - GUNICORN_WORKERS=2
+      - GUNICORN_WORKERS=4
       - GUNICORN_TIMEOUT=120
       - GUNICORN_GRACEFUL_TIMEOUT=45
       - DB_POOL_SIZE=5

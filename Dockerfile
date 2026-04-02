@@ -65,4 +65,4 @@ USER wezu_user
 EXPOSE 8000
 
 # Use conservative defaults for small VPS instances.
-CMD ["sh", "-c", "exec gunicorn app.main:app --workers ${GUNICORN_WORKERS:-2} --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --log-level ${GUNICORN_LOG_LEVEL:-info} --access-logfile - --error-logfile - --capture-output --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-30} --max-requests ${GUNICORN_MAX_REQUESTS:-1000} --max-requests-jitter ${GUNICORN_MAX_REQUESTS_JITTER:-100}"]
+CMD ["sh", "-c", "exec gunicorn app.main:app --workers ${GUNICORN_WORKERS:-4} --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --log-level ${GUNICORN_LOG_LEVEL:-info} --access-logfile - --error-logfile - --capture-output --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-30} --max-requests ${GUNICORN_MAX_REQUESTS:-1000} --max-requests-jitter ${GUNICORN_MAX_REQUESTS_JITTER:-100}"]

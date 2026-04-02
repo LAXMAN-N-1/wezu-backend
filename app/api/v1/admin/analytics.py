@@ -1,4 +1,5 @@
-from threading import Lock
+from dataclasses import dataclass, field
+from threading import Event, Lock
 from time import monotonic
 from typing import Any, Callable, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -16,6 +17,14 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 _analytics_cache: dict[tuple[Any, ...], tuple[float, Any]] = {}
 _analytics_cache_lock = Lock()
+_analytics_inflight: dict[tuple[Any, ...], "_InFlightAnalytics"] = {}
+
+
+@dataclass
+class _InFlightAnalytics:
+    event: Event = field(default_factory=Event)
+    result: Any = None
+    failed: bool = False
 
 
 def _prune_expired_cache(now: float) -> None:
@@ -32,27 +41,58 @@ def _analytics_response(
 ) -> Any:
     ttl = settings.ANALYTICS_CACHE_TTL_SECONDS if ttl_seconds is None else ttl_seconds
     cache_key = (endpoint,) + tuple(cache_parts)
+    is_leader = False
+    inflight: Optional[_InFlightAnalytics] = None
 
-    if ttl > 0:
-        now = monotonic()
-        with _analytics_cache_lock:
+    now = monotonic()
+    with _analytics_cache_lock:
+        if ttl > 0:
             cached = _analytics_cache.get(cache_key)
             if cached and cached[0] > now:
                 return cached[1]
             _prune_expired_cache(now)
 
+        inflight = _analytics_inflight.get(cache_key)
+        if inflight is None:
+            inflight = _InFlightAnalytics()
+            _analytics_inflight[cache_key] = inflight
+            is_leader = True
+
+    if not is_leader:
+        completed = inflight.event.wait(timeout=max(ttl, 30))
+        if not completed:
+            raise HTTPException(
+                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                detail="analytics_timeout",
+            )
+        if inflight.failed:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="analytics_unavailable",
+            )
+        return inflight.result
+
     try:
         result = call()
     except Exception:
         logger.exception("admin.analytics.failed", extra={"endpoint": endpoint})
+        with _analytics_cache_lock:
+            current = _analytics_inflight.pop(cache_key, None)
+            if current:
+                current.failed = True
+                current.event.set()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="analytics_unavailable",
         )
 
-    if ttl > 0:
-        with _analytics_cache_lock:
+    with _analytics_cache_lock:
+        if ttl > 0:
             _analytics_cache[cache_key] = (monotonic() + ttl, result)
+        current = _analytics_inflight.pop(cache_key, None)
+        if current:
+            current.result = result
+            current.event.set()
 
     return result
 
