@@ -356,7 +356,7 @@ async def verify_registration_otp(
             logger.info(f"User {user.id} activated after OTP verification")
 
     # Update Last Login
-    user.last_login_at = datetime.now(UTC)
+    user.last_login = datetime.now(UTC)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -513,7 +513,7 @@ async def social_login(
         db.refresh(user)
 
     # Update Last Login
-    user.last_login_at = datetime.now(UTC)
+    user.last_login = datetime.now(UTC)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -757,7 +757,7 @@ async def login(
         selected_role_name = login_data.role
             
     # Update Last Login
-    user.last_login_at = datetime.now(UTC)
+    user.last_login = datetime.now(UTC)
     db.add(user)
     db.commit()
     db.refresh(user)
