@@ -866,7 +866,7 @@ async def read_users(
     sort_order: Optional[str] = "desc", # asc, desc
     # Filters
     role: Optional[str] = None,
-    status: Optional[str] = None, # active, inactive
+    user_status: Optional[str] = Query(default=None, alias="status"), # active, inactive
     # Dependencies
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
@@ -908,10 +908,10 @@ async def read_users(
         query = query.join(User.role).where(Role.name == role)
 
     # Status filter
-    if status:
-        if status.lower() == "active":
+    if user_status:
+        if user_status.lower() == "active":
             conditions.append(User.is_active == True)
-        elif status.lower() == "inactive":
+        elif user_status.lower() == "inactive":
             conditions.append(User.is_active == False)
     
     # Apply Regional Manager Restriction
@@ -988,7 +988,7 @@ async def read_users(
             "sort_by": sort_by,
             "sort_order": sort_order,
             "role": role,
-            "status": status
+            "status": user_status
         }
     )
 
