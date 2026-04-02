@@ -40,6 +40,8 @@ class DealerProfile(SQLModel, table=True):
     
     # Financial Details
     bank_details: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
+    payout_interval: Optional[str] = Field(default="Weekly") # Daily, Weekly, Bi-Weekly, Monthly
+    min_payout_amount: Optional[float] = Field(default=0.0)
     
     # Global Settings Defaults
     global_station_defaults: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
