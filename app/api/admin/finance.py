@@ -186,7 +186,7 @@ def list_settlements(
 
     from app.models.dealer import DealerProfile
     dealer_ids = {s.dealer_id for s in settlements if s.dealer_id}
-    dealer_map = {d.user_id: d for d in db.exec(select(DealerProfile).where(DealerProfile.user_id.in_(dealer_ids))).all()} if dealer_ids else {}
+    dealer_map = {d.id: d for d in db.exec(select(DealerProfile).where(DealerProfile.id.in_(dealer_ids))).all()} if dealer_ids else {}
 
     result = []
     for s in settlements:

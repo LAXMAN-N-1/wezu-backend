@@ -7,7 +7,9 @@ from app.models.two_factor_auth import TwoFactorAuth
 from app.models.session import UserSession
 from app.models.password_history import PasswordHistory
 from app.models.device_fingerprint import DeviceFingerprint, DuplicateAccount
+from app.models.biometric import BiometricCredential
 from app.models.login_history import LoginHistory
+from app.models.user_history import UserStatusLog
 
 # Fleet, Inventory & IoT
 from app.models.station import Station, StationImage, StationSlot, StationStatus
@@ -16,6 +18,7 @@ from app.models.battery import Battery, BatteryLifecycleEvent, BatteryStatus, Ba
 from app.models.battery_catalog import BatteryCatalog, BatterySpec, BatteryBatch
 from app.models.battery_health import BatteryHealthSnapshot, BatteryMaintenanceSchedule, BatteryHealthAlert
 from app.models.battery_health_log import BatteryHealthLog
+from app.models.battery_reservation import BatteryReservation
 from app.models.station_stock import StationStockConfig, ReorderRequest, StockAlertDismissal
 from app.models.iot import IoTDevice, DeviceCommand, FirmwareUpdate
 from app.models.device import Device
@@ -23,6 +26,7 @@ from app.models.gps_log import GPSTrackingLog
 from app.models.telemetry import Telemetry
 from app.models.geofence import Geofence
 from app.models.alert import Alert
+from app.models.inventory_audit import InventoryAuditLog
 
 # Operations & Rentals
 from app.models.rental import Rental, RentalStatus, Purchase
@@ -42,6 +46,7 @@ from app.models.vehicle import Vehicle
 from app.models.financial import Transaction, Wallet, TransactionType, TransactionStatus, WalletWithdrawalRequest
 from app.models.payment import PaymentTransaction
 from app.models.ecommerce import EcommerceProduct, EcommerceOrder, EcommerceOrderItem
+from app.models.cart import CartItem
 from app.models.catalog import CatalogProduct, CatalogProductImage, CatalogProductVariant, CatalogOrder, CatalogOrderItem, DeliveryTracking, DeliveryEvent
 from app.models.invoice import Invoice
 from app.models.revenue_report import RevenueReport
@@ -65,6 +70,7 @@ from app.models.blog import Blog
 from app.models.banner import Banner
 from app.models.legal import LegalDocument
 from app.models.media import MediaAsset
+from app.models.security_question import SecurityQuestion, UserSecurityQuestion
 
 # Location & Org
 from app.models.location import Zone, City, Region, Country, Continent
@@ -104,5 +110,5 @@ from app.models.system import SystemConfig, FeatureFlag
 from app.models.bess import BessUnit, BessEnergyLog, BessGridEvent, BessReport
 from app.models.notification_admin import PushCampaign, AutomatedTrigger, NotificationLog, NotificationConfig
 from app.models.api_key import ApiKeyConfig
-
+from app.models.analytics import DemandForecast, ChurnPrediction, PricingRecommendation
 

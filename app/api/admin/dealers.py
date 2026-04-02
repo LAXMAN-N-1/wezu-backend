@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from app.api import deps
 from app.models.dealer import DealerProfile, DealerApplication, DealerDocument, FieldVisit
 from app.models.commission import CommissionConfig, CommissionLog
-from app.models.user import User
+from app.models.user import User, UserType, UserStatus
 from app.core.database import get_db
 
 router = APIRouter()
@@ -255,8 +255,18 @@ class DealerCreateRequest(BaseModel):
     city: str
     contact_person: str
     contact_phone: str
+    contact_email: Optional[str] = None
+    address_line1: Optional[str] = None
+    state: Optional[str] = None
+    pincode: Optional[str] = None
     gst_number: Optional[str] = None
     pan_number: Optional[str] = None
+    is_active: bool = True
+
+
+def _default_dealer_email(request: DealerCreateRequest) -> str:
+    suffix = "".join(ch for ch in request.contact_phone if ch.isdigit())[-6:] or "dealer"
+    return f"dealer.{suffix}@powerfill.local"
 
 @router.post("/create")
 def create_dealer(
@@ -265,16 +275,43 @@ def create_dealer(
     current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Create a new dealer profile."""
+    dealer_user = db.exec(
+        select(User).where(
+            (User.phone_number == request.contact_phone)
+            | (User.email == (request.contact_email or _default_dealer_email(request)))
+        )
+    ).first()
+
+    if dealer_user and dealer_user.dealer_profile:
+        raise HTTPException(status_code=400, detail="Dealer already exists for this contact")
+
+    if not dealer_user:
+        dealer_user = User(
+            phone_number=request.contact_phone,
+            email=request.contact_email or _default_dealer_email(request),
+            full_name=request.contact_person,
+            user_type=UserType.DEALER,
+            status=UserStatus.ACTIVE if request.is_active else UserStatus.PENDING,
+            kyc_status="pending",
+            created_by_user_id=current_user.id,
+            notes_internal="Created from admin dealer onboarding",
+        )
+        db.add(dealer_user)
+        db.flush()
+
     dealer = DealerProfile(
-        user_id=current_user.id,
+        user_id=dealer_user.id,
         business_name=request.business_name,
         city=request.city,
         contact_person=request.contact_person,
+        contact_email=dealer_user.email or request.contact_email or _default_dealer_email(request),
         contact_phone=request.contact_phone,
+        address_line1=request.address_line1 or f"{request.city} Operations Hub",
+        state=request.state or "Telangana",
+        pincode=request.pincode or "500081",
         gst_number=request.gst_number,
         pan_number=request.pan_number,
-        is_active=True,
-        commission_rate=10.0,
+        is_active=request.is_active,
     )
     db.add(dealer)
     db.commit()
@@ -438,4 +475,3 @@ def list_commission_logs(
             "created_at": log.created_at
         })
     return result
-
