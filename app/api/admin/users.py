@@ -108,6 +108,40 @@ class ReactivateRequest(BaseModel):
     notes: Optional[str] = None
 
 
+class AdminUserUpdateRequest(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[str] = None
+    phone_number: Optional[str] = None
+
+
+class AdminPasswordResetRequest(BaseModel):
+    new_password: Optional[str] = None
+    password: Optional[str] = None
+    force_reset: bool = True
+
+
+def _serialize_user(user: User, role_name: Optional[str] = None) -> dict:
+    return {
+        "id": user.id,
+        "full_name": user.full_name or "Unknown",
+        "email": user.email or "",
+        "phone_number": user.phone_number or "",
+        "user_type": user.user_type.value if user.user_type else "customer",
+        "status": user.status.value if user.status else "active",
+        "kyc_status": user.kyc_status.value if user.kyc_status else "not_submitted",
+        "is_active": user.is_active,
+        "is_superuser": user.is_superuser,
+        "profile_picture": user.profile_picture,
+        "role": role_name,
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+        "last_login": user.last_login.isoformat() if user.last_login else None,
+        "last_login_at": user.last_login.isoformat() if user.last_login else None,
+        "deletion_reason": user.deletion_reason,
+        "force_password_reset": user.force_password_change,
+        "invited_by": None,
+    }
+
+
 @router.get("/")
 def list_users(
     skip: int = 0,
@@ -157,23 +191,7 @@ def list_users(
             role_name = u.role.name
         elif u.role_id:
             role_name = role_map.get(u.role_id)
-
-        user_list.append({
-            "id": u.id,
-            "full_name": u.full_name or "Unknown",
-            "email": u.email or "",
-            "phone_number": u.phone_number or "",
-            "user_type": u.user_type.value if u.user_type else "customer",
-            "status": u.status.value if u.status else "active",
-            "kyc_status": u.kyc_status.value if u.kyc_status else "not_submitted",
-            "is_active": u.is_active,
-            "is_superuser": u.is_superuser,
-            "profile_picture": u.profile_picture,
-            "role": role_name,
-            "created_at": u.created_at.isoformat() if u.created_at else None,
-            "last_login_at": u.last_login.isoformat() if u.last_login else None,
-            "deletion_reason": u.deletion_reason,
-        })
+        user_list.append(_serialize_user(u, role_name=role_name))
 
     return {
         "items": user_list,
@@ -239,19 +257,10 @@ def list_suspended_users(
 
     user_list = []
     for u in users:
-        user_list.append({
-            "id": u.id,
-            "full_name": u.full_name or "Unknown",
-            "email": u.email or "",
-            "phone_number": u.phone_number or "",
-            "user_type": u.user_type.value if u.user_type else "customer",
-            "status": u.status.value if u.status else "suspended",
-            "kyc_status": u.kyc_status.value if u.kyc_status else "not_submitted",
-            "profile_picture": u.profile_picture,
-            "suspension_reason": u.deletion_reason,  # Using deletion_reason field for suspension reason
-            "suspended_at": u.updated_at.isoformat() if u.updated_at else None,
-            "created_at": u.created_at.isoformat() if u.created_at else None,
-        })
+        serialized = _serialize_user(u, role_name=None)
+        serialized["suspension_reason"] = u.deletion_reason
+        serialized["suspended_at"] = u.updated_at.isoformat() if u.updated_at else None
+        user_list.append(serialized)
 
     return {
         "items": user_list,
@@ -278,21 +287,93 @@ def get_user_detail(
         role = db.get(Role, user.role_id)
         role_name = role.name if role else None
 
-    return {
-        "id": user.id,
-        "full_name": user.full_name,
-        "email": user.email,
-        "phone_number": user.phone_number,
-        "user_type": user.user_type.value if user.user_type else "customer",
-        "status": user.status.value if user.status else "active",
-        "kyc_status": user.kyc_status.value if user.kyc_status else "not_submitted",
-        "is_active": user.is_active,
-        "is_superuser": user.is_superuser,
-        "profile_picture": user.profile_picture,
-        "role": role_name,
-        "created_at": user.created_at.isoformat() if user.created_at else None,
-        "last_login_at": user.last_login.isoformat() if user.last_login else None,
-    }
+    return _serialize_user(user, role_name=role_name)
+
+
+@router.put("/{user_id}")
+def update_user_detail(
+    user_id: int,
+    payload: AdminUserUpdateRequest,
+    current_user: User = Depends(deps.get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    user = db.get(User, user_id)
+    if not user or user.is_deleted:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    if "email" in update_data and update_data["email"] != user.email:
+        existing = db.exec(select(User).where(User.email == update_data["email"], User.id != user_id)).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Email already exists")
+    if "phone_number" in update_data and update_data["phone_number"] != user.phone_number:
+        existing_phone = db.exec(
+            select(User).where(User.phone_number == update_data["phone_number"], User.id != user_id)
+        ).first()
+        if existing_phone:
+            raise HTTPException(status_code=400, detail="Phone number already exists")
+
+    for key, value in update_data.items():
+        setattr(user, key, value)
+    user.updated_at = datetime.now(UTC)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    role_name = db.get(Role, user.role_id).name if user.role_id and db.get(Role, user.role_id) else None
+    return _serialize_user(user, role_name=role_name)
+
+
+@router.post("/{user_id}/reset-password")
+def reset_user_password(
+    user_id: int,
+    payload: AdminPasswordResetRequest,
+    current_user: User = Depends(deps.get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    user = db.get(User, user_id)
+    if not user or user.is_deleted:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    raw_password = payload.new_password or payload.password
+    if not raw_password:
+        raise HTTPException(status_code=400, detail="new_password is required")
+
+    user.hashed_password = get_password_hash(raw_password)
+    user.force_password_change = payload.force_reset
+    user.updated_at = datetime.now(UTC)
+    db.add(user)
+    db.commit()
+    return {"status": "success", "message": "Password reset successful"}
+
+
+@router.put("/{user_id}/password")
+def update_user_password(
+    user_id: int,
+    payload: AdminPasswordResetRequest,
+    current_user: User = Depends(deps.get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    return reset_user_password(user_id=user_id, payload=payload, current_user=current_user, db=db)
+
+
+@router.delete("/{user_id}")
+def delete_user(
+    user_id: int,
+    current_user: User = Depends(deps.get_current_active_admin),
+    db: Session = Depends(get_db),
+):
+    user = db.get(User, user_id)
+    if not user or user.is_deleted:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.is_deleted = True
+    user.deleted_at = datetime.now(UTC)
+    user.status = UserStatus.DELETED
+    user.updated_at = datetime.now(UTC)
+    db.add(user)
+    db.commit()
+    return {"status": "success", "message": f"User {user.full_name or user.email} deleted"}
 
 
 @router.put("/{user_id}/toggle-active")

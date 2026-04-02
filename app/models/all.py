@@ -35,6 +35,7 @@ from app.models.delivery_assignment import DeliveryAssignment
 from app.models.delivery_route import DeliveryRoute, RouteStop
 from app.models.return_request import ReturnRequest
 from app.models.maintenance import MaintenanceSchedule, MaintenanceRecord, StationDowntime
+from app.models.maintenance_checklist import MaintenanceChecklistTemplate, MaintenanceChecklistSubmission
 from app.models.charging_queue import ChargingQueue
 from app.models.vehicle import Vehicle
 
@@ -104,5 +105,4 @@ from app.models.system import SystemConfig, FeatureFlag
 from app.models.bess import BessUnit, BessEnergyLog, BessGridEvent, BessReport
 from app.models.notification_admin import PushCampaign, AutomatedTrigger, NotificationLog, NotificationConfig
 from app.models.api_key import ApiKeyConfig
-
 
