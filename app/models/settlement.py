@@ -5,7 +5,6 @@ from sqlmodel import SQLModel, Field, Relationship
 
 class Settlement(SQLModel, table=True):
     __tablename__ = "settlements"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     
     dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id", index=True)

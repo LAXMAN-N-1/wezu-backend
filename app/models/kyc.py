@@ -20,7 +20,6 @@ class KYCDocumentStatus(str, Enum):
 
 class KYCRecord(SQLModel, table=True):
     __tablename__ = "kyc_records"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True)
@@ -53,7 +52,6 @@ class KYCRecord(SQLModel, table=True):
 
 class KYCDocument(SQLModel, table=True):
     __tablename__ = "kyc_documents"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True)
@@ -79,7 +77,6 @@ class KYCDocument(SQLModel, table=True):
 
 class KYCRequest(SQLModel, table=True):
     __tablename__ = "kyc_requests"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id")

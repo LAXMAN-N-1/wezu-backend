@@ -1,14 +1,12 @@
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from app.api.deps import get_current_user
 from app.models.roles import RoleEnum
 from app.core.database import engine
-from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError, ExpiredSignatureError
 from app.core.config import settings
 from app.models.user import User
 from app.schemas.user import TokenPayload
-from sqlmodel import func, Session
+from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
 import logging
 
@@ -19,6 +17,10 @@ class RBACMiddleware(BaseHTTPMiddleware):
         # Default states
         request.state.user = None
         request.state.user_role = None
+
+        # Never authenticate/authorize CORS preflight requests.
+        if request.method == "OPTIONS":
+            return await call_next(request)
         
         # Skip for openapi and auth
         public_paths = [

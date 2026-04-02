@@ -959,7 +959,7 @@ def seed_users(runtime: SeedRuntime, conn: Connection, resolver: Resolver, ctx: 
                 "email": "laxmanlaxman1629@gmail.com" if full_name == "Laxman" else f"{slugify(full_name)}@seed.wezu.customer",
                 "phone_number": make_phone(9999 + index) if full_name == "Laxman" else make_phone(100 + index),
                 "full_name": full_name,
-                "hashed_password": get_password_hash("laxman123") if full_name == "Laxman" else PASSWORD_HASH,
+                "hashed_password": get_password_hash(os.environ.get("SEED_ADMIN_PASSWORD", "ChangeMe!Seed2026")) if full_name == "Laxman" else PASSWORD_HASH,
                 "user_type": "CUSTOMER",
                 "status": "ACTIVE",
                 "is_superuser": False,

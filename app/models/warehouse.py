@@ -11,7 +11,6 @@ from app.models.stock import Stock
 
 class Warehouse(SQLModel, table=True):
     __tablename__ = "warehouses"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)

@@ -4,7 +4,6 @@ from datetime import datetime, UTC
 
 class Refund(SQLModel, table=True):
     __tablename__ = "refunds"
-    # __table_args__ = {"schema": "public", "extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
     transaction_id: int = Field(foreign_key="transactions.id")
     amount: float

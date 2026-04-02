@@ -7,7 +7,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 class BatchJob(SQLModel, table=True):
     __tablename__ = "batch_jobs"
-    # __table_args__ = {"schema": "public"}
     """Background job definitions and tracking"""
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -40,7 +39,6 @@ class BatchJob(SQLModel, table=True):
 
 class JobExecution(SQLModel, table=True):
     __tablename__ = "job_executions"
-    # __table_args__ = {"schema": "public"}
     """Individual job run history"""
     id: Optional[int] = Field(default=None, primary_key=True)
     job_id: int = Field(foreign_key="batch_jobs.id", index=True)

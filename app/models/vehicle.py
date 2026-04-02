@@ -5,7 +5,6 @@ from app.models.user import User
 
 class Vehicle(SQLModel, table=True):
     __tablename__ = "vehicles"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True)
     

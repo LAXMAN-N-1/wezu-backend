@@ -4,7 +4,6 @@ from datetime import datetime, UTC
 
 class Telemetry(SQLModel, table=True):
     __tablename__ = "telemetry"
-    # __table_args__ = {"schema": "public", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     

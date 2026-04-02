@@ -4,7 +4,6 @@ from datetime import datetime, UTC
 
 class BiometricCredential(SQLModel, table=True):
     __tablename__ = "biometric_credentials"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True)

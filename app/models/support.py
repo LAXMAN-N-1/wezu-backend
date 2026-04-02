@@ -20,7 +20,6 @@ class TicketPriority(str, Enum):
 
 class SupportTicket(SQLModel, table=True):
     __tablename__ = "support_tickets"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     
     user_id: int = Field(foreign_key="users.id", index=True)
@@ -45,7 +44,6 @@ class SupportTicket(SQLModel, table=True):
 
 class TicketMessage(SQLModel, table=True):
     __tablename__ = "ticket_messages"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     ticket_id: int = Field(foreign_key="support_tickets.id", index=True)
     sender_id: int = Field(foreign_key="users.id")
@@ -66,7 +64,6 @@ class ChatStatus(str, Enum):
 
 class ChatSession(SQLModel, table=True):
     __tablename__ = "chat_sessions"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True)
     assigned_agent_id: Optional[int] = Field(default=None, foreign_key="users.id")
@@ -83,7 +80,6 @@ class ChatSession(SQLModel, table=True):
 
 class ChatMessage(SQLModel, table=True):
     __tablename__ = "chat_messages"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     session_id: int = Field(foreign_key="chat_sessions.id", index=True)
     sender_id: int = Field(default=0) # 0 for system/bot

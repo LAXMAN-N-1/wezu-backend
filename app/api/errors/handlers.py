@@ -4,40 +4,17 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy.exc import SQLAlchemyError
 from slowapi.errors import RateLimitExceeded
-from app.core.config import settings
-import json
 import logging
 import uuid
+
+from app.utils.cors import cors_headers_for_origin
 
 logger = logging.getLogger(__name__)
 
 
-def _normalized_cors_origins() -> list[str]:
-    cors_origins_raw = settings.CORS_ORIGINS
-    if isinstance(cors_origins_raw, str):
-        try:
-            parsed = json.loads(cors_origins_raw)
-            if isinstance(parsed, list):
-                cors_origins_raw = parsed
-            else:
-                cors_origins_raw = [cors_origins_raw]
-        except Exception:
-            cors_origins_raw = [cors_origins_raw]
-    return [origin.rstrip("/") for origin in (cors_origins_raw or [])]
-
-
 def _cors_headers_for_request(request: Request) -> dict[str, str]:
-    origin = (request.headers.get("origin") or "").rstrip("/")
-    if not origin:
-        return {}
-    allowed_origins = _normalized_cors_origins()
-    if "*" in allowed_origins or origin in allowed_origins:
-        return {
-            "Access-Control-Allow-Origin": request.headers.get("origin", ""),
-            "Access-Control-Allow-Credentials": "true",
-            "Vary": "Origin",
-        }
-    return {}
+    origin = request.headers.get("origin", "")
+    return cors_headers_for_origin(origin)
 
 
 def make_cors_aware_response(

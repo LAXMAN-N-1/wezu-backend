@@ -4,7 +4,6 @@ from datetime import datetime, UTC
 
 class ChargingQueue(SQLModel, table=True):
     __tablename__ = "charging_queue"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     station_id: int = Field(foreign_key="stations.id")
     battery_id: int = Field(foreign_key="batteries.id")

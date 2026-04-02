@@ -8,7 +8,6 @@ if TYPE_CHECKING:
 
 class DealerPromotion(SQLModel, table=True):
     __tablename__ = "dealer_promotions"
-    # __table_args__ = {"schema": "public"}
     """Dealer-created promotional campaigns"""
     id: Optional[int] = Field(default=None, primary_key=True)
     dealer_id: int = Field(foreign_key="dealer_profiles.id")
@@ -56,7 +55,6 @@ class DealerPromotion(SQLModel, table=True):
 
 class PromotionUsage(SQLModel, table=True):
     __tablename__ = "promotion_usages"
-    # __table_args__ = {"schema": "public"}
     """Track promotion redemptions"""
     id: Optional[int] = Field(default=None, primary_key=True)
     promotion_id: int = Field(foreign_key="dealer_promotions.id")

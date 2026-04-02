@@ -4,7 +4,6 @@ from datetime import time, datetime, UTC
 
 class NotificationPreference(SQLModel, table=True):
     __tablename__ = "notification_preferences"
-    # __table_args__ = {"schema": "public"}
     """User notification settings per channel and category"""
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", unique=True)

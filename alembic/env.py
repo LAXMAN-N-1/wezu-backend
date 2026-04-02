@@ -9,7 +9,7 @@ from sqlmodel import SQLModel
 from app.core.config import settings
 
 # ✅ Import all models so Alembic detects them
-from app.models import *
+from app.models.all import *
 
 # Alembic Config object
 config = context.config
@@ -39,13 +39,11 @@ def render_item(type_, obj, autogen_context):
 def include_object(object, name, type_, reflected, compare_to):
     """
     Control which objects are included in the autogeneration process.
+    All models use the default (public) schema.
     """
     if type_ == "table":
-        # Include specific schemas plus public
-        return object.schema in [
-            "core", "inventory", "stations", "rentals", 
-            "finance", "dealers", "logistics", "public", None
-        ]
+        # All our models use the default schema (public / None)
+        return object.schema in ["public", None]
     return True
 
 

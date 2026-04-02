@@ -8,7 +8,6 @@ from datetime import datetime, UTC
 
 class Branch(SQLModel, table=True):
     __tablename__ = "branches"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)

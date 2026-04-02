@@ -63,15 +63,22 @@ class ChargingService:
                 "score": final_score
             })
         
+        # Build battery mapping for SOC lookups
+        battery_map = {b.battery_id: b for b in batteries}
+        
         # Sort by score descending
         sorted_items = sorted(items, key=lambda x: x['score'], reverse=True)
         
         result = []
         for i, item in enumerate(sorted_items):
-            # Estimate completion: 1.5 mins per 1% needed, factored by position
-            # (In reality, slot power would be used)
-            est_minutes = 45 # mock
-            est_time = datetime.now(UTC) + timedelta(minutes=est_minutes * (i + 1))
+            battery = battery_map[item['battery_id']]
+            needed_charge = max(0, 100 - battery.current_charge)
+            
+            # Dynamic calculation: 1.5 minutes per 1% charge needed
+            # Plus 5 minutes base wait time per slot queuing
+            est_minutes = (needed_charge * 1.5) + (5 * i)
+            
+            est_time = datetime.now(UTC) + timedelta(minutes=est_minutes)
             
             result.append(OptimizedQueueItem(
                 battery_id=item['battery_id'],

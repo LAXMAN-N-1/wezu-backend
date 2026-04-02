@@ -13,33 +13,49 @@ class KYCProvider(Protocol):
     async def verify_pan(self, pan_number: str) -> Dict[str, Any]: ...
 
 class MockKYCProvider:
+    """Mock provider for development/testing only."""
     async def verify_aadhaar(self, aadhaar_number: str) -> Dict[str, Any]:
-        return {"success": True, "verification_id": "mock_aadhaar_v1", "status": "VERIFIED"}
-        
+        logger.info(f"MOCK_KYC: Aadhaar verification for {aadhaar_number[:4]}****")
+        return {"success": True, "verification_id": f"mock_aadhaar_{aadhaar_number[:4]}", "status": "VERIFIED"}
+
     async def verify_pan(self, pan_number: str) -> Dict[str, Any]:
-        return {"success": True, "verification_id": "mock_pan_v1", "status": "VERIFIED"}
+        logger.info(f"MOCK_KYC: PAN verification for {pan_number[:4]}****")
+        return {"success": True, "verification_id": f"mock_pan_{pan_number[:4]}", "status": "VERIFIED"}
+
+
+class PendingReviewProvider:
+    """Production fallback: marks documents for manual review instead of auto-verifying."""
+    async def verify_aadhaar(self, aadhaar_number: str) -> Dict[str, Any]:
+        logger.info(f"KYC_PENDING: Aadhaar submitted for manual review: {aadhaar_number[:4]}****")
+        return {"success": True, "verification_id": None, "status": "PENDING_REVIEW"}
+
+    async def verify_pan(self, pan_number: str) -> Dict[str, Any]:
+        logger.info(f"KYC_PENDING: PAN submitted for manual review: {pan_number[:4]}****")
+        return {"success": True, "verification_id": None, "status": "PENDING_REVIEW"}
+
 
 class KYCService:
     def __init__(self):
-        # In a real app, we'd pick the provider based on settings.ENVIRONMENT or a config flag
         if settings.ENVIRONMENT == "production":
-            # self.provider = ProductionKYCProvider()
-            self.provider = MockKYCProvider() # Still mock until keys are provided
+            # Production: queue for manual review until real KYC API is integrated
+            self.provider = PendingReviewProvider()
+            logger.warning("KYC_SERVICE: Running in manual-review mode. Integrate real KYC provider for auto-verification.")
         else:
             self.provider = MockKYCProvider()
 
     async def verify_aadhaar(self, db: Session, user: User, aadhaar_number: str) -> Dict[str, Any]:
-        """
-        Verify Aadhaar and update user status.
-        """
+        """Verify Aadhaar and update user status based on provider response."""
         result = await self.provider.verify_aadhaar(aadhaar_number)
-        
+
         if result.get("success"):
-            # Update Document Status in DB (Assuming document recording logic exists elsewhere or here)
-            user.kyc_status = KYCStatus.PENDING 
+            status_map = {
+                "VERIFIED": KYCStatus.APPROVED,
+                "PENDING_REVIEW": KYCStatus.PENDING,
+            }
+            user.kyc_status = status_map.get(result.get("status"), KYCStatus.PENDING)
             db.add(user)
             db.commit()
-            
+
         return result
 
     async def verify_pan(self, db: Session, user: User, pan_number: str) -> Dict[str, Any]:
@@ -57,6 +73,14 @@ class KYCService:
 
     @staticmethod
     async def process_video_kyc(db: Session, user: User, recording_url: str) -> Dict[str, Any]:
+        """Process video KYC. Queues for manual review in production."""
+        if settings.ENVIRONMENT == "production":
+            logger.info(f"VIDEO_KYC: Queued for manual review - user {user.id}, url: {recording_url}")
+            user.kyc_status = KYCStatus.PENDING
+            db.add(user)
+            db.commit()
+            return {"liveness_score": None, "status": "PENDING_REVIEW"}
+        # Dev/test: auto-approve
         return {"liveness_score": 0.98, "status": "APPROVED"}
 
     @staticmethod
@@ -74,21 +98,25 @@ class KYCService:
 
     @staticmethod
     async def verify_utility_bill(db: Session, user_id: int, file_path: str) -> Dict[str, Any]:
-        """Mock OCR and validation for Address Proof"""
-        # In production: Trigger AWS Textract or similar
+        """Process utility bill for address verification."""
         logger.info(f"Processing utility bill for user {user_id}: {file_path}")
-        
+
         from app.models.kyc import KYCRecord
         record = db.exec(select(KYCRecord).where(KYCRecord.user_id == user_id)).first()
         if not record:
             record = KYCRecord(user_id=user_id)
-        
+
         record.utility_bill_url = file_path
         record.updated_at = datetime.now(UTC)
         db.add(record)
         db.commit()
-        
-        return {"success": True, "extracted_address": "Mock Extracted Address 123", "match_confidence": 0.95}
+
+        if settings.ENVIRONMENT == "production":
+            # In production: queue for manual review or OCR service
+            return {"success": True, "extracted_address": None, "match_confidence": None, "status": "PENDING_REVIEW"}
+
+        # Dev: return mock data for testing
+        return {"success": True, "extracted_address": "Dev Test Address 123", "match_confidence": 0.95}
 
     @staticmethod
     def resubmit_kyc(db: Session, user_id: int):

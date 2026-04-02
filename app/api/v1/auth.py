@@ -613,47 +613,7 @@ async def register_with_password(
     refresh_token = create_refresh_token(subject=new_user.id)
     return Token(access_token=access_token, refresh_token=refresh_token, user=new_user)
 
-@router.post("/login/form", response_model=Token)
-async def login_with_password(
-    request: Request,
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_session)
-):
-    # Check if user exists by email or phone
-    if "@" in form_data.username:
-        statement = select(User).where(User.email == form_data.username)
-    else:
-        statement = select(User).where(User.phone_number == form_data.username)
-    
-    user = db.exec(statement).first()
-    if not user or not user.hashed_password:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-        )
-    
-    # Verify password
-    from app.core.security import verify_password
-    if not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-        )
-    
-    if user.status != UserStatus.ACTIVE:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Inactive user"
-        )
-    
-    # Create Dual Tokens
-    access_token = create_access_token(subject=user.id)
-    refresh_token = create_refresh_token(subject=user.id)
-    
-    # Create Session
-    AuthService.create_user_session(db, user.id, refresh_token, request)
-    
-    return Token(access_token=access_token, refresh_token=refresh_token, user=user)
+
 
 class RefreshRequest(BaseModel):
     refresh_token: str
@@ -785,33 +745,20 @@ async def login(
          AuditLogger.log_event(db, user.id, "FAILED_LOGIN", "AUTH", metadata={"reason": "inactive_account"})
          raise HTTPException(status_code=403, detail="Account is inactive")
 
-    # 2. Determine Role
-    user_roles = [r.name for r in user.roles]
-    selected_role_name = None
+    # 2. Determine Role (single-role model)
+    selected_role_name = user.role.name if user.role else None
+    user_roles = [selected_role_name] if selected_role_name else []
     
     if not user_roles:
          raise HTTPException(status_code=403, detail="No roles assigned to user")
 
     if login_data.role:
-        if login_data.role not in user_roles:
+        if login_data.role != selected_role_name:
             raise HTTPException(status_code=403, detail=f"User does not have role: {login_data.role}")
         selected_role_name = login_data.role
-    else:
-        # Auto-select if only 1 role
-        if len(user_roles) == 1:
-            selected_role_name = user_roles[0]
-        else:
-            # Require selection
-            return LoginResponse(
-                success=False,
-                message="Please select a role to continue",
-                requires_role_selection=True,
-                available_roles=user_roles,
-                user=user.model_dump(exclude={"hashed_password"})
-            )
             
     # Update Last Login
-    user.last_login = datetime.now(UTC)
+    user.last_login_at = datetime.now(UTC)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -824,14 +771,9 @@ async def login(
     # Create Session
     AuthService.create_user_session(db, user.id, refresh_token, request, token_jti=token_jti)
     
-    # Create Session
-    # login endpoint DOES NOT have Request in signature!
-    # I need to add Request to login signature.
-    # Skipping login in this replace.
-    
     # Get Permissions & Menu from AuthService
-    permissions = AuthService.get_permissions_for_role(selected_role_name)
-    menu_data = AuthService.get_menu_for_role(selected_role_name)
+    permissions = AuthService.get_permissions_for_role(db, selected_role_name)
+    menu_data = AuthService.get_menu_for_role(db, selected_role_name)
     
     # Audit: successful login
     AuditLogger.log_event(db, user.id, "LOGIN", "AUTH", metadata={"role": selected_role_name})
@@ -1245,6 +1187,7 @@ class AdminLoginRequest(BaseModel):
 
 @router.post("/admin/login")
 async def admin_login(
+    request: Request,
     login_data: AdminLoginRequest,
     db: Session = Depends(get_session)
 ):
@@ -1302,7 +1245,8 @@ async def admin_login(
     AuthService.create_user_session(
         db, 
         user.id, 
-        refresh_tok, 
+        refresh_tok,
+        request=request,
         user_agent="Admin Web"
     )
 

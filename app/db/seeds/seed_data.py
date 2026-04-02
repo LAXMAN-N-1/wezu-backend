@@ -26,7 +26,8 @@ def seed_data():
                 email="admin@wezu.com",
                 full_name="Super Admin",
                 phone_number="0000000000",
-                hashed_password=get_password_hash("admin123"),
+                # WARNING: Change this password immediately after seeding in any non-local environment
+                hashed_password=get_password_hash(os.environ.get("SEED_ADMIN_PASSWORD", "ChangeMe!Seed2026")),
                 is_active=True,
                 is_superuser=True
             )

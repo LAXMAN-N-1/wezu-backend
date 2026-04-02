@@ -48,6 +48,13 @@ class BankAccountRequest(BaseModel):
     account_holder_name: str
     bank_name: str
 
+class BankUpdateFlowRequest(BankAccountRequest):
+    document_url: Optional[str] = None
+
+class PayoutSettingsRequest(BaseModel):
+    payout_interval: str
+    min_payout_amount: float
+
 
 class NotificationPrefsRequest(BaseModel):
     low_stock_email: bool = True
@@ -65,6 +72,17 @@ class NotificationPrefsRequest(BaseModel):
     ticket_email: bool = True
     ticket_sms: bool = False
     ticket_push: bool = True
+
+
+class RentalSettingsRequest(BaseModel):
+    daily_rate: Optional[float] = None
+    security_deposit: Optional[float] = None
+    late_fee_hourly: Optional[float] = None
+    grace_period_hours: Optional[int] = None
+    allow_extension: Optional[bool] = None
+    allow_pause: Optional[bool] = None
+    max_concurrent_rentals: Optional[int] = None
+    min_battery_checkout: Optional[int] = None
 
 
 # ── Profile ──────────────────────────────────────────────
@@ -147,7 +165,7 @@ def update_bank_account(
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    """Add/update bank account for commission settlements."""
+    """Add/update bank account (Legacy direct update)."""
     dealer = db.exec(
         select(DealerProfile).where(DealerProfile.user_id == current_user.id)
     ).first()
@@ -160,6 +178,7 @@ def update_bank_account(
         "account_holder_name": data.account_holder_name,
         "bank_name": data.bank_name,
         "verified": False,
+        "status": "UNVERIFIED",
         "updated_at": str(datetime.now(UTC)),
     }
     db.add(dealer)
@@ -168,19 +187,79 @@ def update_bank_account(
     return {"message": "Bank account updated", "verified": False}
 
 
-@router.get("/bank-account")
-def get_bank_account(
+@router.post("/bank-update-request")
+def request_bank_update(
+    data: BankUpdateFlowRequest,
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    """Get current bank account details."""
+    """Submit a request to change bank details (requires review)."""
     dealer = db.exec(
         select(DealerProfile).where(DealerProfile.user_id == current_user.id)
     ).first()
     if not dealer:
         raise HTTPException(status_code=404, detail="Dealer profile not found")
 
-    return {"bank_details": dealer.bank_details or {}}
+    # In a full system, this might create a separate 'ApprovalRequest' record.
+    # For now, we update the JSON but set a distinct pending status.
+    dealer.bank_details = {
+        "account_number": data.account_number,
+        "ifsc_code": data.ifsc_code,
+        "account_holder_name": data.account_holder_name,
+        "bank_name": data.bank_name,
+        "document_url": data.document_url,
+        "verified": False,
+        "status": "PENDING_APPROVAL",
+        "updated_at": str(datetime.now(UTC)),
+    }
+    db.add(dealer)
+    db.commit()
+
+    return {"message": "Bank update request submitted for review", "status": "PENDING_APPROVAL"}
+
+
+@router.get("/bank-account")
+def get_bank_account(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get current bank account and payout schedule details."""
+    dealer = db.exec(
+        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
+    ).first()
+    if not dealer:
+        raise HTTPException(status_code=404, detail="Dealer profile not found")
+
+    return {
+        "bank_details": dealer.bank_details or {},
+        "payout_interval": dealer.payout_interval,
+        "min_payout_amount": dealer.min_payout_amount,
+    }
+
+
+@router.patch("/payout-settings")
+def update_payout_settings(
+    data: PayoutSettingsRequest,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Update payout frequency and threshold."""
+    dealer = db.exec(
+        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
+    ).first()
+    if not dealer:
+        raise HTTPException(status_code=404, detail="Dealer profile not found")
+
+    dealer.payout_interval = data.payout_interval
+    dealer.min_payout_amount = data.min_payout_amount
+    db.add(dealer)
+    db.commit()
+
+    return {
+        "message": "Payout settings updated",
+        "payout_interval": dealer.payout_interval,
+        "min_payout_amount": dealer.min_payout_amount,
+    }
 
 
 # ── Notification Preferences ─────────────────────────────
@@ -447,3 +526,42 @@ def update_holiday_calendar(
     db.add(dealer)
     db.commit()
     return {"message": "Holiday calendar updated"}
+
+
+@router.get("/rental-settings")
+def get_rental_settings(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get global rental settings for the dealer."""
+    dealer = db.exec(
+        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
+    ).first()
+    if not dealer:
+        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    return dealer.global_rental_settings or {}
+
+
+@router.patch("/rental-settings")
+def update_rental_settings(
+    data: RentalSettingsRequest,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Update global rental settings."""
+    dealer = db.exec(
+        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
+    ).first()
+    if not dealer:
+        raise HTTPException(status_code=404, detail="Dealer profile not found")
+    
+    current_settings = dealer.global_rental_settings or {}
+    
+    update_data = data.dict(exclude_unset=True)
+    current_settings.update(update_data)
+    
+    dealer.global_rental_settings = current_settings
+    
+    db.add(dealer)
+    db.commit()
+    return {"message": "Rental settings updated"}

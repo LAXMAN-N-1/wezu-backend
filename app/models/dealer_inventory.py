@@ -4,7 +4,6 @@ from datetime import datetime, UTC
 
 class DealerInventory(SQLModel, table=True):
     __tablename__ = "dealer_inventories"
-    # __table_args__ = {"schema": "public"}
     """Track dealer-specific battery inventory"""
     id: Optional[int] = Field(default=None, primary_key=True)
     dealer_id: int = Field(foreign_key="dealer_profiles.id")
@@ -27,7 +26,6 @@ class DealerInventory(SQLModel, table=True):
 
 class InventoryTransaction(SQLModel, table=True):
     __tablename__ = "inventory_transactions"
-    # __table_args__ = {"schema": "public"}
     """Log all inventory movements"""
     id: Optional[int] = Field(default=None, primary_key=True)
     inventory_id: int = Field(foreign_key="dealer_inventories.id")

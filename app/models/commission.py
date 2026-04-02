@@ -5,7 +5,6 @@ from sqlmodel import SQLModel, Field, Relationship
 
 class CommissionConfig(SQLModel, table=True):
     __tablename__ = "commission_configs"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
 
     # Target entity
@@ -47,7 +46,6 @@ class CommissionTier(SQLModel, table=True):
 
 class CommissionLog(SQLModel, table=True):
     __tablename__ = "commission_logs"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
 
     # Reference to causing event

@@ -37,7 +37,6 @@ class LocationType(str, Enum):
 
 class Battery(SQLModel, table=True):
     __tablename__ = "batteries"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     
     # Identity
@@ -120,7 +119,6 @@ class Battery(SQLModel, table=True):
 
 class BatteryLifecycleEvent(SQLModel, table=True):
     __tablename__ = "battery_lifecycle_events"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     battery_id: int = Field(foreign_key="batteries.id")
     
@@ -134,7 +132,6 @@ class BatteryLifecycleEvent(SQLModel, table=True):
 
 class BatteryAuditLog(SQLModel, table=True):
     __tablename__ = "battery_audit_logs"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     battery_id: int = Field(foreign_key="batteries.id", index=True)
     
@@ -148,7 +145,6 @@ class BatteryAuditLog(SQLModel, table=True):
 
 class BatteryHealthHistory(SQLModel, table=True):
     __tablename__ = "battery_health_history"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     battery_id: int = Field(foreign_key="batteries.id", index=True)
     

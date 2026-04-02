@@ -51,11 +51,10 @@ async def detailed_health_check(db: Session = Depends(deps.get_db)):
 async def get_version():
     """Get API version information"""
     return {
-        "version": "1.0.0",
+        "version": settings.APP_VERSION,
         "api_version": "v1",
-        "environment": settings.APP_ENV if hasattr(settings, 'APP_ENV') else "development",
+        "environment": settings.ENVIRONMENT,
         "python_version": platform.python_version(),
-        "build_date": "2025-12-22"
     }
 
 
@@ -78,8 +77,8 @@ async def get_public_config():
             "max_addresses_per_user": 5
         },
         "support": {
-            "email": "support@wezu.com",
-            "phone": "+91-1234567890",
+            "email": settings.SUPPORT_EMAIL,
+            "phone": settings.SUPPORT_PHONE,
             "hours": "24/7"
         }
     }

@@ -4,7 +4,6 @@ from datetime import datetime
 
 class Continent(SQLModel, table=True):
     __tablename__ = "continents"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(unique=True, index=True)
     
@@ -12,7 +11,6 @@ class Continent(SQLModel, table=True):
 
 class Country(SQLModel, table=True):
     __tablename__ = "countries"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(unique=True, index=True)
     continent_id: int = Field(foreign_key="continents.id")
@@ -22,7 +20,6 @@ class Country(SQLModel, table=True):
 
 class Region(SQLModel, table=True):
     __tablename__ = "regions"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     country_id: int = Field(foreign_key="countries.id")
@@ -32,7 +29,6 @@ class Region(SQLModel, table=True):
 
 class City(SQLModel, table=True):
     __tablename__ = "cities"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     region_id: int = Field(foreign_key="regions.id")
@@ -42,7 +38,6 @@ class City(SQLModel, table=True):
 
 class Zone(SQLModel, table=True):
     __tablename__ = "zones"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     city_id: int = Field(foreign_key="cities.id")

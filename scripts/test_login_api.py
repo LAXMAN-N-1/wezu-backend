@@ -1,10 +1,11 @@
+import os
 import requests
 
 def test_login():
     url = "http://localhost:8000/api/v1/customer/auth/login"
     payload = {
         "email": "9154345918",
-        "password": "laxman123"
+        "password": os.environ.get("SEED_ADMIN_PASSWORD", "ChangeMe!Seed2026")
     }
     try:
         response = requests.post(url, json=payload)

@@ -1,35 +1,37 @@
+"""
+Update a user's password in the database.
+Uses DATABASE_URL from environment / .env — never hardcode credentials.
+
+Usage:
+    python scripts/update_pwd.py <email> <new_password>
+"""
 import os
 import sys
 
-# Add the backend app to Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-import psycopg2
+from sqlmodel import Session, select
+from app.core.database import engine
 from app.core.security import get_password_hash
+from app.models.user import User
 
-db_url = "postgresql://neondb_owner:npg_8gj3tFVnBsoX@ep-cool-night-adhmotv8-pooler.c-2.us-east-1.aws.neon.tech/wezu?sslmode=require"
 
-try:
-    conn = psycopg2.connect(db_url)
-    cur = conn.cursor()
-    
-    # Hash the exact password the user wants
-    new_hash = get_password_hash("laxman123")
-    
-    # Update the dealer@wezu.com account in the DB
-    cur.execute(
-        "UPDATE users SET hashed_password = %s WHERE email = 'dealer@wezu.com';",
-        (new_hash,)
-    )
-    
-    if cur.rowcount > 0:
-        print("Successfully updated dealer@wezu.com password to 'laxman123' in the database.")
-    else:
-        print("Could not find dealer@wezu.com in the database to update.")
-        
-    conn.commit()
-    cur.close()
-    conn.close()
-except Exception as e:
-    import traceback
-    traceback.print_exc()
+def update_password(email: str, new_password: str):
+    with Session(engine) as session:
+        user = session.exec(select(User).where(User.email == email)).first()
+        if not user:
+            print(f"User {email} not found in the database.")
+            return False
+
+        user.hashed_password = get_password_hash(new_password)
+        session.add(user)
+        session.commit()
+        print(f"Successfully updated password for {email}.")
+        return True
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 3:
+        print("Usage: python scripts/update_pwd.py <email> <new_password>")
+        sys.exit(1)
+    update_password(sys.argv[1], sys.argv[2])

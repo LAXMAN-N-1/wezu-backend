@@ -11,7 +11,6 @@ if TYPE_CHECKING:
 
 class SwapSession(SQLModel, table=True):
     __tablename__ = "swap_sessions"
-    # __table_args__ = {"schema": "public", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     rental_id: Optional[int] = Field(default=None, foreign_key="rentals.id", index=True)

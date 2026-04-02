@@ -64,5 +64,5 @@ def monitor_stations():
             logger.info(f"Health check completed. Found {len(offline_stations)} new offline stations.")
             
         except Exception as e:
-            logger.error(f"Error in monitor_stations: {e}")
+            logger.error(f"Error in monitor_stations: {e}", exc_info=True)
             session.rollback()

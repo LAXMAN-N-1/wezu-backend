@@ -4,7 +4,6 @@ from datetime import datetime, UTC
 
 class LateFee(SQLModel, table=True):
     __tablename__ = "late_fees"
-    # __table_args__ = {"schema": "public"}
     """Late fee calculations for overdue rentals"""
     id: Optional[int] = Field(default=None, primary_key=True)
     rental_id: int = Field(foreign_key="rentals.id", unique=True)
@@ -46,7 +45,6 @@ class LateFee(SQLModel, table=True):
 
 class LateFeeWaiver(SQLModel, table=True):
     __tablename__ = "late_fee_waivers"
-    # __table_args__ = {"schema": "public"}
     """Waiver requests for late fees"""
     id: Optional[int] = Field(default=None, primary_key=True)
     late_fee_id: int = Field(foreign_key="late_fees.id", unique=True)

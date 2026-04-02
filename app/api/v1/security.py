@@ -42,10 +42,12 @@ async def enable_2fa(
     db.add(two_fa)
     db.commit()
     
+    from app.core.security import generate_backup_codes
+    
     return {
         "secret_key": secret,
         "provisioning_uri": provisioning_uri,
-        "backup_codes": ["123456", "789012"] # Mock backup codes
+        "backup_codes": generate_backup_codes(8)
     }
 
 class Verify2FARequest(BaseModel):

@@ -65,7 +65,7 @@ def main():
         created_at = fake.date_time_between(start_date="-1y", end_date="now")
         updated_at = created_at + timedelta(days=random.randint(1, 30))
         
-        hashed = get_password_hash("password123")
+        hashed = get_password_hash(os.environ.get("SEED_ADMIN_PASSWORD", "ChangeMe!Seed2026"))
         
         role_id = random.choice(role_ids) if u_type in ["ADMIN", "SUPPORT_AGENT", "LOGISTICS"] else None
         

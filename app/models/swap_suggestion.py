@@ -4,7 +4,6 @@ from datetime import datetime, UTC
 
 class SwapSuggestion(SQLModel, table=True):
     __tablename__ = "swap_suggestions"
-    # __table_args__ = {"schema": "public"}
     """ML-based swap station recommendations"""
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id")
@@ -49,7 +48,6 @@ class SwapSuggestion(SQLModel, table=True):
 
 class SwapPreference(SQLModel, table=True):
     __tablename__ = "swap_preferences"
-    # __table_args__ = {"schema": "public"}
     """User preferences for swap stations"""
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", unique=True)

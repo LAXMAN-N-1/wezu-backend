@@ -8,14 +8,12 @@ from datetime import datetime, UTC
 # Link Table for Role <-> Permission
 class RolePermission(SQLModel, table=True):
     __tablename__ = "role_permissions"
-    # __table_args__ = {"schema": "public"}
     role_id: int = Field(foreign_key="roles.id", primary_key=True)
     permission_id: int = Field(foreign_key="permissions.id", primary_key=True)
 
 # Link Table for AdminUser <-> Role
 class AdminUserRole(SQLModel, table=True):
     __tablename__ = "admin_user_roles"
-    # __table_args__ = {"schema": "public"}
     admin_id: int = Field(foreign_key="admin_users.id", primary_key=True)
     role_id: int = Field(foreign_key="roles.id", primary_key=True)
     
@@ -26,7 +24,6 @@ class AdminUserRole(SQLModel, table=True):
 # Link Table for User <-> Role (Many-to-Many)
 class UserRole(SQLModel, table=True):
     __tablename__ = "user_roles"
-    # __table_args__ = {"schema": "public"}
     user_id: int = Field(foreign_key="users.id", primary_key=True)
     role_id: int = Field(foreign_key="roles.id", primary_key=True)
     
@@ -38,7 +35,6 @@ class UserRole(SQLModel, table=True):
 
 class Permission(SQLModel, table=True):
     __tablename__ = "permissions"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     slug: str = Field(unique=True, index=True)  # e.g., "battery:view:all"
     module: str  # e.g., "battery", "station"
@@ -52,7 +48,6 @@ class Permission(SQLModel, table=True):
 
 class Role(SQLModel, table=True):
     __tablename__ = "roles"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(unique=True, index=True)
     description: Optional[str] = None
@@ -117,7 +112,6 @@ class Role(SQLModel, table=True):
 # Data Scoping: Path Based Access
 class UserAccessPath(SQLModel, table=True):
     __tablename__ = "user_access_paths"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True)

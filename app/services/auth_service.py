@@ -56,17 +56,11 @@ class AuthService:
             )
             return payload
         except Exception as e:
-            # In development, if APPLE_CLIENT_ID is not set, allow unverified for testing (CAUTION)
-            if settings.ENVIRONMENT != "production" and not settings.APPLE_CLIENT_ID:
-                from jose import jwt as jose_jwt
-                return jose_jwt.get_unverified_claims(token)
-                
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=f"Invalid Apple token: {str(e)}",
             )
 
-    @staticmethod
     @staticmethod
     async def verify_facebook_token(token: str):
         try:
@@ -90,76 +84,83 @@ class AuthService:
             )
 
     @staticmethod
-    def get_permissions_for_role(role_name: str) -> list[str]:
+    def get_permissions_for_role(db: Session, role_identifier: int | str) -> list[str]:
         """
-        Return default permission slugs for the given role.
-        Kept lightweight to avoid login hard-failing if RBAC seed data is incomplete.
+        Fetch permissions for a given role from the database.
+        role_identifier can be role ID (int) or role name (str).
         """
-        role_permissions = {
-            "customer": [
-                "profile:read:own",
-                "profile:update:own",
-                "stations:view:all",
-                "rentals:create:own",
-                "rentals:view:own",
-                "wallet:view:own",
-            ],
-            "vendor_owner": [
-                "dashboard:view:own",
-                "stations:manage:own",
-                "staff:manage:own",
-                "finance:view:own",
-            ],
-            "dealer": [
-                "dashboard:view:own",
-                "stations:manage:own",
-                "staff:manage:own",
-                "finance:view:own",
-            ],
-            "admin": [
-                "dashboard:view:all",
-                "users:manage:all",
-                "dealers:manage:all",
-                "settings:manage:all",
-                "audit:read:all",
-            ],
-            "super_admin": [
-                "dashboard:view:all",
-                "users:manage:all",
-                "dealers:manage:all",
-                "settings:manage:all",
-                "audit:read:all",
-                "rbac:manage:all",
-            ],
-        }
-        return role_permissions.get(role_name, [])
+        from app.models.rbac import Role, RolePermission, Permission
+        from sqlmodel import select
+        
+        if isinstance(role_identifier, int):
+            statement = select(Permission.slug).join(RolePermission).where(RolePermission.role_id == role_identifier)
+        else:
+            statement = select(Permission.slug).join(RolePermission).join(Role).where(Role.name == role_identifier)
+            
+        perms = db.exec(statement).all()
+        
+        # Fallbacks for empty DB states just to ensure login works while seeding
+        if not perms and isinstance(role_identifier, str):
+            fallback = {
+                "customer": ["profile:read:own", "stations:view:all", "rentals:create:own", "rentals:view:own", "wallet:view:own"],
+                "vendor_owner": ["dashboard:view:own", "stations:manage:own", "staff:manage:own", "finance:view:own"],
+                "dealer": ["dashboard:view:own", "stations:manage:own", "staff:manage:own", "finance:view:own"],
+                "admin": ["dashboard:view:all", "users:manage:all", "dealers:manage:all", "settings:manage:all", "audit:read:all"],
+                "super_admin": ["dashboard:view:all", "users:manage:all", "dealers:manage:all", "settings:manage:all", "audit:read:all", "rbac:manage:all"],
+            }
+            return fallback.get(role_identifier, [])
+            
+        return list(perms)
 
     @staticmethod
-    def get_menu_for_role(role_name: str) -> list[dict]:
-        # Avoiding circular import by returning dicts or importing locally if needed
-        # But returning dicts is safer for service layer decoupling if schema isn't strictly needed here 
-        # However, for type safety let's use the schema if possible, but for now dicts are fine as they serialize to JSON
-        if role_name == "customer":
-            return [
-                {"id": "dashboard", "label": "Dashboard", "path": "/dashboard", "route": "/dashboard", "icon": "home"},
-                {"id": "vehicle", "label": "My Vehicle", "path": "/vehicle", "route": "/vehicle", "icon": "car"},
-                {"id": "stations", "label": "Find Stations", "path": "/stations", "route": "/stations", "icon": "map"},
-            ]
-        elif role_name in ["vendor_owner", "dealer"]:
-            return [
-                {"id": "dashboard", "label": "Dashboard", "path": "/dashboard", "route": "/dashboard", "icon": "home"},
-                {"id": "stations", "label": "Stations", "path": "/stations", "route": "/stations", "icon": "fuel"},
-                {"id": "staff", "label": "Staff", "path": "/staff", "route": "/staff", "icon": "users"},
-                {"id": "finance", "label": "Finance", "path": "/finance", "route": "/finance", "icon": "dollar-sign"},
-            ]
-        elif role_name in ["admin", "super_admin"]:
-            return [
-                {"id": "admin_dashboard", "label": "Dashboard", "path": "/admin/dashboard", "route": "/admin/dashboard", "icon": "activity"},
-                {"id": "admin_users", "label": "Users", "path": "/admin/users", "route": "/admin/users", "icon": "users"},
-                {"id": "admin_dealers", "label": "Dealers", "path": "/admin/users", "route": "/admin/users", "icon": "briefcase"},
-                {"id": "admin_settings", "label": "Settings", "path": "/admin/settings", "route": "/admin/settings", "icon": "settings"},
-            ]
-        return []
+    def get_menu_for_role(db: Session, role_identifier: int | str) -> list[dict]:
+        from app.models.rbac import Role
+        from app.models.role_right import RoleRight
+        from app.models.menu import Menu
+        from sqlmodel import select
+        
+        if isinstance(role_identifier, int):
+            statement = select(Menu).join(RoleRight, RoleRight.menu_id == Menu.id).where(RoleRight.role_id == role_identifier).order_by(Menu.menu_order)
+        else:
+            statement = select(Menu).join(RoleRight, RoleRight.menu_id == Menu.id).join(Role).where(Role.name == role_identifier).order_by(Menu.menu_order)
+            
+        menus = db.exec(statement).all()
+        
+        if not menus and isinstance(role_identifier, str):
+            # Fallback
+            if role_identifier == "customer":
+                return [
+                    {"id": "dashboard", "label": "Dashboard", "path": "/dashboard", "route": "/dashboard", "icon": "home"},
+                    {"id": "vehicle", "label": "My Vehicle", "path": "/vehicle", "route": "/vehicle", "icon": "car"},
+                    {"id": "stations", "label": "Find Stations", "path": "/stations", "route": "/stations", "icon": "map"},
+                ]
+            elif role_identifier in ["vendor_owner", "dealer"]:
+                return [
+                    {"id": "dashboard", "label": "Dashboard", "path": "/dashboard", "route": "/dashboard", "icon": "home"},
+                    {"id": "stations", "label": "Stations", "path": "/stations", "route": "/stations", "icon": "fuel"},
+                    {"id": "staff", "label": "Staff", "path": "/staff", "route": "/staff", "icon": "users"},
+                    {"id": "finance", "label": "Finance", "path": "/finance", "route": "/finance", "icon": "dollar-sign"},
+                ]
+            elif role_identifier in ["admin", "super_admin"]:
+                return [
+                    {"id": "admin_dashboard", "label": "Dashboard", "path": "/admin/dashboard", "route": "/admin/dashboard", "icon": "activity"},
+                    {"id": "admin_users", "label": "Users", "path": "/admin/users", "route": "/admin/users", "icon": "users"},
+                    {"id": "admin_dealers", "label": "Dealers", "path": "/admin/users", "route": "/admin/users", "icon": "briefcase"},
+                    {"id": "admin_settings", "label": "Settings", "path": "/admin/settings", "route": "/admin/settings", "icon": "settings"},
+                ]
+            return []
+            
+        # Format response
+        result = []
+        for m in menus:
+            result.append({
+                "id": m.name,
+                "label": m.display_name,
+                "path": m.route or "",
+                "route": m.route or "",
+                "icon": m.icon or "circle"
+            })
+        return result
 
     @staticmethod
     def create_user_session(

@@ -19,7 +19,6 @@ class StockMovementDirection(str, Enum):
 
 class StockMovement(SQLModel, table=True):
     __tablename__ = "stock_movements"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     stock_id: int = Field(foreign_key="stocks.id", index=True)

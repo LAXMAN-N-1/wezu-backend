@@ -8,7 +8,7 @@ from app.core.security import get_password_hash
 
 def restore_admin():
     email = "admin@wezu.com"
-    password = "laxman123"
+    password = os.environ.get("SEED_ADMIN_PASSWORD", "ChangeMe!Seed2026")
     hashed_password = get_password_hash(password)
     
     with engine.connect() as conn:

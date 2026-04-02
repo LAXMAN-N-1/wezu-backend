@@ -2,7 +2,6 @@ import traceback
 import sys
 import ssl
 import asyncio
-import json
 from contextlib import asynccontextmanager
 from app.core.logging import setup_logging, get_logger
 
@@ -44,7 +43,8 @@ from app.api.v1 import (
     dealer_portal_customers, dealer_portal_settings, dealer_onboarding, 
     dealer_documents, dealer_portal_roles, dealer_portal_users, 
     dealer_analytics, dealer_campaigns, dealer_stations, drivers, catalog,
-    admin_invoices, admin_financial_reports, admin_audit, admin_rbac, admin_users
+    admin_invoices, admin_financial_reports, admin_audit, admin_rbac, admin_users,
+    admin_dealers
 )
 from app.api.v1.admin import (
     support as admin_support, faqs as admin_faqs, analytics as admin_analytics, 
@@ -75,42 +75,28 @@ if settings.SENTRY_DSN:
 
 logger = get_logger(__name__)
 
+from app.utils.cors import cors_headers_for_origin
 
-def _normalized_cors_origins() -> list[str]:
-    allowed_origins = settings.CORS_ORIGINS
-    if isinstance(allowed_origins, str):
-        try:
-            parsed = json.loads(allowed_origins)
-            if isinstance(parsed, list):
-                allowed_origins = parsed
-            else:
-                allowed_origins = [allowed_origins]
-        except Exception:
-            allowed_origins = [allowed_origins]
-    return [origin.rstrip("/") for origin in (allowed_origins or [])]
-
-
-def _cors_headers_for_origin(origin: str) -> dict[str, str]:
-    if not origin:
-        return {}
-    allowed_origins = _normalized_cors_origins()
-    normalized_origin = origin.rstrip("/")
-    if "*" in allowed_origins or normalized_origin in allowed_origins:
-        return {
-            "Access-Control-Allow-Origin": origin,
-            "Access-Control-Allow-Credentials": "true",
-            "Vary": "Origin",
-        }
-    return {}
+CORS_ALLOWED_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+CORS_ALLOWED_HEADERS = [
+    "Authorization",
+    "Content-Type",
+    "Accept",
+    "Origin",
+    "X-Requested-With",
+    "X-Request-ID",
+    "X-Correlation-ID",
+]
 
 
 class CORSErrorMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
         origin = request.headers.get("origin", "")
-        for key, value in _cors_headers_for_origin(origin).items():
+        for key, value in cors_headers_for_origin(origin).items():
             response.headers[key] = value
         return response
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -124,12 +110,20 @@ async def lifespan(app: FastAPI):
 
     if settings.DB_INIT_ON_STARTUP:
         try:
-            logger.info("Initializing database schema (DB_INIT_ON_STARTUP is True)...")
-            from app.db.session import init_db
-            init_db()
-            logger.info("Database schema initialization complete.")
+            logger.info("Running Alembic migrations (DB_INIT_ON_STARTUP is True)...")
+            from alembic.config import Config as AlembicConfig
+            from alembic import command as alembic_command
+            alembic_cfg = AlembicConfig("alembic.ini")
+            alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+            alembic_command.upgrade(alembic_cfg, "head")
+            logger.info("Alembic migrations complete.")
         except Exception:
-            logger.exception("DB init on startup failed; continuing")
+            logger.exception("Alembic migration on startup failed; falling back to create_all")
+            try:
+                from app.db.session import init_db
+                init_db()
+            except Exception:
+                logger.exception("Fallback create_all also failed")
 
     if settings.RUN_BACKGROUND_TASKS:
         logger.info("Starting background tasks...")
@@ -183,28 +177,31 @@ if settings.ENABLE_TRUSTED_HOST_MIDDLEWARE:
 # In Starlette, the most recently added middleware runs first.
 app.add_middleware(TrustedProxyHeadersMiddleware)
 
-# Keep CORS outermost so proxy/host/auth errors still include CORS headers.
+# Keep error-header patching near the edge, then wrap everything with CORSMiddleware.
+app.add_middleware(CORSErrorMiddleware)
+
+# CORSMiddleware must be the outermost layer (added last) so OPTIONS preflight never
+# reaches auth middleware and CORS headers are consistently returned.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS if settings.ENVIRONMENT == "production" else ["*"],
+    allow_origins=settings.CORS_ORIGINS,
+    allow_origin_regex=settings.cors_allow_origin_regex,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=CORS_ALLOWED_METHODS,
+    allow_headers=CORS_ALLOWED_HEADERS,
+    expose_headers=["*"],
 )
-
-# Keep as the outermost middleware so even error responses include CORS headers.
-app.add_middleware(CORSErrorMiddleware)
 
 
 @app.options("/{full_path:path}", include_in_schema=False)
 async def global_options_handler(full_path: str, request: Request):
     origin = request.headers.get("origin", "")
     headers = {
-        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Origin, X-Requested-With",
+        "Access-Control-Allow-Methods": ", ".join(CORS_ALLOWED_METHODS),
+        "Access-Control-Allow-Headers": ", ".join(CORS_ALLOWED_HEADERS),
         "Access-Control-Max-Age": "600",
     }
-    headers.update(_cors_headers_for_origin(origin))
+    headers.update(cors_headers_for_origin(origin))
     return Response(status_code=200, headers=headers)
 
 # ----------------------------
@@ -215,6 +212,10 @@ async def health_check():
     """Deep health check for database and basic connectivity"""
     from sqlalchemy import text
     db_ok = False
+    redis_ok = False
+    mongo_ok = False
+
+    # PostgreSQL check
     try:
         from app.db.session import SessionLocal
         with SessionLocal() as db:
@@ -223,11 +224,36 @@ async def health_check():
     except Exception as e:
         logger.error(f"Health check DB failure: {e}")
 
+    # Redis check
+    try:
+        import redis
+        r = redis.from_url(settings.REDIS_URL, socket_connect_timeout=2)
+        r.ping()
+        redis_ok = True
+    except Exception as e:
+        logger.error(f"Health check Redis failure: {e}")
+
+    # MongoDB check (non-critical)
+    try:
+        if settings.MONGODB_URL and settings.MONGODB_URL != "mongodb://localhost:27017":
+            from pymongo import MongoClient
+            client = MongoClient(settings.MONGODB_URL, serverSelectionTimeoutMS=2000)
+            client.admin.command("ping")
+            mongo_ok = True
+        else:
+            mongo_ok = None  # Not configured
+    except Exception as e:
+        logger.error(f"Health check MongoDB failure: {e}")
+
+    all_ok = db_ok and redis_ok and (mongo_ok is None or mongo_ok)
+
     return {
-        "status": "ok" if db_ok else "degraded",
+        "status": "ok" if all_ok else "degraded",
         "database": "online" if db_ok else "offline",
+        "redis": "online" if redis_ok else "offline",
+        "mongodb": "online" if mongo_ok else ("not_configured" if mongo_ok is None else "offline"),
         "environment": settings.ENVIRONMENT,
-        "version": "1.0.0"
+        "version": settings.APP_VERSION
     }
 
 
@@ -237,7 +263,7 @@ async def readiness_check():
 
 @app.get("/", tags=["System"])
 async def root():
-    return {"message": f"Welcome to {settings.PROJECT_NAME} API", "version": "1.0.0"}
+    return {"message": f"Welcome to {settings.PROJECT_NAME} API", "version": settings.APP_VERSION}
 
 # ----------------------------
 # API V1 - Customer Endpoints
@@ -294,6 +320,7 @@ app.include_router(admin_rbac.router, prefix=f"{admin_api}/rbac", tags=["Admin: 
 app.include_router(admin_legal.router, prefix=f"{admin_api}/legal", tags=["Admin: Legal"], dependencies=admin_deps)
 app.include_router(admin_banners.router, prefix=f"{admin_api}/banners", tags=["Admin: Banners"], dependencies=admin_deps)
 app.include_router(admin_blogs.router, prefix=f"{admin_api}/blogs", tags=["Admin: Blogs"], dependencies=admin_deps)
+app.include_router(admin_dealers.router, prefix=f"{admin_api}/dealers", tags=["Admin: Dealers"], dependencies=admin_deps)
 
 # ----------------------------
 # API V1 - Dealer Endpoints
