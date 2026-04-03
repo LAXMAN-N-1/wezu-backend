@@ -1,12 +1,14 @@
 from sqlmodel import Session, select, func, and_
+from sqlalchemy import case
 from datetime import datetime, UTC, timedelta
 from typing import Dict, List, Any, Optional
 from collections import defaultdict, Counter
-from sqlalchemy import case
 from app.models.financial import Transaction, TransactionType, TransactionStatus
 from app.models.rental import Rental, RentalStatus
 from app.models.station import Station, StationSlot
 from app.models.battery import Battery
+import math
+import random
 
 class AnalyticsService:
     @staticmethod
@@ -205,104 +207,127 @@ class AnalyticsService:
         from app.models.battery import Battery, BatteryStatus
         from app.models.dealer import DealerProfile
 
-        start, end, prev_start, prev_end, _ = AnalyticsService._period_to_range(period)
+        start, end, prev_start, prev_end, days = AnalyticsService._period_to_range(period)
 
         def pct_change(current: float, previous: float) -> float:
             if previous == 0:
                 return 0.0 if current == 0 else 100.0
             return round(((current - previous) / previous) * 100, 2)
 
-        current_tx = and_(
-            Transaction.status == TransactionStatus.SUCCESS,
-            Transaction.created_at >= start,
-            Transaction.created_at <= end,
-        )
-        previous_tx = and_(
-            Transaction.status == TransactionStatus.SUCCESS,
-            Transaction.created_at >= prev_start,
-            Transaction.created_at <= prev_end,
-        )
-        revenue_current, revenue_previous = db.exec(
-            select(
-                func.coalesce(func.sum(case((current_tx, Transaction.amount), else_=0)), 0),
-                func.coalesce(func.sum(case((previous_tx, Transaction.amount), else_=0)), 0),
-            )
-        ).one()
-        revenue_current = float(revenue_current or 0.0)
-        revenue_previous = float(revenue_previous or 0.0)
-
-        current_rentals = and_(Rental.created_at >= start, Rental.created_at <= end)
-        previous_rentals = and_(Rental.created_at >= prev_start, Rental.created_at <= prev_end)
-        session_duration_minutes = (
-            func.extract("epoch", Rental.end_time) - func.extract("epoch", Rental.start_time)
-        ) / 60
-        rentals_current, rentals_previous, active_rentals_now, avg_session_minutes = db.exec(
-            select(
-                func.coalesce(func.sum(case((current_rentals, 1), else_=0)), 0),
-                func.coalesce(func.sum(case((previous_rentals, 1), else_=0)), 0),
-                func.coalesce(func.sum(case((Rental.status == RentalStatus.ACTIVE, 1), else_=0)), 0),
-                func.avg(
-                    case(
-                        (
-                            and_(
-                                Rental.status == RentalStatus.COMPLETED,
-                                Rental.end_time.is_not(None),
-                                Rental.start_time >= start,
-                            ),
-                            session_duration_minutes,
-                        ),
-                        else_=None,
-                    )
-                ),
-            )
-        ).one()
-        rentals_current = int(rentals_current or 0)
-        rentals_previous = int(rentals_previous or 0)
-        active_rentals_now = int(active_rentals_now or 0)
-        avg_session_minutes = float(avg_session_minutes or 0.0)
-
-        customer_current = and_(
-            User.user_type == UserType.CUSTOMER,
-            User.created_at >= start,
-            User.created_at <= end,
-        )
-        customer_previous = and_(
-            User.user_type == UserType.CUSTOMER,
-            User.created_at >= prev_start,
-            User.created_at <= prev_end,
-        )
-        total_users, new_users_current, new_users_prev = db.exec(
-            select(
-                func.coalesce(func.sum(case((User.user_type == UserType.CUSTOMER, 1), else_=0)), 0),
-                func.coalesce(func.sum(case((customer_current, 1), else_=0)), 0),
-                func.coalesce(func.sum(case((customer_previous, 1), else_=0)), 0),
-            )
-        ).one()
-        total_users = int(total_users or 0)
-        new_users_current = int(new_users_current or 0)
-        new_users_prev = int(new_users_prev or 0)
-
-        total_batteries, rented_batteries, avg_battery_health = db.exec(
-            select(
-                func.coalesce(func.count(Battery.id), 0),
-                func.coalesce(func.sum(case((Battery.status == BatteryStatus.RENTED, 1), else_=0)), 0),
-                func.avg(Battery.health_percentage),
-            )
-        ).one()
-        total_batteries = int(total_batteries or 0)
-        rented_batteries = int(rented_batteries or 0)
-        avg_battery_health = float(avg_battery_health or 0.0)
-        fleet_utilization = round((rented_batteries / total_batteries) * 100, 2) if total_batteries else 0.0
-
-        active_stations = int(db.exec(select(func.count(Station.id))).one() or 0)
-        active_dealers = int(db.exec(select(func.count(DealerProfile.id))).one() or 0)
-        open_tickets = int(
+        # Revenue (successful transactions)
+        revenue_current = (
             db.exec(
-                select(func.count(SupportTicket.id)).where(SupportTicket.status == TicketStatus.OPEN)
+                select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+                    Transaction.status == TransactionStatus.SUCCESS,
+                    Transaction.created_at >= start,
+                    Transaction.created_at <= end,
+                )
+            ).one()
+            or 0.0
+        )
+        revenue_previous = (
+            db.exec(
+                select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+                    Transaction.status == TransactionStatus.SUCCESS,
+                    Transaction.created_at >= prev_start,
+                    Transaction.created_at <= prev_end,
+                )
+            ).one()
+            or 0.0
+        )
+
+        # Rentals in current & previous window
+        rentals_current = (
+            db.exec(
+                select(func.count(Rental.id)).where(
+                    Rental.created_at >= start, Rental.created_at <= end
+                )
+            ).one()
+            or 0
+        )
+        rentals_previous = (
+            db.exec(
+                select(func.count(Rental.id)).where(
+                    Rental.created_at >= prev_start, Rental.created_at <= prev_end
+                )
             ).one()
             or 0
         )
 
+        active_rentals_now = (
+            db.exec(select(func.count(Rental.id)).where(Rental.status == RentalStatus.ACTIVE)).one()
+            or 0
+        )
+
+        # Users
+        total_users = (
+            db.exec(select(func.count(User.id)).where(User.user_type == UserType.CUSTOMER)).one()
+            or 0
+        )
+        new_users_current = (
+            db.exec(
+                select(func.count(User.id)).where(
+                    User.user_type == UserType.CUSTOMER,
+                    User.created_at >= start,
+                    User.created_at <= end,
+                )
+            ).one()
+            or 0
+        )
+        new_users_prev = (
+            db.exec(
+                select(func.count(User.id)).where(
+                    User.user_type == UserType.CUSTOMER,
+                    User.created_at >= prev_start,
+                    User.created_at <= prev_end,
+                )
+            ).one()
+            or 0
+        )
+
+        # Fleet / stations / dealers
+        total_batteries = db.exec(select(func.count(Battery.id))).one() or 0
+        rented_batteries = (
+            db.exec(
+                select(func.count(Battery.id)).where(Battery.status == BatteryStatus.RENTED)
+            ).one()
+            or 0
+        )
+        charging_batteries = (
+            db.exec(
+                select(func.count(Battery.id)).where(Battery.status == BatteryStatus.CHARGING)
+            ).one()
+            or 0
+        )
+        fleet_utilization = (
+            round((rented_batteries / total_batteries) * 100, 2) if total_batteries else 0.0
+        )
+
+        active_stations = db.exec(select(func.count(Station.id))).one() or 0
+        active_dealers = db.exec(select(func.count(DealerProfile.id))).one() or 0
+        open_tickets = (
+            db.exec(
+                select(func.count(SupportTicket.id)).where(
+                    SupportTicket.status == TicketStatus.OPEN
+                )
+            ).one()
+            or 0
+        )
+        avg_battery_health = (
+            db.exec(select(func.avg(Battery.health_percentage))).one() or 0.0
+        )
+
+        # Session / rental efficiency
+        # Optimization: Use SQL aggregation instead of fetching all records
+        avg_duration_stmt = select(func.avg(
+            (func.extract('epoch', Rental.end_time) - func.extract('epoch', Rental.start_time)) / 60
+        )).where(
+            Rental.status == RentalStatus.COMPLETED,
+            Rental.end_time.is_not(None),
+            Rental.start_time >= start,
+        )
+        avg_session_minutes = db.exec(avg_duration_stmt).one() or 0.0
+        
         revenue_per_rental = (
             round(float(revenue_current) / rentals_current, 2) if rentals_current else 0.0
         )
@@ -503,37 +528,148 @@ class AnalyticsService:
         from app.models.user import User, UserType
 
         lookback = datetime.now(UTC) - timedelta(days=60)
-        rentals = db.exec(
-            select(Rental).where(Rental.created_at >= lookback)
+        duration_minutes_expr = (
+            (func.extract("epoch", Rental.end_time) - func.extract("epoch", Rental.start_time))
+            / 60.0
+        )
+
+        avg_session = (
+            db.exec(
+                select(func.coalesce(func.avg(duration_minutes_expr), 0.0)).where(
+                    Rental.created_at >= lookback,
+                    Rental.start_time.is_not(None),
+                    Rental.end_time.is_not(None),
+                )
+            ).one()
+            or 0.0
+        )
+        avg_session = round(float(avg_session), 2)
+
+        total_rentals = (
+            db.exec(
+                select(func.count(Rental.id)).where(Rental.created_at >= lookback)
+            ).one()
+            or 0
+        )
+        distinct_users_count = (
+            db.exec(
+                select(func.count(func.distinct(Rental.user_id))).where(
+                    Rental.created_at >= lookback
+                )
+            ).one()
+            or 0
+        )
+        avg_rentals_per_user = (
+            round(total_rentals / distinct_users_count, 2) if distinct_users_count else 0.0
+        )
+
+        # Peak hours (top 3) using grouped SQL instead of materializing rentals.
+        peak_rows = db.exec(
+            select(
+                func.extract("hour", Rental.created_at).label("hour"),
+                func.count(Rental.id).label("count"),
+            )
+            .where(Rental.created_at >= lookback)
+            .group_by(func.extract("hour", Rental.created_at))
+            .order_by(func.count(Rental.id).desc())
+            .limit(3)
         ).all()
+        peak_hours = {
+            f"{int(row.hour):02d}:00": int(row.count or 0)
+            for row in peak_rows
+        }
 
-        durations = [
-            (r.end_time - r.start_time).total_seconds() / 60
-            for r in rentals
-            if r.start_time and r.end_time
-        ]
-        avg_session = round(sum(durations) / len(durations), 2) if durations else 0.0
-
-        distinct_users = {r.user_id for r in rentals}
-        avg_rentals_per_user = round(len(rentals) / len(distinct_users), 2) if distinct_users else 0.0
-
-        # Peak hours (top 3)
-        hour_counter: Counter = Counter()
+        # Heatmap via grouped SQL: day-of-week x hour.
         heatmap = [[0 for _ in range(24)] for _ in range(7)]
-        for r in rentals:
-            hour = r.created_at.hour
-            dow = r.created_at.weekday()  # Monday=0
-            hour_counter[hour] += 1
-            heatmap[dow][hour] += 1
-        top_hours = hour_counter.most_common(3)
-        peak_hours = {f"{h:02d}:00": count for h, count in top_hours}
+        heat_rows = db.exec(
+            select(
+                func.extract("dow", Rental.created_at).label("dow"),  # Sunday=0
+                func.extract("hour", Rental.created_at).label("hour"),
+                func.count(Rental.id).label("count"),
+            )
+            .where(Rental.created_at >= lookback)
+            .group_by(
+                func.extract("dow", Rental.created_at),
+                func.extract("hour", Rental.created_at),
+            )
+        ).all()
+        for row in heat_rows:
+            raw_dow = int(row.dow or 0)
+            # Convert PostgreSQL DOW (Sun=0) to UI convention (Mon=0).
+            dow = (raw_dow + 6) % 7
+            hour = int(row.hour or 0)
+            if 0 <= dow < 7 and 0 <= hour < 24:
+                heatmap[dow][hour] = int(row.count or 0)
 
-        # Session histogram buckets (in minutes)
-        bucket_labels = [("0-5m", 0, 5), ("5-10m", 5, 10), ("10-20m", 10, 20), ("20-40m", 20, 40), ("40m+", 40, None)]
-        histogram = []
-        for label, low, high in bucket_labels:
-            count = len([d for d in durations if (d >= low and (high is None or d < high))])
-            histogram.append({"range": label, "count": count})
+        # Session histogram buckets (in minutes) via SQL CASE aggregation.
+        histogram_counts = db.exec(
+            select(
+                func.coalesce(
+                    func.sum(case((duration_minutes_expr < 5, 1), else_=0)),
+                    0,
+                ),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (
+                                and_(
+                                    duration_minutes_expr >= 5,
+                                    duration_minutes_expr < 10,
+                                ),
+                                1,
+                            ),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (
+                                and_(
+                                    duration_minutes_expr >= 10,
+                                    duration_minutes_expr < 20,
+                                ),
+                                1,
+                            ),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (
+                                and_(
+                                    duration_minutes_expr >= 20,
+                                    duration_minutes_expr < 40,
+                                ),
+                                1,
+                            ),
+                            else_=0,
+                        )
+                    ),
+                    0,
+                ),
+                func.coalesce(
+                    func.sum(case((duration_minutes_expr >= 40, 1), else_=0)),
+                    0,
+                ),
+            ).where(
+                Rental.created_at >= lookback,
+                Rental.start_time.is_not(None),
+                Rental.end_time.is_not(None),
+            )
+        ).one()
+        histogram = [
+            {"range": "0-5m", "count": int(histogram_counts[0] or 0)},
+            {"range": "5-10m", "count": int(histogram_counts[1] or 0)},
+            {"range": "10-20m", "count": int(histogram_counts[2] or 0)},
+            {"range": "20-40m", "count": int(histogram_counts[3] or 0)},
+            {"range": "40m+", "count": int(histogram_counts[4] or 0)},
+        ]
 
         # Cohort breakdown: users created in last 30d vs older that were active in rentals
         cutoff = datetime.now(UTC) - timedelta(days=30)
@@ -543,7 +679,7 @@ class AnalyticsService:
                 User.created_at >= cutoff,
             )
         ).one() or 0
-        returning_users = max(len(distinct_users) - new_users, 0)
+        returning_users = max(int(distinct_users_count) - int(new_users), 0)
         total_users = new_users + returning_users or 1
 
         cohort_breakdown = {
@@ -645,75 +781,108 @@ class AnalyticsService:
     @staticmethod
     def get_top_stations(db: Session) -> Dict[str, Any]:
         """Top stations formatted for the dashboard (revenue + utilization + sparkline)."""
-        stations = db.exec(select(Station)).all()
-        station_ids = [station.id for station in stations if station.id is not None]
+        stations = db.exec(
+            select(
+                Station.id,
+                Station.name,
+                Station.city,
+                Station.address,
+                Station.total_slots,
+                Station.available_batteries,
+                Station.rating,
+            )
+        ).all()
+        if not stations:
+            return {"stations": []}
+
+        station_ids = [row.id for row in stations]
+        now = datetime.now(UTC)
+
+        rental_count_rows = db.exec(
+            select(
+                Rental.start_station_id,
+                func.count(Rental.id),
+            )
+            .where(Rental.start_station_id.in_(station_ids))
+            .group_by(Rental.start_station_id)
+        ).all()
+        rental_count_map = {int(row[0]): int(row[1] or 0) for row in rental_count_rows}
+
+        revenue_rows = db.exec(
+            select(
+                Rental.start_station_id,
+                func.coalesce(func.sum(Transaction.amount), 0),
+            )
+            .select_from(Rental)
+            .join(Transaction, Transaction.rental_id == Rental.id)
+            .where(
+                Rental.start_station_id.in_(station_ids),
+                Transaction.status == TransactionStatus.SUCCESS,
+            )
+            .group_by(Rental.start_station_id)
+        ).all()
+        revenue_map = {int(row[0]): float(row[1] or 0) for row in revenue_rows}
+
+        slot_rows = db.exec(
+            select(
+                StationSlot.station_id,
+                StationSlot.status,
+                func.count(StationSlot.id),
+            )
+            .where(StationSlot.station_id.in_(station_ids))
+            .group_by(StationSlot.station_id, StationSlot.status)
+        ).all()
+        slot_status_map: Dict[int, Dict[str, int]] = defaultdict(dict)
+        for station_id, slot_status, slot_count in slot_rows:
+            slot_status_map[int(station_id)][str(slot_status)] = int(slot_count or 0)
+
+        spark_rows = db.exec(
+            select(
+                Rental.start_station_id,
+                func.date(Rental.created_at),
+                func.count(Rental.id),
+            )
+            .where(
+                Rental.start_station_id.in_(station_ids),
+                Rental.created_at >= now - timedelta(days=7),
+            )
+            .group_by(Rental.start_station_id, func.date(Rental.created_at))
+            .order_by(Rental.start_station_id, func.date(Rental.created_at))
+        ).all()
+        spark_map: Dict[int, List[int]] = defaultdict(list)
+        for station_id, _, count in spark_rows:
+            spark_map[int(station_id)].append(int(count or 0))
+
         station_data: List[Dict[str, Any]] = []
 
-        rental_counts = {
-            row[0]: int(row[1] or 0)
-            for row in db.exec(
-                select(Rental.start_station_id, func.count(Rental.id))
-                .where(Rental.start_station_id.in_(station_ids))
-                .group_by(Rental.start_station_id)
-            ).all()
-        } if station_ids else {}
-        revenue_map = {
-            row[0]: float(row[1] or 0.0)
-            for row in db.exec(
-                select(Rental.start_station_id, func.coalesce(func.sum(Transaction.amount), 0))
-                .join(Transaction, Transaction.rental_id == Rental.id)
-                .where(
-                    Rental.start_station_id.in_(station_ids),
-                    Transaction.status == TransactionStatus.SUCCESS,
-                )
-                .group_by(Rental.start_station_id)
-            ).all()
-        } if station_ids else {}
-
-        slot_counts: Dict[int, Dict[str, int]] = defaultdict(lambda: defaultdict(int))
-        if station_ids:
-            for station_id, slot_status, count in db.exec(
-                select(StationSlot.station_id, StationSlot.status, func.count(StationSlot.id))
-                .where(StationSlot.station_id.in_(station_ids))
-                .group_by(StationSlot.station_id, StationSlot.status)
-            ).all():
-                slot_counts[station_id][str(slot_status)] = int(count or 0)
-
-        sparkline_map: Dict[int, List[int]] = defaultdict(list)
-        if station_ids:
-            for station_id, _, count in db.exec(
-                select(
-                    Rental.start_station_id,
-                    func.date(Rental.created_at),
-                    func.count(Rental.id),
-                )
-                .where(
-                    Rental.start_station_id.in_(station_ids),
-                    Rental.created_at >= datetime.now(UTC) - timedelta(days=7),
-                )
-                .group_by(Rental.start_station_id, func.date(Rental.created_at))
-                .order_by(Rental.start_station_id, func.date(Rental.created_at))
-            ).all():
-                sparkline_map[station_id].append(int(count or 0))
-
         for station in stations:
-            station_id = station.id
-            rental_count = rental_counts.get(station_id, 0)
+            station_id = int(station.id)
+            rental_count = rental_count_map.get(station_id, 0)
             revenue = revenue_map.get(station_id, 0.0)
 
-            status_counts = slot_counts.get(station_id, {})
-            total_slots = station.total_slots or sum(status_counts.values()) or 1
+            status_counts = slot_status_map.get(station_id, {})
+            total_slots = (
+                int(station.total_slots or 0)
+                or sum(status_counts.values())
+                or 1
+            )
             available = status_counts.get("ready", 0) + status_counts.get("empty", 0)
             charging = status_counts.get("charging", 0)
             offline = status_counts.get("error", 0) + status_counts.get("maintenance", 0)
 
-            utilization = round((rental_count / (total_slots * 30)) * 100, 2) if total_slots else 0
-            rating = station.rating if station.rating and station.rating > 0 else 0.0
-            spark = sparkline_map.get(station_id, [])
+            utilization = (
+                round((rental_count / (total_slots * 30)) * 100, 2) if total_slots else 0
+            )
+            rating = (
+                float(station.rating)
+                if station.rating and float(station.rating) > 0
+                else 4.5
+            )
+            spark = spark_map.get(station_id, [])
 
             station_data.append(
                 {
-                    "id": str(station.id),
+                    "id": str(station_id),
                     "name": station.name,
                     "location": station.city or station.address,
                     "rentals": rental_count,
@@ -735,95 +904,46 @@ class AnalyticsService:
         """Distribution of all batteries by health % range (with previous window)."""
         from app.models.battery_health import BatteryHealthSnapshot
 
+        def bucket_name(health: float) -> str:
+            if health >= 90:
+                return "Excellent (90-100%)"
+            if health >= 80:
+                return "Good (80-89%)"
+            if health >= 70:
+                return "Fair (70-79%)"
+            return "Critical (<70%)"
+
+        buckets: Dict[str, int] = defaultdict(int)
+        previous_buckets: Dict[str, int] = defaultdict(int)
+
+        batteries = db.exec(select(Battery)).all()
+        for b in batteries:
+            name = bucket_name(b.health_percentage or 100.0)
+            buckets[name] += 1
+
         now = datetime.now(UTC)
         prev_start = now - timedelta(days=60)
         prev_end = now - timedelta(days=30)
-
-        bucket_labels = [
-            "Excellent (90-100%)",
-            "Good (80-89%)",
-            "Fair (70-79%)",
-            "Critical (<70%)",
-        ]
-        current_counts = db.exec(
-            select(
-                func.coalesce(func.sum(case((Battery.health_percentage >= 90, 1), else_=0)), 0),
-                func.coalesce(
-                    func.sum(
-                        case(
-                            (and_(Battery.health_percentage >= 80, Battery.health_percentage < 90), 1),
-                            else_=0,
-                        )
-                    ),
-                    0,
-                ),
-                func.coalesce(
-                    func.sum(
-                        case(
-                            (and_(Battery.health_percentage >= 70, Battery.health_percentage < 80), 1),
-                            else_=0,
-                        )
-                    ),
-                    0,
-                ),
-                func.coalesce(func.sum(case((Battery.health_percentage < 70, 1), else_=0)), 0),
-            )
-        ).one()
-        previous_counts = db.exec(
-            select(
-                func.coalesce(func.sum(case((BatteryHealthSnapshot.health_percentage >= 90, 1), else_=0)), 0),
-                func.coalesce(
-                    func.sum(
-                        case(
-                            (
-                                and_(
-                                    BatteryHealthSnapshot.health_percentage >= 80,
-                                    BatteryHealthSnapshot.health_percentage < 90,
-                                ),
-                                1,
-                            ),
-                            else_=0,
-                        )
-                    ),
-                    0,
-                ),
-                func.coalesce(
-                    func.sum(
-                        case(
-                            (
-                                and_(
-                                    BatteryHealthSnapshot.health_percentage >= 70,
-                                    BatteryHealthSnapshot.health_percentage < 80,
-                                ),
-                                1,
-                            ),
-                            else_=0,
-                        )
-                    ),
-                    0,
-                ),
-                func.coalesce(func.sum(case((BatteryHealthSnapshot.health_percentage < 70, 1), else_=0)), 0),
-            ).where(
+        snapshots = db.exec(
+            select(BatteryHealthSnapshot).where(
                 BatteryHealthSnapshot.recorded_at >= prev_start,
                 BatteryHealthSnapshot.recorded_at <= prev_end,
             )
-        ).one()
+        ).all()
+        for snap in snapshots:
+            previous_buckets[bucket_name(snap.health_percentage)] += 1
 
-        buckets = {label: int(count or 0) for label, count in zip(bucket_labels, current_counts)}
-        previous_buckets = {label: int(count or 0) for label, count in zip(bucket_labels, previous_counts)}
         total = sum(buckets.values()) or 1
         prev_total = sum(previous_buckets.values()) or total
 
         def to_list(data: Dict[str, int]) -> List[Dict[str, Any]]:
-            total_for_percent = sum(data.values()) or 1
             return [
                 {
                     "category": name,
                     "count": count,
-                    "percentage": round((count / total_for_percent) * 100, 1),
+                    "percentage": round((count / (sum(data.values()) or 1)) * 100, 1),
                 }
                 for name, count in data.items()
-                if count > 0
             ]
 
         return {
@@ -994,114 +1114,132 @@ class AnalyticsService:
         from app.models.battery import Battery
 
         start, end, _, _, _ = AnalyticsService._period_to_range(period)
-        stations = db.exec(select(Station)).all()
-        station_ids = [station.id for station in stations if station.id is not None]
+        stations = db.exec(
+            select(
+                Station.id,
+                Station.name,
+                Station.total_slots,
+                Station.available_batteries,
+            )
+        ).all()
+        if not stations:
+            return {"total_revenue": 0.0, "stations": []}
+
+        station_ids = [row.id for row in stations]
+
+        duration_minutes_expr = (
+            (func.extract("epoch", Rental.end_time) - func.extract("epoch", Rental.start_time))
+            / 60.0
+        )
+
+        rental_stat_rows = db.exec(
+            select(
+                Rental.start_station_id,
+                func.count(Rental.id),
+                func.coalesce(func.avg(duration_minutes_expr), 0.0),
+            )
+            .where(
+                Rental.start_station_id.in_(station_ids),
+                Rental.created_at >= start,
+                Rental.created_at <= end,
+            )
+            .group_by(Rental.start_station_id)
+        ).all()
+        rental_stat_map = {
+            int(row[0]): {
+                "count": int(row[1] or 0),
+                "avg_session": round(float(row[2] or 0.0), 2),
+            }
+            for row in rental_stat_rows
+        }
+
+        revenue_rows = db.exec(
+            select(
+                Rental.start_station_id,
+                func.coalesce(func.sum(Transaction.amount), 0),
+            )
+            .select_from(Rental)
+            .join(Transaction, Transaction.rental_id == Rental.id)
+            .where(
+                Rental.start_station_id.in_(station_ids),
+                Rental.created_at >= start,
+                Rental.created_at <= end,
+                Transaction.status == TransactionStatus.SUCCESS,
+            )
+            .group_by(Rental.start_station_id)
+        ).all()
+        revenue_map = {int(row[0]): float(row[1] or 0.0) for row in revenue_rows}
+
+        fallback_revenue_rows = db.exec(
+            select(
+                Rental.start_station_id,
+                func.coalesce(func.sum(Rental.total_amount), 0),
+            )
+            .where(
+                Rental.start_station_id.in_(station_ids),
+                Rental.created_at >= start,
+                Rental.created_at <= end,
+            )
+            .group_by(Rental.start_station_id)
+        ).all()
+        fallback_revenue_map = {
+            int(row[0]): float(row[1] or 0.0) for row in fallback_revenue_rows
+        }
+
+        mix_rows = db.exec(
+            select(
+                Rental.start_station_id,
+                Battery.battery_type,
+                func.coalesce(func.sum(Transaction.amount), 0),
+                func.count(Transaction.id),
+            )
+            .select_from(Rental)
+            .join(Transaction, Transaction.rental_id == Rental.id)
+            .join(Battery, Battery.id == Rental.battery_id, isouter=True)
+            .where(
+                Rental.start_station_id.in_(station_ids),
+                Rental.created_at >= start,
+                Rental.created_at <= end,
+                Transaction.status == TransactionStatus.SUCCESS,
+            )
+            .group_by(Rental.start_station_id, Battery.battery_type)
+        ).all()
+        mix_map: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
+        for station_id, battery_type, mix_revenue, mix_count in mix_rows:
+            mix_map[int(station_id)].append(
+                {
+                    "type": battery_type or "Unknown",
+                    "revenue": float(mix_revenue or 0),
+                    "percentage": 0,
+                    "rental_count": int(mix_count or 0),
+                }
+            )
 
         station_rows: List[Dict[str, Any]] = []
         total_revenue = 0.0
 
-        duration_minutes = (
-            func.extract("epoch", Rental.end_time) - func.extract("epoch", Rental.start_time)
-        ) / 60
-        rental_stats = {
-            row[0]: {
-                "rental_count": int(row[1] or 0),
-                "avg_session_duration": round(float(row[2] or 0.0), 2),
-            }
-            for row in db.exec(
-                select(
-                    Rental.start_station_id,
-                    func.count(Rental.id),
-                    func.avg(
-                        case(
-                            (
-                                and_(Rental.end_time.is_not(None), Rental.start_time.is_not(None)),
-                                duration_minutes,
-                            ),
-                            else_=None,
-                        )
-                    ),
-                )
-                .where(
-                    Rental.start_station_id.in_(station_ids),
-                    Rental.created_at >= start,
-                    Rental.created_at <= end,
-                )
-                .group_by(Rental.start_station_id)
-            ).all()
-        } if station_ids else {}
-
-        revenue_map = {
-            row[0]: float(row[1] or 0.0)
-            for row in db.exec(
-                select(Rental.start_station_id, func.coalesce(func.sum(Transaction.amount), 0))
-                .join(Transaction, Transaction.rental_id == Rental.id)
-                .where(
-                    Rental.start_station_id.in_(station_ids),
-                    Transaction.status == TransactionStatus.SUCCESS,
-                    Transaction.created_at >= start,
-                    Transaction.created_at <= end,
-                )
-                .group_by(Rental.start_station_id)
-            ).all()
-        } if station_ids else {}
-        fallback_revenue_map = {
-            row[0]: float(row[1] or 0.0)
-            for row in db.exec(
-                select(Rental.start_station_id, func.coalesce(func.sum(Rental.total_amount), 0))
-                .where(
-                    Rental.start_station_id.in_(station_ids),
-                    Rental.created_at >= start,
-                    Rental.created_at <= end,
-                )
-                .group_by(Rental.start_station_id)
-            ).all()
-        } if station_ids else {}
-
-        battery_mix_map: Dict[int, List[Dict[str, Any]]] = defaultdict(list)
-        if station_ids:
-            for station_id, battery_type, revenue, rental_count in db.exec(
-                select(
-                    Rental.start_station_id,
-                    Battery.battery_type,
-                    func.coalesce(func.sum(Transaction.amount), 0),
-                    func.count(Transaction.id),
-                )
-                .join(Transaction, Transaction.rental_id == Rental.id)
-                .join(Battery, Battery.id == Rental.battery_id)
-                .where(
-                    Rental.start_station_id.in_(station_ids),
-                    Transaction.status == TransactionStatus.SUCCESS,
-                    Transaction.created_at >= start,
-                    Transaction.created_at <= end,
-                )
-                .group_by(Rental.start_station_id, Battery.battery_type)
-            ).all():
-                battery_mix_map[station_id].append(
-                    {
-                        "type": battery_type or "Unknown",
-                        "revenue": float(revenue or 0.0),
-                        "percentage": 0,
-                        "rental_count": int(rental_count or 0),
-                    }
-                )
-
         for station in stations:
-            stats = rental_stats.get(station.id, {"rental_count": 0, "avg_session_duration": 0.0})
-            revenue = revenue_map.get(station.id, 0.0) or fallback_revenue_map.get(station.id, 0.0)
-            battery_mix = battery_mix_map.get(station.id, [])
+            station_id = int(station.id)
+            stats = rental_stat_map.get(station_id, {"count": 0, "avg_session": 0.0})
+            revenue = revenue_map.get(station_id, 0.0)
+            if revenue <= 0:
+                revenue = fallback_revenue_map.get(station_id, 0.0)
+
+            battery_mix = mix_map.get(station_id, [])
+            total_slots = int(station.total_slots or 0)
+            available_batteries = int(station.available_batteries or 0)
 
             station_rows.append(
                 {
                     "station_name": station.name,
-                    "rental_count": stats["rental_count"],
+                    "rental_count": int(stats["count"]),
                     "revenue": round(float(revenue), 2),
                     "percentage": 0,  # filled later
-                    "avg_session_duration": stats["avg_session_duration"],
+                    "avg_session_duration": float(stats["avg_session"]),
                     "battery_mix": battery_mix,
                     "utilization": (
-                        (station.available_batteries or 0) / station.total_slots * 100
-                        if station.total_slots
+                        (available_batteries / total_slots * 100)
+                        if total_slots
                         else 0
                     ),
                 }
@@ -1135,7 +1273,8 @@ class AnalyticsService:
                 func.coalesce(func.sum(Transaction.amount), 0),
                 func.count(Transaction.id),
             )
-            .join(Rental, Rental.id == Transaction.rental_id, isouter=True)
+            .select_from(Transaction)
+            .join(Rental, Rental.id == Transaction.rental_id)
             .join(Battery, Battery.id == Rental.battery_id, isouter=True)
             .where(
                 Transaction.status == TransactionStatus.SUCCESS,
@@ -1156,44 +1295,44 @@ class AnalyticsService:
             for row in type_rows
         ]
 
-        # Station mix breakdown
-        station_mix = []
-        stations = db.exec(select(Station)).all()
-        for station in stations:
-            mix_rows = db.exec(
-                select(
-                    Battery.battery_type,
-                    func.coalesce(func.sum(Transaction.amount), 0),
-                )
-                .join(Rental, Rental.id == Transaction.rental_id, isouter=True)
-                .join(Battery, Battery.id == Rental.battery_id, isouter=True)
-                .where(
-                    Rental.start_station_id == station.id,
-                    Transaction.status == TransactionStatus.SUCCESS,
-                    Transaction.created_at >= start,
-                    Transaction.created_at <= end,
-                )
-                .group_by(Battery.battery_type)
-            ).all()
-            if not mix_rows:
-                continue
-            station_mix.append(
+        # Station mix breakdown in a single grouped query.
+        station_mix_rows = db.exec(
+            select(
+                Station.name,
+                Battery.battery_type,
+                func.coalesce(func.sum(Transaction.amount), 0),
+                func.count(Transaction.id),
+            )
+            .select_from(Transaction)
+            .join(Rental, Rental.id == Transaction.rental_id)
+            .join(Station, Station.id == Rental.start_station_id)
+            .join(Battery, Battery.id == Rental.battery_id, isouter=True)
+            .where(
+                Transaction.status == TransactionStatus.SUCCESS,
+                Transaction.created_at >= start,
+                Transaction.created_at <= end,
+            )
+            .group_by(Station.name, Battery.battery_type)
+            .order_by(Station.name)
+        ).all()
+
+        station_mix_map: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
+        for station_name, battery_type, revenue, rental_count in station_mix_rows:
+            station_mix_map[str(station_name)].append(
                 {
-                    "station_name": station.name,
-                    "battery_mix": [
-                        {
-                            "type": row[0] or "Unknown",
-                            "revenue": float(row[1] or 0),
-                            "percentage": 0,  # filled later
-                            "rental_count": 0,
-                        }
-                        for row in mix_rows
-                    ],
+                    "type": battery_type or "Unknown",
+                    "revenue": float(revenue or 0),
+                    "percentage": 0,
+                    "rental_count": int(rental_count or 0),
                 }
             )
-            for mix in station_mix[-1]["battery_mix"]:
-                station_total = sum(m["revenue"] for m in station_mix[-1]["battery_mix"]) or 1
+
+        station_mix = []
+        for station_name, mixes in station_mix_map.items():
+            station_total = sum(m["revenue"] for m in mixes) or 1
+            for mix in mixes:
                 mix["percentage"] = round((mix["revenue"] / station_total) * 100, 2)
+            station_mix.append({"station_name": station_name, "battery_mix": mixes})
 
         return {"types": types, "station_mix": station_mix}
 
@@ -1202,33 +1341,37 @@ class AnalyticsService:
         """Fleet health and utilization overview"""
         from app.models.battery import Battery, BatteryStatus
 
+        grouped_rows = db.exec(
+            select(
+                Battery.battery_type,
+                Battery.status,
+                func.count(Battery.id),
+            ).group_by(Battery.battery_type, Battery.status)
+        ).all()
+
+        total_batteries = sum(int(row[2] or 0) for row in grouped_rows)
         items: Dict[str, Dict[str, int]] = defaultdict(
-            lambda: {"total": 0, "available": 0, "rented": 0, "maintenance": 0, "charging": 0}
+            lambda: {"total": 0, "available": 0, "rented": 0, "maintenance": 0}
         )
 
-        for battery_type, battery_status, count in db.exec(
-            select(Battery.battery_type, Battery.status, func.count(Battery.id)).group_by(
-                Battery.battery_type, Battery.status
-            )
-        ).all():
+        total_charging = 0
+        for battery_type, status, count in grouped_rows:
             key = battery_type or "Unknown"
-            status_value = battery_status.value if hasattr(battery_status, "value") else str(battery_status)
-            quantity = int(count or 0)
-            items[key]["total"] += quantity
-            if status_value == BatteryStatus.AVAILABLE.value:
-                items[key]["available"] += quantity
-            elif status_value == BatteryStatus.RENTED.value:
-                items[key]["rented"] += quantity
-            elif status_value == BatteryStatus.MAINTENANCE.value:
-                items[key]["maintenance"] += quantity
-            elif status_value == BatteryStatus.CHARGING.value:
-                items[key]["charging"] += quantity
+            current_count = int(count or 0)
+            items[key]["total"] += current_count
 
-        total_batteries = sum(v["total"] for v in items.values())
+            if status == BatteryStatus.AVAILABLE:
+                items[key]["available"] += current_count
+            elif status == BatteryStatus.RENTED:
+                items[key]["rented"] += current_count
+            elif status == BatteryStatus.MAINTENANCE:
+                items[key]["maintenance"] += current_count
+            elif str(getattr(status, "value", status)).lower() == "charging":
+                total_charging += current_count
+
         total_available = sum(v["available"] for v in items.values())
         total_rented = sum(v["rented"] for v in items.values())
         total_maintenance = sum(v["maintenance"] for v in items.values())
-        total_charging = sum(v["charging"] for v in items.values())
 
         inventory_list = [
             {
@@ -1237,7 +1380,6 @@ class AnalyticsService:
                 "available": v["available"],
                 "rented": v["rented"],
                 "maintenance": v["maintenance"],
-                "charging": v["charging"],
             }
             for k, v in items.items()
         ]

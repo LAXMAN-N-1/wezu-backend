@@ -5,6 +5,7 @@ services:
     restart: "on-failure:5"
     init: true
     stop_grace_period: 30s
+    cpus: "0.75"
     expose:
       - "8000"
     # In Coolify/production, inject env vars from platform UI.
@@ -12,20 +13,25 @@ services:
     environment:
       # Keep DATABASE_URL / REDIS_URL out of compose-level environment
       # so platforms like Coolify can manage/delete them directly.
-      - GUNICORN_WORKERS=4
+      - GUNICORN_WORKERS=1
       - GUNICORN_TIMEOUT=120
       - GUNICORN_GRACEFUL_TIMEOUT=45
       - DB_POOL_SIZE=5
       - DB_MAX_OVERFLOW=5
       - DB_POOL_TIMEOUT=30
       - DB_POOL_RECYCLE=1800
-      - AUDIT_REQUEST_LOGGING_ENABLED=false
+      - AUDIT_REQUEST_LOGGING_ENABLED=true
+      - AUDIT_REQUEST_QUEUE_MAXSIZE=2000
+      - AUDIT_REQUEST_BATCH_SIZE=50
+      - AUDIT_REQUEST_FLUSH_MS=500
+      - AUDIT_REQUEST_DROP_WARN_EVERY=100
+      - AUDIT_REQUEST_WORKERS=1
       - DB_INIT_ON_STARTUP=false
       - RUN_BACKGROUND_TASKS=false
       - SCHEDULER_ENABLED=false
       - MQTT_ENABLED=false
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/live', timeout=2)"]
       interval: 20s
       timeout: 5s
       retries: 5

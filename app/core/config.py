@@ -14,8 +14,8 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str # No default allowed, must be provided in env
     SQLALCHEMY_ECHO: bool = False
-    DB_POOL_SIZE: int = 20
-    DB_MAX_OVERFLOW: int = 20
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 5
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 1800
     DB_POOL_PRE_PING: bool = True
@@ -79,7 +79,7 @@ class Settings(BaseSettings):
     VIDEO_KYC_SESSION_TIMEOUT_MINUTES: int = 30
     
     # IoT/MQTT (for customer battery tracking)
-    MQTT_ENABLED: bool = True
+    MQTT_ENABLED: bool = False
     MQTT_BROKER_URL: str = "mqtt://127.0.0.1:1883"
     MQTT_USERNAME: Optional[str] = None
     MQTT_PASSWORD: Optional[str] = None
@@ -118,11 +118,16 @@ class Settings(BaseSettings):
     RATE_LIMIT_PER_HOUR: int = 1000
     
     # Background Jobs
-    RUN_BACKGROUND_TASKS: bool = True
+    RUN_BACKGROUND_TASKS: bool = False
     DB_INIT_ON_STARTUP: bool = False
-    SCHEDULER_ENABLED: bool = True
+    SCHEDULER_ENABLED: bool = False
     SCHEDULER_TIMEZONE: str = "Asia/Kolkata"
     AUDIT_REQUEST_LOGGING_ENABLED: bool = False
+    AUDIT_REQUEST_QUEUE_MAXSIZE: int = 2000
+    AUDIT_REQUEST_BATCH_SIZE: int = 50
+    AUDIT_REQUEST_FLUSH_MS: int = 500
+    AUDIT_REQUEST_DROP_WARN_EVERY: int = 100
+    AUDIT_REQUEST_WORKERS: int = 1
     
     # Monitoring & Logging
     LOG_LEVEL: str = "INFO"

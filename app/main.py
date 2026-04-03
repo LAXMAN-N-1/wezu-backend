@@ -2,6 +2,7 @@ import traceback
 import sys
 import ssl
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from app.core.logging import setup_logging, get_logger
 
@@ -31,6 +32,7 @@ from app.api.errors.handlers import add_exception_handlers
 from app.workers import start_scheduler, stop_scheduler
 from app.services.websocket_service import heartbeat_task
 from app.services.mqtt_service import start_mqtt_service, stop_mqtt_service
+from app.services.request_audit_queue import request_audit_queue
 
 # Import all routers (Consolidated)
 # Import all routers (Consolidated)
@@ -112,6 +114,26 @@ async def lifespan(app: FastAPI):
     """Start background scheduler and connections on startup"""
     scheduler_started = False
     mqtt_started = False
+    request_audit_started = False
+
+    logger.info(
+        "Startup settings: env=%s db_pool_size=%s db_max_overflow=%s db_pool_timeout=%s db_pool_recycle=%s "
+        "audit_request_logging=%s audit_queue_max=%s audit_batch=%s audit_flush_ms=%s audit_workers=%s "
+        "gunicorn_workers=%s gunicorn_timeout=%s gunicorn_graceful_timeout=%s",
+        settings.ENVIRONMENT,
+        settings.DB_POOL_SIZE,
+        settings.DB_MAX_OVERFLOW,
+        settings.DB_POOL_TIMEOUT,
+        settings.DB_POOL_RECYCLE,
+        settings.AUDIT_REQUEST_LOGGING_ENABLED,
+        settings.AUDIT_REQUEST_QUEUE_MAXSIZE,
+        settings.AUDIT_REQUEST_BATCH_SIZE,
+        settings.AUDIT_REQUEST_FLUSH_MS,
+        settings.AUDIT_REQUEST_WORKERS,
+        os.getenv("GUNICORN_WORKERS", "1"),
+        os.getenv("GUNICORN_TIMEOUT", "60"),
+        os.getenv("GUNICORN_GRACEFUL_TIMEOUT", "30"),
+    )
 
     if settings.ENVIRONMENT == "test":
         yield
@@ -156,11 +178,17 @@ async def lifespan(app: FastAPI):
 
         logger.info("Creating heartbeat task...")
         asyncio.create_task(heartbeat_task())
+
+    if settings.AUDIT_REQUEST_LOGGING_ENABLED:
+        await request_audit_queue.start()
+        request_audit_started = True
     
     yield
     
     if scheduler_started: stop_scheduler()
     if mqtt_started: stop_mqtt_service()
+    if request_audit_started:
+        await request_audit_queue.stop()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -281,8 +309,8 @@ def _readiness_payload() -> tuple[dict[str, str], bool]:
     return dependencies, ready
 
 
-@app.get("/health", tags=["System"])
-def health_check():
+@app.get("/live", tags=["System"])
+def live_check():
     """Cheap liveness probe for container and reverse-proxy health checks."""
     return {
         "status": "ok",
@@ -292,8 +320,9 @@ def health_check():
     }
 
 
-@app.get("/ready", tags=["System"])
-def readiness_check():
+@app.get("/health", tags=["System"])
+def health_check():
+    """Deep readiness-style health diagnostics for dependencies."""
     dependencies, ready = _readiness_payload()
     payload = {
         "status": "ok" if ready else "degraded",
@@ -304,6 +333,11 @@ def readiness_check():
     if ready:
         return payload
     return JSONResponse(status_code=503, content=payload)
+
+
+@app.get("/ready", tags=["System"])
+def readiness_check():
+    return health_check()
 
 @app.get("/", tags=["System"])
 async def root():

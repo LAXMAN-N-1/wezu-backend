@@ -1,13 +1,13 @@
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import Request
-from app.services.audit_service import audit_service
+from app.services.request_audit_queue import request_audit_queue
 from app.core.proxy import get_client_ip
 import time
 
 class AuditMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # 1. Skip non-API requests or health checks if needed
-        if request.url.path in ["/health", "/", "/docs", "/openapi.json"]:
+        if request.url.path in ["/live", "/health", "/", "/docs", "/openapi.json"]:
             return await call_next(request)
 
         start_time = time.time()
@@ -26,9 +26,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         # 4. Calculate duration
         process_time = time.time() - start_time
         
-        # 5. Log event asynchronously (don't block the response)
-        # However, since audit_service.log_event is async, we can just await it
-        # or use background tasks. For simplicity and reliability in this middleware:
+        # 5. Enqueue request audit event without blocking the response path.
         metadata = {
             "method": request.method,
             "url": str(request.url),
@@ -36,19 +34,16 @@ class AuditMiddleware(BaseHTTPMiddleware):
             "status_code": response.status_code,
             "user_agent": request.headers.get("user-agent"),
         }
-        
-        # Log to MongoDB
-        import asyncio
-        asyncio.create_task(
-            audit_service.log_event(
-                event_type="api_request",
-                user_id=user_id,
-                resource=request.url.path,
-                action=request.method,
-                status="success" if response.status_code < 400 else "failure",
-                metadata=metadata,
-                ip_address=get_client_ip(request)
-            )
+
+        request_audit_queue.enqueue(
+            user_id=user_id,
+            action=request.method,
+            resource_type="api_request",
+            resource_id=request.url.path,
+            details=f"Status: {'success' if response.status_code < 400 else 'failure'}",
+            metadata=metadata,
+            ip_address=get_client_ip(request),
+            user_agent=request.headers.get("user-agent"),
         )
-        
+
         return response

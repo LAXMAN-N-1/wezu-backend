@@ -7,7 +7,7 @@ from datetime import datetime, UTC
 from app.api import deps
 from app.core.audit import audit_log
 from app.db.session import get_session
-from app.models.user import User
+from app.models.user import User, UserStatus
 from app.models.address import Address
 from app.models.user_profile import UserProfile
 from app.schemas.user import UserResponse, UserCreate, UserUpdate, AddressCreate, AddressResponse, AddressUpdate, DeviceCreate, DeviceResponse
@@ -115,6 +115,42 @@ def calculate_profile_completion(user: User, user_profile: Optional[UserProfile]
     kyc_bonus = 20 if kyc_verified else 0
     
     return min(base_percentage + kyc_bonus, 100)
+
+
+def _format_primary_address(user: User) -> Optional[str]:
+    """Build a display-safe address string from the user's address list."""
+    addresses = list(user.addresses or [])
+    if not addresses:
+        return None
+
+    default_address = next(
+        (addr for addr in addresses if getattr(addr, "is_default", False)),
+        addresses[0],
+    )
+
+    raw_parts = [
+        default_address.address_line1,
+        default_address.address_line2,
+        default_address.street_address,
+        default_address.city,
+        default_address.state,
+        default_address.postal_code,
+        default_address.country,
+    ]
+
+    parts: list[str] = []
+    seen: set[str] = set()
+    for value in raw_parts:
+        cleaned = (value or "").strip()
+        if not cleaned:
+            continue
+        key = cleaned.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        parts.append(cleaned)
+
+    return ", ".join(parts) if parts else None
 
 
 def _build_user_profile_response(user: User, db: Session = None) -> UserProfileResponse:
@@ -1348,7 +1384,7 @@ async def get_user_by_id(
         email=target_user.email,
         phone_number=target_user.phone_number,
         profile_picture=target_user.profile_picture,
-        address=target_user.address,
+        address=_format_primary_address(target_user),
         is_active=target_user.is_active,
         is_superuser=target_user.is_superuser,
         kyc_status=target_user.kyc_status,
@@ -1396,7 +1432,10 @@ async def update_user_status(
         )
         
     # 2. Fetch User
-    user = db.get(User, user_id)
+    statement = select(User).where(User.id == user_id).options(
+        selectinload(User.addresses)
+    )
+    user = db.exec(statement).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
@@ -1573,7 +1612,10 @@ async def delete_user(
             )
             
     # 2. Fetch User
-    user = db.get(User, user_id)
+    user_statement = (
+        select(User).where(User.id == user_id).options(selectinload(User.addresses))
+    )
+    user = db.exec(user_statement).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
@@ -1589,7 +1631,7 @@ async def delete_user(
     user.is_deleted = True
     user.deleted_at = datetime.now(UTC)
     user.is_active = False
-    user.status = "deleted"
+    user.status = UserStatus.DELETED
     
     # Anonymize PII
     user.email = f"deleted_{deletion_uuid}@deleted.wezu"
@@ -1597,12 +1639,14 @@ async def delete_user(
     user.phone_number = f"del_{deletion_uuid}" 
     user.full_name = "Deleted User"
     user.profile_picture = None
-    user.address = None
-    user.emergency_contact = None
     user.security_question = None
     user.security_answer = None
     user.google_id = None
     user.apple_id = None
+
+    # Remove dependent address rows to avoid stale PII and invalid relationship writes.
+    for address in list(user.addresses or []):
+        db.delete(address)
     
     # Invalidate sessions
     user.last_global_logout_at = datetime.now(UTC)
