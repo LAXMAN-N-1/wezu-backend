@@ -12,7 +12,7 @@ from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
@@ -217,59 +217,93 @@ async def global_options_handler(full_path: str, request: Request):
 # ----------------------------
 # System & Health
 # ----------------------------
-@app.get("/health", tags=["System"])
-async def health_check():
-    """Deep health check for database and basic connectivity"""
+def _readiness_payload() -> tuple[dict[str, str], bool]:
+    """Run bounded dependency checks for readiness only."""
     from sqlalchemy import text
+
     db_ok = False
     redis_ok = False
     mongo_ok = False
+    mongo_configured = bool(
+        settings.MONGODB_URL
+        and settings.MONGODB_URL != "mongodb://localhost:27017"
+    )
 
-    # PostgreSQL check
     try:
         from app.db.session import SessionLocal
+
         with SessionLocal() as db:
             db.execute(text("SELECT 1"))
             db_ok = True
     except Exception as e:
-        logger.error(f"Health check DB failure: {e}")
+        logger.error(f"Readiness DB failure: {e}")
 
-    # Redis check
     try:
         import redis
-        r = redis.from_url(settings.REDIS_URL, socket_connect_timeout=2)
+
+        r = redis.from_url(
+            settings.REDIS_URL,
+            socket_connect_timeout=1,
+            socket_timeout=1,
+        )
         r.ping()
         redis_ok = True
     except Exception as e:
-        logger.error(f"Health check Redis failure: {e}")
+        logger.error(f"Readiness Redis failure: {e}")
 
-    # MongoDB check (non-critical)
-    try:
-        if settings.MONGODB_URL and settings.MONGODB_URL != "mongodb://localhost:27017":
+    if mongo_configured:
+        try:
             from pymongo import MongoClient
-            client = MongoClient(settings.MONGODB_URL, serverSelectionTimeoutMS=2000)
+
+            client = MongoClient(
+                settings.MONGODB_URL,
+                serverSelectionTimeoutMS=1000,
+                connectTimeoutMS=1000,
+                socketTimeoutMS=1000,
+            )
             client.admin.command("ping")
             mongo_ok = True
-        else:
-            mongo_ok = None  # Not configured
-    except Exception as e:
-        logger.error(f"Health check MongoDB failure: {e}")
+        except Exception as e:
+            logger.error(f"Readiness MongoDB failure: {e}")
+    else:
+        mongo_ok = None
 
-    all_ok = db_ok and redis_ok and (mongo_ok is None or mongo_ok)
-
-    return {
-        "status": "ok" if all_ok else "degraded",
+    dependencies = {
         "database": "online" if db_ok else "offline",
         "redis": "online" if redis_ok else "offline",
-        "mongodb": "online" if mongo_ok else ("not_configured" if mongo_ok is None else "offline"),
+        "mongodb": (
+            "online"
+            if mongo_ok
+            else ("not_configured" if mongo_ok is None else "offline")
+        ),
+    }
+    ready = db_ok and redis_ok and (mongo_ok is None or mongo_ok)
+    return dependencies, ready
+
+
+@app.get("/health", tags=["System"])
+def health_check():
+    """Cheap liveness probe for container and reverse-proxy health checks."""
+    return {
+        "status": "ok",
+        "service": "api",
         "environment": settings.ENVIRONMENT,
-        "version": settings.APP_VERSION
+        "version": settings.APP_VERSION,
     }
 
 
 @app.get("/ready", tags=["System"])
-async def readiness_check():
-    return await health_check()
+def readiness_check():
+    dependencies, ready = _readiness_payload()
+    payload = {
+        "status": "ok" if ready else "degraded",
+        **dependencies,
+        "environment": settings.ENVIRONMENT,
+        "version": settings.APP_VERSION,
+    }
+    if ready:
+        return payload
+    return JSONResponse(status_code=503, content=payload)
 
 @app.get("/", tags=["System"])
 async def root():
