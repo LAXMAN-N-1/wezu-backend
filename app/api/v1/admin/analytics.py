@@ -1,36 +1,21 @@
-from dataclasses import dataclass, field
-from threading import Event, Lock
-from time import monotonic
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlmodel import Session
+
 from app.api import deps
 from app.core.config import settings
-
 from app.models.user import User
+from app.schemas.analytics.admin import AdminDashboardBootstrapResponse
 from app.services.analytics_service import AnalyticsService
+from app.utils.runtime_cache import cached_call
+
 import csv
 import io
 import logging
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-_analytics_cache: dict[tuple[Any, ...], tuple[float, Any]] = {}
-_analytics_cache_lock = Lock()
-_analytics_inflight: dict[tuple[Any, ...], "_InFlightAnalytics"] = {}
-
-
-@dataclass
-class _InFlightAnalytics:
-    event: Event = field(default_factory=Event)
-    result: Any = None
-    failed: bool = False
-
-
-def _prune_expired_cache(now: float) -> None:
-    expired = [key for key, (expires_at, _) in _analytics_cache.items() if expires_at <= now]
-    for key in expired:
-        _analytics_cache.pop(key, None)
 
 
 def _analytics_response(
@@ -40,61 +25,36 @@ def _analytics_response(
     ttl_seconds: Optional[int] = None,
 ) -> Any:
     ttl = settings.ANALYTICS_CACHE_TTL_SECONDS if ttl_seconds is None else ttl_seconds
-    cache_key = (endpoint,) + tuple(cache_parts)
-    is_leader = False
-    inflight: Optional[_InFlightAnalytics] = None
-
-    now = monotonic()
-    with _analytics_cache_lock:
-        if ttl > 0:
-            cached = _analytics_cache.get(cache_key)
-            if cached and cached[0] > now:
-                return cached[1]
-            _prune_expired_cache(now)
-
-        inflight = _analytics_inflight.get(cache_key)
-        if inflight is None:
-            inflight = _InFlightAnalytics()
-            _analytics_inflight[cache_key] = inflight
-            is_leader = True
-
-    if not is_leader:
-        completed = inflight.event.wait(timeout=max(ttl, 30))
-        if not completed:
-            raise HTTPException(
-                status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-                detail="analytics_timeout",
-            )
-        if inflight.failed:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="analytics_unavailable",
-            )
-        return inflight.result
-
     try:
-        result = call()
+        return cached_call(
+            "admin-analytics",
+            endpoint,
+            *cache_parts,
+            ttl_seconds=ttl,
+            call=call,
+        )
+    except HTTPException:
+        raise
     except Exception:
         logger.exception("admin.analytics.failed", extra={"endpoint": endpoint})
-        with _analytics_cache_lock:
-            current = _analytics_inflight.pop(cache_key, None)
-            if current:
-                current.failed = True
-                current.event.set()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="analytics_unavailable",
         )
 
-    with _analytics_cache_lock:
-        if ttl > 0:
-            _analytics_cache[cache_key] = (monotonic() + ttl, result)
-        current = _analytics_inflight.pop(cache_key, None)
-        if current:
-            current.result = result
-            current.event.set()
 
-    return result
+@router.get("/dashboard", response_model=AdminDashboardBootstrapResponse)
+def get_admin_dashboard(
+    period: str = Query("30d"),
+    current_user: User = Depends(deps.get_current_active_admin),
+    db: Session = Depends(deps.get_db),
+) -> Any:
+    """Admin: First-render dashboard bootstrap payload."""
+    return _analytics_response(
+        "dashboard",
+        lambda: AnalyticsService.get_admin_dashboard_bootstrap(db, period),
+        period,
+    )
 
 @router.get("/overview")
 def get_platform_overview(
