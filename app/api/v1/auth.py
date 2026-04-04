@@ -1211,9 +1211,7 @@ async def admin_login(
         logger.warning(f"Admin login - user not found: {login_data.username}")
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
-    password_clean = login_data.password.strip()
-    
-    if not verify_password(password_clean, user.hashed_password):
+    if not verify_password(login_data.password, user.hashed_password):
         logger.warning(f"Admin login - invalid password for: {login_data.username}")
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
