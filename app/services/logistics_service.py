@@ -1,7 +1,7 @@
 from typing import Any, List, Optional
 from sqlmodel import Session, select, func
 from app.core.database import engine
-from app.models.logistics import BatteryTransfer, Manifest
+from app.models.logistics import BatteryTransfer, LogisticsManifest as Manifest
 from app.models.warehouse import Warehouse
 from app.models.delivery_assignment import DeliveryAssignment
 from app.models.driver_profile import DriverProfile

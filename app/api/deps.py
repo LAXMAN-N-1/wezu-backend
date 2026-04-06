@@ -3,7 +3,7 @@ import hashlib
 from threading import Lock
 from time import monotonic
 from typing import Generator, Optional
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError, ExpiredSignatureError
 from pydantic import ValidationError
@@ -372,3 +372,41 @@ def get_current_customer(current_user: User = Depends(get_current_user)) -> User
             detail="insufficient_permissions",
         )
     return current_user
+
+
+def require_internal_operator(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Require admin or warehouse/logistics operator role."""
+    if current_user.is_superuser:
+        return current_user
+    user_role_names = {r.name.lower() for r in current_user.roles}
+    if current_user.role:
+        user_role_names.add(current_user.role.name.lower())
+    allowed = {"admin", "operator", "warehouse_manager", "logistics"}
+    if not user_role_names & allowed:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="insufficient_permissions",
+        )
+    return current_user
+
+
+def require_internal_service_token(
+    x_internal_service_token: Optional[str] = Header(default=None, alias="X-Internal-Service-Token"),
+) -> bool:
+    configured = (settings.INTERNAL_SERVICE_TOKEN or "").strip()
+    if not configured:
+        if settings.ENVIRONMENT.lower() == "production":
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Internal service token is not configured",
+            )
+        return True
+
+    if not x_internal_service_token or x_internal_service_token.strip() != configured:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid internal service token",
+        )
+    return True

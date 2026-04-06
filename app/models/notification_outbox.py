@@ -32,7 +32,7 @@ class NotificationOutbox(SQLModel, table=True):
     __tablename__ = "notification_outbox"
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    notification_id: int = Field(foreign_key="notification.id", index=True)
+    notification_id: int = Field(foreign_key="notifications.id", index=True)
     user_id: int = Field(foreign_key="users.id", index=True)
     channel: str = Field(index=True)
     status: str = Field(default=NotificationOutboxStatus.PENDING, index=True)

@@ -202,3 +202,14 @@ def get_job_status():
             'trigger': str(job.trigger)
         })
     return jobs
+
+
+def get_scheduler_runtime_state() -> dict:
+    """Return scheduler runtime state for diagnostics."""
+    from datetime import datetime, UTC
+    return {
+        "running": scheduler.running if scheduler else False,
+        "job_count": len(scheduler.get_jobs()) if scheduler and scheduler.running else 0,
+        "jobs": get_job_status() if scheduler and scheduler.running else [],
+        "checked_at": datetime.now(UTC).isoformat(),
+    }

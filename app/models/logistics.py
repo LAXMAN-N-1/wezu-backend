@@ -34,16 +34,16 @@ class BatteryTransfer(SQLModel, table=True):
     to_location_id: int
     
     status: str = Field(default="pending") # pending, assigned, in_transit, received, cancelled
-    manifest_id: Optional[int] = Field(default=None, foreign_key="manifests.id")
+    manifest_id: Optional[int] = Field(default=None, foreign_key="logistics_manifests.id")
     
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationship
-    manifest: Optional["Manifest"] = Relationship(back_populates="transfers")
+    manifest: Optional["LogisticsManifest"] = Relationship(back_populates="transfers")
 
-class Manifest(SQLModel, table=True):
-    __tablename__ = "manifests"
+class LogisticsManifest(SQLModel, table=True):
+    __tablename__ = "logistics_manifests"
     
     id: Optional[int] = Field(default=None, primary_key=True)
     manifest_number: str = Field(default_factory=lambda: f"MAN-{uuid.uuid4().hex[:8].upper()}", index=True, unique=True)

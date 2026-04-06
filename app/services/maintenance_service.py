@@ -4,8 +4,8 @@ from app.models.maintenance import (
     MaintenanceSchedule,
     MaintenanceRecord,
     StationDowntime,
-    MaintenanceChecklistTemplate,
 )
+from app.models.maintenance_checklist import MaintenanceChecklistTemplate
 from app.models.battery import Battery
 from app.models.station import Station
 from app.services.battery_consistency import apply_battery_transition
