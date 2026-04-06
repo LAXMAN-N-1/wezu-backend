@@ -19,6 +19,7 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 
 from app.core.config import settings
 from app.db.session import engine
+import app.models.all  # Force register all models so relationships map successfully
 from app.api import deps
 from app.middleware.rate_limit import limiter
 from app.middleware.audit import AuditMiddleware
@@ -78,15 +79,7 @@ logger = get_logger(__name__)
 from app.utils.cors import cors_headers_for_origin
 
 CORS_ALLOWED_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
-CORS_ALLOWED_HEADERS = [
-    "Authorization",
-    "Content-Type",
-    "Accept",
-    "Origin",
-    "X-Requested-With",
-    "X-Request-ID",
-    "X-Correlation-ID",
-]
+CORS_ALLOWED_HEADERS = ["*"]
 
 
 class CORSErrorMiddleware(BaseHTTPMiddleware):
