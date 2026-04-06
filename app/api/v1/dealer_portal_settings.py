@@ -14,6 +14,8 @@ from app.models.user import User
 from app.models.dealer import DealerProfile
 from app.models.notification import Notification
 from app.models.notification_preference import NotificationPreference
+from app.models.audit_log import AuditActionType
+from app.utils.audit_context import log_audit_action
 
 router = APIRouter()
 
@@ -151,6 +153,18 @@ def update_profile(
         setattr(dealer, key, value)
 
     db.add(dealer)
+    
+    # Audit Logging
+    log_audit_action(
+        db=db,
+        action="DLR_UPDATE_PROFILE",
+        module="dealer",
+        resource_type="DEALER_PROFILE",
+        target_id=dealer.id,
+        new_value=update_data,
+        details="Dealer Profile Updated"
+    )
+    
     db.commit()
     db.refresh(dealer)
 
@@ -172,6 +186,10 @@ def update_bank_account(
     if not dealer:
         raise HTTPException(status_code=404, detail="Dealer profile not found")
 
+    dealer.bank_name = data.bank_name
+    dealer.bank_account_number = data.account_number
+    dealer.bank_ifsc_code = data.ifsc_code
+
     dealer.bank_details = {
         "account_number": data.account_number,
         "ifsc_code": data.ifsc_code,
@@ -182,7 +200,34 @@ def update_bank_account(
         "updated_at": str(datetime.now(UTC)),
     }
     db.add(dealer)
-    db.commit()
+    
+    try:
+        # Audit Logging
+        log_audit_action(
+            db=db,
+            action="FIN_UPDATE_BANK",
+            module="finance",
+            resource_type="DEALER_BANK",
+            target_id=dealer.id,
+            new_value=dealer.bank_details,
+            details="Bank Account Updated",
+            level="CRITICAL"
+        )
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        log_audit_action(
+            db=db,
+            action="FIN_UPDATE_BANK",
+            module="finance",
+            status="failure",
+            resource_type="DEALER_BANK",
+            target_id=dealer.id,
+            details=f"Bank Update Failed: {str(e)}",
+            level="CRITICAL"
+        )
+        db.commit()
+        raise e
 
     return {"message": "Bank account updated", "verified": False}
 
@@ -231,10 +276,62 @@ def get_bank_account(
         raise HTTPException(status_code=404, detail="Dealer profile not found")
 
     return {
+        "bank_name": dealer.bank_name,
+        "bank_account_number": dealer.bank_account_number,
+        "bank_ifsc_code": dealer.bank_ifsc_code,
+        "account_holder_name": dealer.bank_details.get("account_holder_name", "") if dealer.bank_details else "",
         "bank_details": dealer.bank_details or {},
         "payout_interval": dealer.payout_interval,
         "min_payout_amount": dealer.min_payout_amount,
     }
+
+class BankDetailsUpdate(BaseModel):
+    bank_name: Optional[str] = None
+    bank_account_number: Optional[str] = None
+    bank_ifsc_code: Optional[str] = None
+
+@router.get("/bank-details")
+def get_bank_details(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get explicit bank details for the dealer."""
+    dealer = db.exec(
+        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
+    ).first()
+    if not dealer:
+        raise HTTPException(status_code=404, detail="Dealer profile not found")
+        
+    return {
+        "bank_name": dealer.bank_name,
+        "bank_account_number": dealer.bank_account_number,
+        "bank_ifsc_code": dealer.bank_ifsc_code,
+    }
+
+@router.patch("/bank-details")
+def update_bank_details(
+    data: BankDetailsUpdate,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Patch explicit bank details for the dealer."""
+    dealer = db.exec(
+        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
+    ).first()
+    if not dealer:
+        raise HTTPException(status_code=404, detail="Dealer profile not found")
+        
+    if data.bank_name is not None:
+        dealer.bank_name = data.bank_name
+    if data.bank_account_number is not None:
+        dealer.bank_account_number = data.bank_account_number
+    if data.bank_ifsc_code is not None:
+        dealer.bank_ifsc_code = data.bank_ifsc_code
+
+    db.add(dealer)
+    db.commit()
+    
+    return {"message": "Bank details updated successfully."}
 
 
 @router.patch("/payout-settings")
@@ -253,6 +350,19 @@ def update_payout_settings(
     dealer.payout_interval = data.payout_interval
     dealer.min_payout_amount = data.min_payout_amount
     db.add(dealer)
+    
+    # Audit Logging
+    log_audit_action(
+        db=db,
+        action="FIN_UPDATE_PAYOUT",
+        module="finance",
+        resource_type="DEALER_PAYOUT",
+        target_id=dealer.id,
+        new_value={"interval": dealer.payout_interval, "amount": dealer.min_payout_amount},
+        details="Payout Settings Updated",
+        level="CRITICAL"
+    )
+    
     db.commit()
 
     return {

@@ -7,6 +7,7 @@ from typing import Optional, Dict, Any
 from sqlmodel import Session, select
 from app.core.database import engine
 from app.models.audit_log import AuditLog, SecurityEvent
+from app.utils.audit_context import log_audit_action
 from datetime import datetime, UTC
 
 logger = logging.getLogger(__name__)
@@ -26,22 +27,25 @@ class AuditService:
         user_agent: str = None,
         old_value: Dict[str, Any] = None,
         new_value: Dict[str, Any] = None,
+        response_time_ms: Optional[float] = None,
+        module: Optional[str] = None,
+        status: str = "success"
     ):
-        """Create an audit log entry with full change tracking."""
+        """Create an audit log entry with full change tracking using standard context."""
         try:
-            log = AuditLog(
-                user_id=user_id,
+            # We use log_audit_action which pulls trace/session from ContextVars
+            log_audit_action(
+                db=db,
                 action=action,
+                module=module,
+                status=status,
                 resource_type=resource_type,
-                resource_id=resource_id,
                 target_id=target_id,
-                details=details,
-                ip_address=ip_address,
-                user_agent=user_agent,
                 old_value=old_value,
                 new_value=new_value,
+                details=details,
+                response_time_ms=response_time_ms
             )
-            db.add(log)
             db.commit()
         except Exception as e:
             try:
@@ -56,23 +60,25 @@ class AuditService:
         user_id: Optional[int],
         resource: str,
         action: str,
-        status: str,
-        metadata: Dict[str, Any],
-        ip_address: Optional[str] = None
+        status: str = "success",
+        metadata: Dict[str, Any] = None,
+        ip_address: Optional[str] = None,
+        response_time_ms: Optional[float] = None,
+        module: Optional[str] = None
     ):
-        """Async version for middleware and high-frequency logging."""
+        """Async version for middleware/events using context-aware logging."""
         with Session(engine) as db:
             try:
-                log = AuditLog(
-                    user_id=user_id,
+                log_audit_action(
+                    db=db,
                     action=action,
+                    module=module,
+                    status=status,
                     resource_type=event_type,
-                    resource_id=resource,
                     details=f"Status: {status}",
-                    ip_address=ip_address,
-                    meta_data=metadata
+                    meta_data=metadata,
+                    response_time_ms=response_time_ms
                 )
-                db.add(log)
                 db.commit()
             except Exception as e:
                 try:

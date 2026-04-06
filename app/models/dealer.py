@@ -39,6 +39,10 @@ class DealerProfile(SQLModel, table=True):
     pincode: str
     
     # Financial Details
+    bank_name: Optional[str] = None
+    bank_account_number: Optional[str] = None
+    bank_ifsc_code: Optional[str] = None
+    
     bank_details: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     payout_interval: Optional[str] = Field(default="Weekly") # Daily, Weekly, Bi-Weekly, Monthly
     min_payout_amount: Optional[float] = Field(default=0.0)
@@ -53,9 +57,13 @@ class DealerProfile(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
-    user: "User" = Relationship(
-        back_populates="dealer_profile",
-        sa_relationship_kwargs={"foreign_keys": "[DealerProfile.user_id]"}
+    owner: "User" = Relationship(
+        back_populates="owned_dealer_profile",
+        sa_relationship_kwargs={
+            "primaryjoin": "DealerProfile.user_id == User.id",
+            "foreign_keys": "[DealerProfile.user_id]",
+            "overlaps": "dealer_profile,user,owner,owned_dealer_profile,staff_members"
+        }
     )
     stations: List["Station"] = Relationship(back_populates="dealer")
     application: Optional["DealerApplication"] = Relationship(back_populates="dealer")

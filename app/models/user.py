@@ -136,9 +136,13 @@ class User(SQLModel, table=True):
     vehicles: List["Vehicle"] = Relationship(back_populates="user")
     
     # Fix for ambiguous foreign keys: explicitly specify which FK links a user to their OWN dealer profile
-    dealer_profile: Optional["DealerProfile"] = Relationship(
-        back_populates="user",
-        sa_relationship_kwargs={"foreign_keys": "[DealerProfile.user_id]"}
+    owned_dealer_profile: Optional["DealerProfile"] = Relationship(
+        back_populates="owner",
+        sa_relationship_kwargs={
+            "primaryjoin": "User.id == DealerProfile.user_id",
+            "foreign_keys": "[DealerProfile.user_id]",
+            "overlaps": "dealer_profile,user,owner,owned_dealer_profile,staff_profile"
+        }
     )
     
     driver_profile: Optional["DriverProfile"] = Relationship(back_populates="user")

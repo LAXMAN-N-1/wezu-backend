@@ -67,6 +67,15 @@ def register_jobs():
         replace_existing=True
     )
     
+    from app.tasks import log_retention
+    scheduler.add_job(
+        log_retention.purge_old_audit_logs,
+        CronTrigger(hour=1, minute=30),  # Runs nightly at 1:30 AM
+        id='daily_audit_log_retention',
+        name='Daily Audit Log Retention',
+        replace_existing=True
+    )
+    
     # Hourly Jobs
     scheduler.add_job(
         hourly_jobs.battery_health_checks,

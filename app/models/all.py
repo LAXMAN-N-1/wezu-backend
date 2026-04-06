@@ -1,7 +1,10 @@
-# Core Identity & Role
-from app.models.user import User, UserType, UserStatus
-from app.models.user_profile import UserProfile
+# 1. Base / Support Models first
+from app.models.enums import *
+from app.models.location import Zone, City, Region, Country, Continent
+from app.models.address import Address
+from app.models.kyc import KYCDocument, KYCRecord, KYCRequest, KYCDocumentType, KYCDocumentStatus
 from app.models.rbac import Role, Permission, RolePermission, UserRole, UserAccessPath, AdminUserRole
+from app.models.user_profile import UserProfile
 from app.models.token import SessionToken
 from app.models.two_factor_auth import TwoFactorAuth
 from app.models.session import UserSession
@@ -80,9 +83,8 @@ from app.models.notification_preference import NotificationPreference
 from app.models.audit_log import AuditLog, SecurityEvent
 from app.models.admin_user import AdminUser
 from app.models.admin_group import AdminGroup
-from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
+from app.models.admin_group import AdminGroup
 from app.models.driver_profile import DriverProfile
-from app.models.staff import StaffProfile
 from app.models.vendor import Vendor, VendorDocument
 from app.models.role_right import RoleRight
 from app.models.menu import Menu
@@ -99,10 +101,20 @@ from app.models.stock_movement import StockMovement
 from app.models.dealer_promotion import DealerPromotion, PromotionUsage
 from app.models.search_history import SearchHistory
 
+from app.models.dealer_promotion import DealerPromotion, PromotionUsage
+from app.models.search_history import SearchHistory
+
 # New modules
 from app.models.system import SystemConfig, FeatureFlag
 from app.models.bess import BessUnit, BessEnergyLog, BessGridEvent, BessReport
 from app.models.notification_admin import PushCampaign, AutomatedTrigger, NotificationLog, NotificationConfig
 from app.models.api_key import ApiKeyConfig
+
+
+# 4. Core Identity (Moved to bottom to ensure dependencies are registered)
+from app.models.user import User, UserType, UserStatus
+from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
+from app.models.staff import StaffProfile
+from app.models.driver_profile import DriverProfile
 
 

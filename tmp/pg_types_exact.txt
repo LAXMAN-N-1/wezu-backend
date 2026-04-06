@@ -1,0 +1,24 @@
+- id: integer
+- user_id: integer
+- action: character varying
+- resource_type: character varying
+- resource_id: character varying
+- target_id: integer
+- details: character varying
+- metadata: json
+- old_value: json
+- new_value: json
+- ip_address: character varying
+- user_agent: character varying
+- timestamp: timestamp without time zone
+- trace_id: character varying
+- session_id: character varying
+- action_id: character varying
+- role_prefix: character varying
+- level: character varying
+- request_method: character varying
+- endpoint: character varying
+- response_time_ms: double precision
+- stack_trace: text
+- module: character varying
+- status: character varying

@@ -10,6 +10,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
         if request.url.path in ["/health", "/", "/docs", "/openapi.json"]:
             return await call_next(request)
 
+        from app.utils.data_masking import mask_dict
         start_time = time.time()
         
         # 2. Extract basic info
@@ -17,38 +18,66 @@ class AuditMiddleware(BaseHTTPMiddleware):
         if hasattr(request.state, "user_id"):
              user_id = request.state.user_id
         elif hasattr(request.state, "user"):
-             # For cases where getting user object is preferred over just id
              user_id = getattr(request.state.user, "id", None)
         
-        # 3. Process request
-        response = await call_next(request)
+        response = None
+        status = "success"
+        error_metadata = {}
         
-        # 4. Calculate duration
-        process_time = time.time() - start_time
-        
-        # 5. Log event asynchronously (don't block the response)
-        # However, since audit_service.log_event is async, we can just await it
-        # or use background tasks. For simplicity and reliability in this middleware:
-        metadata = {
-            "method": request.method,
-            "url": str(request.url),
-            "process_time_ms": int(process_time * 1000),
-            "status_code": response.status_code,
-            "user_agent": request.headers.get("user-agent"),
-        }
-        
-        # Log to MongoDB
-        import asyncio
-        asyncio.create_task(
-            audit_service.log_event(
-                event_type="api_request",
-                user_id=user_id,
-                resource=request.url.path,
-                action=request.method,
-                status="success" if response.status_code < 400 else "failure",
-                metadata=metadata,
-                ip_address=get_client_ip(request)
+        try:
+            # 3. Process request
+            response = await call_next(request)
+            if response.status_code >= 400:
+                status = "failure"
+        except Exception as e:
+            # 4. Handle uncaught exceptions (Critical for failure logging)
+            status = "failure"
+            error_metadata = {
+                "exception": str(e),
+                "traceback": traceback.format_exc()
+            }
+            # Re-raise to let exception handlers deal with it, but we log first
+            raise e
+        finally:
+            # 5. Calculate duration
+            process_time_ms = int((time.time() - start_time) * 1000)
+            
+            # 6. Capture Masked Headers
+            masked_headers = mask_dict(dict(request.headers))
+            
+            metadata = {
+                "method": request.method,
+                "url": str(request.url),
+                "process_time_ms": process_time_ms,
+                "status_code": response.status_code if response else 500,
+                "user_agent": request.headers.get("user-agent"),
+                "headers": masked_headers,
+                **error_metadata
+            }
+            
+            # Determine appropriate log level
+            level = "INFO"
+            if response:
+                if response.status_code >= 500:
+                    level = "ERROR"
+                elif response.status_code >= 400:
+                    level = "WARNING"
+            else:
+                level = "ERROR"
+
+            # 7. Log event asynchronously
+            import asyncio
+            asyncio.create_task(
+                audit_service.log_event(
+                    event_type="api_request",
+                    user_id=user_id,
+                    resource=request.url.path,
+                    action=request.method,
+                    status=status,
+                    metadata=metadata,
+                    response_time_ms=float(process_time_ms),
+                    module="api"
+                )
             )
-        )
         
         return response
