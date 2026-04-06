@@ -16,12 +16,317 @@ from app.models.dealer import DealerProfile
 from app.models.station import Station, StationSlot
 from app.models.rental import Rental
 from app.models.maintenance import MaintenanceRecord
+from app.models.battery import Battery, BatteryStatus
+from app.models.swap import SwapSession
+from app.models.review import Review
 from app.services.dealer_station_service import DealerStationService
 from pydantic import BaseModel
 from app.utils.audit_context import log_audit_action
 from app.models.audit_log import AuditActionType
 
 router = APIRouter()
+
+
+# ─── NEW: Dealer Quick Stats ───
+@router.get("/stats")
+def get_dealer_stats(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Aggregated stats across all dealer's stations."""
+    dealer_id = _get_dealer_id(db, current_user.id)
+    stations = db.exec(select(Station).where(Station.dealer_id == dealer_id)).all()
+    station_ids = [s.id for s in stations]
+
+    if not station_ids:
+        return {"available_batteries": 0, "total_batteries": 0, "ongoing_rentals": 0, "current_swaps": 0, "avg_rating": 0.0, "station_count": 0}
+
+    # Dynamically compute battery counts from core.batteries
+    total_batteries = db.exec(
+        select(func.count(Battery.id)).where(Battery.station_id.in_(station_ids))
+    ).one() or 0
+
+    available = db.exec(
+        select(func.count(Battery.id)).where(
+            Battery.station_id.in_(station_ids),
+            Battery.status == BatteryStatus.AVAILABLE,
+        )
+    ).one() or 0
+
+    ongoing_rentals = 0
+    try:
+        ongoing_rentals = db.exec(
+            select(func.count(Rental.id)).where(
+                Rental.start_station_id.in_(station_ids),
+                Rental.status == "active",
+            )
+        ).one() or 0
+    except Exception:
+        pass
+
+    current_swaps = 0
+    try:
+        current_swaps = db.exec(
+            select(func.count(SwapSession.id)).where(
+                SwapSession.station_id.in_(station_ids),
+                SwapSession.status.in_(["initiated", "processing"]),
+            )
+        ).one() or 0
+    except Exception:
+        pass
+
+    avg_rating = 0.0
+    rated_stations = [s for s in stations if s.rating > 0]
+    if rated_stations:
+        avg_rating = round(sum(s.rating for s in rated_stations) / len(rated_stations), 1)
+
+    return {
+        "available_batteries": available,
+        "total_batteries": total_batteries,
+        "ongoing_rentals": ongoing_rentals,
+        "current_swaps": current_swaps,
+        "avg_rating": avg_rating,
+        "station_count": len(stations),
+    }
+
+
+# ─── NEW: Dealer Batteries List ───
+@router.get("/batteries")
+def get_dealer_batteries(
+    station_id: int | None = Query(None),
+    status: str | None = Query(None),
+    limit: int = Query(200, le=500),
+    offset: int = Query(0),
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """List batteries across dealer's stations with optional filters."""
+    dealer_id = _get_dealer_id(db, current_user.id)
+    stations = db.exec(select(Station).where(Station.dealer_id == dealer_id)).all()
+    station_ids = [s.id for s in stations]
+    station_map = {s.id: s.name for s in stations}
+
+    if not station_ids:
+        return []
+
+    query = select(Battery).where(Battery.station_id.in_(station_ids))
+    if station_id:
+        query = query.where(Battery.station_id == station_id)
+    if status:
+        query = query.where(Battery.status == status)
+
+    batteries = db.exec(query.order_by(Battery.created_at.desc()).limit(limit).offset(offset)).all()
+
+    if not batteries:
+        return []
+
+    # Batch fetch active rentals for ALL batteries in one query (eliminates N+1)
+    battery_ids = [b.id for b in batteries]
+    active_rental_map = {}
+    try:
+        active_rentals = db.exec(
+            select(Rental).where(
+                Rental.battery_id.in_(battery_ids),
+                Rental.status == "active",
+            )
+        ).all()
+        active_rental_map = {r.battery_id: r for r in active_rentals}
+    except Exception:
+        pass
+
+    result = []
+    for b in batteries:
+        active_rental = active_rental_map.get(b.id)
+        fault_desc = None
+        try:
+            if b.health_status and str(b.health_status) in ("DAMAGED", "POOR", "CRITICAL"):
+                fault_desc = b.notes
+        except Exception:
+            pass
+
+        result.append({
+            "id": b.id,
+            "serial_number": b.serial_number,
+            "station_id": b.station_id,
+            "station_name": station_map.get(b.station_id, ""),
+            "status": b.status.value if hasattr(b.status, 'value') else str(b.status),
+            "current_charge": round(b.current_charge, 1) if b.current_charge else 0.0,
+            "health_percentage": round(b.health_percentage, 1) if b.health_percentage else 100.0,
+            "cycle_count": b.cycle_count or 0,
+            "battery_type": b.battery_type or "",
+            "current_customer": None,
+            "rental_start_time": str(active_rental.start_time) if active_rental and hasattr(active_rental, 'start_time') else None,
+            "days_idle": 0,
+            "fault_description": fault_desc,
+            "last_charged_at": str(b.last_charged_at) if b.last_charged_at else None,
+            "created_at": str(b.created_at) if b.created_at else None,
+        })
+
+    return result
+
+
+# ─── NEW: Active Rentals ───
+@router.get("/rentals/active")
+def get_active_rentals(
+    station_id: int | None = Query(None),
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """List active rentals across dealer's stations."""
+    dealer_id = _get_dealer_id(db, current_user.id)
+    stations = db.exec(select(Station).where(Station.dealer_id == dealer_id)).all()
+    station_ids = [s.id for s in stations]
+    station_map = {s.id: s.name for s in stations}
+
+    if not station_ids:
+        return []
+
+    query = select(Rental).where(
+        Rental.start_station_id.in_(station_ids),
+        Rental.status.in_(["active", "overdue"]),
+    )
+    if station_id:
+        query = query.where(Rental.start_station_id == station_id)
+
+    rentals = db.exec(query.order_by(Rental.start_time.desc())).all()
+
+    result = []
+    for r in rentals:
+        # Get customer name
+        customer = db.get(User, r.user_id)
+        customer_name = customer.full_name if customer and hasattr(customer, 'full_name') else f"User #{r.user_id}"
+
+        # Get battery code
+        battery = db.get(Battery, r.battery_id)
+        battery_code = battery.serial_number if battery else f"BAT-{r.battery_id}"
+
+        result.append({
+            "id": r.id,
+            "customer_name": customer_name,
+            "customer_phone": "",
+            "battery_code": battery_code,
+            "battery_id": r.battery_id,
+            "station_name": station_map.get(r.start_station_id, ""),
+            "station_id": r.start_station_id,
+            "start_time": str(r.start_time),
+            "expected_return": str(r.expected_end_time),
+            "total_amount": r.total_amount,
+            "late_fee": r.late_fee,
+            "status": r.status.value if hasattr(r.status, 'value') else str(r.status),
+            "duration_minutes": int((r.expected_end_time - r.start_time).total_seconds() / 60) if r.expected_end_time else 0,
+        })
+
+    return result
+
+
+# ─── NEW: Reviews ───
+@router.get("/reviews")
+def get_dealer_reviews(
+    station_id: int | None = Query(None),
+    rating: int | None = Query(None),
+    replied: bool | None = Query(None),
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """List reviews for dealer's stations."""
+    dealer_id = _get_dealer_id(db, current_user.id)
+    stations = db.exec(select(Station).where(Station.dealer_id == dealer_id)).all()
+    station_ids = [s.id for s in stations]
+    station_map = {s.id: s.name for s in stations}
+
+    if not station_ids:
+        return []
+
+    query = select(Review).where(Review.station_id.in_(station_ids))
+    if station_id:
+        query = query.where(Review.station_id == station_id)
+    if rating:
+        query = query.where(Review.rating == rating)
+    if replied is True:
+        query = query.where(Review.response_from_station.isnot(None))
+    elif replied is False:
+        query = query.where(Review.response_from_station.is_(None))
+
+    reviews = db.exec(query.order_by(Review.created_at.desc())).all()
+
+    result = []
+    for rv in reviews:
+        customer = db.get(User, rv.user_id)
+        customer_name = customer.full_name if customer and hasattr(customer, 'full_name') else f"User #{rv.user_id}"
+
+        result.append({
+            "id": rv.id,
+            "customer_name": customer_name,
+            "rating": rv.rating,
+            "comment": rv.comment,
+            "station_id": rv.station_id,
+            "station_name": station_map.get(rv.station_id, ""),
+            "response_from_station": rv.response_from_station,
+            "replied_at": None,
+            "is_verified_rental": rv.is_verified_rental,
+            "created_at": str(rv.created_at),
+        })
+
+    return result
+
+
+class ReplyRequest(BaseModel):
+    reply_text: str
+
+
+# ─── NEW: Reply to Review ───
+@router.post("/reviews/{review_id}/reply")
+def reply_to_review(
+    review_id: int,
+    data: ReplyRequest,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Dealer replies to a customer review."""
+    dealer_id = _get_dealer_id(db, current_user.id)
+    stations = db.exec(select(Station).where(Station.dealer_id == dealer_id)).all()
+    station_ids = [s.id for s in stations]
+
+    review = db.get(Review, review_id)
+    if not review or review.station_id not in station_ids:
+        raise HTTPException(status_code=404, detail="Review not found")
+
+    review.response_from_station = data.reply_text
+    db.add(review)
+    db.commit()
+    return {"message": "Reply saved", "review_id": review_id}
+
+
+class StatusChangeRequest(BaseModel):
+    status: str
+    reason: str | None = None
+
+
+# ─── NEW: Change Station Status ───
+@router.put("/{station_id}/status")
+def change_station_status(
+    station_id: int,
+    data: StatusChangeRequest,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Change station operational status."""
+    dealer_id = _get_dealer_id(db, current_user.id)
+    station = db.exec(
+        select(Station).where(Station.id == station_id, Station.dealer_id == dealer_id)
+    ).first()
+    if not station:
+        raise HTTPException(status_code=404, detail="Station not found")
+
+    valid_statuses = ["OPERATIONAL", "OFFLINE", "MAINTENANCE", "CLOSED"]
+    if data.status.upper() not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+
+    station.status = data.status.upper()
+    station.updated_at = datetime.now(UTC)
+    db.add(station)
+    db.commit()
+    return {"message": f"Station status changed to {data.status.upper()}", "id": station_id}
 
 def _get_dealer_id(db: Session, user_id: int) -> int:
     """Resolve dealer_id from current user, or raise 403."""
@@ -84,6 +389,46 @@ def list_stations(
 
     result = []
     for s in stations:
+        # Dynamically compute battery counts from core.batteries
+        total_batteries = db.exec(
+            select(func.count(Battery.id)).where(Battery.station_id == s.id)
+        ).one() or 0
+
+        available_count = db.exec(
+            select(func.count(Battery.id)).where(
+                Battery.station_id == s.id,
+                Battery.status == BatteryStatus.AVAILABLE,
+            )
+        ).one() or 0
+
+        rented_count = db.exec(
+            select(func.count(Battery.id)).where(
+                Battery.station_id == s.id,
+                Battery.status == BatteryStatus.RENTED,
+            )
+        ).one() or 0
+
+        maintenance_count = db.exec(
+            select(func.count(Battery.id)).where(
+                Battery.station_id == s.id,
+                Battery.status == BatteryStatus.MAINTENANCE,
+            )
+        ).one() or 0
+
+        damaged_count = db.exec(
+            select(func.count(Battery.id)).where(
+                Battery.station_id == s.id,
+                Battery.status.in_([BatteryStatus.RETIRED]),
+            )
+        ).one() or 0
+
+        charging_count = db.exec(
+            select(func.count(Battery.id)).where(
+                Battery.station_id == s.id,
+                Battery.status == BatteryStatus.CHARGING,
+            )
+        ).one() or 0
+
         # Count active swaps at this station
         active_rentals = 0
         try:
@@ -98,18 +443,7 @@ def list_stations(
 
         # Slot utilization
         total_slots = s.total_slots or 1
-        occupied_slots = 0
-        try:
-            occupied_slots = db.exec(
-                select(func.count(StationSlot.id)).where(
-                    StationSlot.station_id == s.id,
-                    StationSlot.status.in_(["charging", "ready"]),
-                )
-            ).one() or 0
-        except Exception:
-            pass
-
-        utilization = round((occupied_slots / total_slots) * 100, 1) if total_slots > 0 else 0
+        utilization = round((total_batteries / total_slots) * 100, 1) if total_slots > 0 else 0
 
         result.append({
             "id": s.id,
@@ -121,11 +455,17 @@ def list_stations(
             "status": s.status,
             "station_type": s.station_type,
             "total_slots": s.total_slots,
-            "available_batteries": s.available_batteries,
-            "available_slots": s.available_slots,
+            "total_batteries": total_batteries,
+            "available_batteries": available_count,
+            "rented_batteries": rented_count,
+            "charging_batteries": charging_count,
+            "maintenance_batteries": maintenance_count,
+            "damaged_batteries": damaged_count,
+            "available_slots": max(0, (s.total_slots or 0) - total_batteries),
             "is_24x7": s.is_24x7,
             "rating": round(s.rating, 1),
             "active_swaps": active_rentals,
+            "ongoing_rentals": rented_count,
             "utilization_percent": utilization,
             "contact_phone": s.contact_phone,
             "operating_hours": s.operating_hours,
