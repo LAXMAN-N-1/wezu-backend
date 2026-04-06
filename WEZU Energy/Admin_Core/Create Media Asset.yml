@@ -1,0 +1,144 @@
+info:
+  name: Create Media Asset
+  type: http
+  seq: 43
+  tags:
+    - Admin_Core
+    - Admin_CMS
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/admin/cms/media/"
+  params:
+    - name: file_name
+      value: ""
+      type: query
+    - name: file_type
+      value: ""
+      type: query
+    - name: file_size_bytes
+      value: ""
+      type: query
+    - name: url
+      value: ""
+      type: query
+    - name: alt_text
+      value: ""
+      type: query
+      disabled: true
+    - name: category
+      value: general
+      type: query
+  auth:
+    type: oauth2
+    flow: resource_owner_password_credentials
+    accessTokenUrl: /api/v1/auth/token
+    refreshTokenUrl: "{{oauth_refresh_url}}"
+    credentials:
+      clientId: "{{oauth_client_id}}"
+      clientSecret: "{{oauth_client_secret}}"
+      placement: header
+    tokenConfig:
+      placement:
+        header: Bearer
+      source: access_token
+    settings:
+      autoFetchToken: false
+      autoRefreshToken: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 201 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/admin/cms/media/"
+      method: POST
+      params:
+        - name: file_name
+          value: ""
+          type: query
+        - name: file_type
+          value: ""
+          type: query
+        - name: file_size_bytes
+          value: ""
+          type: query
+        - name: url
+          value: ""
+          type: query
+        - name: alt_text
+          value: ""
+          type: query
+          disabled: true
+        - name: category
+          value: general
+          type: query
+    response:
+      status: 201
+      statusText: Created
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "file_name": "",
+            "file_type": "",
+            "file_size_bytes": 0,
+            "url": "",
+            "alt_text": "",
+            "category": "",
+            "id": 0,
+            "uploaded_by_id": 0,
+            "created_at": "",
+            "updated_at": ""
+          }
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/admin/cms/media/"
+      method: POST
+      params:
+        - name: file_name
+          value: ""
+          type: query
+        - name: file_type
+          value: ""
+          type: query
+        - name: file_size_bytes
+          value: ""
+          type: query
+        - name: url
+          value: ""
+          type: query
+        - name: alt_text
+          value: ""
+          type: query
+          disabled: true
+        - name: category
+          value: general
+          type: query
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": ""
+              }
+            ]
+          }

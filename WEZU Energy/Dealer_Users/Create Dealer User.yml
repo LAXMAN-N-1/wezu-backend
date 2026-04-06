@@ -1,0 +1,144 @@
+info:
+  name: Create Dealer User
+  type: http
+  seq: 3
+  tags:
+    - Dealer_Users
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/dealer/portal/users"
+  body:
+    type: json
+    data: |-
+      {
+        "full_name": "",
+        "email": "",
+        "phone_number": "",
+        "department": "",
+        "notes": "",
+        "role_id": 0,
+        "station_id": "",
+        "credential_mode": "",
+        "password": "",
+        "force_password_change": false,
+        "invitation_message": "",
+        "send_sms": false,
+        "initial_status": ""
+      }
+  auth:
+    type: oauth2
+    flow: resource_owner_password_credentials
+    accessTokenUrl: /api/v1/auth/token
+    refreshTokenUrl: "{{oauth_refresh_url}}"
+    credentials:
+      clientId: "{{oauth_client_id}}"
+      clientSecret: "{{oauth_client_secret}}"
+      placement: header
+    tokenConfig:
+      placement:
+        header: Bearer
+      source: access_token
+    settings:
+      autoFetchToken: false
+      autoRefreshToken: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 201 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/dealer/portal/users"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "full_name": "",
+            "email": "",
+            "phone_number": "",
+            "department": "",
+            "notes": "",
+            "role_id": 0,
+            "station_id": "",
+            "credential_mode": "",
+            "password": "",
+            "force_password_change": false,
+            "invitation_message": "",
+            "send_sms": false,
+            "initial_status": ""
+          }
+    response:
+      status: 201
+      statusText: Created
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "id": 0,
+            "full_name": "",
+            "email": "",
+            "phone_number": "",
+            "department": "",
+            "profile_picture": "",
+            "status": "",
+            "role_id": "",
+            "role_name": "",
+            "role_icon": "",
+            "role_color": "",
+            "station_id": "",
+            "last_login": "",
+            "created_at": "",
+            "created_by": ""
+          }
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/dealer/portal/users"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "full_name": "",
+            "email": "",
+            "phone_number": "",
+            "department": "",
+            "notes": "",
+            "role_id": 0,
+            "station_id": "",
+            "credential_mode": "",
+            "password": "",
+            "force_password_change": false,
+            "invitation_message": "",
+            "send_sms": false,
+            "initial_status": ""
+          }
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": ""
+              }
+            ]
+          }
+
+docs: Create a new user under this dealer with credentials (invite or manual).

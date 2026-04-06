@@ -1,0 +1,121 @@
+info:
+  name: Schedule Maintenance
+  type: http
+  seq: 83
+  tags:
+    - Admin_Core
+    - Admin_Battery_Health
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/admin/health/maintenance"
+  body:
+    type: json
+    data: |-
+      {
+        "battery_id": "",
+        "scheduled_date": "",
+        "maintenance_type": "",
+        "priority": "",
+        "assigned_to": "",
+        "notes": ""
+      }
+  auth:
+    type: oauth2
+    flow: resource_owner_password_credentials
+    accessTokenUrl: /api/v1/auth/token
+    refreshTokenUrl: "{{oauth_refresh_url}}"
+    credentials:
+      clientId: "{{oauth_client_id}}"
+      clientSecret: "{{oauth_client_secret}}"
+      placement: header
+    tokenConfig:
+      placement:
+        header: Bearer
+      source: access_token
+    settings:
+      autoFetchToken: false
+      autoRefreshToken: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/admin/health/maintenance"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "battery_id": "",
+            "scheduled_date": "",
+            "maintenance_type": "",
+            "priority": "",
+            "assigned_to": "",
+            "notes": ""
+          }
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "id": 0,
+            "battery_id": "",
+            "battery_serial": "",
+            "scheduled_date": "",
+            "maintenance_type": "",
+            "priority": "",
+            "assigned_to": "",
+            "assigned_to_name": "",
+            "status": "",
+            "notes": "",
+            "health_before": "",
+            "health_after": "",
+            "completed_at": "",
+            "created_at": ""
+          }
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/admin/health/maintenance"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "battery_id": "",
+            "scheduled_date": "",
+            "maintenance_type": "",
+            "priority": "",
+            "assigned_to": "",
+            "notes": ""
+          }
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": ""
+              }
+            ]
+          }

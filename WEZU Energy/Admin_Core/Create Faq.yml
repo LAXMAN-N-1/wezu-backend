@@ -1,0 +1,108 @@
+info:
+  name: Create Faq
+  type: http
+  seq: 26
+  tags:
+    - Admin_Core
+    - Admin_CMS
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/admin/cms/faqs/"
+  body:
+    type: json
+    data: |-
+      {
+        "question": "",
+        "answer": "",
+        "category": "",
+        "is_active": false
+      }
+  auth:
+    type: oauth2
+    flow: resource_owner_password_credentials
+    accessTokenUrl: /api/v1/auth/token
+    refreshTokenUrl: "{{oauth_refresh_url}}"
+    credentials:
+      clientId: "{{oauth_client_id}}"
+      clientSecret: "{{oauth_client_secret}}"
+      placement: header
+    tokenConfig:
+      placement:
+        header: Bearer
+      source: access_token
+    settings:
+      autoFetchToken: false
+      autoRefreshToken: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 201 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/admin/cms/faqs/"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "question": "",
+            "answer": "",
+            "category": "",
+            "is_active": false
+          }
+    response:
+      status: 201
+      statusText: Created
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "question": "",
+            "answer": "",
+            "category": "",
+            "is_active": false,
+            "id": 0,
+            "helpful_count": 0,
+            "not_helpful_count": 0
+          }
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/admin/cms/faqs/"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "question": "",
+            "answer": "",
+            "category": "",
+            "is_active": false
+          }
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": ""
+              }
+            ]
+          }

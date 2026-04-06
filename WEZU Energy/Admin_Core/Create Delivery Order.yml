@@ -1,0 +1,162 @@
+info:
+  name: Create Delivery Order
+  type: http
+  seq: 146
+  tags:
+    - Admin_Core
+    - Admin_Logistics
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/admin/logistics/orders"
+  params:
+    - name: order_type
+      value: ""
+      type: query
+    - name: origin_address
+      value: ""
+      type: query
+    - name: destination_address
+      value: ""
+      type: query
+    - name: origin_lat
+      value: ""
+      type: query
+      disabled: true
+    - name: origin_lng
+      value: ""
+      type: query
+      disabled: true
+    - name: dest_lat
+      value: ""
+      type: query
+      disabled: true
+    - name: dest_lng
+      value: ""
+      type: query
+      disabled: true
+    - name: driver_id
+      value: ""
+      type: query
+      disabled: true
+  auth:
+    type: oauth2
+    flow: resource_owner_password_credentials
+    accessTokenUrl: /api/v1/auth/token
+    refreshTokenUrl: "{{oauth_refresh_url}}"
+    credentials:
+      clientId: "{{oauth_client_id}}"
+      clientSecret: "{{oauth_client_secret}}"
+      placement: header
+    tokenConfig:
+      placement:
+        header: Bearer
+      source: access_token
+    settings:
+      autoFetchToken: false
+      autoRefreshToken: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/admin/logistics/orders"
+      method: POST
+      params:
+        - name: order_type
+          value: ""
+          type: query
+        - name: origin_address
+          value: ""
+          type: query
+        - name: destination_address
+          value: ""
+          type: query
+        - name: origin_lat
+          value: ""
+          type: query
+          disabled: true
+        - name: origin_lng
+          value: ""
+          type: query
+          disabled: true
+        - name: dest_lat
+          value: ""
+          type: query
+          disabled: true
+        - name: dest_lng
+          value: ""
+          type: query
+          disabled: true
+        - name: driver_id
+          value: ""
+          type: query
+          disabled: true
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: ""
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/admin/logistics/orders"
+      method: POST
+      params:
+        - name: order_type
+          value: ""
+          type: query
+        - name: origin_address
+          value: ""
+          type: query
+        - name: destination_address
+          value: ""
+          type: query
+        - name: origin_lat
+          value: ""
+          type: query
+          disabled: true
+        - name: origin_lng
+          value: ""
+          type: query
+          disabled: true
+        - name: dest_lat
+          value: ""
+          type: query
+          disabled: true
+        - name: dest_lng
+          value: ""
+          type: query
+          disabled: true
+        - name: driver_id
+          value: ""
+          type: query
+          disabled: true
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": ""
+              }
+            ]
+          }

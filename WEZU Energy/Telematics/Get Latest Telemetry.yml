@@ -1,0 +1,86 @@
+info:
+  name: Get Latest Telemetry
+  type: http
+  seq: 2
+  tags:
+    - Telematics
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/telematics/battery/:battery_id/latest"
+  params:
+    - name: battery_id
+      value: ""
+      type: path
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/telematics/battery/:battery_id/latest"
+      method: GET
+      params:
+        - name: battery_id
+          value: ""
+          type: path
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "battery_id": 0,
+            "timestamp": "",
+            "voltage": 0,
+            "current": 0,
+            "temperature": 0,
+            "soc": 0,
+            "soh": 0,
+            "gps_latitude": "",
+            "gps_longitude": "",
+            "gps_altitude": "",
+            "gps_speed": "",
+            "error_codes": "",
+            "raw_payload": "",
+            "received_at": ""
+          }
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/telematics/battery/:battery_id/latest"
+      method: GET
+      params:
+        - name: battery_id
+          value: ""
+          type: path
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": ""
+              }
+            ]
+          }
+
+docs: Get the most recent telemetry packet for a battery.

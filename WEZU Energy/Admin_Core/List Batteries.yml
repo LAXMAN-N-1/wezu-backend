@@ -1,0 +1,219 @@
+info:
+  name: List Batteries
+  type: http
+  seq: 58
+  tags:
+    - Admin_Core
+    - Admin_Batteries
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/admin/batteries"
+  params:
+    - name: status
+      value: ""
+      type: query
+      disabled: true
+    - name: location_type
+      value: ""
+      type: query
+      disabled: true
+    - name: battery_type
+      value: ""
+      type: query
+      disabled: true
+    - name: min_health
+      value: ""
+      type: query
+      disabled: true
+    - name: max_health
+      value: ""
+      type: query
+      disabled: true
+    - name: search
+      value: ""
+      type: query
+      disabled: true
+    - name: sort_by
+      value: created_at
+      type: query
+      description: Sort column
+    - name: sort_order
+      value: desc
+      type: query
+      description: asc or desc
+    - name: offset
+      value: "0"
+      type: query
+    - name: limit
+      value: "20"
+      type: query
+  auth:
+    type: oauth2
+    flow: resource_owner_password_credentials
+    accessTokenUrl: /api/v1/auth/token
+    refreshTokenUrl: "{{oauth_refresh_url}}"
+    credentials:
+      clientId: "{{oauth_client_id}}"
+      clientSecret: "{{oauth_client_secret}}"
+      placement: header
+    tokenConfig:
+      placement:
+        header: Bearer
+      source: access_token
+    settings:
+      autoFetchToken: false
+      autoRefreshToken: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/admin/batteries"
+      method: GET
+      params:
+        - name: status
+          value: ""
+          type: query
+          disabled: true
+        - name: location_type
+          value: ""
+          type: query
+          disabled: true
+        - name: battery_type
+          value: ""
+          type: query
+          disabled: true
+        - name: min_health
+          value: ""
+          type: query
+          disabled: true
+        - name: max_health
+          value: ""
+          type: query
+          disabled: true
+        - name: search
+          value: ""
+          type: query
+          disabled: true
+        - name: sort_by
+          value: created_at
+          type: query
+          description: Sort column
+        - name: sort_order
+          value: desc
+          type: query
+          description: asc or desc
+        - name: offset
+          value: "0"
+          type: query
+        - name: limit
+          value: "20"
+          type: query
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "items": [
+              {
+                "serial_number": "",
+                "sku_id": "",
+                "id": 0,
+                "status": "",
+                "health_status": "",
+                "current_charge": 0,
+                "health_percentage": 0,
+                "cycle_count": 0,
+                "total_cycles": 0,
+                "created_at": "",
+                "updated_at": "",
+                "manufacturer": "",
+                "battery_type": "",
+                "location_type": "",
+                "manufacture_date": "",
+                "purchase_date": "",
+                "warranty_expiry": "",
+                "last_charged_at": "",
+                "last_inspected_at": "",
+                "notes": "",
+                "station_id": "",
+                "sku": "",
+                "iot_device": ""
+              }
+            ],
+            "total_count": 0
+          }
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/admin/batteries"
+      method: GET
+      params:
+        - name: status
+          value: ""
+          type: query
+          disabled: true
+        - name: location_type
+          value: ""
+          type: query
+          disabled: true
+        - name: battery_type
+          value: ""
+          type: query
+          disabled: true
+        - name: min_health
+          value: ""
+          type: query
+          disabled: true
+        - name: max_health
+          value: ""
+          type: query
+          disabled: true
+        - name: search
+          value: ""
+          type: query
+          disabled: true
+        - name: sort_by
+          value: created_at
+          type: query
+          description: Sort column
+        - name: sort_order
+          value: desc
+          type: query
+          description: asc or desc
+        - name: offset
+          value: "0"
+          type: query
+        - name: limit
+          value: "20"
+          type: query
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": ""
+              }
+            ]
+          }

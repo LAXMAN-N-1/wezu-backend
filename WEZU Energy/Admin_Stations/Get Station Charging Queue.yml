@@ -1,0 +1,97 @@
+info:
+  name: Get Station Charging Queue
+  type: http
+  seq: 3
+  tags:
+    - Admin_Stations
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/admin/stations/:station_id/charging-queue"
+  params:
+    - name: station_id
+      value: ""
+      type: path
+  auth:
+    type: oauth2
+    flow: resource_owner_password_credentials
+    accessTokenUrl: /api/v1/auth/token
+    refreshTokenUrl: "{{oauth_refresh_url}}"
+    credentials:
+      clientId: "{{oauth_client_id}}"
+      clientSecret: "{{oauth_client_secret}}"
+      placement: header
+    tokenConfig:
+      placement:
+        header: Bearer
+      source: access_token
+    settings:
+      autoFetchToken: false
+      autoRefreshToken: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/admin/stations/:station_id/charging-queue"
+      method: GET
+      params:
+        - name: station_id
+          value: ""
+          type: path
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "station_id": "",
+            "capacity": 0,
+            "current_queue": [
+              {
+                "battery_id": "",
+                "priority_score": 0,
+                "queue_position": 0,
+                "estimated_completion_time": ""
+              }
+            ]
+          }
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/admin/stations/:station_id/charging-queue"
+      method: GET
+      params:
+        - name: station_id
+          value: ""
+          type: path
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": ""
+              }
+            ]
+          }
+
+docs: View current charging queue for station.

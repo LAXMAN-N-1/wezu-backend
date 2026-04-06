@@ -98,6 +98,19 @@ from app.models.dealer_inventory import DealerInventory, InventoryTransaction
 from app.models.stock import Stock
 from app.models.stock_movement import StockMovement
 from app.models.dealer_promotion import DealerPromotion, PromotionUsage
+
+# ── Hardened-only models (ported) ──────────────────────────────────────────
+from app.models.analytics_dashboard import AnalyticsActivityEvent, AnalyticsReportJob
+from app.models.idempotency import IdempotencyKey
+from app.models.inventory import InventoryTransfer, InventoryTransferItem, StockDiscrepancy
+from app.models.manifest import Manifest, ManifestItem
+from app.models.notification_outbox import NotificationOutbox
+from app.models.order import Order, OrderBattery
+from app.models.order_realtime_outbox import OrderRealtimeOutbox
+from app.models.passkey import PasskeyCredential, PasskeyChallenge
+from app.models.payment_method import PaymentMethod
+from app.models.station_metrics import StationDailyMetric
+from app.models.telematics import TelemeticsData
 from app.models.search_history import SearchHistory
 
 # New modules

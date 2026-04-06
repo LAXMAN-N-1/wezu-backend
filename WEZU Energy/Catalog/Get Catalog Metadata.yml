@@ -1,0 +1,40 @@
+info:
+  name: Get Catalog Metadata
+  type: http
+  seq: 7
+  tags:
+    - Catalog
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/catalog/products/metadata"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/catalog/products/metadata"
+      method: GET
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "success": false,
+            "message": "",
+            "data": ""
+          }
+
+docs: Get unique categories, brands, and price ranges for filtering

@@ -1,0 +1,112 @@
+info:
+  name: Reject Document (POST)
+  type: http
+  seq: 6
+  tags:
+    - Admin_KYC
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/admin/kyc/documents/:doc_id/reject"
+  params:
+    - name: doc_id
+      value: ""
+      type: path
+  body:
+    type: json
+    data: |-
+      {
+        "reason": ""
+      }
+  auth:
+    type: oauth2
+    flow: resource_owner_password_credentials
+    accessTokenUrl: /api/v1/auth/token
+    refreshTokenUrl: "{{oauth_refresh_url}}"
+    credentials:
+      clientId: "{{oauth_client_id}}"
+      clientSecret: "{{oauth_client_secret}}"
+      placement: header
+    tokenConfig:
+      placement:
+        header: Bearer
+      source: access_token
+    settings:
+      autoFetchToken: false
+      autoRefreshToken: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/admin/kyc/documents/:doc_id/reject"
+      method: POST
+      params:
+        - name: doc_id
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "reason": ""
+          }
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "document_type": "",
+            "document_number": "",
+            "id": 0,
+            "user_id": 0,
+            "file_url": "",
+            "status": "",
+            "uploaded_at": ""
+          }
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/admin/kyc/documents/:doc_id/reject"
+      method: POST
+      params:
+        - name: doc_id
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "reason": ""
+          }
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": ""
+              }
+            ]
+          }
+
+docs: Reject a KYC document with a reason.

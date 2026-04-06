@@ -1,0 +1,7 @@
+info:
+  name: Dealer_Settings
+  type: folder
+  seq: 1
+
+request:
+  auth: inherit

@@ -1,0 +1,97 @@
+info:
+  name: Validate Promo (POST)
+  type: http
+  seq: 6
+  tags:
+    - Dealer_Campaigns
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/dealer/campaigns/validate"
+  body:
+    type: json
+    data: |-
+      {
+        "code": "",
+        "order_amount": 0,
+        "station_id": ""
+      }
+  auth:
+    type: oauth2
+    flow: resource_owner_password_credentials
+    accessTokenUrl: /api/v1/auth/token
+    refreshTokenUrl: "{{oauth_refresh_url}}"
+    credentials:
+      clientId: "{{oauth_client_id}}"
+      clientSecret: "{{oauth_client_secret}}"
+      placement: header
+    tokenConfig:
+      placement:
+        header: Bearer
+      source: access_token
+    settings:
+      autoFetchToken: false
+      autoRefreshToken: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/dealer/campaigns/validate"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "code": "",
+            "order_amount": 0,
+            "station_id": ""
+          }
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: ""
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/dealer/campaigns/validate"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "code": "",
+            "order_amount": 0,
+            "station_id": ""
+          }
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": ""
+              }
+            ]
+          }
+
+docs: Validate a promo code for checkout.

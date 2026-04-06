@@ -1,0 +1,100 @@
+info:
+  name: Send Chat Message
+  type: http
+  seq: 8
+  tags:
+    - Support
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/support/chat/:sessionId/message"
+  params:
+    - name: sessionId
+      value: ""
+      type: path
+  body:
+    type: json
+    data: "{}"
+  auth:
+    type: oauth2
+    flow: resource_owner_password_credentials
+    accessTokenUrl: /api/v1/auth/token
+    refreshTokenUrl: "{{oauth_refresh_url}}"
+    credentials:
+      clientId: "{{oauth_client_id}}"
+      clientSecret: "{{oauth_client_secret}}"
+      placement: header
+    tokenConfig:
+      placement:
+        header: Bearer
+      source: access_token
+    settings:
+      autoFetchToken: false
+      autoRefreshToken: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/support/chat/:sessionId/message"
+      method: POST
+      params:
+        - name: sessionId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: "{}"
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "id": 0,
+            "sender_id": 0,
+            "message": "",
+            "created_at": ""
+          }
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/support/chat/:sessionId/message"
+      method: POST
+      params:
+        - name: sessionId
+          value: ""
+          type: path
+      body:
+        type: json
+        data: "{}"
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": ""
+              }
+            ]
+          }
+
+docs: Send a message in chat

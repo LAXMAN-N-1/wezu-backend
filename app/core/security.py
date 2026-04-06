@@ -1,69 +1,93 @@
 from datetime import datetime, timedelta, UTC
 from typing import Any, Union
 import uuid
+
 from jose import jwt
 from passlib.context import CryptContext
+import pyotp
+import secrets
+
 from app.core.config import settings
 
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
-def create_access_token(subject: Union[str, Any], expires_delta: timedelta = None, extra_claims: dict = None) -> str:
+
+# ── JWT ────────────────────────────────────────────────────────────────────
+
+def create_access_token(
+    subject: Union[str, Any],
+    expires_delta: timedelta = None,
+    extra_claims: dict = None,
+) -> str:
     if expires_delta:
         expire = datetime.now(UTC) + expires_delta
     else:
-        # Access token valid for 24 hours per FR-MOB-AUTH-002
-        expire = datetime.now(UTC) + timedelta(hours=24)
-    
-    # Add 'iat' claim for global logout validation
-    to_encode = {"exp": expire, "sub": str(subject), "type": "access", "iat": datetime.now(UTC)}
-    
+        expire = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
+    to_encode = {
+        "exp": expire,
+        "sub": str(subject),
+        "type": "access",
+        "iat": datetime.now(UTC),
+    }
     if extra_claims:
         to_encode.update(extra_claims)
-        
-    encoded_jwt = jwt.encode(
-        to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
-    )
-    return encoded_jwt
+
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
 
 def create_refresh_token(subject: Union[str, Any], jti: str = None) -> str:
-    # This function can now be simplified or removed if create_access_token handles both
-    # For now, keeping it as is, but it's redundant with the changes to create_access_token
     expire = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode = {
-        "exp": expire, 
-        "sub": str(subject), 
+        "exp": expire,
+        "sub": str(subject),
         "type": "refresh",
-        "jti": jti or str(uuid.uuid4()) # Unique identifier to ensure token rotation works even if timestamps are identical
+        "iat": datetime.now(UTC),
+        "jti": jti or str(uuid.uuid4()),
     }
-    encoded_jwt = jwt.encode(
-        to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
-    )
-    return encoded_jwt
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+# ── Password hashing ──────────────────────────────────────────────────────
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
+
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-import pyotp
-import secrets
+# ── TOTP / 2FA ────────────────────────────────────────────────────────────
 
 def generate_totp_secret() -> str:
     return pyotp.random_base32()
 
-def verify_totp(secret: str, code: str) -> bool:
-    totp = pyotp.TOTP(secret)
-    return totp.verify(code)
 
-def generate_backup_codes(count: int = 10) -> list:
+def verify_totp(secret: str, code: str) -> bool:
+    """Verify a TOTP code with null-safety and ±1 window tolerance."""
+    if not secret or not code:
+        return False
+    try:
+        totp = pyotp.TOTP(secret)
+        return totp.verify(code, valid_window=1)
+    except Exception:
+        return False
+
+
+def generate_backup_codes(count: int = 10) -> list[str]:
+    """Generate backup codes for 2FA recovery."""
     return [secrets.token_hex(4).upper() for _ in range(count)]
 
+
 def generate_qr_uri(secret: str, user_email: str) -> str:
+    """Generate otpauth:// URI for QR code scanning."""
     return pyotp.totp.TOTP(secret).provisioning_uri(
         name=user_email, issuer_name="Wezu Energy"
     )
+
+
+# ── RBAC helper ────────────────────────────────────────────────────────────
 
 def verify_permission(user, permission_slug: str) -> bool:
     """
@@ -73,4 +97,3 @@ def verify_permission(user, permission_slug: str) -> bool:
     if user.is_superuser:
         return True
     return user.has_permission(permission_slug)
-

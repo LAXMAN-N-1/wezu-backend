@@ -1,0 +1,7 @@
+info:
+  name: Batteries
+  type: folder
+  seq: 1
+
+request:
+  auth: inherit

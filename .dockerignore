@@ -1,0 +1,23 @@
+.git
+.gitignore
+.env
+.env.*
+__pycache__
+*.pyc
+*.pyo
+.pytest_cache
+.mypy_cache
+.venv
+venv
+node_modules
+*.md
+docs/
+tests/
+scripts/
+k8s/
+mosquitto/
+*.bak
+.bak/
+*.log
+.DS_Store
+WEZU Energy/

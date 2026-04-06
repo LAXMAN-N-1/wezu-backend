@@ -1,0 +1,132 @@
+info:
+  name: Get Job History
+  type: http
+  seq: 127
+  tags:
+    - Admin_Core
+    - Admin_Jobs
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/admin/jobs/:job_id/history"
+  params:
+    - name: job_id
+      value: ""
+      type: path
+    - name: limit
+      value: "50"
+      type: query
+    - name: status
+      value: ""
+      type: query
+      disabled: true
+  auth:
+    type: oauth2
+    flow: resource_owner_password_credentials
+    accessTokenUrl: /api/v1/auth/token
+    refreshTokenUrl: "{{oauth_refresh_url}}"
+    credentials:
+      clientId: "{{oauth_client_id}}"
+      clientSecret: "{{oauth_client_secret}}"
+      placement: header
+    tokenConfig:
+      placement:
+        header: Bearer
+      source: access_token
+    settings:
+      autoFetchToken: false
+      autoRefreshToken: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/admin/jobs/:job_id/history"
+      method: GET
+      params:
+        - name: job_id
+          value: ""
+          type: path
+        - name: limit
+          value: "50"
+          type: query
+        - name: status
+          value: ""
+          type: query
+          disabled: true
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": "",
+              "job_id": 0,
+              "execution_id": "",
+              "status": "",
+              "trigger_type": "",
+              "triggered_by": "",
+              "started_at": "",
+              "completed_at": "",
+              "duration_seconds": "",
+              "total_items": "",
+              "processed_items": 0,
+              "failed_items": 0,
+              "result_summary": "",
+              "error_message": "",
+              "error_stack_trace": "",
+              "execution_log": "",
+              "retry_count": 0,
+              "parent_execution_id": "",
+              "memory_usage_mb": "",
+              "cpu_usage_percent": "",
+              "created_at": ""
+            }
+          ]
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/admin/jobs/:job_id/history"
+      method: GET
+      params:
+        - name: job_id
+          value: ""
+          type: path
+        - name: limit
+          value: "50"
+          type: query
+        - name: status
+          value: ""
+          type: query
+          disabled: true
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": ""
+              }
+            ]
+          }
+
+docs: Get job execution history

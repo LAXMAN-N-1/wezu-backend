@@ -1,0 +1,109 @@
+info:
+  name: Scan Battery Qr
+  type: http
+  seq: 1
+  tags:
+    - Batteries
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/batteries/scan-qr"
+  body:
+    type: json
+    data: |-
+      {
+        "qr_code_data": ""
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/batteries/scan-qr"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "qr_code_data": ""
+          }
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "serial_number": "",
+            "sku_id": "",
+            "id": 0,
+            "status": "",
+            "health_status": "",
+            "current_charge": 0,
+            "health_percentage": 0,
+            "cycle_count": 0,
+            "total_cycles": 0,
+            "created_at": "",
+            "updated_at": "",
+            "manufacturer": "",
+            "battery_type": "",
+            "location_type": "",
+            "manufacture_date": "",
+            "purchase_date": "",
+            "warranty_expiry": "",
+            "last_charged_at": "",
+            "last_inspected_at": "",
+            "notes": "",
+            "station_id": "",
+            "sku": "",
+            "iot_device": "",
+            "lifecycle_events": [
+              {
+                "event_type": "",
+                "description": "",
+                "id": 0,
+                "timestamp": ""
+              }
+            ]
+          }
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/batteries/scan-qr"
+      method: POST
+      body:
+        type: json
+        data: |-
+          {
+            "qr_code_data": ""
+          }
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": ""
+              }
+            ]
+          }
+
+docs: Scan QR code to get battery details.

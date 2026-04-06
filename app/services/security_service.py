@@ -1,8 +1,6 @@
 from sqlmodel import Session, select
-from app.models.user import User
-from app.models.security_question import SecurityQuestion, UserSecurityQuestion
-from app.core.security import get_password_hash, verify_password
-from fastapi import HTTPException, status
+from app.models.audit_log import SecurityEvent
+from datetime import datetime
 from typing import List, Optional
 import logging
 
@@ -10,56 +8,80 @@ logger = logging.getLogger(__name__)
 
 class SecurityService:
     @staticmethod
-    def change_password(db: Session, user: User, current_password: str, new_password: str):
-        """Verify current password and update to new password"""
-        if not verify_password(current_password, user.hashed_password):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Incorrect current password"
-            )
-        
-        user.hashed_password = get_password_hash(new_password)
-        db.add(user)
+    def log_event(
+        db: Session,
+        event_type: str,
+        severity: str = "medium",
+        details: str = None,
+        source_ip: str = None,
+        user_id: Optional[int] = None
+    ) -> SecurityEvent:
+        """
+        Log a security-related event.
+        Severity levels: low, medium, high, critical
+        """
+        event = SecurityEvent(
+            event_type=event_type,
+            severity=severity,
+            details=details,
+            source_ip=source_ip,
+            user_id=user_id,
+            timestamp=datetime.utcnow(),
+            is_resolved=False
+        )
+        db.add(event)
         db.commit()
-        db.refresh(user)
-        return True
-
-    @staticmethod
-    def get_available_questions(db: Session) -> List[SecurityQuestion]:
-        """List all active security questions"""
-        return db.exec(select(SecurityQuestion).where(SecurityQuestion.is_active == True)).all()
-
-    @staticmethod
-    def set_user_security_question(db: Session, user_id: int, question_id: int, answer: str):
-        """Set or update user's security question"""
-        # 1. Check if question exists
-        question = db.get(SecurityQuestion, question_id)
-        if not question:
-            raise HTTPException(status_code=404, detail="Security question not found")
+        db.refresh(event)
         
-        # 2. Check if already exists for user
-        statement = select(UserSecurityQuestion).where(UserSecurityQuestion.user_id == user_id)
-        user_sq = db.exec(statement).first()
-        
-        if not user_sq:
-            user_sq = UserSecurityQuestion(user_id=user_id)
+        if severity in ["high", "critical"]:
+            logger.warning(f"HIGH SEVERITY SECURITY EVENT: {event_type} (User: {user_id}, IP: {source_ip})")
+            # In a real app, this might trigger an email/SMS/Webhook to the security team
             
-        user_sq.question_id = question_id
-        # We hash the answer for security
-        user_sq.hashed_answer = get_password_hash(answer.lower().strip())
-        
-        db.add(user_sq)
-        db.commit()
-        db.refresh(user_sq)
-        return user_sq
+        return event
 
     @staticmethod
-    def verify_security_answer(db: Session, user_id: int, answer: str) -> bool:
-        """Verify user's answer to their security question"""
-        statement = select(UserSecurityQuestion).where(UserSecurityQuestion.user_id == user_id)
-        user_sq = db.exec(statement).first()
+    def get_events(
+        db: Session,
+        skip: int = 0,
+        limit: int = 100,
+        unresolved_only: bool = False,
+        severity: Optional[str] = None
+    ) -> List[SecurityEvent]:
+        statement = select(SecurityEvent)
+        if unresolved_only:
+            statement = statement.where(SecurityEvent.is_resolved == False)
+        if severity:
+            statement = statement.where(SecurityEvent.severity == severity)
         
-        if not user_sq:
-            raise HTTPException(status_code=400, detail="Security question not set for this user")
-            
-        return verify_password(answer.lower().strip(), user_sq.hashed_answer)
+        statement = statement.offset(skip).limit(limit).order_by(SecurityEvent.timestamp.desc())
+        return db.exec(statement).all()
+
+    @staticmethod
+    def resolve_event(db: Session, event_id: int) -> Optional[SecurityEvent]:
+        event = db.get(SecurityEvent, event_id)
+        if event:
+            event.is_resolved = True
+            db.add(event)
+            db.commit()
+            db.refresh(event)
+        return event
+
+    @staticmethod
+    def get_event_stats(db: Session):
+        """Get summary statistics for security events"""
+        from sqlalchemy import func
+        
+        counts = db.exec(
+            select(SecurityEvent.severity, func.count(SecurityEvent.id))
+            .group_by(SecurityEvent.severity)
+        ).all()
+        
+        unresolved_count = db.exec(
+            select(func.count(SecurityEvent.id))
+            .where(SecurityEvent.is_resolved == False)
+        ).first()
+        
+        return {
+            "severity_counts": dict(counts),
+            "unresolved_count": unresolved_count or 0
+        }

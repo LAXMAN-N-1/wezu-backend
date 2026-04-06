@@ -1,0 +1,145 @@
+info:
+  name: Read My Rentals
+  type: http
+  seq: 4
+  tags:
+    - Rentals
+
+http:
+  method: GET
+  url: "{{baseUrl}}/api/v1/rentals/my"
+  params:
+    - name: skip
+      value: "0"
+      type: query
+    - name: limit
+      value: "100"
+      type: query
+  auth:
+    type: oauth2
+    flow: resource_owner_password_credentials
+    accessTokenUrl: /api/v1/auth/token
+    refreshTokenUrl: "{{oauth_refresh_url}}"
+    credentials:
+      clientId: "{{oauth_client_id}}"
+      clientSecret: "{{oauth_client_secret}}"
+      placement: header
+    tokenConfig:
+      placement:
+        header: Bearer
+      source: access_token
+    settings:
+      autoFetchToken: false
+      autoRefreshToken: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/rentals/my"
+      method: GET
+      params:
+        - name: skip
+          value: "0"
+          type: query
+        - name: limit
+          value: "100"
+          type: query
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          [
+            {
+              "id": 0,
+              "user_id": 0,
+              "battery": {
+                "serial_number": "",
+                "sku_id": "",
+                "id": 0,
+                "status": "",
+                "health_status": "",
+                "current_charge": 0,
+                "health_percentage": 0,
+                "cycle_count": 0,
+                "total_cycles": 0,
+                "created_at": "",
+                "updated_at": "",
+                "manufacturer": "",
+                "battery_type": "",
+                "location_type": "",
+                "manufacture_date": "",
+                "purchase_date": "",
+                "warranty_expiry": "",
+                "last_charged_at": "",
+                "last_inspected_at": "",
+                "notes": "",
+                "station_id": "",
+                "sku": "",
+                "iot_device": ""
+              },
+              "start_station_id": 0,
+              "status": "",
+              "start_time": "",
+              "end_time": "",
+              "rental_duration_days": 0,
+              "daily_rate": 0,
+              "damage_deposit": 0,
+              "discount_amount": 0,
+              "total_amount": 0,
+              "late_fee_amount": 0,
+              "is_overdue": false,
+              "swap_station_id": "",
+              "swap_requested_at": "",
+              "events": [
+                {
+                  "event_type": "",
+                  "created_at": "",
+                  "description": ""
+                }
+              ]
+            }
+          ]
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/rentals/my"
+      method: GET
+      params:
+        - name: skip
+          value: "0"
+          type: query
+        - name: limit
+          value: "100"
+          type: query
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": ""
+              }
+            ]
+          }
+
+docs: "Customer: own rental history paginated."

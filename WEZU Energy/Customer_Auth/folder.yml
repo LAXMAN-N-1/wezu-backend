@@ -1,0 +1,7 @@
+info:
+  name: Customer_Auth
+  type: folder
+  seq: 1
+
+request:
+  auth: inherit

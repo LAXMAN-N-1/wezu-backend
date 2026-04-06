@@ -1,0 +1,117 @@
+info:
+  name: Complete Swap
+  type: http
+  seq: 2
+  tags:
+    - Swaps
+
+http:
+  method: POST
+  url: "{{baseUrl}}/api/v1/swaps/:swap_id/complete"
+  params:
+    - name: swap_id
+      value: ""
+      type: path
+  body:
+    type: json
+    data: |-
+      {
+        "new_battery_id": 0,
+        "new_battery_soc": 0,
+        "old_battery_soc": 0
+      }
+  auth:
+    type: oauth2
+    flow: resource_owner_password_credentials
+    accessTokenUrl: /api/v1/auth/token
+    refreshTokenUrl: "{{oauth_refresh_url}}"
+    credentials:
+      clientId: "{{oauth_client_id}}"
+      clientSecret: "{{oauth_client_secret}}"
+      placement: header
+    tokenConfig:
+      placement:
+        header: Bearer
+      source: access_token
+    settings:
+      autoFetchToken: false
+      autoRefreshToken: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+examples:
+  - name: 200 Response
+    description: Successful Response
+    request:
+      url: "{{baseUrl}}/api/v1/swaps/:swap_id/complete"
+      method: POST
+      params:
+        - name: swap_id
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "new_battery_id": 0,
+            "new_battery_soc": 0,
+            "old_battery_soc": 0
+          }
+    response:
+      status: 200
+      statusText: OK
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "id": 0,
+            "status": "",
+            "station_id": 0,
+            "station_name": "",
+            "amount": 0,
+            "created_at": ""
+          }
+  - name: 422 Response
+    description: Validation Error
+    request:
+      url: "{{baseUrl}}/api/v1/swaps/:swap_id/complete"
+      method: POST
+      params:
+        - name: swap_id
+          value: ""
+          type: path
+      body:
+        type: json
+        data: |-
+          {
+            "new_battery_id": 0,
+            "new_battery_soc": 0,
+            "old_battery_soc": 0
+          }
+    response:
+      status: 422
+      statusText: Unprocessable Entity
+      headers:
+        - name: Content-Type
+          value: application/json
+      body:
+        type: json
+        data: |-
+          {
+            "detail": [
+              {
+                "loc": [],
+                "msg": "",
+                "type": ""
+              }
+            ]
+          }
+
+docs: "Finalize swap: hardware confirmed dispense. Deduct money."
