@@ -130,18 +130,49 @@ class AuditService:
     async def get_logs(self, user_id: int = None, page: int = 1, limit: int = 20):
         """Fetch paginated logs."""
         with Session(engine) as db:
-            query = select(AuditLog)
-            if user_id:
-                query = query.where(AuditLog.user_id == user_id)
-            
-            total = len(db.exec(query).all())
-            query = query.order_by(AuditLog.timestamp.desc()).offset((page - 1) * limit).limit(limit)
-            logs = db.exec(query).all()
-            
-            return {
-                "logs": [log.to_dict() if hasattr(log, "to_dict") else log for log in logs],
-                "total_count": total
-            }
+            return await self.get_logs_advanced(db=db, user_id=user_id, page=page, limit=limit)
+
+    async def get_logs_advanced(
+        self,
+        db: Session,
+        user_id: int = None,
+        action: str = None,
+        resource_type: str = None,
+        target_id: int = None,
+        module: str = None,
+        status: str = None,
+        trace_id: str = None,
+        date_from: datetime = None,
+        date_to: datetime = None,
+        page: int = 1,
+        limit: int = 50,
+    ):
+        """Standardized enterprise-grade paginated log retrieval."""
+        query = self._build_query(
+            db=db,
+            user_id=user_id,
+            action=action,
+            resource_type=resource_type,
+            target_id=target_id,
+            module=module,
+            status=status,
+            trace_id=trace_id,
+            date_from=date_from,
+            date_to=date_to
+        )
+        
+        # Count total
+        count_query = select(func.count()).select_from(query.alias())
+        total_count = db.exec(count_query).one()
+        
+        # Paginated fetch
+        offset = (page - 1) * limit
+        logs = db.exec(query.offset(offset).limit(limit)).all()
+        
+        return {
+            "logs": logs,
+            "total_count": total_count
+        }
 
     @staticmethod
     def _build_query(
@@ -152,6 +183,9 @@ class AuditService:
         target_id: int = None,
         date_from: datetime = None,
         date_to: datetime = None,
+        module: str = None,
+        status: str = None,
+        trace_id: str = None,
     ):
         """Build a filtered query for audit logs (shared by list/export)."""
         query = select(AuditLog)
@@ -167,6 +201,13 @@ class AuditService:
             query = query.where(AuditLog.timestamp >= date_from)
         if date_to is not None:
             query = query.where(AuditLog.timestamp <= date_to)
+        if module is not None:
+            query = query.where(AuditLog.module == module)
+        if status is not None:
+            query = query.where(AuditLog.status == status)
+        if trace_id is not None:
+            query = query.where(AuditLog.trace_id == trace_id)
+            
         return query.order_by(AuditLog.timestamp.desc())
 
     @staticmethod
@@ -181,7 +222,8 @@ class AuditService:
         writer = csv.writer(output)
         writer.writerow([
             "id", "user_id", "action", "resource_type", "target_id",
-            "old_value", "new_value", "ip_address", "user_agent", "timestamp",
+            "old_value", "new_value", "ip_address", "user_agent", 
+            "module", "status", "trace_id", "timestamp",
         ])
         for log in logs:
             writer.writerow([
@@ -189,6 +231,7 @@ class AuditService:
                 json.dumps(log.old_value) if log.old_value else "",
                 json.dumps(log.new_value) if log.new_value else "",
                 log.ip_address, log.user_agent,
+                log.module, log.status, log.trace_id,
                 log.timestamp.isoformat() if log.timestamp else "",
             ])
         return output.getvalue()
@@ -211,6 +254,9 @@ class AuditService:
                 "new_value": log.new_value,
                 "ip_address": log.ip_address,
                 "user_agent": log.user_agent,
+                "module": log.module,
+                "status": log.status,
+                "trace_id": log.trace_id,
                 "timestamp": log.timestamp.isoformat() if log.timestamp else None,
             }
             for log in logs
