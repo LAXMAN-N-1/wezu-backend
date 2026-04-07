@@ -30,10 +30,16 @@ def fully_dynamic_seed():
                 email="dealer@wezu.com",
                 phone_number="8888888888",
                 full_name="Laxman Kumar",
-                hashed_password=get_password_hash("Password123"),
+                hashed_password=get_password_hash("laxman123"),
                 user_type=UserType.DEALER,
                 status=UserStatus.ACTIVE,
             )
+            db.add(dealer_user)
+            db.commit()
+            db.refresh(dealer_user)
+        else:
+            # Ensure password is updated to new requirement
+            dealer_user.hashed_password = get_password_hash("laxman123")
             db.add(dealer_user)
             db.commit()
             db.refresh(dealer_user)

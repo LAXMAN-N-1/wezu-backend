@@ -1,14 +1,16 @@
 """
 ═══════════════════════════════════════════════════════════════
-WEZU Dealer Portal — Dynamic Station Data Seeder
+WEZU Dealer Portal — Dynamic Station Data Seeder (v2)
 ═══════════════════════════════════════════════════════════════
-Seeds ALL data required for the stations module to be fully dynamic:
-  - 1000 customer users with wallets
-  - 2 stations (100 + 120 batteries = 220 total)
-  - 180 active rentals (80 from Station 1, 100 from Station 2)
-  - 60 completed swap sessions
-  - 120 customer reviews
-  - Maintenance records for both stations
+Seeds ALL data required for the dealer stations module:
+
+  Laxman's 2 Stations:
+    - Kakinada Station: 120 batteries, 89 rented, 50 swaps, ~40 reviews
+    - Gollapudi Station: 100 batteries, 79 rented, 35 swaps, ~30 reviews
+
+  Named customers appear FIRST in rental lists:
+    Kakinada:  Laxman, Ammulu, Hima, Bindu, Sai, Nanda, Fayaz, Mohith, Ramya, Pratima
+    Gollapudi: Laxman, Ammulu, Hima, Bindu
 
 Run:  cd backend && python scripts/seed_stations_dynamic.py
 """
@@ -20,12 +22,14 @@ import uuid
 from datetime import datetime, UTC, timedelta
 
 _SEED_PASSWORD = os.environ.get("SEED_ADMIN_PASSWORD", "ChangeMe!Seed2026")
+SEED_TAG = "seed_stations_v2"  # Used in battery.notes for idempotent cleanup
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
 from sqlmodel import Session, select, func
+from sqlalchemy import text
 from app.db.session import engine
 from app.models.user import User, UserStatus, UserType
 from app.models.dealer import DealerProfile
@@ -36,19 +40,39 @@ from app.models.swap import SwapSession
 from app.models.review import Review
 from app.models.maintenance import MaintenanceRecord
 from app.models.financial import Wallet
-from app.models.admin_user import AdminUser
-from app.models.rbac import Role, AdminUserRole
-from app.models.role_right import RoleRight
 from app.core.security import get_password_hash
 
-import app.models.all  # Force load all models to resolve SQLAlchemy mapper dependencies
+import app.models.all  # Force load all models
 
 NOW = datetime.now(UTC)
 
-# ── Indian Names Pool ──────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════
+# NAMED CUSTOMERS — these will appear at the TOP of rental lists
+# ══════════════════════════════════════════════════════════════
+KAKINADA_NAMED_CUSTOMERS = [
+    {"full_name": "Laxman Kumar",    "phone": "9000100001", "email": "laxman.k@wezutest.com"},
+    {"full_name": "Ammulu Devi",     "phone": "9000100002", "email": "ammulu.d@wezutest.com"},
+    {"full_name": "Hima Bindu",      "phone": "9000100003", "email": "hima.b@wezutest.com"},
+    {"full_name": "Bindu Madhavi",   "phone": "9000100004", "email": "bindu.m@wezutest.com"},
+    {"full_name": "Sai Krishna",     "phone": "9000100005", "email": "sai.k@wezutest.com"},
+    {"full_name": "Nanda Kishore",   "phone": "9000100006", "email": "nanda.k@wezutest.com"},
+    {"full_name": "Fayaz Khan",      "phone": "9000100007", "email": "fayaz.k@wezutest.com"},
+    {"full_name": "Mohith Reddy",    "phone": "9000100008", "email": "mohith.r@wezutest.com"},
+    {"full_name": "Ramya Sri",       "phone": "9000100009", "email": "ramya.s@wezutest.com"},
+    {"full_name": "Pratima Devi",    "phone": "9000100010", "email": "pratima.d@wezutest.com"},
+]
+
+GOLLAPUDI_NAMED_CUSTOMERS = [
+    {"full_name": "Laxman Rao",     "phone": "9000200001", "email": "laxman.r@wezutest.com"},
+    {"full_name": "Ammulu Priya",   "phone": "9000200002", "email": "ammulu.p@wezutest.com"},
+    {"full_name": "Hima Vathi",     "phone": "9000200003", "email": "hima.v@wezutest.com"},
+    {"full_name": "Bindu Priya",    "phone": "9000200004", "email": "bindu.p@wezutest.com"},
+]
+
+# ── Indian Names Pool (for generic customers) ──────────────────
 FIRST_NAMES_MALE = [
     "Aarav", "Vivaan", "Aditya", "Vihaan", "Arjun", "Reyansh", "Mohammed",
-    "Sai", "Arnav", "Dhruv", "Kabir", "Ritvik", "Aayu", "Shaurya",
+    "Sai", "Arnav", "Dhruv", "Kabir", "Ritvik", "Shaurya",
     "Ayaan", "Krishna", "Ishaan", "Atharv", "Rohan", "Karan",
     "Vikram", "Rajesh", "Suresh", "Ramesh", "Mahesh", "Ganesh",
     "Pranav", "Nikhil", "Akash", "Ankit", "Rahul", "Amit", "Deepak",
@@ -118,28 +142,17 @@ DEALER_REPLIES = [
 ]
 
 
-def _safe_commit(session):
-    try:
-        session.commit()
-    except Exception as e:
-        session.rollback()
-        print(f"  ⚠ Commit error: {e}")
-
-
 def _generate_name(i):
-    """Generate a unique full name."""
     if i % 2 == 0:
         first = FIRST_NAMES_MALE[i % len(FIRST_NAMES_MALE)]
     else:
         first = FIRST_NAMES_FEMALE[i % len(FIRST_NAMES_FEMALE)]
     last = LAST_NAMES[i % len(LAST_NAMES)]
-    # Add suffix for uniqueness when we have more than ~2500 combos
     suffix = f" {chr(65 + (i // 2500))}" if i >= 2500 else ""
     return f"{first} {last}{suffix}"
 
 
 def _generate_phone(i):
-    """Generate unique Indian phone number."""
     prefix = random.choice(["70", "72", "73", "74", "75", "76", "77", "78", "79",
                              "80", "81", "82", "83", "84", "85", "86", "87", "88",
                              "89", "90", "91", "92", "93", "94", "95", "96", "97",
@@ -147,16 +160,75 @@ def _generate_phone(i):
     return f"{prefix}{10000000 + i:08d}"
 
 
+def cleanup_previous_data():
+    print("\n[0/10] Cleaning up stale data from previous seeds...")
+    with engine.begin() as conn:
+        # 0a: Cleanup batteries tagged from previous seed runs
+        for tag in [SEED_TAG, "seed_laxman_script", "seed_stations_dynamic"]:
+            bat_ids_rows = conn.execute(text(
+                "SELECT id FROM batteries WHERE notes = :tag"
+            ), {"tag": tag}).fetchall()
+            bat_ids = [r[0] for r in bat_ids_rows]
+
+            if not bat_ids:
+                continue
+
+            bat_count = len(bat_ids)
+            bat_ids_str = ",".join(str(i) for i in bat_ids)
+
+            # Delete swap sessions referencing these batteries
+            conn.execute(text(f"DELETE FROM swap_sessions WHERE old_battery_id IN ({bat_ids_str}) OR new_battery_id IN ({bat_ids_str})"))
+            # Get rental IDs for review cleanup
+            rental_ids_rows = conn.execute(text(f"SELECT id FROM rentals WHERE battery_id IN ({bat_ids_str})")).fetchall()
+            rental_ids = [r[0] for r in rental_ids_rows]
+            if rental_ids:
+                rental_ids_str = ",".join(str(i) for i in rental_ids)
+                conn.execute(text(f"DELETE FROM reviews WHERE rental_id IN ({rental_ids_str})"))
+                conn.execute(text(f"DELETE FROM rentals WHERE id IN ({rental_ids_str})"))
+            # Clear slot references
+            conn.execute(text(f"UPDATE station_slots SET battery_id = NULL, status = 'empty' WHERE battery_id IN ({bat_ids_str})"))
+            # Delete batteries
+            conn.execute(text(f"DELETE FROM batteries WHERE id IN ({bat_ids_str})"))
+            print(f"  ✓ Cleaned {bat_count} batteries tagged '{tag}'")
+
+        # 0b: Cleanup data from old/renamed stations
+        old_station_names_list = ["kakinda station", "golapudi sttaion", "Madhapur SwapHub", "Gachibowli EnergyPoint"]
+        names_sql = ",".join(f"'{n}'" for n in old_station_names_list)
+        old_station_ids_rows = conn.execute(text(
+            f"SELECT id FROM stations WHERE name IN ({names_sql})"
+        )).fetchall()
+        old_station_ids = [r[0] for r in old_station_ids_rows]
+
+        if old_station_ids:
+            ids_str = ",".join(str(i) for i in old_station_ids)
+            # Delete reviews, swaps, rentals
+            conn.execute(text(f"DELETE FROM reviews WHERE station_id IN ({ids_str})"))
+            conn.execute(text(f"DELETE FROM swap_sessions WHERE station_id IN ({ids_str})"))
+            conn.execute(text(f"DELETE FROM rentals WHERE start_station_id IN ({ids_str})"))
+            # Get battery IDs, clear slots, delete batteries
+            ob_rows = conn.execute(text(f"SELECT id FROM batteries WHERE station_id IN ({ids_str})")).fetchall()
+            ob_ids = [r[0] for r in ob_rows]
+            if ob_ids:
+                ob_str = ",".join(str(i) for i in ob_ids)
+                conn.execute(text(f"UPDATE station_slots SET battery_id = NULL, status = 'empty' WHERE battery_id IN ({ob_str})"))
+                conn.execute(text(f"DELETE FROM batteries WHERE id IN ({ob_str})"))
+            # Delete maintenance records
+            conn.execute(text(f"DELETE FROM maintenance_records WHERE entity_type = 'station' AND entity_id IN ({ids_str})"))
+        print(f"  ✓ Cleaned data from {len(old_station_ids)} old stations")
+
 def seed_dynamic():
+    print("=" * 70)
+    print("  WEZU Dealer Portal — Dynamic Station Data Seeder v2")
+    print("=" * 70)
+    
+    cleanup_previous_data()
+
     with Session(engine) as db:
-        print("=" * 70)
-        print("  WEZU Dealer Portal — Dynamic Station Data Seeder")
-        print("=" * 70)
 
         # ════════════════════════════════════════════════════════
         # STEP 1: Ensure dealer user + profile
         # ════════════════════════════════════════════════════════
-        print("\n[1/9] Ensuring dealer user...")
+        print("\n[1/10] Ensuring dealer user...")
         dealer_user = db.exec(select(User).where(User.email == "dealer@wezu.com")).first()
         if not dealer_user:
             dealer_user = User(
@@ -178,15 +250,15 @@ def seed_dynamic():
         if not dealer:
             dealer = DealerProfile(
                 user_id=dealer_user.id,
-                business_name="GreenCharge Hyderabad",
+                business_name="Laxman Energy Solutions",
                 contact_person="Laxman Kumar",
                 contact_email="dealer@wezu.com",
                 contact_phone="8888888888",
-                address_line1="Plot 42, Madhapur Tech Zone",
-                city="Hyderabad",
-                state="Telangana",
-                pincode="500081",
-                gst_number="36AABCU9603R1ZM",
+                address_line1="Plot 42, Main Road",
+                city="Kakinada",
+                state="Andhra Pradesh",
+                pincode="533001",
+                gst_number="37AABCU9603R1ZM",
                 pan_number="AABCU9603R",
                 is_active=True,
             )
@@ -198,107 +270,71 @@ def seed_dynamic():
             print(f"  ✓ Dealer profile exists id={dealer.id}")
 
         # ════════════════════════════════════════════════════════
-        # STEP 2: Seed 1000 customer users
+        # STEP 2: Unlink phantom stations & fix names
         # ════════════════════════════════════════════════════════
-        print("\n[2/9] Seeding 1000 customers...")
-        existing_customers = db.exec(
-            select(User).where(User.user_type == UserType.CUSTOMER)
-        ).all()
-        existing_map = {u.email: u for u in existing_customers}
+        print("\n[2/10] Cleaning phantom stations...")
 
-        customers = list(existing_customers)
-        hashed_pw = get_password_hash(_SEED_PASSWORD)
-        created_count = 0
-
-        for i in range(1000):
-            email = f"cust_{i:04d}@wezutest.com"
-            if email in existing_map:
-                continue
-
-            full_name = _generate_name(i)
-            phone = _generate_phone(i)
-
-            user = User(
-                email=email,
-                phone_number=phone,
-                full_name=full_name,
-                hashed_password=hashed_pw,
-                user_type=UserType.CUSTOMER,
-                status=UserStatus.ACTIVE,
-            )
-            db.add(user)
-            created_count += 1
-
-            # Batch commit every 100
-            if created_count % 100 == 0:
-                db.commit()
-                print(f"    ... created {created_count} customers")
-
-        if created_count % 100 != 0:
+        # Unlink any stations from this dealer that are not our target
+        target_names_old = ["kakinda station", "golapudi sttaion", "Kakinada Station", "Gollapudi Station"]
+        stray_stations = db.exec(select(Station).where(
+            Station.dealer_id == dealer.id,
+            Station.name.notin_(target_names_old),
+        )).all()
+        for ss in stray_stations:
+            print(f"  → Unlinking stray station: '{ss.name}' (id={ss.id})")
+            ss.dealer_id = None
+            db.add(ss)
+        if stray_stations:
             db.commit()
 
-        # Refresh customer list
-        customers = db.exec(
-            select(User).where(User.user_type == UserType.CUSTOMER)
-        ).all()
-        print(f"  ✓ {len(customers)} total customers ({created_count} new)")
-
-        # Seed wallets for new customers
-        print("  → Seeding wallets...")
-        existing_wallet_user_ids = set(
-            db.exec(select(Wallet.user_id)).all()
-        )
-        wallet_count = 0
-        for c in customers:
-            if c.id not in existing_wallet_user_ids:
-                db.add(Wallet(user_id=c.id, balance=round(random.uniform(200, 5000), 2)))
-                wallet_count += 1
-                if wallet_count % 200 == 0:
-                    db.commit()
+        # Fix station name typos
+        for old_name, new_name in [("kakinda station", "Kakinada Station"), ("golapudi sttaion", "Gollapudi Station")]:
+            st = db.exec(select(Station).where(Station.name == old_name)).first()
+            if st:
+                st.name = new_name
+                db.add(st)
+                print(f"  ✓ Renamed '{old_name}' → '{new_name}'")
         db.commit()
-        print(f"  ✓ {wallet_count} new wallets created")
 
         # ════════════════════════════════════════════════════════
-        # STEP 3: Seed / Update 2 Stations
+        # STEP 3: Create/update the 2 target stations
         # ════════════════════════════════════════════════════════
-        print("\n[3/9] Setting up 2 stations...")
+        print("\n[3/10] Setting up 2 stations...")
 
         station_configs = [
             {
-                "name": "Madhapur SwapHub",
-                "address": "Plot 42, Madhapur IT Park",
-                "city": "Hyderabad",
-                "latitude": 17.4484,
-                "longitude": 78.3908,
-                "total_slots": 12,
+                "name": "Kakinada Station",
+                "address": "Main Road, Near RTC Complex",
+                "city": "Kakinada",
+                "latitude": 16.9891,
+                "longitude": 82.2475,
+                "total_slots": 120,
+                "battery_count": 120,
+                "rented_count": 89,
+                "swap_count": 50,
+                "review_count": 40,
                 "is_24x7": True,
-                "battery_count": 100,
-                "rented_count": 80,
-                "operating_hours": '{"monday":"06:00-22:00","tuesday":"06:00-22:00","wednesday":"06:00-22:00","thursday":"06:00-22:00","friday":"06:00-22:00","saturday":"08:00-20:00","sunday":"09:00-18:00"}',
+                "operating_hours": '{"monday":"00:00-23:59","tuesday":"00:00-23:59","wednesday":"00:00-23:59","thursday":"00:00-23:59","friday":"00:00-23:59","saturday":"00:00-23:59","sunday":"00:00-23:59"}',
             },
             {
-                "name": "Gachibowli EnergyPoint",
-                "address": "DLF Cyber City, Gachibowli",
-                "city": "Hyderabad",
-                "latitude": 17.4401,
-                "longitude": 78.3489,
-                "total_slots": 15,
+                "name": "Gollapudi Station",
+                "address": "NH-16, Near Benz Circle",
+                "city": "Vijayawada",
+                "latitude": 16.5366,
+                "longitude": 80.5960,
+                "total_slots": 100,
+                "battery_count": 100,
+                "rented_count": 79,
+                "swap_count": 35,
+                "review_count": 30,
                 "is_24x7": True,
-                "battery_count": 120,
-                "rented_count": 100,
                 "operating_hours": '{"monday":"00:00-23:59","tuesday":"00:00-23:59","wednesday":"00:00-23:59","thursday":"00:00-23:59","friday":"00:00-23:59","saturday":"00:00-23:59","sunday":"00:00-23:59"}',
             },
         ]
 
         stations = []
         for cfg in station_configs:
-            st = db.exec(
-                select(Station).where(
-                    Station.name == cfg["name"],
-                    Station.dealer_id == dealer.id,
-                )
-            ).first()
-
+            st = db.exec(select(Station).where(Station.name == cfg["name"])).first()
             if not st:
                 st = Station(
                     name=cfg["name"],
@@ -310,12 +346,12 @@ def seed_dynamic():
                     total_slots=cfg["total_slots"],
                     status="OPERATIONAL",
                     is_24x7=cfg["is_24x7"],
-                    rating=0.0,  # Will be computed from reviews later
+                    rating=0.0,
                     dealer_id=dealer.id,
-                    available_batteries=0,  # Will be computed dynamically
+                    available_batteries=0,
                     available_slots=0,
                     last_maintenance_date=NOW - timedelta(days=random.randint(5, 30)),
-                    contact_phone="040-12345678",
+                    contact_phone="0884-2345678" if "Kakinada" in cfg["name"] else "0866-2345678",
                     operating_hours=cfg["operating_hours"],
                     last_heartbeat=NOW - timedelta(minutes=random.randint(1, 10)),
                 )
@@ -323,87 +359,163 @@ def seed_dynamic():
                 db.commit()
                 db.refresh(st)
                 print(f"  ✓ Created station: {st.name} (id={st.id})")
-
-                # Create slots
-                for slot_i in range(st.total_slots):
-                    slot_status = random.choice(["empty", "charging", "ready", "ready", "empty"])
-                    db.add(StationSlot(
-                        station_id=st.id,
-                        slot_number=slot_i + 1,
-                        status=slot_status,
-                        is_locked=slot_status == "empty",
-                        current_power_w=random.uniform(50, 500) if slot_status == "charging" else 0,
-                    ))
-                db.commit()
             else:
-                # Update operating hours if station exists
+                # Update ownership and config
+                st.dealer_id = dealer.id
                 st.operating_hours = cfg["operating_hours"]
                 st.status = "OPERATIONAL"
+                st.is_24x7 = cfg["is_24x7"]
+                st.total_slots = cfg["total_slots"]
+                st.address = cfg["address"]
+                st.city = cfg["city"]
+                st.last_heartbeat = NOW - timedelta(minutes=random.randint(1, 10))
                 db.add(st)
                 db.commit()
                 db.refresh(st)
-                print(f"  ✓ Station exists: {st.name} (id={st.id})")
+                print(f"  ✓ Station exists: {st.name} (id={st.id}), updated config")
+
+            # Ensure slots exist
+            existing_slots = db.exec(select(func.count(StationSlot.id)).where(
+                StationSlot.station_id == st.id
+            )).one() or 0
+            if existing_slots < cfg["total_slots"]:
+                for si in range(existing_slots, cfg["total_slots"]):
+                    db.add(StationSlot(
+                        station_id=st.id,
+                        slot_number=si + 1,
+                        status="empty",
+                        is_locked=True,
+                    ))
+                db.commit()
+                print(f"    → Created {cfg['total_slots'] - existing_slots} slots")
 
             stations.append((st, cfg))
 
         # ════════════════════════════════════════════════════════
-        # STEP 4: Seed 220 Batteries across 2 stations
+        # STEP 4: Seed NAMED customers FIRST, then generic
         # ════════════════════════════════════════════════════════
-        print("\n[4/9] Seeding 220 batteries...")
+        print("\n[4/10] Seeding named + generic customers...")
+        hashed_pw = get_password_hash(_SEED_PASSWORD)
 
-        all_seeded_batteries = []
-        for st, cfg in stations:
-            existing_count = db.exec(
-                select(func.count(Battery.id)).where(Battery.station_id == st.id)
-            ).one() or 0
+        def ensure_customer(name, phone, email):
+            """Create or find a customer user, return User object."""
+            user = db.exec(select(User).where(User.email == email)).first()
+            if not user:
+                user = User(
+                    email=email,
+                    phone_number=phone,
+                    full_name=name,
+                    hashed_password=hashed_pw,
+                    user_type=UserType.CUSTOMER,
+                    status=UserStatus.ACTIVE,
+                )
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+                # Create wallet
+                existing_wallet = db.exec(select(Wallet).where(Wallet.user_id == user.id)).first()
+                if not existing_wallet:
+                    db.add(Wallet(user_id=user.id, balance=round(random.uniform(500, 5000), 2)))
+                    db.commit()
+            return user
 
-            batteries_needed = cfg["battery_count"] - existing_count
-            rented_count = cfg["rented_count"]
-            available_count = cfg["battery_count"] - rented_count
+        # Named customers for Kakinada
+        kakinada_named_users = []
+        for c in KAKINADA_NAMED_CUSTOMERS:
+            user = ensure_customer(c["full_name"], c["phone"], c["email"])
+            kakinada_named_users.append(user)
+            print(f"    ✓ Named: {user.full_name} (id={user.id})")
 
-            if batteries_needed <= 0:
-                print(f"  ✓ {st.name}: {existing_count} batteries already exist (need {cfg['battery_count']})")
-                existing_batteries = db.exec(
-                    select(Battery).where(Battery.station_id == st.id)
-                ).all()
-                all_seeded_batteries.extend([(b, st) for b in existing_batteries])
+        # Named customers for Gollapudi
+        gollapudi_named_users = []
+        for c in GOLLAPUDI_NAMED_CUSTOMERS:
+            user = ensure_customer(c["full_name"], c["phone"], c["email"])
+            gollapudi_named_users.append(user)
+            print(f"    ✓ Named: {user.full_name} (id={user.id})")
+
+        # Generic customers (fill rest of ~1000)
+        existing_cust_count = db.exec(
+            select(func.count(User.id)).where(User.user_type == UserType.CUSTOMER)
+        ).one() or 0
+
+        generic_needed = max(0, 1000 - existing_cust_count)
+        created_generic = 0
+        for i in range(generic_needed):
+            email = f"cust_{existing_cust_count + i:04d}@wezutest.com"
+            existing = db.exec(select(User).where(User.email == email)).first()
+            if existing:
                 continue
+            user = User(
+                email=email,
+                phone_number=_generate_phone(existing_cust_count + i),
+                full_name=_generate_name(existing_cust_count + i),
+                hashed_password=hashed_pw,
+                user_type=UserType.CUSTOMER,
+                status=UserStatus.ACTIVE,
+            )
+            db.add(user)
+            created_generic += 1
+            if created_generic % 100 == 0:
+                db.commit()
+                print(f"    ... created {created_generic} generic customers")
+        db.commit()
 
-            print(f"  → Creating {batteries_needed} batteries for {st.name}...")
-            for i in range(batteries_needed):
-                battery_index = existing_count + i
-                serial = f"WZ-{st.id:02d}-{battery_index:04d}"
+        # Seed wallets for all customers without one
+        all_customers = db.exec(select(User).where(User.user_type == UserType.CUSTOMER)).all()
+        existing_wallet_ids = set(db.exec(select(Wallet.user_id)).all())
+        wallet_count = 0
+        for c in all_customers:
+            if c.id not in existing_wallet_ids:
+                db.add(Wallet(user_id=c.id, balance=round(random.uniform(200, 5000), 2)))
+                wallet_count += 1
+                if wallet_count % 200 == 0:
+                    db.commit()
+        db.commit()
 
-                # Determine status
-                if battery_index < rented_count:
+        # RELOAD customers to prevent lazy-load storm on expired objects
+        all_customers = db.exec(select(User).where(User.user_type == UserType.CUSTOMER)).all()
+
+        print(f"  ✓ {len(all_customers)} total customers ({created_generic} new, {wallet_count} new wallets)")
+
+        # Build a pool of generic customers (exclude named ones)
+        named_ids = set(u.id for u in kakinada_named_users + gollapudi_named_users)
+        generic_customers = [c for c in all_customers if c.id not in named_ids]
+        random.shuffle(generic_customers)
+
+        # ════════════════════════════════════════════════════════
+        # STEP 5: Seed batteries (120 + 100 = 220)
+        # ════════════════════════════════════════════════════════
+        print("\n[5/10] Seeding 220 batteries...")
+
+        all_station_batteries = {}  # station_id -> list of Battery objects
+
+        for st, cfg in stations:
+            bat_count = cfg["battery_count"]
+            rented_count = cfg["rented_count"]
+            available_count = bat_count - rented_count
+
+            station_bats = []
+            for i in range(bat_count):
+                serial = f"WZ-{st.id:02d}-{i:04d}-{uuid.uuid4().hex[:6]}"
+
+                # FIRST rented_count batteries are RENTED, rest are AVAILABLE
+                if i < rented_count:
                     status = BatteryStatus.RENTED
-                elif battery_index < rented_count + int(available_count * 0.6):
-                    status = BatteryStatus.AVAILABLE
-                elif battery_index < rented_count + int(available_count * 0.85):
-                    status = BatteryStatus.CHARGING
-                elif battery_index < rented_count + int(available_count * 0.95):
-                    status = BatteryStatus.MAINTENANCE
+                    charge = round(random.uniform(30, 85), 1)
+                    health = round(random.uniform(80, 100), 1)
                 else:
-                    status = BatteryStatus.RETIRED
-
-                charge = round(random.uniform(15, 100), 1) if status != BatteryStatus.RENTED else round(random.uniform(30, 85), 1)
-                if status == BatteryStatus.AVAILABLE:
+                    status = BatteryStatus.AVAILABLE
                     charge = round(random.uniform(85, 100), 1)
-                if status == BatteryStatus.CHARGING:
-                    charge = round(random.uniform(20, 70), 1)
+                    health = round(random.uniform(85, 100), 1)
 
-                health = round(random.uniform(75, 100), 1)
-                if status == BatteryStatus.MAINTENANCE:
-                    health = round(random.uniform(50, 75), 1)
-                if status == BatteryStatus.RETIRED:
-                    health = round(random.uniform(20, 50), 1)
+                health_enum = BatteryHealth.GOOD if health > 80 else (BatteryHealth.FAIR if health > 60 else BatteryHealth.POOR)
 
-                battery = Battery(
+                bat = Battery(
                     serial_number=serial,
                     qr_code_data=f"QR-{serial}",
                     station_id=st.id,
                     status=status,
-                    health_status=BatteryHealth.GOOD if health > 80 else (BatteryHealth.FAIR if health > 60 else BatteryHealth.POOR),
+                    health_status=health_enum,
                     current_charge=charge,
                     health_percentage=health,
                     cycle_count=random.randint(10, 500),
@@ -411,209 +523,173 @@ def seed_dynamic():
                     manufacturer="Wezu Energy",
                     purchase_cost=round(random.uniform(8000, 15000), 2),
                     location_type=LocationType.STATION,
-                    location_id=st.id,
                     manufacture_date=NOW - timedelta(days=random.randint(90, 365)),
                     purchase_date=NOW - timedelta(days=random.randint(60, 300)),
                     last_charged_at=NOW - timedelta(hours=random.randint(1, 72)),
+                    notes=SEED_TAG,
                 )
-                db.add(battery)
+                db.add(bat)
+                station_bats.append(bat)
 
                 if (i + 1) % 50 == 0:
                     db.commit()
-                    print(f"    ... {i + 1}/{batteries_needed}")
 
             db.commit()
 
-            # Refresh battery list for this station
-            station_batteries = db.exec(
-                select(Battery).where(Battery.station_id == st.id)
-            ).all()
-            all_seeded_batteries.extend([(b, st) for b in station_batteries])
-            print(f"  ✓ {st.name}: {len(station_batteries)} batteries total")
+            # Refresh to get IDs
+            refreshed = db.exec(select(Battery).where(
+                Battery.station_id == st.id, Battery.notes == SEED_TAG
+            )).all()
+            all_station_batteries[st.id] = refreshed
+
+            # Assign batteries to slots
+            st_slots = db.exec(select(StationSlot).where(
+                StationSlot.station_id == st.id
+            ).order_by(StationSlot.slot_number)).all()
+            for idx, bat in enumerate(refreshed):
+                if idx < len(st_slots):
+                    st_slots[idx].battery_id = bat.id
+                    st_slots[idx].status = "charging" if bat.status == BatteryStatus.AVAILABLE else "occupied"
+                    db.add(st_slots[idx])
+            db.commit()
+
+            print(f"  ✓ {st.name}: {len(refreshed)} batteries ({rented_count} rented, {available_count} available)")
 
         # ════════════════════════════════════════════════════════
-        # STEP 5: Seed 180 Active Rentals
+        # STEP 6: Seed active rentals (89 + 79 = 168)
         # ════════════════════════════════════════════════════════
-        print("\n[5/9] Seeding active rentals...")
+        print("\n[6/10] Seeding 168 active rentals...")
 
-        # Check existing active rentals
-        existing_active_rentals = db.exec(
-            select(func.count(Rental.id)).where(
-                Rental.status == RentalStatus.ACTIVE,
-                Rental.start_station_id.in_([s.id for s, _ in stations]),
-            )
-        ).one() or 0
+        rental_count = 0
+        generic_idx = 0  # Pointer into generic_customers pool
 
-        if existing_active_rentals >= 150:
-            print(f"  ✓ Already have {existing_active_rentals} active rentals, skipping")
-        else:
-            # Clear old active rentals for clean state
-            old_rentals = db.exec(
-                select(Rental).where(
-                    Rental.status == RentalStatus.ACTIVE,
-                    Rental.start_station_id.in_([s.id for s, _ in stations]),
+        for st, cfg in stations:
+            rented_count = cfg["rented_count"]
+            rented_batteries = [b for b in all_station_batteries[st.id] if b.status == BatteryStatus.RENTED]
+
+            # Determine named customers for this station
+            if "Kakinada" in st.name:
+                named_users = kakinada_named_users
+            else:
+                named_users = gollapudi_named_users
+
+            for i, bat in enumerate(rented_batteries):
+                # NAMED customers come FIRST
+                if i < len(named_users):
+                    customer = named_users[i]
+                else:
+                    # Use generic customers
+                    if generic_idx < len(generic_customers):
+                        customer = generic_customers[generic_idx]
+                        generic_idx += 1
+                    else:
+                        customer = random.choice(all_customers)
+
+                start_time = NOW - timedelta(
+                    days=random.randint(0, 7),
+                    hours=random.randint(0, 23),
+                    minutes=random.randint(0, 59),
                 )
-            ).all()
-            for r in old_rentals:
-                db.delete(r)
-            db.commit()
-
-            rental_count = 0
-            used_customer_ids = set()
-            used_battery_ids = set()
-
-            for st, cfg in stations:
-                rented_batteries = db.exec(
-                    select(Battery).where(
-                        Battery.station_id == st.id,
-                        Battery.status == BatteryStatus.RENTED,
-                    )
-                ).all()
-
-                for bat in rented_batteries:
-                    if bat.id in used_battery_ids:
-                        continue
-
-                    # Pick a unique customer
-                    customer = None
-                    attempts = 0
-                    while attempts < 50:
-                        c = random.choice(customers)
-                        if c.id not in used_customer_ids:
-                            customer = c
-                            used_customer_ids.add(c.id)
-                            break
-                        attempts += 1
-
-                    if customer is None:
-                        customer = random.choice(customers)
-
-                    start_time = NOW - timedelta(
-                        days=random.randint(0, 5),
-                        hours=random.randint(0, 23),
-                        minutes=random.randint(0, 59),
-                    )
-                    duration_hours = random.choice([4, 8, 12, 24, 48])
-
-                    rental = Rental(
-                        user_id=customer.id,
-                        battery_id=bat.id,
-                        start_station_id=st.id,
-                        start_time=start_time,
-                        expected_end_time=start_time + timedelta(hours=duration_hours),
-                        status=RentalStatus.ACTIVE,
-                        total_amount=round(random.uniform(50, 500), 2),
-                        security_deposit=round(random.uniform(100, 500), 2),
-                        late_fee=0.0 if random.random() > 0.15 else round(random.uniform(20, 100), 2),
-                        start_battery_level=round(random.uniform(80, 100), 1),
-                        currency="INR",
-                    )
-                    db.add(rental)
-                    used_battery_ids.add(bat.id)
-                    rental_count += 1
-
-                    if rental_count % 50 == 0:
-                        db.commit()
-                        print(f"    ... {rental_count} rentals created")
-
-            # Also seed some completed rentals for history
-            completed_count = 0
-            for i in range(50):
-                st, cfg = random.choice(stations)
-                avail_batteries = db.exec(
-                    select(Battery).where(
-                        Battery.station_id == st.id,
-                        Battery.status == BatteryStatus.AVAILABLE,
-                    ).limit(1)
-                ).first()
-                if not avail_batteries:
-                    continue
-
-                customer = random.choice(customers)
-                start_time = NOW - timedelta(days=random.randint(1, 30), hours=random.randint(0, 23))
-                end_time = start_time + timedelta(hours=random.randint(2, 48))
+                duration_hours = random.choice([4, 8, 12, 24, 48])
 
                 rental = Rental(
                     user_id=customer.id,
-                    battery_id=avail_batteries.id,
+                    battery_id=bat.id,
                     start_station_id=st.id,
-                    end_station_id=random.choice([s.id for s, _ in stations]),
                     start_time=start_time,
-                    expected_end_time=start_time + timedelta(hours=24),
-                    end_time=end_time,
-                    status=RentalStatus.COMPLETED,
-                    total_amount=round(random.uniform(80, 400), 2),
+                    expected_end_time=start_time + timedelta(hours=duration_hours),
+                    status=RentalStatus.ACTIVE,
+                    total_amount=round(random.uniform(50, 500), 2),
                     security_deposit=round(random.uniform(100, 500), 2),
-                    late_fee=0.0 if random.random() > 0.2 else round(random.uniform(20, 80), 2),
-                    start_battery_level=round(random.uniform(85, 100), 1),
-                    end_battery_level=round(random.uniform(10, 40), 1),
-                    distance_traveled_km=round(random.uniform(5, 80), 1),
-                    is_deposit_refunded=True,
+                    late_fee=0.0 if random.random() > 0.15 else round(random.uniform(20, 100), 2),
+                    start_battery_level=round(random.uniform(80, 100), 1),
                     currency="INR",
                 )
                 db.add(rental)
-                completed_count += 1
+                rental_count += 1
 
-            db.commit()
-            print(f"  ✓ {rental_count} active + {completed_count} completed rentals seeded")
+                if rental_count % 50 == 0:
+                    db.commit()
 
-        # ════════════════════════════════════════════════════════
-        # STEP 6: Seed 60 Completed Swap Sessions
-        # ════════════════════════════════════════════════════════
-        print("\n[6/9] Seeding swap sessions...")
+        # Also seed some completed rentals for history
+        completed_count = 0
+        for i in range(50):
+            st, cfg = random.choice(stations)
+            customer = random.choice(all_customers)
+            avail_bat = random.choice([b for b in all_station_batteries[st.id] if b.status == BatteryStatus.AVAILABLE][:5]) if [b for b in all_station_batteries[st.id] if b.status == BatteryStatus.AVAILABLE] else None
+            if not avail_bat:
+                continue
 
-        existing_swaps = db.exec(
-            select(func.count(SwapSession.id)).where(
-                SwapSession.station_id.in_([s.id for s, _ in stations]),
+            start_time = NOW - timedelta(days=random.randint(1, 30), hours=random.randint(0, 23))
+            end_time = start_time + timedelta(hours=random.randint(2, 48))
+
+            rental = Rental(
+                user_id=customer.id,
+                battery_id=avail_bat.id,
+                start_station_id=st.id,
+                end_station_id=random.choice([s.id for s, _ in stations]),
+                start_time=start_time,
+                expected_end_time=start_time + timedelta(hours=24),
+                end_time=end_time,
+                status=RentalStatus.COMPLETED,
+                total_amount=round(random.uniform(80, 400), 2),
+                security_deposit=round(random.uniform(100, 500), 2),
+                late_fee=0.0 if random.random() > 0.2 else round(random.uniform(20, 80), 2),
+                start_battery_level=round(random.uniform(85, 100), 1),
+                end_battery_level=round(random.uniform(10, 40), 1),
+                distance_traveled_km=round(random.uniform(5, 80), 1),
+                is_deposit_refunded=True,
+                currency="INR",
             )
-        ).one() or 0
+            db.add(rental)
+            completed_count += 1
 
-        if existing_swaps >= 50:
-            print(f"  ✓ Already have {existing_swaps} swaps, skipping")
-        else:
-            swap_count = 0
-            # Get all rentals for linking
-            all_rentals = db.exec(
-                select(Rental).where(
-                    Rental.start_station_id.in_([s.id for s, _ in stations]),
-                )
-            ).all()
+        db.commit()
+        print(f"  ✓ {rental_count} active + {completed_count} completed rentals seeded")
 
-            for i in range(60):
-                st, _ = random.choice(stations)
+        # ════════════════════════════════════════════════════════
+        # STEP 7: Seed swap sessions (50 + 35 = 85)
+        # ════════════════════════════════════════════════════════
+        print("\n[7/10] Seeding 85 swap sessions...")
 
-                # Get batteries at this station
-                station_batteries = db.exec(
-                    select(Battery).where(Battery.station_id == st.id).limit(50)
-                ).all()
+        swap_count = 0
+        for st, cfg in stations:
+            target_swaps = cfg["swap_count"]
 
-                if len(station_batteries) < 2:
+            # Get active rentals for this station to link swaps
+            station_rentals = db.exec(select(Rental).where(
+                Rental.start_station_id == st.id,
+                Rental.status == RentalStatus.ACTIVE,
+            )).all()
+
+            station_bats = all_station_batteries[st.id]
+
+            for i in range(target_swaps):
+                # Pick a customer from active rentals
+                if i < len(station_rentals):
+                    rental = station_rentals[i]
+                    customer_id = rental.user_id
+                    rental_id = rental.id
+                else:
+                    rental = random.choice(station_rentals) if station_rentals else None
+                    customer_id = rental.user_id if rental else random.choice(all_customers).id
+                    rental_id = rental.id if rental else None
+
+                # Pick two different batteries
+                if len(station_bats) >= 2:
+                    old_bat, new_bat = random.sample(station_bats, 2)
+                else:
                     continue
 
-                old_bat = random.choice(station_batteries)
-                new_bat = random.choice([b for b in station_batteries if b.id != old_bat.id])
-                customer = random.choice(customers)
-
-                # Link to a rental if possible
-                rental_id = None
-                matching_rentals = [r for r in all_rentals if r.user_id == customer.id]
-                if matching_rentals:
-                    rental_id = matching_rentals[0].id
-
                 swap_time = NOW - timedelta(
-                    days=random.randint(0, 20),
+                    days=random.randint(0, 30),
                     hours=random.randint(0, 23),
                     minutes=random.randint(0, 59),
                 )
 
-                swap_status = random.choices(
-                    ["completed", "completed", "completed", "completed", "initiated", "processing"],
-                    weights=[40, 30, 15, 5, 5, 5],
-                )[0]
-
                 swap = SwapSession(
                     rental_id=rental_id,
-                    user_id=customer.id,
+                    user_id=customer_id,
                     station_id=st.id,
                     old_battery_id=old_bat.id,
                     new_battery_id=new_bat.id,
@@ -621,10 +697,10 @@ def seed_dynamic():
                     new_battery_soc=round(random.uniform(85, 100), 1),
                     swap_amount=round(random.uniform(30, 80), 2),
                     currency="INR",
-                    status=swap_status,
-                    payment_status="paid" if swap_status == "completed" else "pending",
+                    status="completed",
+                    payment_status="paid",
                     created_at=swap_time,
-                    completed_at=swap_time + timedelta(minutes=random.randint(2, 8)) if swap_status == "completed" else None,
+                    completed_at=swap_time + timedelta(minutes=random.randint(2, 8)),
                 )
                 db.add(swap)
                 swap_count += 1
@@ -632,44 +708,47 @@ def seed_dynamic():
                 if swap_count % 20 == 0:
                     db.commit()
 
-            db.commit()
-            print(f"  ✓ {swap_count} swap sessions seeded")
+        db.commit()
+        print(f"  ✓ {swap_count} swap sessions seeded")
 
         # ════════════════════════════════════════════════════════
-        # STEP 7: Seed 120 Reviews
+        # STEP 8: Seed reviews (40 + 30 = 70)
         # ════════════════════════════════════════════════════════
-        print("\n[7/9] Seeding reviews...")
+        print("\n[8/10] Seeding 70 reviews...")
 
-        existing_reviews = db.exec(
-            select(func.count(Review.id)).where(
-                Review.station_id.in_([s.id for s, _ in stations]),
-            )
-        ).one() or 0
+        review_count = 0
+        used_review_keys = set()
 
-        if existing_reviews >= 100:
-            print(f"  ✓ Already have {existing_reviews} reviews, skipping")
-        else:
-            review_count = 0
-            used_review_customers = set()
+        for st, cfg in stations:
+            target_reviews = cfg["review_count"]
 
-            for i in range(120):
-                st, _ = random.choice(stations)
+            # Named customers get reviews first
+            if "Kakinada" in st.name:
+                priority_users = kakinada_named_users
+            else:
+                priority_users = gollapudi_named_users
 
-                # Pick a customer we haven't used for this station
-                customer = None
-                for _ in range(50):
-                    c = random.choice(customers)
-                    key = (c.id, st.id)
-                    if key not in used_review_customers:
-                        customer = c
-                        used_review_customers.add(key)
-                        break
+            for i in range(target_reviews):
+                # Pick customer: named users first, then generic
+                if i < len(priority_users):
+                    customer = priority_users[i]
+                else:
+                    # Pick a unique customer for this station
+                    customer = None
+                    for _ in range(50):
+                        c = random.choice(all_customers)
+                        key = (c.id, st.id)
+                        if key not in used_review_keys:
+                            customer = c
+                            used_review_keys.add(key)
+                            break
+                    if customer is None:
+                        customer = random.choice(all_customers)
 
-                if customer is None:
-                    customer = random.choice(customers)
+                used_review_keys.add((customer.id, st.id))
 
-                # Weighted rating: mostly 4-5
-                rating = random.choices([5, 4, 3, 2, 1], weights=[40, 30, 15, 10, 5])[0]
+                # Weighted rating: mostly 4-5 stars
+                rating = random.choices([5, 4, 3, 2, 1], weights=[40, 35, 15, 7, 3])[0]
 
                 if rating >= 4:
                     comment = random.choice(REVIEW_COMMENTS_POSITIVE)
@@ -678,16 +757,14 @@ def seed_dynamic():
                 else:
                     comment = random.choice(REVIEW_COMMENTS_NEGATIVE)
 
-                # Link to a rental if we can find one
-                rental = db.exec(
-                    select(Rental).where(
-                        Rental.user_id == customer.id,
-                        Rental.start_station_id == st.id,
-                    ).limit(1)
-                ).first()
+                # Link to rental if possible
+                rental = db.exec(select(Rental).where(
+                    Rental.user_id == customer.id,
+                    Rental.start_station_id == st.id,
+                ).limit(1)).first()
 
                 response = None
-                if random.random() < 0.4:  # 40% have dealer replies
+                if random.random() < 0.4:
                     response = random.choice(DEALER_REPLIES)
 
                 review = Review(
@@ -706,37 +783,49 @@ def seed_dynamic():
                 db.add(review)
                 review_count += 1
 
-                if review_count % 30 == 0:
+                if review_count % 20 == 0:
                     db.commit()
 
-            db.commit()
-            print(f"  ✓ {review_count} reviews seeded")
+        db.commit()
+        print(f"  ✓ {review_count} reviews seeded")
 
         # ════════════════════════════════════════════════════════
-        # STEP 8: Update station ratings from actual reviews
+        # STEP 9: Update station ratings + battery counts
         # ════════════════════════════════════════════════════════
-        print("\n[8/9] Computing station ratings from reviews...")
+        print("\n[9/10] Computing station ratings & battery counts...")
 
-        for st, _ in stations:
+        for st, cfg in stations:
+            # Rating
             avg_rating = db.exec(
                 select(func.avg(Review.rating)).where(Review.station_id == st.id)
             ).one()
-            review_count = db.exec(
+            rev_count = db.exec(
                 select(func.count(Review.id)).where(Review.station_id == st.id)
             ).one() or 0
 
             if avg_rating:
                 st.rating = round(float(avg_rating), 1)
-                st.total_reviews = review_count
-                db.add(st)
-                print(f"  ✓ {st.name}: rating={st.rating} ({review_count} reviews)")
+                st.total_reviews = rev_count
+
+            # Battery counts
+            avail = db.exec(select(func.count(Battery.id)).where(
+                Battery.station_id == st.id, Battery.status == BatteryStatus.AVAILABLE
+            )).one() or 0
+            total_bats = db.exec(select(func.count(Battery.id)).where(
+                Battery.station_id == st.id
+            )).one() or 0
+
+            st.available_batteries = avail
+            st.available_slots = max(0, st.total_slots - total_bats)
+            db.add(st)
+            print(f"  ✓ {st.name}: rating={st.rating} ({rev_count} reviews), {avail}/{total_bats} batteries available")
 
         db.commit()
 
         # ════════════════════════════════════════════════════════
-        # STEP 9: Seed Maintenance Records
+        # STEP 10: Seed maintenance records
         # ════════════════════════════════════════════════════════
-        print("\n[9/9] Seeding maintenance records...")
+        print("\n[10/10] Seeding maintenance records...")
 
         maint_descriptions = [
             "Routine quarterly inspection and cleaning",
@@ -752,12 +841,10 @@ def seed_dynamic():
         ]
 
         for st, _ in stations:
-            existing_maint = db.exec(
-                select(func.count(MaintenanceRecord.id)).where(
-                    MaintenanceRecord.entity_type == "station",
-                    MaintenanceRecord.entity_id == st.id,
-                )
-            ).one() or 0
+            existing_maint = db.exec(select(func.count(MaintenanceRecord.id)).where(
+                MaintenanceRecord.entity_type == "station",
+                MaintenanceRecord.entity_id == st.id,
+            )).one() or 0
 
             if existing_maint >= 5:
                 print(f"  ✓ {st.name}: {existing_maint} records exist, skipping")
@@ -778,7 +865,7 @@ def seed_dynamic():
             print(f"  ✓ {st.name}: maintenance records seeded")
 
         # ════════════════════════════════════════════════════════
-        # FINAL: Print Summary
+        # FINAL: Print verification summary
         # ════════════════════════════════════════════════════════
         print("\n" + "=" * 70)
         print("  ✅ SEEDING COMPLETE — VERIFICATION")
@@ -789,41 +876,37 @@ def seed_dynamic():
         ).one()
 
         for st, cfg in stations:
-            total_batt = db.exec(
-                select(func.count(Battery.id)).where(Battery.station_id == st.id)
-            ).one()
-            avail_batt = db.exec(
-                select(func.count(Battery.id)).where(
-                    Battery.station_id == st.id,
-                    Battery.status == BatteryStatus.AVAILABLE,
-                )
-            ).one()
-            rented_batt = db.exec(
-                select(func.count(Battery.id)).where(
-                    Battery.station_id == st.id,
-                    Battery.status == BatteryStatus.RENTED,
-                )
-            ).one()
-            active_rentals = db.exec(
-                select(func.count(Rental.id)).where(
-                    Rental.start_station_id == st.id,
-                    Rental.status == RentalStatus.ACTIVE,
-                )
-            ).one()
-            swaps = db.exec(
-                select(func.count(SwapSession.id)).where(
-                    SwapSession.station_id == st.id,
-                )
-            ).one()
-            reviews = db.exec(
-                select(func.count(Review.id)).where(Review.station_id == st.id)
-            ).one()
+            total_batt = db.exec(select(func.count(Battery.id)).where(Battery.station_id == st.id)).one()
+            avail_batt = db.exec(select(func.count(Battery.id)).where(
+                Battery.station_id == st.id, Battery.status == BatteryStatus.AVAILABLE
+            )).one()
+            rented_batt = db.exec(select(func.count(Battery.id)).where(
+                Battery.station_id == st.id, Battery.status == BatteryStatus.RENTED
+            )).one()
+            active_rentals = db.exec(select(func.count(Rental.id)).where(
+                Rental.start_station_id == st.id, Rental.status == RentalStatus.ACTIVE
+            )).one()
+            swaps = db.exec(select(func.count(SwapSession.id)).where(
+                SwapSession.station_id == st.id
+            )).one()
+            reviews = db.exec(select(func.count(Review.id)).where(Review.station_id == st.id)).one()
+
+            # Print first 5 rental customers to verify named ones are first
+            first_rentals = db.exec(select(Rental).where(
+                Rental.start_station_id == st.id,
+                Rental.status == RentalStatus.ACTIVE,
+            ).order_by(Rental.id).limit(5)).all()
+            first_names = []
+            for r in first_rentals:
+                u = db.get(User, r.user_id)
+                first_names.append(u.full_name if u else "?")
 
             print(f"\n  📍 {st.name} (id={st.id})")
             print(f"     Batteries: {total_batt} total | {avail_batt} available | {rented_batt} rented")
-            print(f"     Active Rentals: {active_rentals}")
-            print(f"     Swaps: {swaps}")
-            print(f"     Reviews: {reviews} | Rating: {st.rating}")
+            print(f"     Active Rentals: {active_rentals} (target: {cfg['rented_count']})")
+            print(f"     Swaps: {swaps} (target: {cfg['swap_count']})")
+            print(f"     Reviews: {reviews} (target: {cfg['review_count']}) | Rating: {st.rating}")
+            print(f"     First 5 renters: {', '.join(first_names)}")
 
         print(f"\n  👥 Total Customers: {total_customers}")
         print("=" * 70)
