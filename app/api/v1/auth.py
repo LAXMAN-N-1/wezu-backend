@@ -1233,6 +1233,9 @@ def admin_login(
         raise HTTPException(status_code=400, detail="Incorrect email or password")
     if new_hash:
         user.hashed_password = new_hash  # persisted with the last_login commit below
+        logger.info(f"Admin login - rehashed password for user ID: {user.id} (scheme migrated to bcrypt)")
+    else:
+        logger.info(f"Admin login - password hash is current for user ID: {user.id}")
 
     if user.status != UserStatus.ACTIVE:
         raise HTTPException(status_code=400, detail="Inactive user")
@@ -1267,6 +1270,7 @@ def admin_login(
     # Persist last login alongside the new session in the same commit.
     user.last_login = datetime.now(UTC)
     db.add(user)
+    db.flush()  # ensure hashed_password + last_login hit the DB before session commit
 
     AuthService.create_user_session(
         db, 
