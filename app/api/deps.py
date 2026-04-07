@@ -120,9 +120,9 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     validated = _get_validated_token(token)
-    payload = None
 
     if validated is None:
+        # ── Cache MISS: full validation (JWT decode + blacklist + session) ──
         try:
             payload = jwt.decode(
                 token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
@@ -167,12 +167,8 @@ def get_current_user(
             issued_at=payload.get("iat"),
         )
         _store_validated_token(token, validated)
-    else:
-        token_data = TokenPayload(sub=str(validated.user_id))
-    
-    # Check if we are using SQLModel (which uses .get) or pure SQLAlchemy
-    # User model inherits from SQLModel, so we can use db.get(User, id) or query.
-    # To be safe and consistent with typical patterns:
+    # ── Cache HIT: blacklist + session checks already passed within TTL ──
+
     user = db.exec(
         select(User)
         .where(User.id == validated.user_id)
