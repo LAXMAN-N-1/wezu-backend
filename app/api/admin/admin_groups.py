@@ -46,6 +46,7 @@ def _supports_admin_group_membership(db: Session) -> bool:
         logger.warning("admin.groups.membership_schema_missing")
     return _admin_group_membership_supported
 
+@router.get("", include_in_schema=False)
 @router.get("/", response_model=List[AdminGroupWithCount])
 def read_admin_groups(
     db: Session = Depends(deps.get_db),

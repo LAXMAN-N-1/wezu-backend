@@ -33,6 +33,7 @@ router = APIRouter()
 # FAQ Endpoints
 # ============================================================================
 
+@router.get("/faqs", include_in_schema=False)
 @router.get("/faqs/", response_model=List[FAQResponse])
 def list_faqs(
     db: Session = Depends(get_db),
@@ -93,6 +94,7 @@ def delete_faq(
 # Blog Endpoints
 # ============================================================================
 
+@router.get("/blogs", include_in_schema=False)
 @router.get("/blogs/", response_model=List[BlogPublic])
 def list_blogs(
     *, db: Session = Depends(get_db),
@@ -161,6 +163,7 @@ def delete_blog(
 # Banner Endpoints
 # ============================================================================
 
+@router.get("/banners", include_in_schema=False)
 @router.get("/banners/", response_model=List[BannerRead])
 def list_banners(
     db: Session = Depends(get_db),

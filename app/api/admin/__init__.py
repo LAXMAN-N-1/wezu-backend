@@ -1,13 +1,19 @@
 from fastapi import APIRouter
 
 from . import main, fraud, jobs, monitoring, users, rentals, finance, iot, batteries, stock, health, stations, kyc_admin, rbac_admin, cms, admin_groups, audit_trails, logistics, support, bess, notifications, settings, security
+from app.api.v1 import admin_stations as v1_admin_stations
+from app.api.v1 import admin_users as v1_admin_users
 
 router = APIRouter()
 router.include_router(main.router)
 router.include_router(audit_trails.router, prefix="/audit-trails", tags=["Admin Audit Trails"])
 router.include_router(stations.router, prefix="/stations", tags=["Admin Stations"])
+# v1 station routes (health, alerts, charging-queue) merged into same prefix
+router.include_router(v1_admin_stations.router, prefix="/stations", tags=["Admin Stations"])
 router.include_router(cms.router, prefix="/cms", tags=["Admin CMS"])
 router.include_router(users.router, prefix="/users", tags=["Admin Users"])
+# v1 user routes (force-logout, ban, unban, etc.) merged into same prefix
+router.include_router(v1_admin_users.router, prefix="/users", tags=["Admin Users"])
 router.include_router(batteries.router, prefix="/batteries", tags=["Admin Batteries"])
 router.include_router(stock.router, prefix="/stock", tags=["Admin Stock Levels"])
 router.include_router(health.router, prefix="/health", tags=["Admin Battery Health"])

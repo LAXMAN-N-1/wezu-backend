@@ -152,6 +152,7 @@ def _serialize_submission(submission: MaintenanceChecklistSubmission) -> dict[st
 
 # ---- STATION LISTING & CRUD ----
 
+@router.get("", include_in_schema=False)
 @router.get("/")
 def list_stations(
     skip: int = 0,

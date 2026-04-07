@@ -13,6 +13,8 @@ from app.models.dealer import DealerProfile, DealerApplication, DealerDocument
 from app.models.user import User
 from app.models.station import Station
 from app.models.commission import CommissionConfig, CommissionLog
+from app.utils.runtime_cache import cached_call
+from app.core.config import settings
 
 router = APIRouter()
 
@@ -93,6 +95,7 @@ def _dealer_to_dict(dp: DealerProfile, user: User = None) -> dict:
 # DEALER CRUD
 # ═══════════════════════════════════════════════════════════════════════════
 
+@router.get("", include_in_schema=False)
 @router.get("/")
 def list_dealers(
     skip: int = Query(0, ge=0),
@@ -146,27 +149,30 @@ def list_dealers(
 @router.get("/stats")
 def get_dealer_stats(db: Session = Depends(deps.get_db)):
     """Aggregated dealer statistics for the admin dashboard."""
-    total_active = db.exec(
-        select(func.count(DealerProfile.id)).where(DealerProfile.is_active == True)
-    ).one()
-    total_inactive = db.exec(
-        select(func.count(DealerProfile.id)).where(DealerProfile.is_active == False)
-    ).one()
-    pending = db.exec(
-        select(func.count(DealerApplication.id)).where(
-            DealerApplication.current_stage.notin_(["APPROVED", "ACTIVE", "REJECTED"])
-        )
-    ).one()
-    total_commissions = db.exec(
-        select(func.coalesce(func.sum(CommissionLog.amount), 0.0))
-    ).one()
+    def _load():
+        total_active = db.exec(
+            select(func.count(DealerProfile.id)).where(DealerProfile.is_active == True)
+        ).one()
+        total_inactive = db.exec(
+            select(func.count(DealerProfile.id)).where(DealerProfile.is_active == False)
+        ).one()
+        pending = db.exec(
+            select(func.count(DealerApplication.id)).where(
+                DealerApplication.current_stage.notin_(["APPROVED", "ACTIVE", "REJECTED"])
+            )
+        ).one()
+        total_commissions = db.exec(
+            select(func.coalesce(func.sum(CommissionLog.amount), 0.0))
+        ).one()
 
-    return {
-        "totalActiveDealers": total_active,
-        "totalInactiveDealers": total_inactive,
-        "pendingOnboardings": pending,
-        "totalCommissionsPaid": float(total_commissions),
-    }
+        return {
+            "totalActiveDealers": total_active,
+            "totalInactiveDealers": total_inactive,
+            "pendingOnboardings": pending,
+            "totalCommissionsPaid": float(total_commissions),
+        }
+
+    return cached_call("admin-dealers", "stats", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
 
 
 @router.post("/create")
@@ -252,42 +258,47 @@ def list_applications(
     db: Session = Depends(deps.get_db),
 ):
     """List all dealer applications, optionally filtered by stage."""
-    query = select(DealerApplication)
-    if stage:
-        query = query.where(DealerApplication.current_stage == stage)
-    apps = db.exec(query.order_by(DealerApplication.updated_at.desc())).all()
+    def _load():
+        query = select(DealerApplication)
+        if stage:
+            query = query.where(DealerApplication.current_stage == stage)
+        apps = db.exec(query.order_by(DealerApplication.updated_at.desc())).all()
 
-    # Batch-preload dealer profiles and users
-    dealer_ids = {a.dealer_id for a in apps}
-    dp_map = {}
-    if dealer_ids:
-        from sqlmodel import col
-        dp_list = db.exec(select(DealerProfile).where(col(DealerProfile.id).in_(dealer_ids))).all()
-        dp_map = {dp.id: dp for dp in dp_list}
+        # Batch-preload dealer profiles and users
+        dealer_ids = {a.dealer_id for a in apps}
+        dp_map = {}
+        if dealer_ids:
+            from sqlmodel import col
+            dp_list = db.exec(select(DealerProfile).where(col(DealerProfile.id).in_(dealer_ids))).all()
+            dp_map = {dp.id: dp for dp in dp_list}
 
-    user_ids = {dp.user_id for dp in dp_map.values()}
-    users_map = {}
-    if user_ids:
-        users_list = db.exec(select(User).where(col(User.id).in_(user_ids))).all()
-        users_map = {u.id: u for u in users_list}
+        user_ids = {dp.user_id for dp in dp_map.values()}
+        users_map = {}
+        if user_ids:
+            from sqlmodel import col
+            users_list = db.exec(select(User).where(col(User.id).in_(user_ids))).all()
+            users_map = {u.id: u for u in users_list}
 
-    results = []
-    for a in apps:
-        dp = dp_map.get(a.dealer_id)
-        user = users_map.get(dp.user_id) if dp else None
-        results.append({
-            "id": a.id,
-            "dealer_id": a.dealer_id,
-            "business_name": dp.business_name if dp else "Unknown",
-            "contact_email": dp.contact_email if dp else "",
-            "current_stage": a.current_stage,
-            "risk_score": a.risk_score,
-            "status_history": a.status_history or [],
-            "created_at": a.created_at.isoformat() if a.created_at else None,
-            "updated_at": a.updated_at.isoformat() if a.updated_at else None,
-            "user_name": user.full_name if user else "",
-        })
-    return results
+        results = []
+        for a in apps:
+            dp = dp_map.get(a.dealer_id)
+            user = users_map.get(dp.user_id) if dp else None
+            results.append({
+                "id": a.id,
+                "dealer_id": a.dealer_id,
+                "business_name": dp.business_name if dp else "Unknown",
+                "contact_email": dp.contact_email if dp else "",
+                "current_stage": a.current_stage,
+                "risk_score": a.risk_score,
+                "status_history": a.status_history or [],
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+                "updated_at": a.updated_at.isoformat() if a.updated_at else None,
+                "user_name": user.full_name if user else "",
+            })
+        return results
+
+    cache_key = f"applications-{stage or 'all'}"
+    return cached_call("admin-dealers", cache_key, ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
 
 
 @router.put("/applications/{app_id}/stage")
