@@ -190,20 +190,31 @@ def get_active_rentals(
 
     rentals = db.exec(query.order_by(Rental.start_time.desc())).all()
 
+    # Batch fetch all customers and batteries to avoid N+1
+    user_ids = list(set(r.user_id for r in rentals))
+    battery_ids = list(set(r.battery_id for r in rentals))
+    customers_map = {}
+    batteries_map = {}
+    if user_ids:
+        users = db.exec(select(User).where(User.id.in_(user_ids))).all()
+        customers_map = {u.id: u for u in users}
+    if battery_ids:
+        batts = db.exec(select(Battery).where(Battery.id.in_(battery_ids))).all()
+        batteries_map = {b.id: b for b in batts}
+
     result = []
     for r in rentals:
-        # Get customer name
-        customer = db.get(User, r.user_id)
-        customer_name = customer.full_name if customer and hasattr(customer, 'full_name') else f"User #{r.user_id}"
+        customer = customers_map.get(r.user_id)
+        customer_name = customer.full_name if customer and customer.full_name else f"User #{r.user_id}"
+        customer_phone = customer.phone_number if customer and customer.phone_number else ""
 
-        # Get battery code
-        battery = db.get(Battery, r.battery_id)
+        battery = batteries_map.get(r.battery_id)
         battery_code = battery.serial_number if battery else f"BAT-{r.battery_id}"
 
         result.append({
             "id": r.id,
             "customer_name": customer_name,
-            "customer_phone": "",
+            "customer_phone": customer_phone,
             "battery_code": battery_code,
             "battery_id": r.battery_id,
             "station_name": station_map.get(r.start_station_id, ""),
@@ -491,7 +502,76 @@ def get_station_detail(
     if not station:
         raise HTTPException(status_code=404, detail="Station not found")
 
-    # Slots
+    # ── Dynamic battery counts from batteries table ──
+    total_batteries = db.exec(
+        select(func.count(Battery.id)).where(Battery.station_id == station_id)
+    ).one() or 0
+
+    available_count = db.exec(
+        select(func.count(Battery.id)).where(
+            Battery.station_id == station_id,
+            Battery.status == BatteryStatus.AVAILABLE,
+        )
+    ).one() or 0
+
+    rented_count = db.exec(
+        select(func.count(Battery.id)).where(
+            Battery.station_id == station_id,
+            Battery.status == BatteryStatus.RENTED,
+        )
+    ).one() or 0
+
+    charging_count = db.exec(
+        select(func.count(Battery.id)).where(
+            Battery.station_id == station_id,
+            Battery.status == BatteryStatus.CHARGING,
+        )
+    ).one() or 0
+
+    maintenance_count = db.exec(
+        select(func.count(Battery.id)).where(
+            Battery.station_id == station_id,
+            Battery.status == BatteryStatus.MAINTENANCE,
+        )
+    ).one() or 0
+
+    damaged_count = db.exec(
+        select(func.count(Battery.id)).where(
+            Battery.station_id == station_id,
+            Battery.status == BatteryStatus.RETIRED,
+        )
+    ).one() or 0
+
+    # ── Active rentals count ──
+    active_rentals = db.exec(
+        select(func.count(Rental.id)).where(
+            Rental.start_station_id == station_id,
+            Rental.status == "active",
+        )
+    ).one() or 0
+
+    # ── Today's revenue ──
+    today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_rental_revenue = db.exec(
+        select(func.coalesce(func.sum(Rental.total_amount), 0)).where(
+            Rental.start_station_id == station_id,
+            Rental.start_time >= today_start,
+        )
+    ).one() or 0
+    today_swap_revenue = 0
+    try:
+        today_swap_revenue = db.exec(
+            select(func.coalesce(func.sum(SwapSession.swap_amount), 0)).where(
+                SwapSession.station_id == station_id,
+                SwapSession.created_at >= today_start,
+                SwapSession.status == "completed",
+            )
+        ).one() or 0
+    except Exception:
+        pass
+    today_revenue = round(float(today_rental_revenue) + float(today_swap_revenue), 2)
+
+    # ── Slots ──
     slots = db.exec(select(StationSlot).where(StationSlot.station_id == station_id)).all()
     slot_data = [
         {
@@ -505,7 +585,7 @@ def get_station_detail(
         for sl in slots
     ]
 
-    # Recent rentals
+    # ── Recent rentals ──
     recent_rentals = db.exec(
         select(Rental)
         .where(Rental.start_station_id == station_id)
@@ -523,7 +603,7 @@ def get_station_detail(
         for r in recent_rentals
     ]
 
-    # Maintenance history
+    # ── Maintenance history ──
     maintenance = db.exec(
         select(MaintenanceRecord)
         .where(MaintenanceRecord.entity_type == "station", MaintenanceRecord.entity_id == station_id)
@@ -542,18 +622,9 @@ def get_station_detail(
         for m in maintenance
     ]
 
-    # Active rentals count
-    active_rentals = db.exec(
-        select(func.count(Rental.id)).where(
-            Rental.start_station_id == station_id,
-            Rental.status == "active",
-        )
-    ).one() or 0
-
-    # Slot utilization
+    # ── Slot utilization ──
     total_slots = station.total_slots or 1
-    occupied = len([sl for sl in slots if sl.status in ("charging", "ready")])
-    utilization = round((occupied / total_slots) * 100, 1)
+    utilization = round((total_batteries / total_slots) * 100, 1) if total_slots > 0 else 0
 
     return {
         "station": {
@@ -566,10 +637,17 @@ def get_station_detail(
             "status": station.status,
             "station_type": station.station_type,
             "total_slots": station.total_slots,
-            "available_batteries": station.available_batteries,
-            "available_slots": station.available_slots,
+            "total_batteries": total_batteries,
+            "available_batteries": available_count,
+            "rented_batteries": rented_count,
+            "charging_batteries": charging_count,
+            "maintenance_batteries": maintenance_count,
+            "damaged_batteries": damaged_count,
+            "available_slots": max(0, (station.total_slots or 0) - total_batteries),
             "is_24x7": station.is_24x7,
             "rating": round(station.rating, 1),
+            "ongoing_rentals": active_rentals,
+            "today_revenue": today_revenue,
             "contact_phone": station.contact_phone,
             "operating_hours": station.operating_hours,
             "last_maintenance_date": str(station.last_maintenance_date) if station.last_maintenance_date else None,
@@ -650,6 +728,265 @@ def get_station_maintenance(
         }
         for m in records
     ]
+
+
+# ─── NEW: Station Activity Feed ───
+@router.get("/{station_id}/activity")
+def get_station_activity(
+    station_id: int,
+    limit: int = Query(20, le=50),
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get recent activity events for a specific station from real DB data."""
+    dealer_id = _get_dealer_id(db, current_user.id)
+    station = db.exec(
+        select(Station).where(Station.id == station_id, Station.dealer_id == dealer_id)
+    ).first()
+    if not station:
+        raise HTTPException(status_code=404, detail="Station not found")
+
+    events = []
+
+    # Recent rentals (started)
+    recent_rentals = db.exec(
+        select(Rental)
+        .where(Rental.start_station_id == station_id)
+        .order_by(Rental.start_time.desc())
+        .limit(limit)
+    ).all()
+
+    user_ids = list(set(r.user_id for r in recent_rentals))
+    users_map = {}
+    if user_ids:
+        users = db.exec(select(User).where(User.id.in_(user_ids))).all()
+        users_map = {u.id: u for u in users}
+
+    bat_ids = list(set(r.battery_id for r in recent_rentals))
+    bats_map = {}
+    if bat_ids:
+        batts = db.exec(select(Battery).where(Battery.id.in_(bat_ids))).all()
+        bats_map = {b.id: b for b in batts}
+
+    for r in recent_rentals:
+        customer = users_map.get(r.user_id)
+        customer_name = customer.full_name if customer and customer.full_name else f"User #{r.user_id}"
+        battery = bats_map.get(r.battery_id)
+        bat_code = battery.serial_number if battery else f"BAT-{r.battery_id}"
+
+        if r.status.value if hasattr(r.status, 'value') else str(r.status) == "active":
+            events.append({
+                "id": r.id,
+                "event_type": "rental",
+                "description": f"New rental started — {customer_name} ({bat_code})",
+                "created_at": str(r.start_time),
+                "battery_code": bat_code,
+                "customer_name": customer_name,
+                "amount": r.total_amount,
+            })
+        elif r.status.value if hasattr(r.status, 'value') else str(r.status) == "completed":
+            events.append({
+                "id": r.id,
+                "event_type": "return",
+                "description": f"Battery {bat_code} returned by {customer_name}",
+                "created_at": str(r.end_time or r.start_time),
+                "battery_code": bat_code,
+                "customer_name": customer_name,
+                "amount": r.total_amount,
+            })
+
+    # Recent swaps
+    try:
+        recent_swaps = db.exec(
+            select(SwapSession)
+            .where(SwapSession.station_id == station_id)
+            .order_by(SwapSession.created_at.desc())
+            .limit(limit)
+        ).all()
+
+        swap_user_ids = list(set(s.user_id for s in recent_swaps))
+        if swap_user_ids:
+            swap_users = db.exec(select(User).where(User.id.in_(swap_user_ids))).all()
+            swap_users_map = {u.id: u for u in swap_users}
+        else:
+            swap_users_map = {}
+
+        for s in recent_swaps:
+            customer = swap_users_map.get(s.user_id)
+            customer_name = customer.full_name if customer and customer.full_name else f"User #{s.user_id}"
+            old_bat = db.get(Battery, s.old_battery_id) if s.old_battery_id else None
+            bat_code = old_bat.serial_number if old_bat else ""
+
+            events.append({
+                "id": s.id + 100000,  # offset to avoid ID collision with rentals
+                "event_type": "completed" if s.status == "completed" else "swap",
+                "description": f"Battery {bat_code} swap {'completed' if s.status == 'completed' else 'initiated'} by {customer_name}",
+                "created_at": str(s.completed_at or s.created_at),
+                "battery_code": bat_code,
+                "customer_name": customer_name,
+                "amount": s.swap_amount,
+            })
+    except Exception:
+        pass
+
+    # Sort all events by timestamp desc
+    events.sort(key=lambda e: e["created_at"], reverse=True)
+    return events[:limit]
+
+
+# ─── NEW: Station Transactions ───
+@router.get("/{station_id}/transactions")
+def get_station_transactions(
+    station_id: int,
+    limit: int = Query(10, le=50),
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get recent financial transactions for a station."""
+    dealer_id = _get_dealer_id(db, current_user.id)
+    station = db.exec(
+        select(Station).where(Station.id == station_id, Station.dealer_id == dealer_id)
+    ).first()
+    if not station:
+        raise HTTPException(status_code=404, detail="Station not found")
+
+    transactions = []
+
+    # Rental payments
+    rentals = db.exec(
+        select(Rental)
+        .where(Rental.start_station_id == station_id, Rental.total_amount > 0)
+        .order_by(Rental.start_time.desc())
+        .limit(limit)
+    ).all()
+
+    user_ids = list(set(r.user_id for r in rentals))
+    users_map = {}
+    if user_ids:
+        users = db.exec(select(User).where(User.id.in_(user_ids))).all()
+        users_map = {u.id: u for u in users}
+
+    for r in rentals:
+        customer = users_map.get(r.user_id)
+        customer_name = customer.full_name if customer and customer.full_name else f"User #{r.user_id}"
+        transactions.append({
+            "id": r.id,
+            "type": "Rental",
+            "customer": customer_name,
+            "amount": r.total_amount,
+            "time": str(r.start_time),
+        })
+        # Add late fee as separate transaction if applicable
+        if r.late_fee and r.late_fee > 0:
+            transactions.append({
+                "id": r.id + 500000,
+                "type": "Late Fee",
+                "customer": customer_name,
+                "amount": r.late_fee,
+                "time": str(r.end_time or r.start_time),
+            })
+
+    # Swap fees
+    try:
+        swaps = db.exec(
+            select(SwapSession)
+            .where(SwapSession.station_id == station_id, SwapSession.swap_amount > 0)
+            .order_by(SwapSession.created_at.desc())
+            .limit(limit)
+        ).all()
+
+        swap_user_ids = list(set(s.user_id for s in swaps))
+        if swap_user_ids:
+            swap_users = db.exec(select(User).where(User.id.in_(swap_user_ids))).all()
+            swap_users_map = {u.id: u for u in swap_users}
+        else:
+            swap_users_map = {}
+
+        for s in swaps:
+            customer = swap_users_map.get(s.user_id)
+            customer_name = customer.full_name if customer and customer.full_name else f"User #{s.user_id}"
+            transactions.append({
+                "id": s.id + 200000,
+                "type": "Swap Fee",
+                "customer": customer_name,
+                "amount": s.swap_amount,
+                "time": str(s.completed_at or s.created_at),
+            })
+    except Exception:
+        pass
+
+    # Sort by time desc
+    transactions.sort(key=lambda t: t["time"], reverse=True)
+    return transactions[:limit]
+
+
+# ─── NEW: Dealer Swaps ───
+@router.get("/swaps/list")
+def get_dealer_swaps(
+    station_id: int | None = Query(None),
+    status: str | None = Query(None),
+    limit: int = Query(50, le=200),
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """List swap sessions across dealer's stations."""
+    dealer_id = _get_dealer_id(db, current_user.id)
+    stations = db.exec(select(Station).where(Station.dealer_id == dealer_id)).all()
+    station_ids = [s.id for s in stations]
+    station_map = {s.id: s.name for s in stations}
+
+    if not station_ids:
+        return []
+
+    query = select(SwapSession).where(SwapSession.station_id.in_(station_ids))
+    if station_id:
+        query = query.where(SwapSession.station_id == station_id)
+    if status:
+        query = query.where(SwapSession.status == status)
+
+    swaps = db.exec(query.order_by(SwapSession.created_at.desc()).limit(limit)).all()
+
+    # Batch fetch users and batteries
+    user_ids = list(set(s.user_id for s in swaps))
+    users_map = {}
+    if user_ids:
+        users = db.exec(select(User).where(User.id.in_(user_ids))).all()
+        users_map = {u.id: u for u in users}
+
+    bat_ids = set()
+    for s in swaps:
+        if s.old_battery_id: bat_ids.add(s.old_battery_id)
+        if s.new_battery_id: bat_ids.add(s.new_battery_id)
+    bats_map = {}
+    if bat_ids:
+        batts = db.exec(select(Battery).where(Battery.id.in_(list(bat_ids)))).all()
+        bats_map = {b.id: b for b in batts}
+
+    result = []
+    for s in swaps:
+        customer = users_map.get(s.user_id)
+        customer_name = customer.full_name if customer and customer.full_name else f"User #{s.user_id}"
+        old_bat = bats_map.get(s.old_battery_id) if s.old_battery_id else None
+        new_bat = bats_map.get(s.new_battery_id) if s.new_battery_id else None
+
+        result.append({
+            "id": s.id,
+            "customer_name": customer_name,
+            "customer_id": s.user_id,
+            "station_name": station_map.get(s.station_id, ""),
+            "station_id": s.station_id,
+            "old_battery_code": old_bat.serial_number if old_bat else "",
+            "new_battery_code": new_bat.serial_number if new_bat else "",
+            "old_battery_soc": s.old_battery_soc,
+            "new_battery_soc": s.new_battery_soc,
+            "swap_amount": s.swap_amount,
+            "status": s.status,
+            "payment_status": s.payment_status,
+            "created_at": str(s.created_at),
+            "completed_at": str(s.completed_at) if s.completed_at else None,
+        })
+
+    return result
 
 
 # ─── Existing Endpoints ───

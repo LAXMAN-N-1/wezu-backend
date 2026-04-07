@@ -278,9 +278,13 @@ class SettlementService:
         pending = [s for s in settlements if s.status in ("pending", "generated")]
         paid = [s for s in settlements if s.status == "paid"]
 
+        # Calculate total platform fees deducted across history
+        total_platform_fees = round(sum(s.total_commission * 0.02 for s in settlements), 2)
+
         return {
             "current_month": current_month,
             "current_month_earnings": current_month_earnings,
+            "total_platform_fees": total_platform_fees,
             "history": history,
             "pending_settlements": {
                 "count": len(pending),
@@ -290,6 +294,10 @@ class SettlementService:
                 "count": len(paid),
                 "total_amount": round(sum(s.net_payable for s in paid), 2),
             },
+            "next_payout": {
+                "amount": round(sum(s.net_payable for s in pending), 2),
+                "date": (now.replace(day=28) + timedelta(days=5)).replace(day=10).isoformat(),
+            }
         }
 
     @staticmethod
