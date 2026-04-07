@@ -5,6 +5,7 @@ from datetime import datetime, UTC, timedelta
 import uuid
 
 from app.api.deps import get_db, get_current_active_admin
+from app.core.config import settings
 from app.models.battery import Battery, BatteryStatus, LocationType
 from app.models.station import Station
 from app.models.station_stock import StationStockConfig, ReorderRequest, StockAlertDismissal
@@ -14,6 +15,7 @@ from app.schemas.station_stock import (
     StockAlertResponse, StationStockDetailResponse, StockForecastResponse,
     LocationStockResponse
 )
+from app.utils.runtime_cache import cached_call
 
 router = APIRouter()
 
@@ -47,55 +49,58 @@ def get_station_stock_stats(db: Session, station_id: int):
 @router.get("/overview", response_model=StockOverviewResponse)
 def get_stock_overview(db: Session = Depends(get_db)):
     """Fleet-wide stock summary"""
-    stations_count = db.exec(select(func.count(Station.id))).first() or 0
-    total_batteries = db.exec(select(func.count(Battery.id))).first() or 0
-    
-    total_rented = db.exec(select(func.count(Battery.id)).where(Battery.status == BatteryStatus.RENTED)).first() or 0
-    total_available = db.exec(select(func.count(Battery.id)).where(Battery.status == BatteryStatus.AVAILABLE)).first() or 0
-    total_maintenance = db.exec(select(func.count(Battery.id)).where(Battery.status == BatteryStatus.MAINTENANCE)).first() or 0
-    avg_utilization = (total_rented / total_batteries * 100) if total_batteries > 0 else 0.0
-    
-    warehouse_count = db.exec(select(func.count(Battery.id)).where(Battery.location_type == LocationType.WAREHOUSE)).first() or 0
-    service_count = db.exec(select(func.count(Battery.id)).where(Battery.location_type == LocationType.SERVICE_CENTER)).first() or 0
-    
-    # Grouped battery stats by station ID
-    b_stats = db.exec(
-        select(Battery.station_id, Battery.status, func.count(Battery.id))
-        .where(Battery.station_id.is_not(None)).group_by(Battery.station_id, Battery.status)
-    ).all()
-    
-    station_avail = {}
-    for s_id, status, count in b_stats:
-        if s_id not in station_avail: station_avail[s_id] = 0
-        if status == BatteryStatus.AVAILABLE:
-            station_avail[s_id] += count
+    def _load():
+        stations_count = db.exec(select(func.count(Station.id))).first() or 0
+        total_batteries = db.exec(select(func.count(Battery.id))).first() or 0
 
-    configs = db.exec(select(StationStockConfig)).all()
-    config_map = {c.station_id: c.reorder_point if c.reorder_point else int(c.max_capacity * 0.1) for c in configs}
+        total_rented = db.exec(select(func.count(Battery.id)).where(Battery.status == BatteryStatus.RENTED)).first() or 0
+        total_available = db.exec(select(func.count(Battery.id)).where(Battery.status == BatteryStatus.AVAILABLE)).first() or 0
+        total_maintenance = db.exec(select(func.count(Battery.id)).where(Battery.status == BatteryStatus.MAINTENANCE)).first() or 0
+        avg_utilization = (total_rented / total_batteries * 100) if total_batteries > 0 else 0.0
 
-    active_dismissals = {d.station_id for d in db.exec(select(StockAlertDismissal).where(StockAlertDismissal.is_active == True)).all()}
+        warehouse_count = db.exec(select(func.count(Battery.id)).where(Battery.location_type == LocationType.WAREHOUSE)).first() or 0
+        service_count = db.exec(select(func.count(Battery.id)).where(Battery.location_type == LocationType.SERVICE_CENTER)).first() or 0
 
-    low_stock_alerts = 0
-    stations = db.exec(select(Station)).all()
-    for station in stations:
-        if station.id:
-            avail = station_avail.get(station.id, 0)
-            reorder = config_map.get(station.id, 5) # Default 5 (50 * 0.1)
-            
-            if avail < reorder and station.id not in active_dismissals:
-                low_stock_alerts += 1
+        # Grouped battery stats by station ID
+        b_stats = db.exec(
+            select(Battery.station_id, Battery.status, func.count(Battery.id))
+            .where(Battery.station_id.is_not(None)).group_by(Battery.station_id, Battery.status)
+        ).all()
 
-    return StockOverviewResponse(
-        total_batteries=total_batteries,
-        total_stations=stations_count,
-        avg_utilization=avg_utilization,
-        low_stock_alerts=low_stock_alerts,
-        warehouse_count=warehouse_count,
-        service_count=service_count,
-        available_count=total_available,
-        rented_count=total_rented,
-        maintenance_count=total_maintenance
-    )
+        station_avail = {}
+        for s_id, status, count in b_stats:
+            if s_id not in station_avail: station_avail[s_id] = 0
+            if status == BatteryStatus.AVAILABLE:
+                station_avail[s_id] += count
+
+        configs = db.exec(select(StationStockConfig)).all()
+        config_map = {c.station_id: c.reorder_point if c.reorder_point else int(c.max_capacity * 0.1) for c in configs}
+
+        active_dismissals = {d.station_id for d in db.exec(select(StockAlertDismissal).where(StockAlertDismissal.is_active == True)).all()}
+
+        low_stock_alerts = 0
+        stations = db.exec(select(Station)).all()
+        for station in stations:
+            if station.id:
+                avail = station_avail.get(station.id, 0)
+                reorder = config_map.get(station.id, 5)
+
+                if avail < reorder and station.id not in active_dismissals:
+                    low_stock_alerts += 1
+
+        return StockOverviewResponse(
+            total_batteries=total_batteries,
+            total_stations=stations_count,
+            avg_utilization=avg_utilization,
+            low_stock_alerts=low_stock_alerts,
+            warehouse_count=warehouse_count,
+            service_count=service_count,
+            available_count=total_available,
+            rented_count=total_rented,
+            maintenance_count=total_maintenance
+        ).model_dump()
+
+    return cached_call("admin-stock", "overview", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
 
 @router.get("/stations", response_model=List[StationStockResponse])
 def get_stations_stock(

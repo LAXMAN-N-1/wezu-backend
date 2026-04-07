@@ -17,6 +17,9 @@ from app.schemas.battery_health import (
     HealthAlertResponse, AlertResolveRequest,
     HealthAnalyticsResponse, FleetHealthTrendPoint, WorstDegrader
 )
+from sqlalchemy import case
+from app.core.config import settings
+from app.utils.runtime_cache import cached_call
 
 router = APIRouter()
 
@@ -116,50 +119,54 @@ def _serialize_dt(dt: Optional[datetime]) -> Optional[str]:
 # ============================================================
 @router.get("/overview", response_model=HealthOverviewResponse)
 def get_health_overview(db: Session = Depends(get_db)):
-    batteries = db.exec(select(Battery)).all()
-    total = len(batteries)
-    if total == 0:
+    def _fetch():
+        # SQL-side aggregation instead of loading all batteries
+        row = db.exec(
+            select(
+                func.count(Battery.id).label("total"),
+                func.coalesce(func.avg(Battery.health_percentage), 0).label("avg_health"),
+                func.coalesce(func.sum(case((Battery.health_percentage > 80, 1), else_=0)), 0).label("good"),
+                func.coalesce(func.sum(case((Battery.health_percentage > 50, Battery.health_percentage <= 80, 1), else_=0)), 0).label("fair"),
+                func.coalesce(func.sum(case((Battery.health_percentage > 30, Battery.health_percentage <= 50, 1), else_=0)), 0).label("poor"),
+                func.coalesce(func.sum(case((Battery.health_percentage <= 30, 1), else_=0)), 0).label("critical"),
+            )
+        ).one()
+        total = row.total or 0
+        if total == 0:
+            return HealthOverviewResponse(
+                fleet_avg_health=0, good_count=0, fair_count=0, poor_count=0,
+                critical_count=0, avg_degradation_rate=0, batteries_needing_service=0,
+                scheduled_maintenance_count=0, total_batteries=0
+            ).model_dump()
+
+        # Bulk degradation rates still need snapshots — keep existing logic but only fetch IDs
+        b_ids = [r[0] for r in db.exec(select(Battery.id)).all()]
+        rates_90d = _compute_bulk_degradation_rates(b_ids, db, days=90)
+        rates_30d = _compute_bulk_degradation_rates(b_ids, db, days=30)
+
+        degs = [r for r in rates_90d.values() if r > 0]
+        avg_deg = round(sum(degs) / len(degs), 2) if degs else 0.0
+        needing_service = sum(1 for bid, r in rates_30d.items() if r > 5)
+
+        next_week = datetime.now(UTC) + timedelta(days=7)
+        upcoming = db.exec(
+            select(func.count(BatteryMaintenanceSchedule.id))
+            .where(BatteryMaintenanceSchedule.status == MaintenanceStatus.SCHEDULED)
+            .where(BatteryMaintenanceSchedule.scheduled_date <= next_week)
+        ).first() or 0
+
         return HealthOverviewResponse(
-            fleet_avg_health=0, good_count=0, fair_count=0, poor_count=0,
-            critical_count=0, avg_degradation_rate=0, batteries_needing_service=0,
-            scheduled_maintenance_count=0, total_batteries=0
-        )
-
-    healths = [b.health_percentage for b in batteries]
-    good = sum(1 for h in healths if h > 80)
-    fair = sum(1 for h in healths if 50 < h <= 80)
-    poor = sum(1 for h in healths if 30 < h <= 50)
-    critical = sum(1 for h in healths if h <= 30)
-
-    # Bulk rates
-    b_ids = [b.id for b in batteries]
-    rates_90d = _compute_bulk_degradation_rates(b_ids, db, days=90)
-    rates_30d = _compute_bulk_degradation_rates(b_ids, db, days=30)
-
-    degs = [r for r in rates_90d.values() if r > 0]
-    avg_deg = round(sum(degs) / len(degs), 2) if degs else 0.0
-
-    needing_service = sum(1 for bid, r in rates_30d.items() if r > 5)
-
-    # Scheduled maintenance in next 7 days
-    next_week = datetime.now(UTC) + timedelta(days=7)
-    upcoming = db.exec(
-        select(func.count(BatteryMaintenanceSchedule.id))
-        .where(BatteryMaintenanceSchedule.status == MaintenanceStatus.SCHEDULED)
-        .where(BatteryMaintenanceSchedule.scheduled_date <= next_week)
-    ).first() or 0
-
-    return HealthOverviewResponse(
-        fleet_avg_health=round(sum(healths) / total, 1),
-        good_count=good,
-        fair_count=fair,
-        poor_count=poor,
-        critical_count=critical,
-        avg_degradation_rate=avg_deg,
-        batteries_needing_service=needing_service,
-        scheduled_maintenance_count=upcoming,
-        total_batteries=total
-    )
+            fleet_avg_health=round(float(row.avg_health), 1),
+            good_count=row.good,
+            fair_count=row.fair,
+            poor_count=row.poor,
+            critical_count=row.critical,
+            avg_degradation_rate=avg_deg,
+            batteries_needing_service=needing_service,
+            scheduled_maintenance_count=upcoming,
+            total_batteries=total
+        ).model_dump()
+    return cached_call("health_overview", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)
 
 # ============================================================
 # GET /health/batteries — Paginated list with filters
@@ -661,81 +668,92 @@ def get_maintenance_list(
 # ============================================================
 @router.get("/analytics", response_model=HealthAnalyticsResponse)
 def get_health_analytics(db: Session = Depends(get_db)):
-    batteries = db.exec(select(Battery)).all()
+    def _fetch():
+        now = datetime.now(UTC)
+        start_of_90d = now - timedelta(days=90)
 
-    # 1. Fleet trend — weekly average over 90 days
-    trend = []
-    now = datetime.now(UTC)
-    start_of_90d = now - timedelta(days=90)
-    
-    all_snaps = db.exec(
-        select(BatteryHealthSnapshot)
-        .where(col(BatteryHealthSnapshot.recorded_at) >= start_of_90d)
-    ).all()
-    normalized_snaps = []
-    for snapshot in all_snaps:
-        recorded_at = _coerce_datetime(snapshot.recorded_at)
-        if recorded_at:
-            normalized_snaps.append((snapshot, recorded_at))
-    
-    for week_back in range(12, -1, -1):
-        week_start = now - timedelta(weeks=week_back + 1)
-        week_end = now - timedelta(weeks=week_back)
+        # 1. Fleet trend — weekly avg via SQL group_by week
+        all_snaps = db.exec(
+            select(BatteryHealthSnapshot)
+            .where(col(BatteryHealthSnapshot.recorded_at) >= start_of_90d)
+        ).all()
+        normalized_snaps = []
+        for snapshot in all_snaps:
+            recorded_at = _coerce_datetime(snapshot.recorded_at)
+            if recorded_at:
+                normalized_snaps.append((snapshot, recorded_at))
 
-        week_snaps = [
-            snapshot for snapshot, recorded_at in normalized_snaps
-            if week_start <= recorded_at < week_end
-        ]
+        trend = []
+        for week_back in range(12, -1, -1):
+            week_start = now - timedelta(weeks=week_back + 1)
+            week_end = now - timedelta(weeks=week_back)
 
-        if week_snaps:
-            avg = round(sum(s.health_percentage for s in week_snaps) / len(week_snaps), 1)
-        else:
-            avg = 0
+            week_snaps = [
+                snapshot for snapshot, recorded_at in normalized_snaps
+                if week_start <= recorded_at < week_end
+            ]
 
-        trend.append(FleetHealthTrendPoint(
-            date=week_end.strftime("%Y-%m-%d"),
-            avg_health=avg
-        ))
+            if week_snaps:
+                avg = round(sum(s.health_percentage for s in week_snaps) / len(week_snaps), 1)
+            else:
+                avg = 0
 
-    # 2. Health distribution
-    healths = [b.health_percentage for b in batteries]
-    distribution = {
-        "good": sum(1 for h in healths if h > 80),
-        "fair": sum(1 for h in healths if 50 < h <= 80),
-        "poor": sum(1 for h in healths if 30 < h <= 50),
-        "critical": sum(1 for h in healths if h <= 30),
-    }
-
-    # 3. Top 5 worst degraders
-    degraders = []
-    if batteries:
-        b_ids = [b.id for b in batteries]
-        rates = _compute_bulk_degradation_rates(b_ids, db)
-        
-        for b in batteries:
-            rate = rates.get(b.id, 0.0)
-            degraders.append(WorstDegrader(
-                battery_id=str(b.id),
-                serial_number=b.serial_number,
-                degradation_rate=rate,
-                current_health=b.health_percentage
+            trend.append(FleetHealthTrendPoint(
+                date=week_end.strftime("%Y-%m-%d"),
+                avg_health=avg
             ))
-        degraders.sort(key=lambda x: x.degradation_rate, reverse=True)
-    top5 = degraders[:5]
 
-    # 4. Maintenance compliance
-    total_sched = db.exec(
-        select(func.count(BatteryMaintenanceSchedule.id))
-    ).first() or 0
-    completed_on_time = db.exec(
-        select(func.count(BatteryMaintenanceSchedule.id))
-        .where(BatteryMaintenanceSchedule.status == MaintenanceStatus.COMPLETED)
-    ).first() or 0
-    compliance = round((completed_on_time / total_sched * 100), 1) if total_sched > 0 else 100.0
+        # 2. Health distribution — SQL CASE instead of loading all batteries
+        dist_row = db.exec(
+            select(
+                func.coalesce(func.sum(case((Battery.health_percentage > 80, 1), else_=0)), 0).label("good"),
+                func.coalesce(func.sum(case((Battery.health_percentage > 50, Battery.health_percentage <= 80, 1), else_=0)), 0).label("fair"),
+                func.coalesce(func.sum(case((Battery.health_percentage > 30, Battery.health_percentage <= 50, 1), else_=0)), 0).label("poor"),
+                func.coalesce(func.sum(case((Battery.health_percentage <= 30, 1), else_=0)), 0).label("critical"),
+            )
+        ).one()
+        distribution = {
+            "good": dist_row.good,
+            "fair": dist_row.fair,
+            "poor": dist_row.poor,
+            "critical": dist_row.critical,
+        }
 
-    return HealthAnalyticsResponse(
-        fleet_trend=trend,
-        health_distribution=distribution,
-        worst_degraders=top5,
-        maintenance_compliance_rate=compliance
-    )
+        # 3. Top 5 worst degraders — only fetch IDs + needed fields
+        batteries = db.exec(select(Battery)).all()
+        degraders = []
+        if batteries:
+            b_ids = [b.id for b in batteries]
+            rates = _compute_bulk_degradation_rates(b_ids, db)
+            
+            for b in batteries:
+                rate = rates.get(b.id, 0.0)
+                degraders.append(WorstDegrader(
+                    battery_id=str(b.id),
+                    serial_number=b.serial_number,
+                    degradation_rate=rate,
+                    current_health=b.health_percentage
+                ))
+            degraders.sort(key=lambda x: x.degradation_rate, reverse=True)
+        top5 = degraders[:5]
+
+        # 4. Maintenance compliance — 2 queries → 1 CASE
+        maint_row = db.exec(
+            select(
+                func.count(BatteryMaintenanceSchedule.id).label("total"),
+                func.coalesce(func.sum(case(
+                    (BatteryMaintenanceSchedule.status == MaintenanceStatus.COMPLETED, 1), else_=0
+                )), 0).label("completed"),
+            )
+        ).one()
+        total_sched = maint_row.total or 0
+        completed_on_time = maint_row.completed or 0
+        compliance = round((completed_on_time / total_sched * 100), 1) if total_sched > 0 else 100.0
+
+        return HealthAnalyticsResponse(
+            fleet_trend=trend,
+            health_distribution=distribution,
+            worst_degraders=top5,
+            maintenance_compliance_rate=compliance
+        ).model_dump()
+    return cached_call("health_analytics", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)

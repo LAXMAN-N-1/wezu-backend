@@ -7,6 +7,7 @@ import csv
 import io
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.models.battery import Battery, BatteryStatus, BatteryAuditLog, BatteryHealthHistory, LocationType, BatteryLifecycleEvent
 from app.schemas.battery import (
     BatteryResponse, BatteryCreate, BatteryUpdate, BatteryDetailResponse,
@@ -15,6 +16,7 @@ from app.schemas.battery import (
 )
 from app.api.deps import get_current_active_admin
 from app.models.user import User
+from app.utils.runtime_cache import cached_call
 
 router = APIRouter()
 
@@ -82,27 +84,30 @@ def get_battery_summary(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_admin)
 ):
-    stmt = select(
-        func.count(Battery.id).label("total"),
-        func.count(Battery.id).filter(Battery.status == BatteryStatus.AVAILABLE).label("available"),
-        func.count(Battery.id).filter(Battery.status == BatteryStatus.RENTED).label("rented"),
-        func.count(Battery.id).filter(Battery.status == BatteryStatus.MAINTENANCE).label("maintenance"),
-        func.count(Battery.id).filter(Battery.status == BatteryStatus.RETIRED).label("retired")
-    )
+    def _load():
+        stmt = select(
+            func.count(Battery.id).label("total"),
+            func.count(Battery.id).filter(Battery.status == BatteryStatus.AVAILABLE).label("available"),
+            func.count(Battery.id).filter(Battery.status == BatteryStatus.RENTED).label("rented"),
+            func.count(Battery.id).filter(Battery.status == BatteryStatus.MAINTENANCE).label("maintenance"),
+            func.count(Battery.id).filter(Battery.status == BatteryStatus.RETIRED).label("retired")
+        )
 
-    result = session.exec(stmt).one()
-    total = result.total
-    rented = result.rented
-    utilization = (rented / total * 100) if total > 0 else 0
+        result = session.exec(stmt).one()
+        total = result.total
+        rented = result.rented
+        utilization = (rented / total * 100) if total > 0 else 0
 
-    return {
-        "total_batteries": total,
-        "available_count": result.available,
-        "rented_count": rented,
-        "maintenance_count": result.maintenance,
-        "retired_count": result.retired,
-        "utilization_percentage": round(utilization, 2)
-    }
+        return {
+            "total_batteries": total,
+            "available_count": result.available,
+            "rented_count": rented,
+            "maintenance_count": result.maintenance,
+            "retired_count": result.retired,
+            "utilization_percentage": round(utilization, 2)
+        }
+
+    return cached_call("admin-batteries", "summary", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
 
 @router.get("/export")
 def export_batteries(

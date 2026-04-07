@@ -6,12 +6,14 @@ Endpoints: Tickets (CRUD, assign, status, messages, stats), Knowledge Base (CRUD
 from typing import Any, List, Optional
 from datetime import datetime, UTC, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session, select, func, col
+from sqlmodel import Session, select, func, col, case
 from pydantic import BaseModel
 from app.api import deps
 from app.models.user import User
 from app.models.support import SupportTicket, TicketMessage, TicketStatus, TicketPriority
 from app.models.faq import FAQ
+from app.utils.runtime_cache import cached_call
+from app.core.config import settings
 
 router = APIRouter()
 
@@ -105,80 +107,94 @@ def get_ticket_stats(
     current_user: User = Depends(deps.get_current_active_admin),
 ) -> Any:
     """Dashboard-level ticket statistics."""
-    now = datetime.now(UTC)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    overdue_threshold = now - timedelta(hours=24)
+    _NS = "admin-support"
 
-    total = db.exec(select(func.count(SupportTicket.id))).one() or 0
-    open_count = db.exec(select(func.count(SupportTicket.id)).where(SupportTicket.status == "open")).one() or 0
-    in_progress = db.exec(select(func.count(SupportTicket.id)).where(SupportTicket.status == "in_progress")).one() or 0
-    resolved = db.exec(select(func.count(SupportTicket.id)).where(SupportTicket.status == "resolved")).one() or 0
-    closed = db.exec(select(func.count(SupportTicket.id)).where(SupportTicket.status == "closed")).one() or 0
-    
-    # Overdue = open + older than 24h
-    overdue = db.exec(select(func.count(SupportTicket.id)).where(
-        SupportTicket.status == "open", SupportTicket.created_at < overdue_threshold
-    )).one() or 0
-    
-    # Today's new tickets
-    today_new = db.exec(select(func.count(SupportTicket.id)).where(
-        SupportTicket.created_at >= today_start
-    )).one() or 0
-    
-    # Priority breakdown
-    priority_rows = db.exec(
-        select(SupportTicket.priority, func.count(SupportTicket.id))
-        .where(SupportTicket.status.in_(["open", "in_progress"]))
-        .group_by(SupportTicket.priority)
-    ).all()
-    priority_breakdown = {str(r[0].value if hasattr(r[0], 'value') else r[0]): r[1] for r in priority_rows}
-    
-    # Category breakdown
-    category_rows = db.exec(
-        select(SupportTicket.category, func.count(SupportTicket.id))
-        .group_by(SupportTicket.category)
-    ).all()
-    category_breakdown = {r[0]: r[1] for r in category_rows}
-    
-    # Source breakdown (derive from user roles)
-    source_counts = {"customer": 0, "dealer": 0, "driver": 0, "internal": 0}
-    all_open_uids = db.exec(select(SupportTicket.user_id).where(SupportTicket.status.in_(["open", "in_progress"]))).all()
-    unique_uids = {u for u in all_open_uids if u}
-    user_map = {u.id: (u.user_type.value if hasattr(u, 'user_type') and u.user_type else "customer").lower() for u in db.exec(select(User).where(User.id.in_(unique_uids))).all()} if unique_uids else {}
-    
-    for uid in all_open_uids:
-        role = user_map.get(uid, "customer")
-        if role in source_counts:
-            source_counts[role] += 1
-        else:
-            source_counts["customer"] += 1
-    
-    # Avg resolution time
-    resolved_tickets = db.exec(
-        select(SupportTicket).where(SupportTicket.resolved_at.is_not(None))
-    ).all()
-    if resolved_tickets:
-        total_hours = sum(
-            (t.resolved_at - t.created_at).total_seconds() / 3600
-            for t in resolved_tickets if t.resolved_at and t.created_at
+    def _load():
+        now = datetime.now(UTC)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        overdue_threshold = now - timedelta(hours=24)
+
+        # --- 1) Single CASE query for status counts + overdue + today_new ---
+        row = db.exec(
+            select(
+                func.count(SupportTicket.id),
+                func.coalesce(func.sum(case((SupportTicket.status == "open", 1), else_=0)), 0),
+                func.coalesce(func.sum(case((SupportTicket.status == "in_progress", 1), else_=0)), 0),
+                func.coalesce(func.sum(case((SupportTicket.status == "resolved", 1), else_=0)), 0),
+                func.coalesce(func.sum(case((SupportTicket.status == "closed", 1), else_=0)), 0),
+                func.coalesce(func.sum(case(
+                    (SupportTicket.status == "open", case((SupportTicket.created_at < overdue_threshold, 1), else_=0)),
+                    else_=0
+                )), 0),
+                func.coalesce(func.sum(case((SupportTicket.created_at >= today_start, 1), else_=0)), 0),
+            )
+        ).one()
+        total, open_count, in_progress, resolved, closed, overdue, today_new = (
+            int(row[0]), int(row[1]), int(row[2]), int(row[3]),
+            int(row[4]), int(row[5]), int(row[6]),
         )
-        avg_resolution_hours = round(total_hours / len(resolved_tickets), 1)
-    else:
-        avg_resolution_hours = 0.0
-    
-    return {
-        "total_tickets": total,
-        "open": open_count,
-        "in_progress": in_progress,
-        "resolved": resolved,
-        "closed": closed,
-        "overdue": overdue,
-        "today_new": today_new,
-        "avg_resolution_hours": avg_resolution_hours,
-        "priority_breakdown": priority_breakdown,
-        "category_breakdown": category_breakdown,
-        "source_breakdown": source_counts,
-    }
+
+        # --- 2) Priority breakdown (already grouped, 1 query) ---
+        priority_rows = db.exec(
+            select(SupportTicket.priority, func.count(SupportTicket.id))
+            .where(SupportTicket.status.in_(["open", "in_progress"]))
+            .group_by(SupportTicket.priority)
+        ).all()
+        priority_breakdown = {str(r[0].value if hasattr(r[0], 'value') else r[0]): r[1] for r in priority_rows}
+
+        # --- 3) Category breakdown (already grouped, 1 query) ---
+        category_rows = db.exec(
+            select(SupportTicket.category, func.count(SupportTicket.id))
+            .group_by(SupportTicket.category)
+        ).all()
+        category_breakdown = {r[0]: r[1] for r in category_rows}
+
+        # --- 4) Source breakdown — batch user lookup (2 queries instead of N+1) ---
+        source_counts = {"customer": 0, "dealer": 0, "driver": 0, "internal": 0}
+        open_uid_rows = db.exec(
+            select(SupportTicket.user_id)
+            .where(SupportTicket.status.in_(["open", "in_progress"]))
+        ).all()
+        unique_uids = {u for u in open_uid_rows if u}
+        if unique_uids:
+            user_map = {
+                u.id: (u.user_type.value if hasattr(u, 'user_type') and u.user_type else "customer").lower()
+                for u in db.exec(select(User).where(User.id.in_(unique_uids))).all()
+            }
+            for uid in open_uid_rows:
+                role = user_map.get(uid, "customer")
+                if role in source_counts:
+                    source_counts[role] += 1
+                else:
+                    source_counts["customer"] += 1
+
+        # --- 5) Avg resolution time — SQL aggregate instead of loading all rows ---
+        avg_row = db.exec(
+            select(func.avg(
+                func.extract("epoch", SupportTicket.resolved_at) -
+                func.extract("epoch", SupportTicket.created_at)
+            )).where(
+                SupportTicket.resolved_at.is_not(None),
+                SupportTicket.created_at.is_not(None),
+            )
+        ).one()
+        avg_resolution_hours = round(float(avg_row) / 3600, 1) if avg_row else 0.0
+
+        return {
+            "total_tickets": total,
+            "open": open_count,
+            "in_progress": in_progress,
+            "resolved": resolved,
+            "closed": closed,
+            "overdue": overdue,
+            "today_new": today_new,
+            "avg_resolution_hours": avg_resolution_hours,
+            "priority_breakdown": priority_breakdown,
+            "category_breakdown": category_breakdown,
+            "source_breakdown": source_counts,
+        }
+
+    return cached_call(_NS, "ticket-stats", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
 
 
 @router.get("/tickets/{ticket_id}")
@@ -372,23 +388,26 @@ def get_kb_stats(
     db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_admin),
 ) -> Any:
-    total = db.exec(select(func.count(FAQ.id))).one() or 0
-    active = db.exec(select(func.count(FAQ.id)).where(FAQ.is_active == True)).one() or 0
-    total_helpful = db.exec(select(func.sum(FAQ.helpful_count))).one() or 0
-    total_not_helpful = db.exec(select(func.sum(FAQ.not_helpful_count))).one() or 0
-    
-    cat_rows = db.exec(
-        select(FAQ.category, func.count(FAQ.id)).group_by(FAQ.category)
-    ).all()
-    
-    return {
-        "total_articles": total,
-        "active_articles": active,
-        "total_helpful": total_helpful,
-        "total_not_helpful": total_not_helpful,
-        "satisfaction_rate": round(total_helpful / max(total_helpful + total_not_helpful, 1) * 100, 1),
-        "categories": {r[0]: r[1] for r in cat_rows},
-    }
+    def _load():
+        total = db.exec(select(func.count(FAQ.id))).one() or 0
+        active = db.exec(select(func.count(FAQ.id)).where(FAQ.is_active == True)).one() or 0
+        total_helpful = db.exec(select(func.sum(FAQ.helpful_count))).one() or 0
+        total_not_helpful = db.exec(select(func.sum(FAQ.not_helpful_count))).one() or 0
+
+        cat_rows = db.exec(
+            select(FAQ.category, func.count(FAQ.id)).group_by(FAQ.category)
+        ).all()
+
+        return {
+            "total_articles": total,
+            "active_articles": active,
+            "total_helpful": total_helpful,
+            "total_not_helpful": total_not_helpful,
+            "satisfaction_rate": round(total_helpful / max(total_helpful + total_not_helpful, 1) * 100, 1),
+            "categories": {r[0]: r[1] for r in cat_rows},
+        }
+
+    return cached_call("admin-support", "kb-stats", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
 
 
 class KBArticleCreate(BaseModel):
@@ -464,102 +483,129 @@ def get_team_performance(
     current_user: User = Depends(deps.get_current_active_admin),
 ) -> Any:
     """Detailed agent performance metrics."""
-    # Get all users who have been assigned tickets (agents)
-    agent_ids_rows = db.exec(
-        select(SupportTicket.assigned_to).where(SupportTicket.assigned_to.is_not(None)).distinct()
-    ).all()
-    agent_ids = [r for r in agent_ids_rows if r]
-    agents_map = {u.id: u for u in db.exec(select(User).where(User.id.in_(agent_ids))).all()} if agent_ids else {}
-    
-    total_assigned_map = {r[0]: r[1] for r in db.exec(select(SupportTicket.assigned_to, func.count(SupportTicket.id)).where(SupportTicket.assigned_to.is_not(None)).group_by(SupportTicket.assigned_to)).all()}
-    resolved_count_map = {r[0]: r[1] for r in db.exec(select(SupportTicket.assigned_to, func.count(SupportTicket.id)).where(SupportTicket.assigned_to.is_not(None), SupportTicket.status.in_(["resolved", "closed"])).group_by(SupportTicket.assigned_to)).all()}
-    open_count_map = {r[0]: r[1] for r in db.exec(select(SupportTicket.assigned_to, func.count(SupportTicket.id)).where(SupportTicket.assigned_to.is_not(None), SupportTicket.status.in_(["open", "in_progress"])).group_by(SupportTicket.assigned_to)).all()}
-    
-    resolved_tickets = db.exec(select(SupportTicket.assigned_to, SupportTicket.created_at, SupportTicket.resolved_at).where(SupportTicket.assigned_to.is_not(None), SupportTicket.resolved_at.is_not(None))).all()
-    agent_times = {}
-    for rt in resolved_tickets:
-        if rt[0] not in agent_times: agent_times[rt[0]] = []
-        if rt[1] and rt[2]: agent_times[rt[0]].append((rt[2] - rt[1]).total_seconds() / 3600)
-    
-    agents = []
-    for aid in agent_ids:
-        user = agents_map.get(aid)
-        if not user: continue
-        
-        total_assigned = total_assigned_map.get(aid, 0)
-        resolved_count = resolved_count_map.get(aid, 0)
-        open_count = open_count_map.get(aid, 0)
-        
-        times = agent_times.get(aid, [])
-        avg_hrs = round(sum(times) / max(len(times), 1), 1)
-        
-        resolution_rate = round(resolved_count / max(total_assigned, 1) * 100, 1)
-        csat = round(min(5.0, 3.0 + resolution_rate / 50), 1)
-        
-        agents.append({
-            "agent_id": aid,
-            "agent_name": user.full_name,
-            "agent_email": user.email,
-            "total_assigned": total_assigned,
-            "resolved": resolved_count,
-            "open": open_count,
-            "resolution_rate": resolution_rate,
-            "avg_resolution_hours": avg_hrs,
-            "csat_score": csat,
-        })
-    
-    # Sort by resolved desc
-    agents.sort(key=lambda a: a["resolved"], reverse=True)
-    
-    # SLA metrics
-    now = datetime.now(UTC)
-    sla_breach_4h = db.exec(select(func.count(SupportTicket.id)).where(
-        SupportTicket.status == "open",
-        SupportTicket.priority.in_(["high", "critical"]),
-        SupportTicket.created_at < now - timedelta(hours=4)
-    )).one() or 0
-    
-    sla_breach_24h = db.exec(select(func.count(SupportTicket.id)).where(
-        SupportTicket.status == "open",
-        SupportTicket.created_at < now - timedelta(hours=24)
-    )).one() or 0
-    
-    first_response_tickets = db.exec(
-        select(SupportTicket).where(SupportTicket.status.in_(["in_progress", "resolved", "closed"])).limit(50)
-    ).all()
-    
-    if first_response_tickets:
-        ticket_ids = [t.id for t in first_response_tickets]
-        ticket_map = {t.id: t for t in first_response_tickets}
-        all_msgs = db.exec(select(TicketMessage).where(TicketMessage.ticket_id.in_(ticket_ids))).all()
-        
-        # Map first response per ticket
-        first_responses = {}
-        for m in all_msgs:
-            t = ticket_map.get(m.ticket_id)
-            if not t or m.sender_id == t.user_id: continue
-            if m.ticket_id not in first_responses or m.created_at < first_responses[m.ticket_id].created_at:
-                first_responses[m.ticket_id] = m
-                
-        first_response_times = []
-        for tid, msg in first_responses.items():
-            t = ticket_map[tid]
-            if t.created_at and msg.created_at:
-                first_response_times.append((msg.created_at - t.created_at).total_seconds() / 60)
-        
-        avg_first_response_min = round(sum(first_response_times) / max(len(first_response_times), 1), 1) if first_response_times else 0.0
-    else:
+    def _load():
+        # Get all users who have been assigned tickets (agents)
+        agent_ids_rows = db.exec(
+            select(SupportTicket.assigned_to).where(SupportTicket.assigned_to.is_not(None)).distinct()
+        ).all()
+        agent_ids = [r for r in agent_ids_rows if r]
+        agents_map = {u.id: u for u in db.exec(select(User).where(User.id.in_(agent_ids))).all()} if agent_ids else {}
+
+        # --- Single grouped query for total/resolved/open per agent ---
+        agent_status_rows = db.exec(
+            select(
+                SupportTicket.assigned_to,
+                func.count(SupportTicket.id),
+                func.coalesce(func.sum(case((SupportTicket.status.in_(["resolved", "closed"]), 1), else_=0)), 0),
+                func.coalesce(func.sum(case((SupportTicket.status.in_(["open", "in_progress"]), 1), else_=0)), 0),
+            )
+            .where(SupportTicket.assigned_to.is_not(None))
+            .group_by(SupportTicket.assigned_to)
+        ).all()
+        total_assigned_map = {r[0]: int(r[1]) for r in agent_status_rows}
+        resolved_count_map = {r[0]: int(r[2]) for r in agent_status_rows}
+        open_count_map = {r[0]: int(r[3]) for r in agent_status_rows}
+
+        # --- Avg resolution time per agent via SQL ---
+        avg_time_rows = db.exec(
+            select(
+                SupportTicket.assigned_to,
+                func.avg(
+                    func.extract("epoch", SupportTicket.resolved_at) -
+                    func.extract("epoch", SupportTicket.created_at)
+                )
+            )
+            .where(
+                SupportTicket.assigned_to.is_not(None),
+                SupportTicket.resolved_at.is_not(None),
+                SupportTicket.created_at.is_not(None),
+            )
+            .group_by(SupportTicket.assigned_to)
+        ).all()
+        avg_time_map = {r[0]: round(float(r[1]) / 3600, 1) if r[1] else 0.0 for r in avg_time_rows}
+
+        agents = []
+        for aid in agent_ids:
+            user = agents_map.get(aid)
+            if not user: continue
+
+            total_assigned = total_assigned_map.get(aid, 0)
+            resolved_count = resolved_count_map.get(aid, 0)
+            open_count = open_count_map.get(aid, 0)
+            avg_hrs = avg_time_map.get(aid, 0.0)
+
+            resolution_rate = round(resolved_count / max(total_assigned, 1) * 100, 1)
+            csat = round(min(5.0, 3.0 + resolution_rate / 50), 1)
+
+            agents.append({
+                "agent_id": aid,
+                "agent_name": user.full_name,
+                "agent_email": user.email,
+                "total_assigned": total_assigned,
+                "resolved": resolved_count,
+                "open": open_count,
+                "resolution_rate": resolution_rate,
+                "avg_resolution_hours": avg_hrs,
+                "csat_score": csat,
+            })
+
+        # Sort by resolved desc
+        agents.sort(key=lambda a: a["resolved"], reverse=True)
+
+        # SLA metrics
+        now = datetime.now(UTC)
+        sla_row = db.exec(
+            select(
+                func.coalesce(func.sum(case(
+                    (SupportTicket.priority.in_(["high", "critical"]), case(
+                        (SupportTicket.created_at < now - timedelta(hours=4), 1), else_=0
+                    )), else_=0
+                )), 0),
+                func.coalesce(func.sum(case(
+                    (SupportTicket.created_at < now - timedelta(hours=24), 1), else_=0
+                )), 0),
+            ).where(SupportTicket.status == "open")
+        ).one()
+        sla_breach_4h = int(sla_row[0])
+        sla_breach_24h = int(sla_row[1])
+
+        first_response_tickets = db.exec(
+            select(SupportTicket).where(SupportTicket.status.in_(["in_progress", "resolved", "closed"])).limit(50)
+        ).all()
+
         avg_first_response_min = 0.0
-    
-    return {
-        "agents": agents,
-        "sla_metrics": {
-            "critical_breach_4h": sla_breach_4h,
-            "general_breach_24h": sla_breach_24h,
-            "avg_first_response_minutes": avg_first_response_min,
-        },
-        "total_agents": len(agents),
-    }
+        if first_response_tickets:
+            ticket_ids = [t.id for t in first_response_tickets]
+            ticket_map = {t.id: t for t in first_response_tickets}
+            all_msgs = db.exec(select(TicketMessage).where(TicketMessage.ticket_id.in_(ticket_ids))).all()
+
+            # Map first response per ticket
+            first_responses = {}
+            for m in all_msgs:
+                t = ticket_map.get(m.ticket_id)
+                if not t or m.sender_id == t.user_id: continue
+                if m.ticket_id not in first_responses or m.created_at < first_responses[m.ticket_id].created_at:
+                    first_responses[m.ticket_id] = m
+
+            first_response_times = []
+            for tid, msg in first_responses.items():
+                t = ticket_map[tid]
+                if t.created_at and msg.created_at:
+                    first_response_times.append((msg.created_at - t.created_at).total_seconds() / 60)
+
+            avg_first_response_min = round(sum(first_response_times) / max(len(first_response_times), 1), 1) if first_response_times else 0.0
+
+        return {
+            "agents": agents,
+            "sla_metrics": {
+                "critical_breach_4h": sla_breach_4h,
+                "general_breach_24h": sla_breach_24h,
+                "avg_first_response_minutes": avg_first_response_min,
+            },
+            "total_agents": len(agents),
+        }
+
+    return cached_call("admin-support", "team-performance", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
 
 
 @router.get("/team/overview")
@@ -569,33 +615,36 @@ def get_team_overview(
     current_user: User = Depends(deps.get_current_active_admin),
 ) -> Any:
     """Daily/weekly ticket volume trend."""
-    now = datetime.now(UTC)
-    past_14 = now - timedelta(days=14)
-    past_14_start = past_14.replace(hour=0, minute=0, second=0, microsecond=0)
-    
-    # Batch fetch created counts
-    created_rows = db.exec(select(func.date(SupportTicket.created_at), func.count(SupportTicket.id))
-                           .where(SupportTicket.created_at >= past_14_start)
-                           .group_by(func.date(SupportTicket.created_at))).all()
-    created_map = {str(r[0]): r[1] for r in created_rows}
-    
-    # Batch fetch resolved counts
-    resolved_rows = db.exec(select(func.date(SupportTicket.resolved_at), func.count(SupportTicket.id))
-                            .where(SupportTicket.resolved_at.is_not(None), SupportTicket.resolved_at >= past_14_start)
-                            .group_by(func.date(SupportTicket.resolved_at))).all()
-    resolved_map = {str(r[0]): r[1] for r in resolved_rows}
+    def _load():
+        now = datetime.now(UTC)
+        past_14 = now - timedelta(days=14)
+        past_14_start = past_14.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    trends = []
-    for i in range(14, -1, -1):
-        day_start = (now - timedelta(days=i)).date()
-        date_str = str(day_start)
-        created = created_map.get(date_str, 0)
-        resolved = resolved_map.get(date_str, 0)
-        
-        trends.append({
-            "date": day_start.strftime("%b %d"),
-            "created": created,
-            "resolved": resolved,
-        })
-    
-    return {"daily_trends": trends}
+        # Batch fetch created counts
+        created_rows = db.exec(select(func.date(SupportTicket.created_at), func.count(SupportTicket.id))
+                               .where(SupportTicket.created_at >= past_14_start)
+                               .group_by(func.date(SupportTicket.created_at))).all()
+        created_map = {str(r[0]): r[1] for r in created_rows}
+
+        # Batch fetch resolved counts
+        resolved_rows = db.exec(select(func.date(SupportTicket.resolved_at), func.count(SupportTicket.id))
+                                .where(SupportTicket.resolved_at.is_not(None), SupportTicket.resolved_at >= past_14_start)
+                                .group_by(func.date(SupportTicket.resolved_at))).all()
+        resolved_map = {str(r[0]): r[1] for r in resolved_rows}
+
+        trends = []
+        for i in range(14, -1, -1):
+            day_start = (now - timedelta(days=i)).date()
+            date_str = str(day_start)
+            created = created_map.get(date_str, 0)
+            resolved = resolved_map.get(date_str, 0)
+
+            trends.append({
+                "date": day_start.strftime("%b %d"),
+                "created": created,
+                "resolved": resolved,
+            })
+
+        return {"daily_trends": trends}
+
+    return cached_call("admin-support", "team-overview", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)

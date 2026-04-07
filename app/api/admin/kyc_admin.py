@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, case
 from typing import Any, List, Optional
 from datetime import datetime, UTC, date
 from pydantic import BaseModel
@@ -7,6 +7,8 @@ from app.api import deps
 from app.models.user import User, KYCStatus
 from app.models.kyc import KYCDocument, KYCDocumentStatus
 from app.core.database import get_db
+from app.core.config import settings
+from app.utils.runtime_cache import cached_call
 
 router = APIRouter()
 
@@ -72,32 +74,29 @@ def get_kyc_stats(
     current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Get KYC dashboard statistics."""
-    total_pending = db.exec(
-        select(func.count()).where(KYCDocument.status == "pending")
-    ).one()
+    def _load():
+        doc_row = db.exec(
+            select(
+                func.count(KYCDocument.id),
+                func.coalesce(func.sum(case((KYCDocument.status == "pending", 1), else_=0)), 0),
+                func.coalesce(func.sum(case((KYCDocument.status == "verified", 1), else_=0)), 0),
+                func.coalesce(func.sum(case((KYCDocument.status == "rejected", 1), else_=0)), 0),
+            )
+        ).one()
 
-    total_verified = db.exec(
-        select(func.count()).where(KYCDocument.status == "verified")
-    ).one()
+        pending_users = db.exec(
+            select(func.count()).where(User.kyc_status == KYCStatus.PENDING, User.is_deleted == False)
+        ).one()
 
-    total_rejected = db.exec(
-        select(func.count()).where(KYCDocument.status == "rejected")
-    ).one()
+        return {
+            "total_documents": int(doc_row[0]),
+            "total_pending": int(doc_row[1]),
+            "total_verified": int(doc_row[2]),
+            "total_rejected": int(doc_row[3]),
+            "pending_users": pending_users,
+        }
 
-    total_documents = db.exec(select(func.count()).select_from(KYCDocument)).one()
-
-    # Users with pending KYC
-    pending_users = db.exec(
-        select(func.count()).where(User.kyc_status == KYCStatus.PENDING, User.is_deleted == False)
-    ).one()
-
-    return {
-        "total_documents": total_documents,
-        "total_pending": total_pending,
-        "total_verified": total_verified,
-        "total_rejected": total_rejected,
-        "pending_users": pending_users,
-    }
+    return cached_call("admin-kyc", "stats", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
 
 
 @router.get("/{doc_id}")

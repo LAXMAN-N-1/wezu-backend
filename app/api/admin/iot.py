@@ -11,6 +11,8 @@ from app.models.iot import IoTDevice, DeviceCommand
 from app.models.geofence import Geofence
 from app.models.alert import Alert
 from app.core.database import get_db
+from app.core.config import settings
+from app.utils.runtime_cache import cached_call
 
 router = APIRouter()
 
@@ -20,17 +22,19 @@ def get_iot_stats(
     db: Session = Depends(get_db),
 ):
     """Get aggregated IoT device statistics."""
-    total = db.exec(select(func.count(IoTDevice.id))).one()
-    online = db.exec(select(func.count(IoTDevice.id)).where(IoTDevice.status == "online")).one()
-    errors = db.exec(select(func.count(Alert.id)).where(Alert.acknowledged_at == None)).one()
-    
-    return {
-        "total_devices": total,
-        "online_devices": online,
-        "offline_devices": total - online,
-        "active_alerts": errors,
-        "health_score": 98.5 # Mock metric for dashboard
-    }
+    def _load():
+        total = db.exec(select(func.count(IoTDevice.id))).one()
+        online = db.exec(select(func.count(IoTDevice.id)).where(IoTDevice.status == "online")).one()
+        errors = db.exec(select(func.count(Alert.id)).where(Alert.acknowledged_at == None)).one()
+        return {
+            "total_devices": total,
+            "online_devices": online,
+            "offline_devices": total - online,
+            "active_alerts": errors,
+            "health_score": 98.5
+        }
+
+    return cached_call("admin-iot", "stats", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
 
 @router.get("/devices", response_model=List[IoTDevice])
 def list_iot_devices(
@@ -142,14 +146,24 @@ def get_battery_health_overview(
     db: Session = Depends(get_db),
 ):
     """Get health status distribution of all batteries."""
-    batteries = db.exec(select(Battery)).all()
-    health_summary = {
-        "total": len(batteries),
-        "healthy": len([b for b in batteries if b.health_percentage >= 80]),
-        "warning": len([b for b in batteries if 50 <= b.health_percentage < 80]),
-        "critical": len([b for b in batteries if b.health_percentage < 50]),
-    }
-    return health_summary
+    def _load():
+        from sqlmodel import case
+        health_row = db.exec(
+            select(
+                func.count(Battery.id),
+                func.coalesce(func.sum(case((Battery.health_percentage >= 80, 1), else_=0)), 0),
+                func.coalesce(func.sum(case((Battery.health_percentage >= 50, case((Battery.health_percentage < 80, 1), else_=0)), else_=0)), 0),
+                func.coalesce(func.sum(case((Battery.health_percentage < 50, 1), else_=0)), 0),
+            )
+        ).one()
+        return {
+            "total": int(health_row[0]),
+            "healthy": int(health_row[1]),
+            "warning": int(health_row[2]),
+            "critical": int(health_row[3]),
+        }
+
+    return cached_call("admin-iot", "battery-health", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
 
 @router.get("/telematics/{battery_id}")
 def get_battery_telematics(

@@ -1,11 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session, select, func, text
+from sqlmodel import Session, select, func, text, case
 from typing import Any, Optional
 from datetime import datetime, UTC, timedelta
 from app.api import deps
 from app.models.inventory_audit import InventoryAuditLog
 from app.models.user import User
 from app.core.database import get_db
+from app.core.config import settings
+from app.utils.runtime_cache import cached_call
 
 router = APIRouter()
 
@@ -16,42 +18,34 @@ def get_audit_stats(
     current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Get summary statistics for inventory audit trail."""
-    total = db.exec(select(func.count(InventoryAuditLog.id))).one()
+    def _load():
+        now = datetime.now(UTC)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        week_ago = now - timedelta(days=7)
 
-    today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-    today_count = db.exec(
-        select(func.count(InventoryAuditLog.id)).where(InventoryAuditLog.timestamp >= today_start)
-    ).one()
+        row = db.exec(
+            select(
+                func.count(InventoryAuditLog.id),
+                func.coalesce(func.sum(case((InventoryAuditLog.timestamp >= today_start, 1), else_=0)), 0),
+                func.coalesce(func.sum(case((InventoryAuditLog.timestamp >= week_ago, 1), else_=0)), 0),
+                func.coalesce(func.sum(case((InventoryAuditLog.action_type == "transfer", 1), else_=0)), 0),
+                func.coalesce(func.sum(case((InventoryAuditLog.action_type == "disposal", 1), else_=0)), 0),
+                func.coalesce(func.sum(case((InventoryAuditLog.action_type == "status_change", 1), else_=0)), 0),
+                func.coalesce(func.sum(case((InventoryAuditLog.action_type == "manual_entry", 1), else_=0)), 0),
+            )
+        ).one()
 
-    # Count by action type
-    transfers = db.exec(
-        select(func.count(InventoryAuditLog.id)).where(InventoryAuditLog.action_type == "transfer")
-    ).one()
-    disposals = db.exec(
-        select(func.count(InventoryAuditLog.id)).where(InventoryAuditLog.action_type == "disposal")
-    ).one()
-    status_changes = db.exec(
-        select(func.count(InventoryAuditLog.id)).where(InventoryAuditLog.action_type == "status_change")
-    ).one()
-    manual_entries = db.exec(
-        select(func.count(InventoryAuditLog.id)).where(InventoryAuditLog.action_type == "manual_entry")
-    ).one()
+        return {
+            "total_entries": int(row[0]),
+            "today_count": int(row[1]),
+            "week_count": int(row[2]),
+            "transfers": int(row[3]),
+            "disposals": int(row[4]),
+            "status_changes": int(row[5]),
+            "manual_entries": int(row[6]),
+        }
 
-    # Last 7 days trend
-    week_ago = datetime.now(UTC) - timedelta(days=7)
-    week_count = db.exec(
-        select(func.count(InventoryAuditLog.id)).where(InventoryAuditLog.timestamp >= week_ago)
-    ).one()
-
-    return {
-        "total_entries": total,
-        "today_count": today_count,
-        "week_count": week_count,
-        "transfers": transfers,
-        "disposals": disposals,
-        "status_changes": status_changes,
-        "manual_entries": manual_entries,
-    }
+    return cached_call("admin-audit", "stats", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
 
 
 @router.get("/")

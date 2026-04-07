@@ -9,6 +9,8 @@ from app.models.rental import Rental, Purchase, RentalStatus
 from app.models.swap import SwapSession
 from app.models.late_fee import LateFee, LateFeeWaiver
 from app.core.database import get_db
+from app.core.config import settings
+from app.utils.runtime_cache import cached_call
 
 router = APIRouter()
 
@@ -27,20 +29,22 @@ def get_rental_stats(
     current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Get high-level statistics for rentals and orders."""
-    total_active = db.exec(select(func.count(Rental.id)).where(Rental.status == RentalStatus.ACTIVE)).one()
-    overdue_count = db.exec(select(func.count(Rental.id)).where(Rental.status == RentalStatus.OVERDUE)).one()
-    total_swaps = db.exec(select(func.count(SwapSession.id))).one()
-    
-    # Simple revenue calculation for today
-    today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-    today_revenue = db.exec(select(func.sum(Rental.total_amount)).where(Rental.created_at >= today_start)).one() or 0.0
-    
-    return {
-        "active_rentals": total_active,
-        "overdue_rentals": overdue_count,
-        "total_swaps_completed": total_swaps,
-        "today_revenue": round(float(today_revenue), 2),
-    }
+    def _load():
+        total_active = db.exec(select(func.count(Rental.id)).where(Rental.status == RentalStatus.ACTIVE)).one()
+        overdue_count = db.exec(select(func.count(Rental.id)).where(Rental.status == RentalStatus.OVERDUE)).one()
+        total_swaps = db.exec(select(func.count(SwapSession.id))).one()
+
+        today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+        today_revenue = db.exec(select(func.sum(Rental.total_amount)).where(Rental.created_at >= today_start)).one() or 0.0
+
+        return {
+            "active_rentals": total_active,
+            "overdue_rentals": overdue_count,
+            "total_swaps_completed": total_swaps,
+            "today_revenue": round(float(today_revenue), 2),
+        }
+
+    return cached_call("admin-rentals", "stats", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
 
 # --- Rentals ---
 

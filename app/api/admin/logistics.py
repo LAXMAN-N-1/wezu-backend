@@ -1,14 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session, select, func, desc
+from sqlmodel import Session, select, func, desc, case
 from typing import List, Optional
 from datetime import datetime, UTC
 from app.api import deps
 from app.core.database import get_db
+from app.core.config import settings
 from app.models.user import User
 from app.models.logistics import DeliveryOrder, DeliveryStatus, DeliveryType
 from app.models.driver_profile import DriverProfile
 from app.models.delivery_route import DeliveryRoute, RouteStop
 from app.models.return_request import ReturnRequest
+from app.utils.runtime_cache import cached_call
 
 router = APIRouter()
 
@@ -61,19 +63,25 @@ def get_order_stats(
     current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(get_db),
 ):
-    total = db.exec(select(func.count(DeliveryOrder.id))).one()
-    pending = db.exec(select(func.count(DeliveryOrder.id)).where(DeliveryOrder.status == DeliveryStatus.PENDING)).one()
-    in_transit = db.exec(select(func.count(DeliveryOrder.id)).where(DeliveryOrder.status == DeliveryStatus.IN_TRANSIT)).one()
-    delivered = db.exec(select(func.count(DeliveryOrder.id)).where(DeliveryOrder.status == DeliveryStatus.DELIVERED)).one()
-    failed = db.exec(select(func.count(DeliveryOrder.id)).where(DeliveryOrder.status == DeliveryStatus.FAILED)).one()
+    def _load():
+        row = db.exec(
+            select(
+                func.count(DeliveryOrder.id),
+                func.coalesce(func.sum(case((DeliveryOrder.status == DeliveryStatus.PENDING, 1), else_=0)), 0),
+                func.coalesce(func.sum(case((DeliveryOrder.status == DeliveryStatus.IN_TRANSIT, 1), else_=0)), 0),
+                func.coalesce(func.sum(case((DeliveryOrder.status == DeliveryStatus.DELIVERED, 1), else_=0)), 0),
+                func.coalesce(func.sum(case((DeliveryOrder.status == DeliveryStatus.FAILED, 1), else_=0)), 0),
+            )
+        ).one()
+        return {
+            "total_orders": int(row[0]),
+            "pending": int(row[1]),
+            "in_transit": int(row[2]),
+            "delivered": int(row[3]),
+            "failed": int(row[4]),
+        }
 
-    return {
-        "total_orders": total,
-        "pending": pending,
-        "in_transit": in_transit,
-        "delivered": delivered,
-        "failed": failed,
-    }
+    return cached_call("admin-logistics", "order-stats", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
 
 @router.post("/orders")
 def create_delivery_order(
@@ -160,18 +168,26 @@ def get_driver_stats(
     current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(get_db),
 ):
-    total = db.exec(select(func.count(DriverProfile.id))).one()
-    online = db.exec(select(func.count(DriverProfile.id)).where(DriverProfile.is_online == True)).one()
-    avg_rating = db.exec(select(func.coalesce(func.avg(DriverProfile.rating), 0))).one()
-    total_deliveries = db.exec(select(func.coalesce(func.sum(DriverProfile.total_deliveries), 0))).one()
+    def _load():
+        row = db.exec(
+            select(
+                func.count(DriverProfile.id),
+                func.coalesce(func.sum(case((DriverProfile.is_online == True, 1), else_=0)), 0),
+                func.coalesce(func.avg(DriverProfile.rating), 0),
+                func.coalesce(func.sum(DriverProfile.total_deliveries), 0),
+            )
+        ).one()
+        total = int(row[0])
+        online = int(row[1])
+        return {
+            "total_drivers": total,
+            "online_drivers": online,
+            "offline_drivers": total - online,
+            "avg_rating": round(float(row[2]), 1),
+            "total_deliveries": int(row[3]),
+        }
 
-    return {
-        "total_drivers": total,
-        "online_drivers": online,
-        "offline_drivers": total - online,
-        "avg_rating": round(float(avg_rating), 1),
-        "total_deliveries": total_deliveries,
-    }
+    return cached_call("admin-logistics", "driver-stats", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
 
 
 # ─── ROUTES ───────────────────────────────────────────────────────────────────
@@ -263,17 +279,23 @@ def get_return_stats(
     current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(get_db),
 ):
-    total = db.exec(select(func.count(ReturnRequest.id))).one()
-    pending = db.exec(select(func.count(ReturnRequest.id)).where(ReturnRequest.status == "pending")).one()
-    completed = db.exec(select(func.count(ReturnRequest.id)).where(ReturnRequest.status == "completed")).one()
-    total_refund = db.exec(select(func.coalesce(func.sum(ReturnRequest.refund_amount), 0))).one()
+    def _load():
+        row = db.exec(
+            select(
+                func.count(ReturnRequest.id),
+                func.coalesce(func.sum(case((ReturnRequest.status == "pending", 1), else_=0)), 0),
+                func.coalesce(func.sum(case((ReturnRequest.status == "completed", 1), else_=0)), 0),
+                func.coalesce(func.sum(ReturnRequest.refund_amount), 0),
+            )
+        ).one()
+        return {
+            "total_returns": int(row[0]),
+            "pending": int(row[1]),
+            "completed": int(row[2]),
+            "total_refund_amount": round(float(row[3]), 2),
+        }
 
-    return {
-        "total_returns": total,
-        "pending": pending,
-        "completed": completed,
-        "total_refund_amount": round(float(total_refund), 2),
-    }
+    return cached_call("admin-logistics", "return-stats", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
 
 @router.put("/returns/{return_id}/status")
 def update_return_status(

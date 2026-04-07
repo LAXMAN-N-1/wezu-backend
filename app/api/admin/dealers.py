@@ -8,6 +8,8 @@ from app.models.dealer import DealerProfile, DealerApplication, DealerDocument, 
 from app.models.commission import CommissionConfig, CommissionLog
 from app.models.user import User
 from app.core.database import get_db
+from app.core.config import settings
+from app.utils.runtime_cache import cached_call
 
 router = APIRouter()
 
@@ -57,15 +59,17 @@ def get_dealer_stats(
     current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Get high-level dealer network statistics."""
-    total_dealers = db.exec(select(func.count(DealerProfile.id)).where(DealerProfile.is_active == True)).one()
-    pending_applications = db.exec(select(func.count(DealerApplication.id)).where(DealerApplication.current_stage != "ACTIVE")).one()
-    total_commissions = db.exec(select(func.sum(CommissionLog.amount))).one() or 0.0
-    
-    return {
-        "total_active_dealers": total_dealers,
-        "pending_onboardings": pending_applications,
-        "total_commissions_paid": round(float(total_commissions), 2),
-    }
+    def _load():
+        total_dealers = db.exec(select(func.count(DealerProfile.id)).where(DealerProfile.is_active == True)).one()
+        pending_applications = db.exec(select(func.count(DealerApplication.id)).where(DealerApplication.current_stage != "ACTIVE")).one()
+        total_commissions = db.exec(select(func.sum(CommissionLog.amount))).one() or 0.0
+        return {
+            "total_active_dealers": total_dealers,
+            "pending_onboardings": pending_applications,
+            "total_commissions_paid": round(float(total_commissions), 2),
+        }
+
+    return cached_call("admin-dealers", "stats", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
 
 # --- Onboarding Applications ---
 
@@ -355,15 +359,17 @@ def get_commission_stats(
     current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Get commission summary stats."""
-    total_paid = db.exec(select(func.coalesce(func.sum(CommissionLog.amount), 0.0)).where(CommissionLog.status == "paid")).one()
-    total_pending = db.exec(select(func.coalesce(func.sum(CommissionLog.amount), 0.0)).where(CommissionLog.status == "pending")).one()
-    total_configs = db.exec(select(func.count(CommissionConfig.id)).where(CommissionConfig.is_active == True)).one()
-    
-    return {
-        "total_paid": round(float(total_paid), 2),
-        "total_pending": round(float(total_pending), 2),
-        "active_configs": total_configs,
-    }
+    def _load():
+        total_paid = db.exec(select(func.coalesce(func.sum(CommissionLog.amount), 0.0)).where(CommissionLog.status == "paid")).one()
+        total_pending = db.exec(select(func.coalesce(func.sum(CommissionLog.amount), 0.0)).where(CommissionLog.status == "pending")).one()
+        total_configs = db.exec(select(func.count(CommissionConfig.id)).where(CommissionConfig.is_active == True)).one()
+        return {
+            "total_paid": round(float(total_paid), 2),
+            "total_pending": round(float(total_pending), 2),
+            "active_configs": total_configs,
+        }
+
+    return cached_call("admin-dealers", "commission-stats", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
 
 class CommissionConfigCreate(BaseModel):
     dealer_id: Optional[int] = None

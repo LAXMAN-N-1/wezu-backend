@@ -1,6 +1,6 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, case
 from typing import Any, List, Optional
 from datetime import datetime, UTC
 from pydantic import BaseModel
@@ -13,6 +13,8 @@ from app.models.maintenance_checklist import (
 )
 from app.models.user import User
 from app.core.database import get_db
+from app.core.config import settings
+from app.utils.runtime_cache import cached_call
 
 router = APIRouter()
 
@@ -225,29 +227,33 @@ def get_station_stats(
     current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Get station network statistics."""
-    total = db.exec(select(func.count()).select_from(Station)).one()
-    operational = db.exec(select(func.count()).where(Station.status == StationStatus.OPERATIONAL)).one()
-    maintenance = db.exec(select(func.count()).where(Station.status == StationStatus.MAINTENANCE)).one()
-    offline = db.exec(select(func.count()).where(Station.status == StationStatus.OFFLINE)).one()
-    closed = db.exec(select(func.count()).where(Station.status == StationStatus.CLOSED)).one()
-    error = db.exec(select(func.count()).where(Station.status == StationStatus.ERROR)).one()
+    def _load():
+        row = db.exec(
+            select(
+                func.count(Station.id),
+                func.coalesce(func.sum(case((Station.status == StationStatus.OPERATIONAL, 1), else_=0)), 0),
+                func.coalesce(func.sum(case((Station.status == StationStatus.MAINTENANCE, 1), else_=0)), 0),
+                func.coalesce(func.sum(case((Station.status == StationStatus.OFFLINE, 1), else_=0)), 0),
+                func.coalesce(func.sum(case((Station.status == StationStatus.CLOSED, 1), else_=0)), 0),
+                func.coalesce(func.sum(case((Station.status == StationStatus.ERROR, 1), else_=0)), 0),
+                func.coalesce(func.sum(Station.total_slots), 0),
+                func.coalesce(func.sum(Station.available_batteries), 0),
+                func.coalesce(func.avg(Station.rating), 0.0),
+            )
+        ).one()
+        return {
+            "total_stations": int(row[0]),
+            "operational": int(row[1]),
+            "maintenance": int(row[2]),
+            "offline": int(row[3]),
+            "closed": int(row[4]),
+            "error": int(row[5]),
+            "total_slots": int(row[6]),
+            "total_available_batteries": int(row[7]),
+            "avg_rating": round(float(row[8]), 2),
+        }
 
-    total_slots = db.exec(select(func.coalesce(func.sum(Station.total_slots), 0))).one()
-    total_available = db.exec(select(func.coalesce(func.sum(Station.available_batteries), 0))).one()
-
-    avg_rating = db.exec(select(func.coalesce(func.avg(Station.rating), 0.0))).one()
-
-    return {
-        "total_stations": total,
-        "operational": operational,
-        "maintenance": maintenance,
-        "offline": offline,
-        "closed": closed,
-        "error": error,
-        "total_slots": total_slots,
-        "total_available_batteries": total_available,
-        "avg_rating": round(float(avg_rating), 2),
-    }
+    return cached_call("admin-stations", "stats", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
 
 
 @router.post("/")
@@ -505,46 +511,31 @@ def get_maintenance_stats(
     db: Session = Depends(deps.get_db)
 ):
     """Get maintenance statistics."""
-    total = db.exec(
-        select(func.count()).where(MaintenanceRecord.entity_type == "station")
-    ).one()
-    completed = db.exec(
-        select(func.count()).where(
-            MaintenanceRecord.entity_type == "station",
-            MaintenanceRecord.status == "completed"
-        )
-    ).one()
-    scheduled = db.exec(
-        select(func.count()).where(
-            MaintenanceRecord.entity_type == "station",
-            MaintenanceRecord.status == "scheduled"
-        )
-    ).one()
-    in_progress = db.exec(
-        select(func.count()).where(
-            MaintenanceRecord.entity_type == "station",
-            MaintenanceRecord.status == "in_progress"
-        )
-    ).one()
-    total_cost = db.exec(
-        select(func.coalesce(func.sum(MaintenanceRecord.cost), 0.0)).where(
-            MaintenanceRecord.entity_type == "station"
-        )
-    ).one()
+    def _load():
+        row = db.exec(
+            select(
+                func.count(MaintenanceRecord.id),
+                func.coalesce(func.sum(case((MaintenanceRecord.status == "completed", 1), else_=0)), 0),
+                func.coalesce(func.sum(case((MaintenanceRecord.status == "scheduled", 1), else_=0)), 0),
+                func.coalesce(func.sum(case((MaintenanceRecord.status == "in_progress", 1), else_=0)), 0),
+                func.coalesce(func.sum(MaintenanceRecord.cost), 0.0),
+            ).where(MaintenanceRecord.entity_type == "station")
+        ).one()
 
-    # Stations currently in maintenance status
-    stations_in_maintenance = db.exec(
-        select(func.count()).where(Station.status == StationStatus.MAINTENANCE)
-    ).one()
+        stations_in_maintenance = db.exec(
+            select(func.count()).where(Station.status == StationStatus.MAINTENANCE)
+        ).one()
 
-    return {
-        "total_records": total,
-        "completed": completed,
-        "scheduled": scheduled,
-        "in_progress": in_progress,
-        "total_cost": round(float(total_cost), 2),
-        "stations_in_maintenance": stations_in_maintenance,
-    }
+        return {
+            "total_records": int(row[0]),
+            "completed": int(row[1]),
+            "scheduled": int(row[2]),
+            "in_progress": int(row[3]),
+            "total_cost": round(float(row[4]), 2),
+            "stations_in_maintenance": stations_in_maintenance,
+        }
+
+    return cached_call("admin-stations", "maintenance-stats", period, ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
 
 
 @router.post("/maintenance/create")

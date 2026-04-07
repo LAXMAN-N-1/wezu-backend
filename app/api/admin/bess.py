@@ -5,6 +5,7 @@ from typing import List, Optional
 from datetime import datetime, UTC, timedelta
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.api.deps import get_current_active_admin
 from app.models.user import User
 from app.models.bess import BessUnit, BessEnergyLog, BessGridEvent, BessReport
@@ -12,6 +13,7 @@ from app.schemas.bess import (
     BessUnitRead, BessUnitCreate, BessEnergyLogRead,
     BessGridEventRead, BessGridEventCreate, BessReportRead, BessOverviewStats
 )
+from app.utils.runtime_cache import cached_call
 
 router = APIRouter()
 
@@ -25,45 +27,46 @@ def get_bess_overview(
     current_user: User = Depends(get_current_active_admin),
 ):
     """Aggregate dashboard stats for BESS overview."""
-    units = session.exec(select(BessUnit)).all()
-    if not units:
+    def _load():
+        units = session.exec(select(BessUnit)).all()
+        if not units:
+            return BessOverviewStats(
+                total_units=0, online_units=0, total_capacity_kwh=0,
+                current_stored_kwh=0, avg_soc=0, avg_soh=0,
+                total_energy_today_kwh=0, total_revenue_today=0
+            ).model_dump()
+
+        total = len(units)
+        online = sum(1 for u in units if u.status == "online")
+        total_cap = sum(u.capacity_kwh for u in units)
+        current_stored = sum(u.current_charge_kwh for u in units)
+        avg_soc = sum(u.soc for u in units) / total if total else 0
+        avg_soh = sum(u.soh for u in units) / total if total else 0
+
+        # Today's energy + revenue via SQL aggregation
+        today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+        energy_row = session.exec(
+            select(func.coalesce(func.sum(func.abs(BessEnergyLog.energy_kwh)), 0))
+            .where(BessEnergyLog.timestamp >= today_start)
+        ).one()
+        total_energy = float(energy_row)
+
+        revenue_row = session.exec(
+            select(func.coalesce(func.sum(BessGridEvent.revenue_earned), 0))
+            .where(BessGridEvent.start_time >= today_start, BessGridEvent.status == "completed")
+        ).one()
+        total_revenue = float(revenue_row)
+
         return BessOverviewStats(
-            total_units=0, online_units=0, total_capacity_kwh=0,
-            current_stored_kwh=0, avg_soc=0, avg_soh=0,
-            total_energy_today_kwh=0, total_revenue_today=0
-        )
+            total_units=total, online_units=online,
+            total_capacity_kwh=round(total_cap, 1),
+            current_stored_kwh=round(current_stored, 1),
+            avg_soc=round(avg_soc, 1), avg_soh=round(avg_soh, 1),
+            total_energy_today_kwh=round(total_energy, 1),
+            total_revenue_today=round(total_revenue, 2)
+        ).model_dump()
 
-    total = len(units)
-    online = sum(1 for u in units if u.status == "online")
-    total_cap = sum(u.capacity_kwh for u in units)
-    current_stored = sum(u.current_charge_kwh for u in units)
-    avg_soc = sum(u.soc for u in units) / total if total else 0
-    avg_soh = sum(u.soh for u in units) / total if total else 0
-
-    # Today's energy
-    today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-    today_logs = session.exec(
-        select(BessEnergyLog).where(BessEnergyLog.timestamp >= today_start)
-    ).all()
-    total_energy = sum(abs(l.energy_kwh) for l in today_logs)
-
-    # Today's revenue from grid events
-    today_events = session.exec(
-        select(BessGridEvent).where(
-            BessGridEvent.start_time >= today_start,
-            BessGridEvent.status == "completed"
-        )
-    ).all()
-    total_revenue = sum(e.revenue_earned or 0 for e in today_events)
-
-    return BessOverviewStats(
-        total_units=total, online_units=online,
-        total_capacity_kwh=round(total_cap, 1),
-        current_stored_kwh=round(current_stored, 1),
-        avg_soc=round(avg_soc, 1), avg_soh=round(avg_soh, 1),
-        total_energy_today_kwh=round(total_energy, 1),
-        total_revenue_today=round(total_revenue, 2)
-    )
+    return cached_call("admin-bess", "overview", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
 
 
 # ============================================================================
