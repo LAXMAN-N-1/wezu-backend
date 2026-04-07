@@ -61,8 +61,10 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         if is_health:
             return response
 
-        user_id = getattr(getattr(request.state, "user", None), "id", None) or getattr(
-            request.state, "user_id", None
+        user_id = (
+            getattr(getattr(request.state, "user", None), "id", None)
+            or getattr(request.state, "user_id", None)
+            or getattr(request.state, "token_user_id", None)
         )
         auth_error = getattr(request.state, "auth_error", None)
 
