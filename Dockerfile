@@ -38,6 +38,8 @@ RUN adduser --disabled-password --gecos '' wezu_user
 
 WORKDIR /app
 ENV PYTHONPATH=/app
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 ENV PIP_DEFAULT_TIMEOUT=120
 
@@ -66,4 +68,5 @@ EXPOSE 8000
 
 # Use conservative defaults for small VPS instances.
 # Run migrations then start the app server.
-CMD ["sh", "-c", "alembic upgrade head && exec gunicorn app.main:app --workers ${GUNICORN_WORKERS:-4} --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --log-level ${GUNICORN_LOG_LEVEL:-info} --access-logfile - --error-logfile - --capture-output --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-30} --max-requests ${GUNICORN_MAX_REQUESTS:-1000} --max-requests-jitter ${GUNICORN_MAX_REQUESTS_JITTER:-100}"]
+# Logs go to stderr via structlog; no --capture-output needed.
+CMD ["sh", "-c", "alembic upgrade head && exec gunicorn app.main:app -c gunicorn.conf.py --workers ${GUNICORN_WORKERS:-4} --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --log-level ${GUNICORN_LOG_LEVEL:-info} --access-logfile - --error-logfile - --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout ${GUNICORN_GRACEFUL_TIMEOUT:-30} --max-requests ${GUNICORN_MAX_REQUESTS:-1000} --max-requests-jitter ${GUNICORN_MAX_REQUESTS_JITTER:-100}"]

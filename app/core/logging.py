@@ -37,9 +37,19 @@ def _shared_processors() -> list[structlog.types.Processor]:
 
 def setup_logging() -> None:
     """
-    Configure stdlib logging and structlog so all logs end up on stdout/stderr
-    with request context attached. This is the only logging bootstrap path the
-    API should use.
+    Configure stdlib logging and structlog so **all** logs end up on
+    stderr (the stream Docker/Dozzle/Coolify capture by default) with
+    request context attached.
+
+    Key design choices for container environments:
+    • Write to **sys.stderr** — Docker's log driver captures stderr
+      line-by-line; gunicorn's --capture-output only intercepts
+      sys.stdout, so using stderr avoids the double-pipe buffering
+      that makes logs disappear.
+    • Flush after every record so nothing stays stuck in a buffer.
+    • Do NOT clear handlers on gunicorn.error / gunicorn.access —
+      let gunicorn's own handlers coexist; we only ensure propagation
+      reaches our root handler.
     """
     shared_processors = _shared_processors()
     renderer: structlog.types.Processor
@@ -53,7 +63,8 @@ def setup_logging() -> None:
         processor=renderer,
     )
 
-    handler = logging.StreamHandler(sys.stdout)
+    # --- stderr handler with immediate flush ---
+    handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(formatter)
     handler.addFilter(_HealthcheckAccessFilter())
 
@@ -76,7 +87,6 @@ def setup_logging() -> None:
         "uvicorn": logging.INFO,
         "uvicorn.error": logging.INFO,
         "uvicorn.access": access_log_level,
-        "gunicorn": logging.INFO,
         "gunicorn.error": logging.INFO,
         "gunicorn.access": access_log_level,
         "sqlalchemy.engine": logging.INFO if settings.SQLALCHEMY_ECHO else logging.WARNING,
@@ -85,7 +95,9 @@ def setup_logging() -> None:
     }
     for logger_name, level in quiet_loggers.items():
         library_logger = logging.getLogger(logger_name)
-        library_logger.handlers.clear()
+        # Let library loggers propagate to root (which has our stderr
+        # handler) instead of clearing their handlers — gunicorn adds
+        # its own handler that we must not remove.
         library_logger.propagate = True
         library_logger.setLevel(level)
 
