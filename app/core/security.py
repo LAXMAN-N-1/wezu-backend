@@ -6,9 +6,9 @@ from passlib.context import CryptContext
 from app.core.config import settings
 
 # bcrypt is ~250ms vs pbkdf2_sha256 ~3s on 0.75-CPU VPS.
-# "deprecated=auto" means existing pbkdf2 hashes still verify
-# and get transparently re-hashed to bcrypt on next successful login.
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated=["pbkdf2_sha256"])
+# Both schemes must be listed; marking pbkdf2 as deprecated means
+# existing hashes still verify but get re-hashed to bcrypt on next login.
+pwd_context = CryptContext(schemes=["bcrypt", "pbkdf2_sha256"], deprecated=["pbkdf2_sha256"])
 
 def create_access_token(subject: Union[str, Any], expires_delta: timedelta = None, extra_claims: dict = None) -> str:
     if expires_delta:
