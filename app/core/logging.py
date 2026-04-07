@@ -7,7 +7,12 @@ import structlog
 from app.core.config import settings
 
 
+_HEALTH_PATHS = frozenset({"/health", "/live", "/ready", "/healthz", "/livez", "/readyz"})
+
+
 class _HealthcheckAccessFilter(logging.Filter):
+    """Suppress healthcheck noise from uvicorn/gunicorn access logs."""
+
     def filter(self, record: logging.LogRecord) -> bool:
         if settings.LOG_HEALTHCHECKS:
             return True
@@ -20,7 +25,7 @@ class _HealthcheckAccessFilter(logging.Filter):
             path_hint = str(args[2])
 
         message = path_hint or record.getMessage()
-        return "/health" not in message and "/ready" not in message
+        return not any(p in message for p in _HEALTH_PATHS)
 
 
 def _shared_processors() -> list[structlog.types.Processor]:
@@ -53,7 +58,7 @@ def setup_logging() -> None:
     """
     shared_processors = _shared_processors()
     renderer: structlog.types.Processor
-    if settings.ENVIRONMENT == "production":
+    if settings.ENVIRONMENT.lower() == "production":
         renderer = structlog.processors.JSONRenderer()
     else:
         renderer = structlog.dev.ConsoleRenderer()
@@ -86,7 +91,11 @@ def setup_logging() -> None:
     quiet_loggers = {
         "uvicorn": logging.INFO,
         "uvicorn.error": logging.INFO,
-        "uvicorn.access": access_log_level,
+        # Silence uvicorn.access completely — our RequestLoggingMiddleware
+        # already emits richer structured request logs with request_id,
+        # duration_ms, user_id, etc.  Keeping uvicorn.access on causes
+        # every request to appear twice.
+        "uvicorn.access": logging.WARNING,
         "gunicorn.error": logging.INFO,
         "gunicorn.access": access_log_level,
         "sqlalchemy.engine": logging.INFO if settings.SQLALCHEMY_ECHO else logging.WARNING,
