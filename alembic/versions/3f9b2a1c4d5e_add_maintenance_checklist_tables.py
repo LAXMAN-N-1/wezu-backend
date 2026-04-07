@@ -63,15 +63,23 @@ def upgrade() -> None:
         )
 
     if not inspector.has_table("maintenance_checklist_submissions"):
-        op.create_table(
-            "maintenance_checklist_submissions",
-            sa.Column("id", sa.Integer(), primary_key=True, nullable=False),
+        # Build column list; only add FK to maintenance_records if that table exists
+        has_mr = inspector.has_table("maintenance_records")
+        mr_col = (
             sa.Column(
                 "maintenance_record_id",
                 sa.Integer(),
                 sa.ForeignKey("maintenance_records.id"),
                 nullable=True,
-            ),
+            )
+            if has_mr
+            else sa.Column("maintenance_record_id", sa.Integer(), nullable=True)
+        )
+
+        op.create_table(
+            "maintenance_checklist_submissions",
+            sa.Column("id", sa.Integer(), primary_key=True, nullable=False),
+            mr_col,
             sa.Column(
                 "template_id",
                 sa.Integer(),

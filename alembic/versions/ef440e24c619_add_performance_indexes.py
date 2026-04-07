@@ -26,11 +26,17 @@ depends_on = None
 
 
 def _safe_create_index(index_name: str, table: str, columns: list[str], **kw):
-    """Create an index only if it doesn't already exist."""
+    """Create an index only if it doesn't already exist.
+
+    Uses a SAVEPOINT so that a failure (e.g. index/table already exists)
+    doesn't abort the outer PostgreSQL transaction.
+    """
+    bind = op.get_bind()
     try:
-        op.create_index(index_name, table, columns, **kw)
+        with bind.begin_nested():          # SAVEPOINT
+            op.create_index(index_name, table, columns, **kw)
     except Exception:
-        pass  # Index already exists — skip
+        pass  # index or table doesn't exist — skip silently
 
 
 def upgrade() -> None:
@@ -50,6 +56,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    bind = op.get_bind()
     for idx in [
         "ix_commission_logs_dealer_id",
         "ix_dealer_profiles_user_id",
@@ -66,6 +73,7 @@ def downgrade() -> None:
         "ix_users_role_id",
     ]:
         try:
-            op.drop_index(idx)
+            with bind.begin_nested():
+                op.drop_index(idx)
         except Exception:
             pass
