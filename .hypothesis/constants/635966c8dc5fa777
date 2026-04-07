@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/analytics/logistics_service.py
+# hypothesis_version: 6.151.11
+
+[4.8, 5.2, 15.0, 92.5, 450.0, 100, 150, '30d', 'Failed', 'Mon', 'Success', 'Tue', 'battery_returns', 'cancelled', 'completed', 'deliveries', 'deliveries_today', 'delivery_delay_rate', 'delivery_time_trend', 'distance_covered', 'driver_performance', 'driver_rating_avg', 'epoch', 'failed_deliveries', 'failed_pickups', 'name', 'negative', 'pending', 'pending_deliveries', 'pickup_requests', 'positive', 'route_efficiency', 'sms_sent', 'success_rate_pie', 'total_deliveries']

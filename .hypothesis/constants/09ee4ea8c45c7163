@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/middleware/audit.py
+# hypothesis_version: 6.151.11
+
+[1000, '/', '/docs', '/health', '/live', '/openapi.json', 'api_request', 'id', 'method', 'process_time_ms', 'status_code', 'url', 'user', 'user-agent', 'user_agent', 'user_id']

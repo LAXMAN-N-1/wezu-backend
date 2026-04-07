@@ -343,7 +343,7 @@ async def verify_registration_otp(
             db.refresh(user)
         
         # Check Fraud Risk
-        FraudService.calculate_risk_score(user.id)
+        FraudService.calculate_risk_score(db, user.id)
     else:
         logger.info(f"Existing user linked via OTP: {verify_data.target}")
         
@@ -498,7 +498,7 @@ async def social_login(
             db.refresh(user)
             
         # Check Fraud Risk
-        FraudService.calculate_risk_score(user.id)
+        FraudService.calculate_risk_score(db, user.id)
         
     else:
         # Update existing user info
@@ -604,7 +604,7 @@ async def register_with_password(
         db.refresh(new_user)
     
     # Check Fraud Risk
-    FraudService.calculate_risk_score(new_user.id)
+    FraudService.calculate_risk_score(db, new_user.id)
     
     # Audit log
     AuditLogger.log_event(db, new_user.id, "USER_CREATION", "USER", resource_id=str(new_user.id), target_id=new_user.id)

@@ -26,6 +26,14 @@ class TransactionResponse(BaseModel):
     payment_method: Optional[str] = None
     payment_gateway_ref: Optional[str] = None
     
+    # P1-C canonical fields
+    type: Optional[str] = None
+    category: Optional[str] = None
+    balance_after: Optional[float] = None
+    reference_type: Optional[str] = None
+    reference_id: Optional[str] = None
+    razorpay_payment_id: Optional[str] = None
+    
     description: Optional[str] = None
     created_at: datetime
     

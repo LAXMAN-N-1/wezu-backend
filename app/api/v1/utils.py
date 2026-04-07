@@ -19,4 +19,4 @@ async def upload_file(
         url = await storage_service.upload_file(file, directory)
         return {"url": url}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="File upload failed")

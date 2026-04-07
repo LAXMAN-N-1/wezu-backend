@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/battery_batch_service.py
+# hypothesis_version: 6.151.11
+
+[100.0, 'created_at', 'cycle_count', 'error', 'error_count', 'errors', 'health_percentage', 'health_status', 'id', 'location_type', 'manufacture_date', 'manufacturer', 'notes', 'row', 'serial_number', 'sku_id', 'station_id', 'status', 'success_count', 'warehouse', 'warehouse_id']

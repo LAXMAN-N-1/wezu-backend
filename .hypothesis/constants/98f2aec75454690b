@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/core/screen_config.py
+# hypothesis_version: 6.151.11
+
+['Cost', 'Delete', 'Edit', 'Export CSV', 'ID', 'Min SoC', 'SoC', 'Status', 'View Details', 'actions', 'active', 'battery:delete', 'battery:update', 'battery_id', 'battery_list', 'bulk_actions', 'columns', 'delete', 'edit', 'enabled', 'export_csv', 'field', 'filters', 'finance:view', 'financial_data', 'id', 'label', 'maintenance', 'number', 'options', 'permission', 'permission_required', 'retired', 'screen_id', 'select', 'soc', 'soc_min', 'sortable', 'status', 'type', 'view_details', 'visible']

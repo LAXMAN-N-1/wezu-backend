@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/swaps.py
+# hypothesis_version: 6.151.11
+
+[0.0, 50.0, 400, 404, '/initiate', '/{swap_id}/complete', 'COMPLETE_SWAP', 'INITIATE_SWAP', 'SWAP', 'Session not found', 'Station not found', 'amount', 'completed', 'created_at', 'debit', 'id', 'initiated', 'paid', 'station_id', 'station_name', 'status', 'swap_fee', 'swap_id', 'swap_session']

@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/rental_event.py
+# hypothesis_version: 6.151.11
+
+['Rental', 'batteries.id', 'events', 'rental_events', 'rentals.id', 'stations.id']

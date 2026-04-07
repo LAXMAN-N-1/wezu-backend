@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/core/database.py
+# hypothesis_version: 6.151.11
+
+[400, 1000, '_query_start_times', 'after_cursor_execute', 'check_same_thread', 'connect', 'connect_args', 'connect_timeout', 'echo', 'max_overflow', 'pool_pre_ping', 'pool_recycle', 'pool_size', 'pool_timeout', 'pool_use_lifo', 'poolclass', 'postgresql', 'rowcount', 'sqlite', 'sslmode', 'timeout']

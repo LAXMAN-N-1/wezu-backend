@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/rental.py
+# hypothesis_version: 6.151.11
+
+[0.0, 100.0, 'Battery', 'INR', 'RentalEvent', 'Station', 'SwapSession', 'Transaction', 'User', 'active', 'batteries.id', 'cancelled', 'completed', 'foreign_keys', 'overdue', 'pending_payment', 'purchases', 'rental', 'rentals', 'stations.id', 'users.id']

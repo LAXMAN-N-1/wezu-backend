@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/order_service.py
+# hypothesis_version: 6.151.11
+
+[0.05, 0.18, 100, 500, 'BlueDart', 'CANCELLED', 'CONFIRMED', 'DELIVERED', 'PAID', 'PENDING', 'RETURN_REQUESTED', 'address', 'city', 'phone', 'pincode', 'product_id', 'product_name', 'quantity', 'sku', 'state', 'total_price', 'unit_price', 'variant_id', 'warranty_months']

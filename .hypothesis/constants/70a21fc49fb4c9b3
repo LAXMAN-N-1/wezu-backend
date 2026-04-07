@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/dealer_service.py
+# hypothesis_version: 6.151.11
+
+[0.0, 10.0, 100, 'ACTIVE', 'APPROVED', 'AUTO_VERIFIED', 'COMPLETED', 'Dealer not found', 'Field visit done', 'Initial Submission', 'KYC_SUBMITTED', 'Promotion not found', 'REJECTED', 'REVIEW_PENDING', 'SCHEDULED', 'SUBMITTED', 'SUSPENDED', 'Visit not found', 'Visit scheduled', 'active', 'active_stations', 'daily_rentals', 'dealer', 'monthly_rentals', 'note', 'revenue', 'stage', 'timestamp', 'total_earnings', 'total_stations', 'weekly_rentals']

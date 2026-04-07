@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/schemas/dealer.py
+# hypothesis_version: 6.151.11
+
+[0.0, 100, 200, 'ALL', 'APPROVED', 'CANCELLED', 'COMPLETED', 'DOCUMENTS_PENDING', 'REJECTED', 'SCHEDULED', 'SUBMITTED', 'UNDER_REVIEW', '^\\+?[1-9]\\d{9,14}$', '^\\d{6}$']

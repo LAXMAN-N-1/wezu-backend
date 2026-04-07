@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/delivery_assignment.py
+# hypothesis_version: 6.151.11
+
+['EcommerceOrder', 'ReturnRequest', 'assigned', 'delivery', 'delivery_assignments', 'driver_profiles.id', 'ecommerce_orders.id', 'return_requests.id']

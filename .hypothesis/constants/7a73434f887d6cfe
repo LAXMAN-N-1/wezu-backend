@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/notification.py
+# hypothesis_version: 6.151.11
+
+['User', 'dead_letter', 'failed', 'info', 'notifications', 'pending', 'push', 'queued', 'sent', 'skipped', 'users.id']

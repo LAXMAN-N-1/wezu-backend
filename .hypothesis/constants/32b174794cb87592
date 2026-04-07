@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/repositories/wallet_repository.py
+# hypothesis_version: 6.151.11
+
+[0.0, 'Insufficient balance', 'user_id']

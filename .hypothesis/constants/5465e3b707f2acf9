@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/dealer_documents.py
+# hypothesis_version: 6.151.11
+
+[403, 404, '/upload', '/{document_id}', 'ARCHIVED', 'Document archived', 'Document not found', 'Not a dealer', 'PENDING', 'document', 'message', 'verification']

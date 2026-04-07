@@ -61,8 +61,8 @@ def get_station_health_stats(
         
         return StationHealthListResponse(stations=results)
     except Exception as e:
-        logger.exception(f"Error in get_station_health_stats: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("station_health_stats_failed")
+        raise HTTPException(status_code=500, detail="Failed to retrieve station health stats")
 
 @router.get("/{station_id}/alerts")
 def get_station_alerts(

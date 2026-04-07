@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/warehouse.py
+# hypothesis_version: 6.151.11
+
+[100, 'Branch', 'Rack', 'Shelf', 'ShelfBattery', 'Stock', 'User', 'branches.id', 'rack', 'racks', 'shelf', 'shelf_batteries', 'shelves', 'users.id', 'warehouse', 'warehouse_racks', 'warehouse_racks.id', 'warehouse_shelves', 'warehouse_shelves.id', 'warehouses', 'warehouses.id']

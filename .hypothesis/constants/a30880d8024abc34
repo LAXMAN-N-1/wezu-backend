@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/role_right.py
+# hypothesis_version: 6.151.11
+
+['Menu', 'Role', 'menu_id', 'menus.id', 'role_id', 'role_rights', 'roles.id', 'unique_role_menu']

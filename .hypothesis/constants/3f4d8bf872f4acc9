@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/admin/cms.py
+# hypothesis_version: 6.151.11
+
+[100, 404, '/banners/', '/banners/{banner_id}', '/blogs/', '/blogs/{blog_id}', '/faqs/', '/faqs/{faq_id}', '/legal/', '/legal/{doc_id}', '/media/', '/media/{asset_id}', 'Asset not found', 'Banner not found', 'Blog not found', 'Document not found', 'FAQ not found', 'general', 'message']

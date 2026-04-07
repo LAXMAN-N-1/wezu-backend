@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/commission.py
+# hypothesis_version: 6.151.11
+
+[0.0, 'Settlement', 'commission_configs', 'commission_logs', 'commission_tiers', 'pending', 'settlements.id', 'transactions.id', 'users.id', 'vendors.id']

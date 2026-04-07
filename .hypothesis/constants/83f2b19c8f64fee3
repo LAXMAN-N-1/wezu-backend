@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/logistics.py
+# hypothesis_version: 6.151.11
+
+['LogisticsManifest', 'ReturnRequest', 'User', 'assigned', 'batteries.id', 'battery_transfers', 'cancelled', 'customer_delivery', 'dealer_restock', 'delivered', 'delivery_order', 'delivery_orders', 'draft', 'failed', 'foreign_keys', 'in_transit', 'logistics_manifests', 'manifest', 'pending', 'return_requests.id', 'reverse_logistics', 'transfers', 'users.id']

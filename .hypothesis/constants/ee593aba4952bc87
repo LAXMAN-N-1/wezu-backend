@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/swap_service.py
+# hypothesis_version: 6.151.11
+
+[0.0, '-', '24/7', 'Invalid rental', '_', 'active', 'address', 'available', 'available_batteries', 'best_battery_soc', 'customer', 'deployed', 'description', 'distance_km', 'latitude', 'longitude', 'operating_hours', 'station', 'station_id', 'station_name', 'swap_complete', 'swap_dispensed', 'swap_returned', 'timestamp', 'travel_time_minutes']

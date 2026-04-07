@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/admin_group.py
+# hypothesis_version: 6.151.11
+
+['AdminUser', 'admin_group', 'admin_groups']

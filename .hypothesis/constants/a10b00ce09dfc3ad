@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/schemas/faq.py
+# hypothesis_version: 6.151.11
+
+['Category of the FAQ', 'The FAQ answer', 'The FAQ question', 'general']

@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/analytics/base.py
+# hypothesis_version: 6.151.11
+
+[0.0, 100, 365, '30d', '365d', '7d', '90d', 'down', 'monthly', 'neutral', 'quarterly', 'status', 'trend_percentage', 'up', 'value', 'weekly', 'yearly']

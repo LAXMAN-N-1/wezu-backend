@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/alert.py
+# hypothesis_version: 6.151.11
+
+['MEDIUM', 'Station', 'alerts', 'stations.id', 'users.id']

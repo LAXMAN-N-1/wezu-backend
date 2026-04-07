@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/swap.py
+# hypothesis_version: 6.151.11
+
+[0.0, 'Battery', 'INR', 'Rental', 'Station', 'User', 'batteries.id', 'foreign_keys', 'initiated', 'pending', 'rentals.id', 'stations.id', 'swap_sessions', 'swaps', 'users.id']

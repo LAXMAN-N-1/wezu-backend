@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/admin/security.py
+# hypothesis_version: 6.151.11
+
+[404, '/audit-logs', '/audit-logs/stats', '/security-events', '/security-settings', '2fa_enabled', '5', '60', '8', '90', 'Days of history', 'Event not found', 'action', 'addresses', 'by_action', 'details', 'enabled', 'enforcement', 'event_type', 'expiry_days', 'false', 'id', 'ip_address', 'ip_whitelist', 'ip_whitelist_enabled', 'is_resolved', 'items', 'login_security', 'max_attempts', 'max_login_attempts', 'message', 'min_length', 'new_value', 'old_value', 'optional', 'password_expiry_days', 'password_min_length', 'password_policy', 'require_numbers', 'require_uppercase', 'resource_id', 'resource_type', 'session_management', 'severity', 'source_ip', 'this_week', 'timeout_minutes', 'timestamp', 'today', 'total', 'total_count', 'true', 'two_factor_auth', 'updated_keys', 'user_agent', 'user_id']

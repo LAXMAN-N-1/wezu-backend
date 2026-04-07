@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/warehouse_structure.py
+# hypothesis_version: 6.151.11
+
+[120, 180, 200, 400, 404, 409, 500, 800, 900, 5000, '/', '/all', 'Idempotency-Key', 'POST', 'Shelf not found', 'active_only', 'battery_id', 'json', 'shelf', 'shelf_assigned', 'shelf_id', 'warehouse', 'warehouse_structures']

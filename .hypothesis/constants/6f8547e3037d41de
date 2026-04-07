@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/payments.py
+# hypothesis_version: 6.151.11
+
+[100, 400, 404, '/admin/payments', '/admin/revenue', '/methods', '/methods/{method_id}', '/payment-methods', '/refunds', '/transactions', '/webhooks/razorpay', '/{id}', '/{id}/refund', '/{id}/refund-status', 'CONFIRMED', 'Content-Disposition', 'Invalid signature', 'Order not found', 'PAYMENT', 'PENDING', 'REFUND', 'REQUEST_REFUND', 'Rental not found', 'SHIPPED', 'X-Razorpay-Signature', 'amount', 'application/pdf', 'created', 'created_at', 'daily', 'default_method_id', 'description', 'entity', 'event', 'id', 'initiated', 'is_default', 'message', 'method', 'method_id', 'methods', 'monthly', 'ok', 'order_id', 'payload', 'payment', 'payment.captured', 'processed_at', 'razorpay', 'refund_amount', 'refund_id', 'refunded', 'saved_methods', 'status', 'transaction_id', 'wallet_topup', 'weekly']

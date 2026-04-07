@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/promo_service.py
+# hypothesis_version: 6.151.11
+
+[0.0, 100, 400, 404, 'Invalid promo code', 'Promo code expired', 'Promo not found', 'code', 'discount', 'final_amount', 'promo_id']

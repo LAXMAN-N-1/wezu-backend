@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/rental_modification.py
+# hypothesis_version: 6.151.11
+
+[0.0, 'PENDING', 'Rental', 'Station', 'User', 'foreign_keys', 'rental_extensions', 'rental_pauses', 'rentals.id', 'stations.id', 'users.id']

@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/schemas/dealer_user.py
+# hypothesis_version: 6.151.11
+
+['active', 'bearer', 'change_role', 'credential_mode', 'deactivate', 'delete', 'invite', 'manual', 'mode', 'new_password', 'password']

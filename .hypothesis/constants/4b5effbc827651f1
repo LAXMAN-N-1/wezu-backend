@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/kyc_service.py
+# hypothesis_version: 6.151.11
+
+[0.95, 0.98, 'APPROVED', 'DOC_BLURRY', 'Dev Test Address 123', 'Document has expired', 'EXP_DOC', 'INCOMPLETE_DOC', 'INVALID_ADDRESS', 'NAME_MISMATCH', 'PENDING_REVIEW', 'PHOTO_MISMATCH', 'POSSIBLE_FRAUD', 'VERIFIED', '_dev_mode', 'code', 'description', 'extracted_address', 'kyc.mock_pan_verify', 'liveness_score', 'match_confidence', 'production', 'status', 'submission_trend', 'success', 'total_approved_today', 'total_pending', 'total_rejected_today', 'verification_id']

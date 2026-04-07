@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/station_monitoring.py
+# hypothesis_version: 6.151.11
+
+[404, 500, '/charging/prioritize', '/heartbeat', 'Heartbeat received', 'Station not found']

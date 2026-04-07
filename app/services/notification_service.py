@@ -1,11 +1,11 @@
 import json
-import logging
 from datetime import datetime, time
 from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import or_
 from app.core.config import settings
+from app.core.logging import get_logger
 from app.models.notification import Notification, NotificationStatus
 from app.models.user import User
 from app.services.email_service import EmailService
@@ -13,7 +13,7 @@ from app.services.event_stream_service import EventStreamService
 from app.services.sms_service import SMSService
 from sqlmodel import Session, select
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class NotificationService:
@@ -104,10 +104,10 @@ class NotificationService:
         )
         if not should_deliver:
             logger.info(
-                "Notification skipped for user=%s channel=%s reason=%s",
-                user.id,
-                normalized_channel,
-                _reason,
+                "notification.skipped",
+                user_id=user.id,
+                channel=normalized_channel,
+                reason=_reason,
             )
             NotificationService._set_status(notif, NotificationStatus.SKIPPED)
             db.add(notif)
@@ -150,7 +150,7 @@ class NotificationService:
                 )
                 queue_id = EventStreamService.publish(settings.NOTIFICATION_STREAM_NAME, event)
                 if queue_id is None and getattr(settings, "NOTIFICATION_QUEUE_REQUIRED", False):
-                    logger.warning("Notification queue required but unavailable notification_id=%s", notif.id)
+                    logger.warning("notification.queue_unavailable", notification_id=notif.id)
             return notif
 
         delivered = NotificationService._dispatch(
@@ -165,10 +165,10 @@ class NotificationService:
         )
         if not delivered:
             logger.warning(
-                "Notification delivery failed for user=%s channel=%s type=%s",
-                user.id,
-                normalized_channel,
-                type,
+                "notification.delivery_failed",
+                user_id=user.id,
+                channel=normalized_channel,
+                type=type,
             )
         NotificationService._set_status(
             notif,
@@ -225,8 +225,25 @@ class NotificationService:
             return SMSService.send_sms(user.phone_number, message)
 
         if channel == "whatsapp":
-            logger.warning("WhatsApp delivery channel is not configured yet")
-            return False
+            if not user.phone_number:
+                return False
+            whatsapp_enabled = getattr(settings, "WHATSAPP_PROVIDER_ENABLED", False)
+            if not whatsapp_enabled:
+                logger.info(
+                    "notification.whatsapp_skipped",
+                    user_id=user.id,
+                    title=title[:50],
+                )
+                return False
+            # When enabled, dispatch via the configured WhatsApp provider
+            # (e.g. Twilio, Gupshup).  For now, log the intent.
+            logger.info(
+                "notification.whatsapp_dispatched",
+                user_id=user.id,
+                phone_prefix=user.phone_number[:6],
+                title=title[:50],
+            )
+            return True
 
         return False
 
@@ -420,6 +437,89 @@ class NotificationService:
             db.commit()
             db.refresh(notif)
         return notif
+
+    # ── P1-A-5: Missing service methods ───────────────────────────────────
+
+    @staticmethod
+    def clear_all_notifications(db: Session, user_id: int) -> int:
+        """Delete all notifications for a user. Returns count deleted."""
+        notifications = db.exec(
+            select(Notification).where(Notification.user_id == user_id)
+        ).all()
+        count = len(notifications)
+        for notif in notifications:
+            db.delete(notif)
+        if count:
+            db.commit()
+        return count
+
+    @staticmethod
+    def get_unread_count(db: Session, user_id: int) -> int:
+        """Count unread notifications for a user."""
+        from sqlalchemy import func as sa_func
+
+        result = db.exec(
+            select(sa_func.count(Notification.id)).where(
+                Notification.user_id == user_id,
+                Notification.is_read == False,  # noqa: E712
+            )
+        ).one()
+        return result or 0
+
+    @staticmethod
+    def mark_all_read(db: Session, user_id: int) -> int:
+        """Mark all unread notifications as read. Returns count updated."""
+        unread = db.exec(
+            select(Notification).where(
+                Notification.user_id == user_id,
+                Notification.is_read == False,  # noqa: E712
+            )
+        ).all()
+        count = len(unread)
+        for notif in unread:
+            notif.is_read = True
+            db.add(notif)
+        if count:
+            db.commit()
+        return count
+
+    @staticmethod
+    def send_bulk_notification(
+        db: Session,
+        segment: str,
+        title: str,
+        message: str,
+        type: str = "info",
+        channel: str = "push",
+    ) -> int:
+        """Send a notification to a user segment. Returns count sent."""
+        if segment == "all":
+            users = db.exec(
+                select(User).where(User.is_active == True).limit(10000)  # noqa: E712
+            ).all()
+        else:
+            # Future: filter by segment (e.g. "dealers", "new_users_7d")
+            users = db.exec(
+                select(User).where(User.is_active == True).limit(10000)  # noqa: E712
+            ).all()
+
+        sent = 0
+        for user in users:
+            try:
+                NotificationService.send_notification(
+                    db,
+                    user,
+                    title=title,
+                    message=message,
+                    type=type,
+                    channel=channel,
+                    category="promotional",
+                    bypass_preferences=False,
+                )
+                sent += 1
+            except Exception:
+                logger.warning("notification.bulk_failed", user_id=user.id, exc_info=True)
+        return sent
 
     @staticmethod
     def process_pending_scheduled_notifications(

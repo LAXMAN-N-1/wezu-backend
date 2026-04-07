@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/catalog_service.py
+# hypothesis_version: 6.151.11
+
+['ACTIVE', 'BATTERY', 'INACTIVE', 'brands', 'capacities', 'categories', 'images', 'in_stock', 'max', 'min', 'newest', 'popularity', 'price_asc', 'price_desc', 'price_range', 'product', 'rating', 'variants']

@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/request_audit_queue.py
+# hypothesis_version: 6.151.11
+
+[0.0, 0.01, 1000.0, 1000, 'action', 'details', 'dropped', 'enqueued', 'flush_errors', 'flushed', 'ip_address', 'meta_data', 'queue_maxsize', 'queue_size', 'resource_id', 'resource_type', 'running', 'timestamp', 'user_agent', 'user_id', 'workers']

@@ -44,94 +44,9 @@ def _get_owned_transaction(db: Session, user_id: int, transaction_id: int) -> Op
     ).first()
 
 
-@router.post("/methods")
-def add_payment_method(
-    method: PaymentMethodCreate,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
-):
-    """Persist a user payment method token reference."""
-    method_type = method.type.strip().lower()
-    provider = method.provider.strip().lower()
-    provider_token = method.provider_token.strip()
-    if not method_type:
-        raise HTTPException(status_code=400, detail="method type is required")
-    if not provider_token:
-        raise HTTPException(status_code=400, detail="provider_token is required")
-
-    existing = db.exec(
-        select(PaymentMethod)
-        .where(PaymentMethod.user_id == current_user.id)
-        .where(PaymentMethod.provider == provider)
-        .where(PaymentMethod.provider_token == provider_token)
-        .where(PaymentMethod.status == "active")
-    ).first()
-    if existing:
-        return {
-            "message": "Payment method already exists",
-            "method_id": existing.id,
-            "type": existing.method_type,
-            "provider": existing.provider,
-            "is_default": existing.is_default,
-        }
-
-    if method.is_default:
-        existing_defaults = db.exec(
-            select(PaymentMethod)
-            .where(PaymentMethod.user_id == current_user.id)
-            .where(PaymentMethod.status == "active")
-            .where(PaymentMethod.is_default == True)
-        ).all()
-        for row in existing_defaults:
-            row.is_default = False
-            row.updated_at = datetime.utcnow()
-            db.add(row)
-
-    payment_method = PaymentMethod(
-        user_id=current_user.id,
-        provider=provider,
-        method_type=method_type,
-        provider_token=provider_token,
-        last4=str(method.details.get("last4", "")).strip() or None,
-        brand=str(method.details.get("brand", "")).strip() or None,
-        metadata_json=method.details,
-        is_default=method.is_default,
-        status="active",
-    )
-    db.add(payment_method)
-    db.commit()
-    db.refresh(payment_method)
-    return {
-        "message": "Payment method added successfully",
-        "method_id": payment_method.id,
-        "type": payment_method.method_type,
-        "provider": payment_method.provider,
-        "is_default": payment_method.is_default,
-    }
-
-
-@router.delete("/methods/{method_id}")
-def delete_payment_method(
-    method_id: int,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(get_session),
-):
-    """Soft-delete a saved payment method."""
-    method = db.exec(
-        select(PaymentMethod)
-        .where(PaymentMethod.id == method_id)
-        .where(PaymentMethod.user_id == current_user.id)
-        .where(PaymentMethod.status == "active")
-    ).first()
-    if not method:
-        raise HTTPException(status_code=404, detail="Payment method not found")
-
-    method.status = "deleted"
-    method.is_default = False
-    method.updated_at = datetime.utcnow()
-    db.add(method)
-    db.commit()
-    return {"message": "Payment method deleted successfully", "method_id": method_id}
+# DECONFLICTED P0-B: POST /methods and DELETE /methods/{method_id} removed.
+# Canonical handlers live in app/api/v1/payments.py (uses PaymentMethodService).
+# Removed 2026-04-06.
 
 
 @router.get("/methods")

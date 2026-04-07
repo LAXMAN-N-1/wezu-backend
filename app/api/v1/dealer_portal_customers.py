@@ -5,8 +5,11 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
 from datetime import datetime, UTC
+import logging
 
 from app.db.session import get_session
+
+logger = logging.getLogger(__name__)
 from app.api.deps import get_current_user
 from app.models.user import User
 from app.models.dealer import DealerProfile
@@ -70,7 +73,8 @@ def get_active_rentals(
 
         return {"rentals": result, "total": len(result)}
     except Exception as e:
-        return {"rentals": [], "total": 0, "error": str(e)}
+        logger.exception("customer_active_rentals_failed")
+        return {"rentals": [], "total": 0, "error": "Failed to fetch rentals"}
 
 
 @router.get("")
@@ -132,7 +136,8 @@ def list_customers(
 
         return {"customers": customers, "total": total, "page": page, "limit": limit}
     except Exception as e:
-        return {"customers": [], "total": 0, "error": str(e)}
+        logger.exception("list_customers_failed")
+        return {"customers": [], "total": 0, "error": "Failed to fetch customers"}
 
 
 @router.get("/{customer_id}")
@@ -177,6 +182,7 @@ def get_customer_detail(
             "rentals": rental_list,
         }
     except Exception as e:
+        logger.exception("customer_detail_failed", extra={"customer_id": customer.id})
         return {
             "id": customer.id,
             "full_name": customer.full_name,
@@ -184,5 +190,5 @@ def get_customer_detail(
             "phone_number": customer.phone_number,
             "total_rentals": 0,
             "rentals": [],
-            "error": str(e),
+            "error": "Failed to fetch customer detail",
         }

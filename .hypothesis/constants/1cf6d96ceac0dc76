@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/user_state_service.py
+# hypothesis_version: 6.151.11
+
+['Deleted User', 'USER', 'User not found', 'deleted', 'status', 'suspended']

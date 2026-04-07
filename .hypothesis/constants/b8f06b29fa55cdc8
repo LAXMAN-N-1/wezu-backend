@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/errors/handlers.py
+# hypothesis_version: 6.151.11
+
+[400, 422, 429, 500, 'DATABASE_ERROR', 'HTTP_ERROR', 'INTERNAL_ERROR', 'RATE_LIMIT_EXCEEDED', 'Too Many Requests', 'VALIDATION_ERROR', 'Validation Error', 'X-Request-ID', 'auth_error', 'client_ip', 'code', 'correlation_id', 'detail', 'details', 'error', 'headers', 'http.exception', 'id', 'method', 'origin', 'path', 'query_keys', 'request.rate_limited', 'request_id', 'status_code', 'user', 'user_id', 'validation_errors']

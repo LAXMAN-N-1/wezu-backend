@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/orders_realtime.py
+# hypothesis_version: 6.151.11
+
+[123, 401, 403, 4401, 4403, '/stream', '/stream/{order_id}', 'JWT access token', 'Missing token', 'action', 'all', 'auth_error', 'bearer ', 'command', 'detail', 'location_id', 'location_type', 'order', 'order_id', 'orders_stream_ready', 'ping', 'pong', 'scope', 'status_code', 'subscribe', 'subscribe_order', 'subscription_key', 'timestamp', 'type', 'unsubscribe', 'unsubscribe_order']

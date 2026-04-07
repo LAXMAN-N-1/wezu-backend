@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/admin_users.py
+# hypothesis_version: 6.151.11
+
+[400, 404, '/{user_id}/ban', '/{user_id}/unban', 'ADMIN_PASSWORD_RESET', 'BAN_USER', 'FORCE_LOGOUT', 'TempPass@123', 'UNBAN_USER', 'USER', 'User not found', 'Violation of terms', 'allowed_next', 'message', 'new_status', 'reason', 'sessions_revoked', 'target_user_email', 'user_id']

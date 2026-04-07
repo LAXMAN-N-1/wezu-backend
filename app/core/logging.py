@@ -1,10 +1,45 @@
 import logging
 import logging.config
 import sys
+from typing import Any
 
-import structlog
+try:
+    import structlog  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - environment fallback
+    structlog = None
 
 from app.core.config import settings
+
+
+class _FallbackBoundLogger:
+    """Minimal structlog-like adapter for environments without structlog."""
+
+    def __init__(self, logger: logging.Logger):
+        self._logger = logger
+
+    def bind(self, **kwargs: Any) -> "_FallbackBoundLogger":
+        return self
+
+    def _emit(self, level: int, event: str, **kwargs: Any) -> None:
+        if kwargs:
+            self._logger.log(level, "%s | %s", event, kwargs)
+        else:
+            self._logger.log(level, "%s", event)
+
+    def debug(self, event: str, **kwargs: Any) -> None:
+        self._emit(logging.DEBUG, event, **kwargs)
+
+    def info(self, event: str, **kwargs: Any) -> None:
+        self._emit(logging.INFO, event, **kwargs)
+
+    def warning(self, event: str, **kwargs: Any) -> None:
+        self._emit(logging.WARNING, event, **kwargs)
+
+    def error(self, event: str, **kwargs: Any) -> None:
+        self._emit(logging.ERROR, event, **kwargs)
+
+    def exception(self, event: str, **kwargs: Any) -> None:
+        self._emit(logging.ERROR, event, **kwargs)
 
 
 class _HealthcheckAccessFilter(logging.Filter):
@@ -23,7 +58,9 @@ class _HealthcheckAccessFilter(logging.Filter):
         return "/health" not in message and "/ready" not in message
 
 
-def _shared_processors() -> list[structlog.types.Processor]:
+def _shared_processors() -> list[Any]:
+    if structlog is None:
+        return []
     return [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_logger_name,
@@ -41,35 +78,50 @@ def setup_logging() -> None:
     with request context attached. This is the only logging bootstrap path the
     API should use.
     """
-    shared_processors = _shared_processors()
-    renderer: structlog.types.Processor
-    if settings.ENVIRONMENT == "production":
-        renderer = structlog.processors.JSONRenderer()
+    if structlog is None:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.addFilter(_HealthcheckAccessFilter())
+        formatter = logging.Formatter(
+            fmt="%(asctime)s %(levelname)s %(name)s %(message)s",
+            datefmt="%Y-%m-%dT%H:%M:%S",
+        )
+        handler.setFormatter(formatter)
+
+        root_logger = logging.getLogger()
+        root_logger.handlers.clear()
+        root_logger.addHandler(handler)
+        root_logger.setLevel(getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO))
+        logging.captureWarnings(True)
     else:
-        renderer = structlog.dev.ConsoleRenderer()
+        shared_processors = _shared_processors()
+        renderer: Any
+        if settings.ENVIRONMENT == "production":
+            renderer = structlog.processors.JSONRenderer()
+        else:
+            renderer = structlog.dev.ConsoleRenderer()
 
-    formatter = structlog.stdlib.ProcessorFormatter(
-        foreign_pre_chain=shared_processors,
-        processor=renderer,
-    )
+        formatter = structlog.stdlib.ProcessorFormatter(
+            foreign_pre_chain=shared_processors,
+            processor=renderer,
+        )
 
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(formatter)
-    handler.addFilter(_HealthcheckAccessFilter())
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(formatter)
+        handler.addFilter(_HealthcheckAccessFilter())
 
-    root_logger = logging.getLogger()
-    root_logger.handlers.clear()
-    root_logger.addHandler(handler)
-    root_logger.setLevel(getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO))
+        root_logger = logging.getLogger()
+        root_logger.handlers.clear()
+        root_logger.addHandler(handler)
+        root_logger.setLevel(getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO))
 
-    logging.captureWarnings(True)
+        logging.captureWarnings(True)
 
-    structlog.configure(
-        processors=shared_processors + [structlog.stdlib.ProcessorFormatter.wrap_for_formatter],
-        logger_factory=structlog.stdlib.LoggerFactory(),
-        wrapper_class=structlog.stdlib.BoundLogger,
-        cache_logger_on_first_use=True,
-    )
+        structlog.configure(
+            processors=shared_processors + [structlog.stdlib.ProcessorFormatter.wrap_for_formatter],
+            logger_factory=structlog.stdlib.LoggerFactory(),
+            wrapper_class=structlog.stdlib.BoundLogger,
+            cache_logger_on_first_use=True,
+        )
 
     access_log_level = logging.INFO if settings.LOG_ACCESS_LOGS else logging.WARNING
     quiet_loggers = {
@@ -90,5 +142,7 @@ def setup_logging() -> None:
         library_logger.setLevel(level)
 
 
-def get_logger(name: str) -> structlog.stdlib.BoundLogger:
+def get_logger(name: str) -> Any:
+    if structlog is None:
+        return _FallbackBoundLogger(logging.getLogger(name))
     return structlog.get_logger(name)

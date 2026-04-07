@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/schemas/role.py
+# hypothesis_version: 6.151.11
+
+['#4CAF50', 'is_system', 'permissions', 'shield']

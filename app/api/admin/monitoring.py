@@ -35,7 +35,7 @@ def system_health(
             logger.info(f"DATABASE_OK: {count} users found")
         except Exception as e:
             logger.error(f"DATABASE_CHECK_FAILED: {str(e)}")
-            health_status["checks"]["database"] = {"status": "down", "error": str(e)}
+            health_status["checks"]["database"] = {"status": "down", "error": "Database unreachable"}
             health_status["status"] = "degraded"
         
         # Check critical services
@@ -45,7 +45,7 @@ def system_health(
         return health_status
     except Exception as e:
         logger.exception("CRITICAL_ERROR_IN_HEALTH_CHECK")
-        raise HTTPException(status_code=500, detail=f"Internal health check error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Health check failed")
 
 @router.get("/metrics")
 def performance_metrics(

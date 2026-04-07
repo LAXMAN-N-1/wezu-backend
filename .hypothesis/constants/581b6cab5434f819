@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/middleware/security.py
+# hypothesis_version: 6.151.11
+
+['1; mode=block', 'DENY', 'Referrer-Policy', 'X-Frame-Options', 'X-XSS-Protection', 'nosniff']

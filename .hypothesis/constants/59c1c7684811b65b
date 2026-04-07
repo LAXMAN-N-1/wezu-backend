@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/admin/__init__.py
+# hypothesis_version: 6.151.11
+
+['/audit-trails', '/batteries', '/bess', '/cms', '/finance', '/fraud', '/groups', '/health', '/iot', '/jobs', '/kyc-docs', '/logistics', '/monitoring', '/notifications', '/rentals', '/security', '/settings', '/stations', '/stock', '/support', '/users', 'Admin Audit Trails', 'Admin BESS', 'Admin Batteries', 'Admin Battery Health', 'Admin CMS', 'Admin Finance', 'Admin Fraud', 'Admin Groups', 'Admin IoT', 'Admin Jobs', 'Admin KYC Documents', 'Admin Logistics', 'Admin Monitoring', 'Admin Notifications', 'Admin Rentals', 'Admin Security', 'Admin Settings', 'Admin Stations', 'Admin Stock Levels', 'Admin Support', 'Admin Users']

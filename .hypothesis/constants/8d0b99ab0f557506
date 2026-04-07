@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/core/audit.py
+# hypothesis_version: 6.151.11
+
+['_in', 'battery_id', 'current_user', 'db', 'dict', 'http_request', 'id', 'model_dump', 'order_id', 'payload', 'payment_id', 'request', 'session', 'station_id', 'swap_id', 'user-agent', 'user_id']

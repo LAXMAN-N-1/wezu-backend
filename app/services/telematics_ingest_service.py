@@ -25,6 +25,7 @@ class TelematicsIngestService:
         *,
         data_in: TelemeticsDataIngest,
         create_alert_events: bool = True,
+        commit: bool = True,
     ) -> TelemeticsData:
         battery = session.get(Battery, data_in.battery_id)
         if not battery:
@@ -64,8 +65,12 @@ class TelematicsIngestService:
                 data_in=data_in,
             )
 
-        session.commit()
-        session.refresh(telemetry_entry)
+        if commit:
+            session.commit()
+            session.refresh(telemetry_entry)
+        else:
+            session.flush()
+
         return telemetry_entry
 
     @staticmethod

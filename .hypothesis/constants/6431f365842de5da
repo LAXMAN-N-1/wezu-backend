@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/menu.py
+# hypothesis_version: 6.151.11
+
+['Menu', 'Menu.id', 'RoleRight', 'all, delete-orphan', 'cascade', 'children', 'menu', 'menus', 'menus.id', 'parent', 'remote_side']

@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/stock.py
+# hypothesis_version: 6.151.11
+
+['/adjust', '/receive', '/transfer', 'create', 'edit', 'product_id', 'stock', 'view', 'warehouse_id']

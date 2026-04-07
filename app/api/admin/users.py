@@ -352,8 +352,13 @@ def update_user_detail(
     return _serialize_user(user, role_name=role_name)
 
 
-@router.post("/{user_id}/reset-password")
-def reset_user_password(
+# DECONFLICTED P0-B: POST /{user_id}/reset-password removed.
+# Canonical handler lives in app/api/v1/admin_users.py::admin_reset_password
+# (has richer audit trail).  Removed 2026-04-06.
+
+
+@router.put("/{user_id}/password")
+def update_user_password(
     user_id: int,
     payload: AdminPasswordResetRequest,
     current_user: User = Depends(deps.get_current_active_admin),
@@ -374,16 +379,6 @@ def reset_user_password(
     db.commit()
     _invalidate_admin_user_cache()
     return {"status": "success", "message": "Password reset successful"}
-
-
-@router.put("/{user_id}/password")
-def update_user_password(
-    user_id: int,
-    payload: AdminPasswordResetRequest,
-    current_user: User = Depends(deps.get_current_active_admin),
-    db: Session = Depends(get_db),
-):
-    return reset_user_password(user_id=user_id, payload=payload, current_user=current_user, db=db)
 
 
 @router.delete("/{user_id}")

@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/vendor.py
+# hypothesis_version: 6.151.11
+
+[15.0, 'Settlement', 'VendorDocument', 'documents', 'pending', 'vendor', 'vendor_documents', 'vendors', 'vendors.id', 'zones.id']

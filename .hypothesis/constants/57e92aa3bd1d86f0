@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/roles.py
+# hypothesis_version: 6.151.11
+
+[100, 404, '/', '/{role_id}', 'Role not found', 'create', 'delete', 'edit', 'roles']

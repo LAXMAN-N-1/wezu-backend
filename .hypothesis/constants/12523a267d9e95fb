@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/payment_method_service.py
+# hypothesis_version: 6.151.11
+
+[255, 400, 404, '-', 'All major banks', 'CARD', 'Credit/Debit Card', 'Digital Wallet', 'NETBANKING', 'Net Banking', 'UPI', 'WALLET', '_', 'active', 'bank', 'brand', 'card', 'created_at', 'deleted', 'description', 'enabled', 'exp_month', 'exp_year', 'expiry', 'icon', 'id', 'is_default', 'last4', 'name', 'net_banking', 'netbank', 'netbanking', 'provider', 'razorpay', 'type', 'upi', 'wallet']

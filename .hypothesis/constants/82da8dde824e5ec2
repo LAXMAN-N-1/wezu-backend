@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/rentals.py
+# hypothesis_version: 6.151.11
+
+[0.2, 1.5, 15.0, 100, 400, 403, 404, '/', '/active', '/active/current', '/admin/all', '/history', '/my', '/{rental_id}/extend', '/{rental_id}/pause', '/{rental_id}/resume', '/{rental_id}/return', 'ACTIVE', 'COMPLETED', 'Invalid pause period', 'No late fees found', 'Not authorized', 'PENDING', 'Rental is not active', 'Rental not found', 'active', 'breakdown', 'calculation', 'chargeable_hours', 'distance', 'grace_period_hours', 'health_check', 'hourly_rate', 'hours_late', 'hours_overdue', 'is_late', 'late_fee', 'message', 'rental_id', 'resumed', 'status', 'total_late_fee']

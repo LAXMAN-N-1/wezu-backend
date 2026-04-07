@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/staff.py
+# hypothesis_version: 6.151.11
+
+['DealerProfile', 'StaffProfile.user_id', 'User', 'dealer_profiles.id', 'foreign_keys', 'staff_members', 'staff_profile', 'staff_profiles', 'stations.id', 'users.id']

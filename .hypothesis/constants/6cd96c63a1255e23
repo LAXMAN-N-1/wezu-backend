@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/return_request.py
+# hypothesis_version: 6.151.11
+
+['DeliveryAssignment', 'DeliveryOrder', 'cancelled', 'completed', 'ecommerce_orders.id', 'in_transit', 'inspected', 'pending', 'pickup_assigned', 'received', 'return_inspections', 'return_request', 'return_requests', 'return_requests.id', 'users.id']

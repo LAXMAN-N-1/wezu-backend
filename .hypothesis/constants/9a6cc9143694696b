@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/security.py
+# hypothesis_version: 6.151.11
+
+[400, '/activity-logs', '/enable-2fa', '/verify-enable-2fa', 'Invalid code', 'Wezu Battery', 'backup_codes', 'message', 'provisioning_uri', 'secret_key']

@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/dealer_stations.py
+# hypothesis_version: 6.151.11
+
+[100, 403, 404, '/inventory/alerts', '/new', '/{station_id}', '/{station_id}/hours', 'Not a dealer', 'Station not found', 'Station updated', 'active', 'active_swaps', 'address', 'automated', 'available_batteries', 'available_slots', 'battery_id', 'charging', 'city', 'contact_phone', 'cost', 'created_at', 'current_power_w', 'default', 'description', 'id', 'is_24x7', 'is_locked', 'last_heartbeat', 'latitude', 'longitude', 'maintenance_history', 'message', 'name', 'operating_hours', 'performed_at', 'rating', 'ready', 'recent_rentals', 'slot_number', 'slots', 'start_time', 'station', 'station_type', 'status', 'total_amount', 'total_slots', 'type', 'user_id', 'utilization_percent', 'value']

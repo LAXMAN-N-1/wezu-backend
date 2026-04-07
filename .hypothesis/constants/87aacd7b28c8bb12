@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/dealer_portal_roles.py
+# hypothesis_version: 6.151.11
+
+[400, 403, 404, '%customer%', '%dealer%', ', ', '...', '/matrix', '/permissions/modules', '/users/invite', '/{role_id}', '/{role_id}/audit-log', '/{role_id}/users', 'Not a dealer account', 'ROLE', 'Role not found', 'System', 'User not found', 'dealer_staff', 'email', 'id', 'message', 'name', 'permissions', 'role_id', 'status', 'success', 'user_id']

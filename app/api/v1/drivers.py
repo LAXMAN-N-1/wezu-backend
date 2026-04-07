@@ -76,7 +76,7 @@ def onboard_driver(
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create driver profile: {str(e)}"
+            detail="Failed to create driver profile"
         )
 
 @router.get("/me", response_model=DataResponse[DriverProfile])

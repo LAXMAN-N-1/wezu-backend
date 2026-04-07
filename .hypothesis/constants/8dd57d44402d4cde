@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/admin/promo.py
+# hypothesis_version: 6.151.11
+
+['/', '/{id}']

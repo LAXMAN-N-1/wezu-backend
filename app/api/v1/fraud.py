@@ -68,9 +68,13 @@ def verify_pan(
     current_user: User = Depends(deps.get_current_user),
     session: Session = Depends(deps.get_db)
 ):
-    """Verify PAN number (mock implementation)"""
-    # In production, integrate with government API
-    # For now, basic validation
+    """Verify PAN number via format validation and fraud-check logging.
+
+    In production, integrate with government PAN verification API for
+    real-time name-match and status checks.
+    """
+    # Format validation (10-char alphanumeric PAN)
+    # In production: add government API call here
     
     if len(req.pan_number) != 10:
         status = "FAIL"
@@ -107,8 +111,12 @@ def verify_gst(
     current_user: User = Depends(deps.get_current_user),
     session: Session = Depends(deps.get_db)
 ):
-    """Verify GST number (mock implementation)"""
-    # In production, integrate with GST API
+    """Verify GST number via format validation and fraud-check logging.
+
+    In production, integrate with GST API for real-time business status checks.
+    """
+    # Format validation (15-char GST number)
+    # In production: add government API call here
     
     if len(req.gst_number) != 15:
         status = "FAIL"

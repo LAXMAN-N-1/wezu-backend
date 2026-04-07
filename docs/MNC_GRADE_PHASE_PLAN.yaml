@@ -1,0 +1,1627 @@
+##############################################################################
+# MNC-GRADE BACKEND HARDENING – IMPLEMENTATION-READY PHASE PLAN
+# Generated: 2026-04-06
+# Repo: wezu-backend-unified (production branch)
+# Assessment basis:
+#   - docs/audit/BACKEND_MNC_GRADE_ASSESSMENT.md
+#   - docs/audit/flow_inventory.md
+#   - docs/audit/flow_summary.json
+#   - BACKEND_MNC_GRADE_TRACKER.md
+# Notation:
+#   risk_level: P0 (critical) | P1 (high) | P2 (medium) | P3 (low)
+#   Each phase is independently testable and deployable.
+##############################################################################
+
+meta:
+  plan_version: "1.0.0"
+  total_phases: 12
+  total_duplicate_routes: 34
+  total_registered_routes: 943
+  missing_service_methods: 17
+  transaction_schema_drift_fields: 6
+  placeholder_files_count: 72
+
+# ═══════════════════════════════════════════════════════════════════════════
+# EXECUTION GRAPH (DAG – phase dependencies)
+# ═══════════════════════════════════════════════════════════════════════════
+execution_graph:
+  #                   ┌─── P0-A ───┐
+  #                   │             ▼
+  #  (start) ────► P0-B ────► P1-A ────► P1-B ────► P2-A
+  #                   │             │              ▲
+  #                   └───► P0-C ───┘              │
+  #                                 │              │
+  #                                 └──► P1-C ─────┘
+  #                                        │
+  #                                        ▼
+  #  P2-A ──► P2-B ──► P2-C ──► P3-A ──► P3-B ──► P3-C
+  #                                                       │
+  #                                                       ▼
+  #                                              P4-A ──► P4-B ──► P4-C
+  #                                                                   │
+  #                                                                   ▼
+  #                                              P5-A ──► P5-B ──► P5-C
+  nodes:
+    - id: P0-A
+      label: "Route Collision Deconfliction – RBAC (double registration)"
+      depends_on: []
+    - id: P0-B
+      label: "Route Collision Deconfliction – enhanced modules (cross-file)"
+      depends_on: []
+    - id: P0-C
+      label: "CI Guard – Duplicate-Route Test"
+      depends_on: [P0-A, P0-B]
+    - id: P1-A
+      label: "Missing Service-Method Contract Fixes (wallet, auth, notifications, KYC, rentals, analytics)"
+      depends_on: [P0-B]
+    - id: P1-B
+      label: "CI Guard – Service-Contract Static Test"
+      depends_on: [P1-A]
+    - id: P1-C
+      label: "Transaction Schema Canonicalization + Migration"
+      depends_on: [P0-B]
+    - id: P2-A
+      label: "Placeholder/Mock Elimination – P0 Money Flows"
+      depends_on: [P1-A, P1-C]
+    - id: P2-B
+      label: "Placeholder/Mock Elimination – Identity & KYC"
+      depends_on: [P2-A]
+    - id: P2-C
+      label: "Placeholder/Mock Elimination – Comms & Dealer"
+      depends_on: [P2-A]
+    - id: P3-A
+      label: "Flow-Level Invariant Tests (property-based)"
+      depends_on: [P2-A]
+    - id: P3-B
+      label: "Observability & SLO Hooks"
+      depends_on: [P2-A]
+    - id: P3-C
+      label: "Bounded Context Module Boundaries"
+      depends_on: [P3-A, P3-B]
+    - id: P4-A
+      label: "Error-Handling Hardening & Detail-Leak Prevention"
+      depends_on: [P3-C]
+    - id: P4-B
+      label: "Input/Output Contract Hardening (Pydantic schemas)"
+      depends_on: [P4-A]
+    - id: P4-C
+      label: "Structured Logging Normalization (structlog)"
+      depends_on: [P4-A]
+    - id: P5-A
+      label: "Exception Hygiene – Replace bare except-Exception with typed catches"
+      depends_on: [P4-C]
+    - id: P5-B
+      label: "db.commit Extraction – Move commits from routes to service layer"
+      depends_on: [P5-A]
+    - id: P5-C
+      label: "Response Model Coverage – Add response_model to high-traffic routes"
+      depends_on: [P5-A]
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PHASES
+# ═══════════════════════════════════════════════════════════════════════════
+phases:
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # P0-A: RBAC Double Registration Fix  ✅ COMPLETED 2026-04-06
+  # ─────────────────────────────────────────────────────────────────────────
+  - phase_id: P0-A
+    status: completed
+    completed_at: "2026-04-06"
+    objective: >
+      Eliminate all 23 RBAC duplicate route registrations caused by
+      app/api/admin/rbac_admin.py re-exporting the same router object
+      that app/main.py also mounts under the same prefix.
+    risk_level: P0
+    estimated_effort: "30 minutes"
+    file_scope:
+      - app/api/admin/rbac_admin.py
+      - app/api/admin/__init__.py
+      - app/main.py
+    code_tasks:
+      - task_id: P0-A-1
+        description: >
+          In app/api/admin/__init__.py, REMOVE the line:
+            router.include_router(rbac_admin.router, prefix="/rbac", tags=["Admin RBAC"])
+          This prevents the global_admin_router (mounted at /api/v1/admin)
+          from re-mounting rbac routes that are already mounted directly by
+          app.main.py via admin_rbac.router at /api/v1/admin/rbac.
+        file: app/api/admin/__init__.py
+        action: remove_line
+        target_line: 'router.include_router(rbac_admin.router, prefix="/rbac", tags=["Admin RBAC"])'
+      - task_id: P0-A-2
+        description: >
+          Verify app/main.py still has exactly ONE registration:
+            app.include_router(admin_rbac.router, prefix=f"{admin_api}/rbac", ...)
+          Confirm no other file re-includes admin_rbac.router.
+        file: app/main.py
+        action: verify_only
+    db_migration_impact: none
+    test_tasks:
+      - type: unit
+        description: >
+          Run route-inventory script and assert RBAC routes appear
+          exactly once each. Count must drop from 46 to 23.
+        command: |
+          DATABASE_URL=sqlite:///./test_wezu.db REDIS_URL=redis://localhost:6379/0 \
+          SECRET_KEY=test_secret_for_ci_only python3.11 -c "
+          from app.main import app
+          rbac = [(r.path, list(r.methods)) for r in app.routes
+                  if hasattr(r,'path') and '/rbac/' in r.path]
+          from collections import Counter
+          dupes = {k:v for k,v in Counter([(p,tuple(sorted(m))) for p,m in rbac]).items() if v>1}
+          assert not dupes, f'RBAC duplicates remain: {dupes}'
+          print('P0-A PASS: 0 RBAC duplicates')
+          "
+      - type: integration
+        description: "Run existing RBAC test suite to confirm no regression."
+        command: |
+          DATABASE_URL=sqlite:///./test_wezu.db REDIS_URL=redis://localhost:6379/0 \
+          SECRET_KEY=test_secret_for_ci_only python3.11 -m pytest -q \
+          tests/api/v1/test_rbac.py tests/api/v1/test_granular_rbac.py
+    acceptance_criteria:
+      - "Zero RBAC routes with duplicate path+method registrations."
+      - "All existing RBAC tests pass unchanged."
+    rollout_strategy: "Merge to staging, run full test suite, deploy to production with no traffic shift needed."
+    rollback_strategy: "Revert single commit; re-add the removed include_router line."
+    risk_controls:
+      - "Change is purely subtractive (removes redundant mount). No new code."
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # P0-B: Enhanced Module Route Deconfliction  ✅ COMPLETED 2026-04-06
+  # ─────────────────────────────────────────────────────────────────────────
+  - phase_id: P0-B
+    status: completed
+    completed_at: "2026-04-06"
+    objective: >
+      Eliminate the remaining 11 cross-file duplicate routes caused by
+      legacy routers (payments, wallet, notifications, support, rentals)
+      mounting overlapping paths with their _enhanced counterparts.
+      Consolidate handler ownership so exactly ONE handler serves each path.
+    risk_level: P0
+    estimated_effort: "2 hours"
+    file_scope:
+      # Overlapping source files (legacy)
+      - app/api/v1/payments.py
+      - app/api/v1/wallet.py
+      - app/api/v1/notifications.py
+      - app/api/v1/support.py
+      - app/api/v1/rentals.py
+      # Overlapping target files (enhanced)
+      - app/api/v1/payments_enhanced.py
+      - app/api/v1/wallet_enhanced.py
+      - app/api/v1/notifications_enhanced.py
+      - app/api/v1/support_enhanced.py
+      - app/api/v1/rentals_enhanced.py
+      # Admin users (cross-package)
+      - app/api/admin/users.py
+      - app/api/v1/admin_users.py
+      # Router mount
+      - app/main.py
+    code_tasks:
+      - task_id: P0-B-1
+        description: >
+          For each duplicate pair, decide owner using rule:
+          if _enhanced version has DB-backed logic → keep enhanced, remove from legacy.
+          If legacy is DB-backed and enhanced is thin wrapper → keep legacy, remove from enhanced.
+          Document decision in inline comment at removal site.
+        action: consolidate
+        duplicate_map:
+          - path: "POST /payments/methods"
+            keep: app/api/v1/payments.py
+            remove_from: app/api/v1/payments_enhanced.py
+            reason: "payments.py already uses PaymentMethodService (hardened batch 2)"
+          - path: "DELETE /payments/methods/{method_id}"
+            keep: app/api/v1/payments.py
+            remove_from: app/api/v1/payments_enhanced.py
+            reason: "payments.py already uses PaymentMethodService"
+          - path: "POST /wallet/transfer"
+            keep: app/api/v1/wallet_enhanced.py
+            remove_from: app/api/v1/wallet.py
+            reason: "wallet.py calls missing WalletService.transfer_balance; enhanced version must be implemented"
+          - path: "GET /wallet/cashback"
+            keep: app/api/v1/wallet_enhanced.py
+            remove_from: app/api/v1/wallet.py
+            reason: "wallet.py calls missing WalletService.get_cashback_history; enhanced must implement"
+          - path: "PATCH /notifications/read-all"
+            keep: app/api/v1/notifications_enhanced.py
+            remove_from: app/api/v1/notifications.py
+            reason: "enhanced has mark_all_read implementation"
+          - path: "POST /notifications/device-token"
+            keep: app/api/v1/notifications_enhanced.py
+            remove_from: app/api/v1/notifications.py
+            reason: "enhanced has richer device-token handling"
+          - path: "GET /rentals/{rental_id}/receipt"
+            keep: app/api/v1/rentals_enhanced.py
+            remove_from: app/api/v1/rentals.py
+            reason: "enhanced has hardened receipt generation"
+          - path: "POST /rentals/{rental_id}/report-issue"
+            keep: app/api/v1/rentals_enhanced.py
+            remove_from: app/api/v1/rentals.py
+            reason: "enhanced has DB-backed issue reporting"
+          - path: "GET /support/faq/search"
+            keep: app/api/v1/support_enhanced.py
+            remove_from: app/api/v1/support.py
+            reason: "enhanced has improved search"
+          - path: "POST /support/tickets/{ticket_id}/attachment"
+            keep: app/api/v1/support_enhanced.py
+            remove_from: app/api/v1/support.py
+            reason: "enhanced has file-handling improvements"
+          - path: "POST /admin/users/{user_id}/reset-password"
+            keep: app/api/v1/admin_users.py
+            remove_from: app/api/admin/users.py
+            reason: "v1/admin_users.py has richer audit trail"
+      - task_id: P0-B-2
+        description: >
+          For each "remove_from" endpoint: comment out or delete the
+          route decorator + handler function. Add an inline comment:
+          # DECONFLICTED P0-B: handler moved to {keep_file}
+        action: remove_duplicate_handlers
+      - task_id: P0-B-3
+        description: >
+          After removals, verify no import breakage. Run:
+            python -c "from app.main import app; print(len(app.routes))"
+          Route count should drop by exactly 11 (from 943 to 932).
+        action: verify
+    db_migration_impact: none
+    test_tasks:
+      - type: unit
+        description: "Assert zero duplicate path+method registrations across entire app."
+        command: |
+          DATABASE_URL=sqlite:///./test_wezu.db REDIS_URL=redis://localhost:6379/0 \
+          SECRET_KEY=test_secret_for_ci_only python3.11 -c "
+          from app.main import app
+          from collections import Counter
+          pairs = []
+          for r in app.routes:
+              if hasattr(r,'path') and hasattr(r,'methods'):
+                  for m in r.methods:
+                      if m != 'HEAD':
+                          pairs.append((r.path, m))
+          dupes = {k:v for k,v in Counter(pairs).items() if v>1}
+          assert not dupes, f'Duplicates remain: {dupes}'
+          print(f'P0-B PASS: 0 duplicates in {len(set(pairs))} unique routes')
+          "
+      - type: integration
+        description: "Run full existing test suite to confirm no regressions."
+        command: |
+          DATABASE_URL=sqlite:///./test_wezu.db REDIS_URL=redis://localhost:6379/0 \
+          SECRET_KEY=test_secret_for_ci_only python3.11 -m pytest -q tests/
+    acceptance_criteria:
+      - "Zero duplicate path+method registrations in the entire FastAPI app."
+      - "All existing tests pass."
+      - "Removed handlers are documented with DECONFLICTED comment."
+    rollout_strategy: "Deploy to staging. Run route inventory diff. Confirm front-end clients hit correct handlers."
+    rollback_strategy: "Revert commit. Duplicates are harmless at runtime (first-registered wins); reverting restores prior behavior."
+    risk_controls:
+      - "Keep removed code commented (not deleted) for one release cycle."
+      - "Tag commit with route_manifest.json snapshot for diff auditing."
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # P0-C: CI Guard – Duplicate-Route Test  ✅ COMPLETED 2026-04-06
+  # ─────────────────────────────────────────────────────────────────────────
+  - phase_id: P0-C
+    status: completed
+    completed_at: "2026-04-06"
+    objective: >
+      Add a CI test that fails the build if any duplicate path+method
+      registrations are detected. Generates route_manifest.json as artifact.
+    risk_level: P1
+    estimated_effort: "45 minutes"
+    file_scope:
+      - tests/test_route_collisions.py  # NEW FILE
+      - scripts/generate_route_manifest.py  # NEW FILE
+    code_tasks:
+      - task_id: P0-C-1
+        description: >
+          Create tests/test_route_collisions.py with a single test:
+          test_no_duplicate_route_registrations().
+          Import app from app.main, iterate app.routes, collect (path, method)
+          pairs (exclude HEAD and OPTIONS), assert no Counter value > 1.
+          On failure, print the exact duplicates for debugging.
+        file: tests/test_route_collisions.py
+        action: create
+      - task_id: P0-C-2
+        description: >
+          Create scripts/generate_route_manifest.py that outputs
+          docs/audit/route_manifest.json with full route inventory.
+          CI can diff this against the committed baseline to detect
+          unintended additions or removals.
+        file: scripts/generate_route_manifest.py
+        action: create
+    db_migration_impact: none
+    test_tasks:
+      - type: unit
+        description: "Run the new guard test itself."
+        command: |
+          DATABASE_URL=sqlite:///./test_wezu.db REDIS_URL=redis://localhost:6379/0 \
+          SECRET_KEY=test_secret_for_ci_only python3.11 -m pytest -q tests/test_route_collisions.py
+    acceptance_criteria:
+      - "tests/test_route_collisions.py passes."
+      - "Any future PR introducing a duplicate route will fail CI."
+    rollout_strategy: "Add to CI pipeline as a required check."
+    rollback_strategy: "Remove test file. No runtime impact."
+    risk_controls:
+      - "Test is read-only; cannot break production."
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # P1-A: Missing Service-Method Contract Fixes  ✅ COMPLETED 2026-04-06
+  # ─────────────────────────────────────────────────────────────────────────
+  - phase_id: P1-A
+    status: completed
+    completed_at: "2026-04-06"
+    objective: >
+      Implement all missing service methods that are called by live route
+      handlers. This eliminates AttributeError crashes on 17 endpoints.
+    risk_level: P0
+    estimated_effort: "6–8 hours"
+    file_scope:
+      # Service files to implement methods in:
+      - app/services/wallet_service.py
+      - app/services/auth_service.py
+      - app/services/security_service.py
+      - app/services/notification_service.py
+      - app/services/kyc_service.py
+      - app/services/rental_service.py
+      - app/services/analytics_service.py
+      # Route files that call the missing methods:
+      - app/api/v1/wallet.py
+      - app/api/v1/wallet_enhanced.py
+      - app/api/v1/auth.py
+      - app/api/v1/notifications.py
+      - app/api/v1/admin_kyc.py
+      - app/api/v1/rentals.py
+      - app/api/v1/analytics.py
+    code_tasks:
+      - task_id: P1-A-1
+        description: "Implement WalletService.transfer_balance(db, sender_id, recipient_phone, amount, note) → Transaction"
+        file: app/services/wallet_service.py
+        method_signature: >
+          @staticmethod
+          def transfer_balance(db: Session, sender_id: int,
+            recipient_phone: str, amount: float, note: str = None) -> Transaction
+        business_rules:
+          - "Validate amount > 0."
+          - "Lookup recipient by phone_number; raise 404 if not found."
+          - "Deduct from sender wallet (with_for_update); raise 400 if insufficient."
+          - "Credit recipient wallet."
+          - "Create two Transaction rows (debit sender, credit recipient) with category='transfer'."
+          - "Use SELECT … FOR UPDATE on both wallets to prevent race conditions."
+          - "Return the sender's debit transaction."
+      - task_id: P1-A-2
+        description: "Implement WalletService.get_cashback_history(db, user_id) → List[Transaction]"
+        file: app/services/wallet_service.py
+        method_signature: >
+          @staticmethod
+          def get_cashback_history(db: Session, user_id: int) -> list[Transaction]
+        business_rules:
+          - "Get wallet for user_id."
+          - "Query Transaction where wallet_id=wallet.id AND category='cashback'."
+          - "Order by created_at DESC, limit 100."
+      - task_id: P1-A-3
+        description: >
+          Implement AuthService methods:
+            - initiate_2fa_setup(user) → dict with secret + QR URI
+            - verify_and_enable_2fa(db, user, code, secret) → list[str] backup codes
+            - register_biometric(db, user_id, credential_id, public_key, device_info)
+            - verify_biometric_signature(db, user_id, credential_id, signature, challenge) → bool
+        file: app/services/auth_service.py
+        business_rules:
+          - "2FA: use pyotp for TOTP secret generation. Store encrypted secret in user record."
+          - "2FA verify: validate TOTP code, set user.two_fa_enabled=True, generate 8 backup codes."
+          - "Biometric: store credential in BiometricCredential model (or JSON field)."
+          - "Biometric verify: compare signature against stored public key using cryptography lib."
+          - "If cryptography libs not available, raise HTTPException(501) with clear message."
+      - task_id: P1-A-4
+        description: >
+          Implement SecurityService methods:
+            - get_available_questions(db) → list[dict]
+            - set_user_security_question(db, user_id, question_id, answer)
+            - verify_security_answer(db, user_id, answer) → bool
+        file: app/services/security_service.py
+        business_rules:
+          - "Store security questions in a SecurityQuestion table or return a static list."
+          - "Hash the answer before storing (use bcrypt or argon2)."
+          - "Verify by comparing hashed stored answer."
+      - task_id: P1-A-5
+        description: >
+          Implement NotificationService methods:
+            - clear_all_notifications(db, user_id) → int (count deleted)
+            - get_unread_count(db, user_id) → int
+            - mark_all_read(db, user_id) → int (count updated)
+            - send_bulk_notification(db, segment, title, message, type, channel) → int
+        file: app/services/notification_service.py
+        business_rules:
+          - "clear_all: DELETE FROM notifications WHERE user_id=X; return rowcount."
+          - "get_unread_count: COUNT(*) WHERE user_id=X AND status='sent' (or 'unread' enum)."
+          - "mark_all_read: UPDATE status='read' WHERE user_id=X AND status IN ('sent','pending')."
+          - "send_bulk: for 'all' segment, iterate active users in batches of 100; call send_notification per user. Return total sent count."
+      - task_id: P1-A-6
+        description: >
+          Implement KYCService methods:
+            - approve_document(db, document_id, reviewer_id) → KYCDocument
+            - reject_document(db, document_id, reviewer_id, reason) → KYCDocument
+        file: app/services/kyc_service.py
+        business_rules:
+          - "approve: set KYCDocument.status='verified', verified_at=now, verified_by=reviewer_id."
+          - "reject: set status='rejected', rejection_reason=reason."
+          - "Both: commit and return refreshed document."
+        note: >
+          admin_kyc.py currently does inline approval/rejection in verify_kyc_submission.
+          If those routes don't call approve_document/reject_document directly,
+          consider refactoring them to use the service methods for consistency.
+          Check callers before implementing.
+      - task_id: P1-A-7
+        description: "Implement RentalService.get_current_rental(db, user_id) → Optional[Rental]"
+        file: app/services/rental_service.py
+        method_signature: >
+          @staticmethod
+          def get_current_rental(db: Session, user_id: int) -> Optional[Rental]
+        business_rules:
+          - "Query Rental where user_id=X AND status IN ('active','pending')."
+          - "Order by created_at DESC, return first() or None."
+      - task_id: P1-A-8
+        description: >
+          Implement AnalyticsService methods:
+            - get_rental_history_stats(user_id, db) → dict
+            - get_cost_analytics(user_id, db, months) → dict
+            - get_usage_patterns(user_id, db) → dict
+        file: app/services/analytics_service.py
+        business_rules:
+          - "rental_history_stats: count total rentals, avg duration, most-used stations for user."
+          - "cost_analytics: sum transactions by month for last N months; compute avg, trend."
+          - "usage_patterns: group rentals by day_of_week, hour; return heatmap-style data."
+          - "All queries must be user-scoped (user_id filter)."
+    db_migration_impact:
+      description: >
+        P1-A-3 (2FA) may require new columns on users table: two_fa_secret,
+        two_fa_enabled, two_fa_backup_codes. P1-A-4 may require a
+        security_questions table and user_security_answers table.
+        Prepare Alembic migrations before implementing.
+      migration_files:
+        - "alembic/versions/xxxx_add_2fa_fields_to_users.py"
+        - "alembic/versions/xxxx_add_security_questions.py"
+      backwards_compatible: true
+      notes: "All new columns are nullable with defaults; no existing data affected."
+    test_tasks:
+      - type: unit
+        description: >
+          For each implemented method, write a unit test that:
+          1) Creates necessary DB fixtures (user, wallet, etc.)
+          2) Calls the method
+          3) Asserts return type and side effects (balance changes, row counts)
+        files:
+          - tests/api/v1/test_wallet_service_contracts.py  # NEW
+          - tests/api/v1/test_auth_service_contracts.py  # NEW
+          - tests/api/v1/test_notification_service_contracts.py  # NEW
+          - tests/api/v1/test_rental_service_contracts.py  # NEW
+          - tests/api/v1/test_analytics_service_contracts.py  # NEW
+      - type: integration
+        description: >
+          Hit each affected endpoint via TestClient and assert 200 (not 500).
+          Confirm response schema matches declared response_model.
+    acceptance_criteria:
+      - "All 17 previously-missing service methods exist and are callable."
+      - "No endpoint returns 500/AttributeError for missing method."
+      - "Each method has at least one unit test."
+      - "Existing test suite passes."
+    rollout_strategy: "Deploy to staging. Run smoke tests against all affected endpoints."
+    rollback_strategy: "Revert service file changes. Affected endpoints revert to prior 500 behavior (no worse)."
+    risk_controls:
+      - "Implement methods one service file at a time; commit + test after each."
+      - "New methods are additive; they don't change existing method signatures."
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # P1-B: CI Guard – Service-Contract Static Test  ✅ COMPLETED 2026-04-06
+  # ─────────────────────────────────────────────────────────────────────────
+  - phase_id: P1-B
+    status: completed
+    completed_at: "2026-04-06"
+    objective: >
+      Add a CI test that statically verifies every service method called
+      by route modules actually exists on the service class. Prevents
+      future AttributeError regressions.
+    risk_level: P1
+    estimated_effort: "2 hours"
+    file_scope:
+      - tests/test_service_contracts.py  # NEW FILE
+    code_tasks:
+      - task_id: P1-B-1
+        description: >
+          Create tests/test_service_contracts.py.
+          The test should:
+          1) Parse all .py files under app/api/v1/ and app/api/admin/.
+          2) For each file, find all patterns: SomeService.some_method(
+          3) Resolve the import to the actual class.
+          4) Assert hasattr(ServiceClass, 'some_method').
+          Implementation approach: use ast module to parse imports and
+          attribute accesses. Maintain an allowlist for known dynamic
+          dispatches if any.
+        file: tests/test_service_contracts.py
+        action: create
+    db_migration_impact: none
+    test_tasks:
+      - type: unit
+        description: "Run the contract test."
+        command: |
+          DATABASE_URL=sqlite:///./test_wezu.db REDIS_URL=redis://localhost:6379/0 \
+          SECRET_KEY=test_secret_for_ci_only python3.11 -m pytest -q tests/test_service_contracts.py
+    acceptance_criteria:
+      - "Test passes with zero missing service methods."
+      - "Test is added to CI pipeline as required check."
+    rollout_strategy: "Add to CI. No runtime impact."
+    rollback_strategy: "Remove test file."
+    risk_controls:
+      - "Test is read-only; cannot break production."
+      - "Allowlist mechanism prevents false positives from dynamic dispatch."
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # P1-C: Transaction Schema Canonicalization  ✅ COMPLETED 2026-04-06
+  # ─────────────────────────────────────────────────────────────────────────
+  - phase_id: P1-C
+    status: completed
+    completed_at: "2026-04-06"
+    objective: >
+      Canonicalize the Transaction model to include all 6 fields used by
+      live code but missing from the schema: type, category, balance_after,
+      reference_type, reference_id, razorpay_payment_id.
+      Add Alembic migration. Update DTOs at route boundary.
+    risk_level: P0
+    estimated_effort: "3 hours"
+    file_scope:
+      - app/models/financial.py
+      - app/schemas/wallet.py
+      - app/schemas/payment.py
+      - alembic/versions/  # new migration file
+      - app/api/v1/wallet.py
+      - app/api/v1/wallet_enhanced.py
+      - app/api/v1/payments_enhanced.py
+      - app/services/wallet_service.py
+    code_tasks:
+      - task_id: P1-C-1
+        description: >
+          Add missing columns to Transaction model in app/models/financial.py:
+            type: Optional[str] = Field(default=None, index=True)  # "credit" | "debit"
+            category: Optional[str] = Field(default=None, index=True)  # "deposit","withdrawal","cashback","transfer","withdrawal_request","withdrawal_reversal"
+            balance_after: Optional[float] = Field(default=None)
+            reference_type: Optional[str] = Field(default=None)  # "wallet_recharge","withdrawal_request","booking_payment"
+            reference_id: Optional[str] = Field(default=None, index=True)
+            razorpay_payment_id: Optional[str] = Field(default=None, index=True)
+          All fields are Optional with defaults to maintain backward compatibility.
+        file: app/models/financial.py
+        action: add_columns
+      - task_id: P1-C-2
+        description: >
+          Generate Alembic migration:
+            alembic revision --autogenerate -m "add_canonical_transaction_fields"
+          Review generated migration. Ensure it only ADDs columns (not drops).
+        action: generate_migration
+      - task_id: P1-C-3
+        description: >
+          Update TransactionResponse schema in app/schemas/wallet.py to
+          expose the new fields. Use Optional types to preserve backward
+          compat with API consumers.
+        file: app/schemas/wallet.py
+        action: update_schema
+      - task_id: P1-C-4
+        description: >
+          Audit all Transaction(...) constructor calls across the codebase.
+          Ensure each call uses the canonical field names. Key files:
+          - app/services/wallet_service.py (already uses the fields)
+          - app/api/v1/wallet_enhanced.py (uses Transaction.category in filters)
+          - app/api/v1/payments_enhanced.py (reads transaction.type, transaction.category)
+          After schema is canonical, all these become valid column accesses.
+        action: verify_all_callers
+    db_migration_impact:
+      description: >
+        Alembic migration adds 6 nullable columns to the transactions table.
+        No data loss. Existing rows get NULL for new columns.
+        WalletService already writes these fields; after migration they
+        persist to DB instead of being silently dropped by SQLModel.
+      migration_files:
+        - "alembic/versions/xxxx_add_canonical_transaction_fields.py"
+      backwards_compatible: true
+      downgrade_safe: true
+      notes: >
+        CRITICAL: Until this migration runs, wallet_service.py writes to
+        columns that don't exist in the DB schema. SQLModel/SQLAlchemy
+        silently ignores unknown columns in some configurations but may
+        raise in strict mode. This phase MUST deploy migration before
+        any code that depends on these columns in WHERE clauses.
+    test_tasks:
+      - type: unit
+        description: >
+          Test that Transaction model can be instantiated with all 6 new
+          fields and round-trips through DB correctly.
+        file: tests/test_transaction_schema.py  # NEW
+      - type: integration
+        description: >
+          Test wallet recharge flow end-to-end: create intent → capture →
+          verify balance_after, type, category, reference_type, reference_id
+          are all persisted and queryable.
+    acceptance_criteria:
+      - "Transaction model defines all 6 fields."
+      - "Alembic migration runs cleanly (upgrade + downgrade)."
+      - "wallet_service.py writes persist to DB without silent drops."
+      - "API responses include new fields when present."
+    rollout_strategy: >
+      1) Run migration on staging DB.
+      2) Deploy code.
+      3) Verify wallet operations write and read new fields.
+      4) Run migration on production DB.
+      5) Deploy code to production.
+    rollback_strategy: >
+      1) Revert code (fields become Optional, so old code ignores them).
+      2) Optionally run alembic downgrade to remove columns.
+      New columns are nullable; leaving them in place is also safe.
+    risk_controls:
+      - "Migration is additive only (no column drops, no renames)."
+      - "All new fields are Optional with defaults."
+      - "Run migration in a transaction with timeout on production."
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # P2-A: Placeholder/Mock Elimination – Money Flows  ✅ COMPLETED 2026-04-06
+  # ─────────────────────────────────────────────────────────────────────────
+  - phase_id: P2-A
+    status: completed
+    completed_at: "2026-04-06"
+    objective: >
+      Replace placeholder/mock logic in payment, wallet, and settlement
+      critical paths with production-grade implementations.
+    risk_level: P1
+    estimated_effort: "8–12 hours"
+    file_scope:
+      - app/api/v1/payments.py
+      - app/api/v1/payments_enhanced.py
+      - app/api/v1/wallet.py
+      - app/api/v1/wallet_enhanced.py
+      - app/services/wallet_service.py
+      - app/services/payment_service.py
+      - app/api/v1/settlements.py
+      - app/services/settlement_service.py  # if exists
+    code_tasks:
+      - task_id: P2-A-1
+        description: >
+          Audit app/api/v1/payments.py and payments_enhanced.py for
+          any remaining placeholder signals: "TODO", "mock", "placeholder",
+          "random.", "hardcoded", "fake". Replace each with DB-backed logic.
+        action: audit_and_replace
+      - task_id: P2-A-2
+        description: >
+          Implement idempotent wallet recharge capture:
+          Ensure WalletService.apply_recharge_capture is idempotent
+          (already partially done – verify with concurrent-request test).
+        action: verify_and_harden
+      - task_id: P2-A-3
+        description: >
+          Implement exactly-once refund state transitions:
+          Refund.status transitions: pending → processing → success | failed.
+          Add guard: if refund.status != 'pending', reject duplicate.
+        file: app/services/wallet_service.py
+        action: harden_state_machine
+      - task_id: P2-A-4
+        description: >
+          Replace any settlement mock data with DB-driven aggregations.
+        files:
+          - app/api/v1/settlements.py
+        action: audit_and_replace
+    db_migration_impact:
+      description: "Possible new status values for refunds; no schema changes expected."
+    test_tasks:
+      - type: unit
+        description: >
+          Test idempotency: call apply_recharge_capture twice with same
+          order_id; assert wallet credited exactly once.
+      - type: unit
+        description: >
+          Test refund state machine: attempt double-refund; assert second
+          attempt returns error or is no-op.
+      - type: integration
+        description: >
+          End-to-end wallet recharge via TestClient: create_intent → capture
+          → verify balance.
+    acceptance_criteria:
+      - "Zero placeholder/mock signals in money-flow files."
+      - "Wallet recharge is idempotent under concurrent capture attempts."
+      - "Refund transitions enforce exactly-once semantics."
+    rollout_strategy: "Staged rollout with shadow-mode logging before switching live traffic."
+    rollback_strategy: "Revert to prior code. Money flows revert to prior behavior."
+    risk_controls:
+      - "All changes guarded by SELECT ... FOR UPDATE to prevent races."
+      - "Comprehensive transaction logging for audit trail."
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # P2-B: Placeholder/Mock Elimination – Identity & KYC  ✅ COMPLETED 2026-04-06
+  # ─────────────────────────────────────────────────────────────────────────
+  - phase_id: P2-B
+    status: completed
+    completed_at: "2026-04-06"
+    objective: >
+      Replace KYC mock provider with production-grade manual-review queue
+      and eliminate placeholder fraud detection logic.
+    risk_level: P1
+    estimated_effort: "4–6 hours"
+    file_scope:
+      - app/services/kyc_service.py
+      - app/api/v1/kyc.py
+      - app/api/v1/admin_kyc.py
+      - app/services/fraud_service.py
+      - app/api/v1/fraud.py
+    code_tasks:
+      - task_id: P2-B-1
+        description: >
+          KYCService already has PendingReviewProvider for production.
+          Verify MockKYCProvider is ONLY used when ENVIRONMENT != 'production'.
+          Add explicit guard: if settings.ENVIRONMENT == 'production' and
+          isinstance(self.provider, MockKYCProvider), raise RuntimeError.
+        file: app/services/kyc_service.py
+        action: add_safety_guard
+      - task_id: P2-B-2
+        description: >
+          Audit fraud_service.py for mock/placeholder logic.
+          Replace with production-grade risk scoring (even if rule-based).
+          At minimum: IP velocity check, device fingerprint check, amount threshold.
+        file: app/services/fraud_service.py
+        action: audit_and_replace
+      - task_id: P2-B-3
+        description: >
+          Ensure admin KYC document approval/rejection uses the new
+          KYCService.approve_document / reject_document methods from P1-A-6.
+        file: app/api/v1/admin_kyc.py
+        action: refactor_to_service
+    db_migration_impact: none
+    test_tasks:
+      - type: unit
+        description: "Test KYC production guard rejects MockKYCProvider in production mode."
+      - type: integration
+        description: "Test admin KYC approval flow end-to-end."
+    acceptance_criteria:
+      - "MockKYCProvider cannot be instantiated in production."
+      - "Fraud service uses rule-based scoring instead of mocks."
+      - "Admin KYC approval uses service-layer methods."
+    rollout_strategy: "Deploy to staging. Verify KYC flow with test documents."
+    rollback_strategy: "Revert. MockKYCProvider was already safe (only in dev)."
+    risk_controls:
+      - "Production safety guard prevents accidental mock usage."
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # P2-C: Placeholder/Mock Elimination – Comms & Dealer  ✅ COMPLETED 2026-04-06
+  # ─────────────────────────────────────────────────────────────────────────
+  - phase_id: P2-C
+    status: completed
+    completed_at: "2026-04-06"
+    objective: >
+      Replace remaining placeholder/mock logic in notification, support,
+      and dealer portal flows.
+    risk_level: P2
+    estimated_effort: "4–6 hours"
+    file_scope:
+      - app/api/v1/notifications.py
+      - app/api/v1/notifications_enhanced.py
+      - app/services/notification_service.py
+      - app/api/v1/support.py
+      - app/api/v1/support_enhanced.py
+      - app/api/v1/dealer_portal_dashboard.py
+      - app/api/v1/dealer_analytics.py
+      - app/api/v1/dealer_campaigns.py
+    code_tasks:
+      - task_id: P2-C-1
+        description: >
+          Audit all files for "mock", "placeholder", "random.", "TODO",
+          "hardcoded" signals. Replace with DB-backed or service-layer calls.
+        action: audit_and_replace_batch
+      - task_id: P2-C-2
+        description: >
+          Ensure notification dispatch actually reaches FCM/SMS/email
+          services in production mode. Add delivery-failure logging.
+        file: app/services/notification_service.py
+        action: verify_dispatch_path
+      - task_id: P2-C-3
+        description: >
+          Ensure dealer analytics endpoints use real DB aggregations
+          (some were hardened in batch 2; audit remaining).
+        files:
+          - app/api/v1/dealer_analytics.py
+          - app/api/v1/dealer_campaigns.py
+        action: audit_and_replace
+    db_migration_impact: none
+    test_tasks:
+      - type: integration
+        description: "Hit each dealer analytics endpoint; assert response contains DB-derived data."
+      - type: unit
+        description: "Test notification dispatch logs delivery failures correctly."
+    acceptance_criteria:
+      - "Zero placeholder/mock signals in comms/dealer files."
+      - "All dealer analytics endpoints return DB-backed data."
+    rollout_strategy: "Standard staging → production."
+    rollback_strategy: "Revert. Prior mock responses were safe but inaccurate."
+    risk_controls:
+      - "Mock elimination is behavior change; test thoroughly on staging."
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # P3-A: Flow-Level Invariant Tests  ✅ COMPLETED 2026-04-06
+  # ─────────────────────────────────────────────────────────────────────────
+  - phase_id: P3-A
+    status: completed
+    completed_at: "2026-04-06"
+    objective: >
+      Codify business invariants as property-based tests for money and
+      lifecycle flows. These serve as ongoing correctness guardrails.
+    risk_level: P2
+    estimated_effort: "6–8 hours"
+    file_scope:
+      - tests/test_wallet_invariants.py  # NEW
+      - tests/test_rental_invariants.py  # NEW
+      - tests/test_booking_invariants.py  # NEW
+    code_tasks:
+      - task_id: P3-A-1
+        description: >
+          Install hypothesis (property-based testing library).
+          Add to requirements.txt if not present.
+        action: add_dependency
+      - task_id: P3-A-2
+        description: >
+          Implement wallet invariant tests:
+            - No wallet balance goes negative without explicit overdraft flag.
+            - Recharge capture is idempotent (balance credited exactly once per order_id).
+            - Withdrawal request + rejection restores exact original balance.
+            - Transfer: sender_debit + recipient_credit = 0 (conservation of money).
+        file: tests/test_wallet_invariants.py
+      - task_id: P3-A-3
+        description: >
+          Implement rental/booking invariant tests:
+            - Rental status transitions follow state machine: pending → active → completed | cancelled.
+            - No rental can be in 'active' status if another is already active for same user.
+            - Booking expiry transitions are time-monotonic.
+        file: tests/test_rental_invariants.py
+    db_migration_impact: none
+    test_tasks:
+      - type: property
+        description: "Run hypothesis-based tests with 200 examples each."
+        command: |
+          DATABASE_URL=sqlite:///./test_wezu.db REDIS_URL=redis://localhost:6379/0 \
+          SECRET_KEY=test_secret_for_ci_only python3.11 -m pytest -q \
+          tests/test_wallet_invariants.py tests/test_rental_invariants.py
+    acceptance_criteria:
+      - "All invariant tests pass with 200+ hypothesis examples."
+      - "Tests are added to CI."
+    rollout_strategy: "Tests only; no runtime impact."
+    rollback_strategy: "Remove test files."
+    risk_controls:
+      - "Property tests may be slow; set hypothesis deadline."
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # P3-B: Observability & SLO Hooks  ✅ COMPLETED 2026-04-06
+  # ─────────────────────────────────────────────────────────────────────────
+  - phase_id: P3-B
+    status: completed
+    completed_at: "2026-04-06"
+    objective: >
+      Add structured observability to critical flows: request tracing,
+      flow IDs, latency histograms, and SLO threshold alerts.
+    risk_level: P2
+    estimated_effort: "4–6 hours"
+    file_scope:
+      - app/middleware/request_logging.py
+      - app/middleware/server_timing.py
+      - app/services/wallet_service.py
+      - app/services/rental_service.py
+      - app/services/payment_service.py
+      - app/core/observability.py  # NEW
+    code_tasks:
+      - task_id: P3-B-1
+        description: >
+          Create app/core/observability.py with:
+            - flow_id() → generates unique flow ID (UUID) per request.
+            - timer context manager that logs operation duration.
+            - SLO threshold checker (configurable per-flow).
+        file: app/core/observability.py
+        action: create
+      - task_id: P3-B-2
+        description: >
+          Add flow_id injection to request_logging middleware.
+          Propagate via request.state.flow_id to all downstream services.
+        file: app/middleware/request_logging.py
+        action: augment
+      - task_id: P3-B-3
+        description: >
+          Add timing + SLO checks to wallet_service critical paths:
+          add_balance, deduct_balance, apply_recharge_capture, request_withdrawal.
+          Log warning if any operation exceeds configured SLO threshold.
+        files:
+          - app/services/wallet_service.py
+          - app/services/rental_service.py
+        action: instrument
+    db_migration_impact: none
+    test_tasks:
+      - type: unit
+        description: "Test that flow_id is present in response headers and logs."
+      - type: unit
+        description: "Test SLO threshold logging triggers on slow operations."
+    acceptance_criteria:
+      - "Every request has a unique flow_id in response headers."
+      - "Critical service operations log duration."
+      - "SLO breaches emit structured warning logs."
+    rollout_strategy: "Deploy with logging only (no alerting). Enable alerts after baseline period."
+    rollback_strategy: "Remove middleware augmentation. No runtime impact."
+    risk_controls:
+      - "Observability is additive; does not change business logic."
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # P3-C: Bounded Context Module Boundaries  ✅ COMPLETED 2026-04-06
+  # ─────────────────────────────────────────────────────────────────────────
+  - phase_id: P3-C
+    status: completed
+    completed_at: "2026-04-06"
+    objective: >
+      Enforce clear module boundaries between internal domains to prevent
+      cross-domain coupling. Define stable interfaces between contexts.
+    risk_level: P3
+    estimated_effort: "8–12 hours"
+    file_scope:
+      - app/services/  # All service files
+      - app/api/v1/  # All route files
+      - app/models/  # All model files
+      - tests/test_module_boundaries.py  # NEW
+    code_tasks:
+      - task_id: P3-C-1
+        description: >
+          Define domain boundaries in a domains.yaml manifest:
+          - auth (auth, security, sessions, passkeys)
+          - wallet_payments (wallet, payments, transactions, settlements)
+          - fleet_rentals (rentals, bookings, batteries, swaps, maintenance)
+          - dealer (dealer_*, dealer_portal_*)
+          - logistics (logistics, orders, manifests, routes, drivers, warehouse)
+          - admin (admin_*)
+          - comms (notifications, support, email, sms, fcm)
+          - catalog (catalog, products, inventory, stock)
+        file: docs/domains.yaml
+        action: create
+      - task_id: P3-C-2
+        description: >
+          Create tests/test_module_boundaries.py that:
+          1) Parses imports in each domain's files.
+          2) Asserts no direct model imports across domain boundaries.
+          3) Cross-domain access must go through service interfaces only.
+          Allowlist for shared models (User, common enums).
+        file: tests/test_module_boundaries.py
+        action: create
+      - task_id: P3-C-3
+        description: >
+          Refactor top-3 cross-domain violations found by the boundary test.
+          Introduce explicit interface functions or DTOs at boundaries.
+        action: refactor
+    db_migration_impact: none
+    test_tasks:
+      - type: unit
+        description: "Run module boundary test."
+    acceptance_criteria:
+      - "Domain manifest exists and is maintained."
+      - "Module boundary test passes (with documented allowlist)."
+      - "No new cross-domain model imports without review."
+    rollout_strategy: "Tests only initially. Enforce in CI after stabilization."
+    rollback_strategy: "Remove test file and manifest."
+    risk_controls:
+      - "Allowlist mechanism prevents over-restrictive enforcement."
+      - "Refactoring is incremental."
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # P4-A: Error-Handling Hardening & Detail-Leak Prevention
+  # ─────────────────────────────────────────────────────────────────────────
+  - phase_id: P4-A
+    status: completed
+    completed_at: "2025-07-25"
+    objective: >
+      Prevent internal error details (stack traces, DB errors, exception
+      messages) from leaking to API clients. Harden the global error
+      handler, fix 26 str(e) leak sites in route handlers, and add a
+      CI guard to prevent future regressions.
+    risk_level: P1
+    estimated_effort: "3–4 hours"
+    file_scope:
+      - app/middleware/error_handler.py
+      - app/api/v1/wallet.py
+      - app/api/v1/auth.py
+      - app/api/v1/admin_stations.py
+      - app/api/v1/admin_rbac.py
+      - app/api/v1/dealers.py
+      - app/api/v1/dealer_kyc.py
+      - app/api/v1/dealer_commission.py
+      - app/api/v1/dealer_portal_customers.py
+      - tests/test_error_safety.py  # NEW
+    code_tasks:
+      - task_id: P4-A-1
+        description: >
+          Fix ErrorHandlerMiddleware to not leak str(e) in production.
+          In production mode, return generic "Internal Server Error" with
+          only the request_id for correlation. In development mode, keep
+          detail for debugging convenience.
+        file: app/middleware/error_handler.py
+        action: harden
+        rules:
+          - "If ENVIRONMENT == 'production': detail = 'See logs for request_id=<X>'"
+          - "Always log the full exception to structlog with request_id."
+          - "Never return traceback, SQL errors, or internal paths to client."
+      - task_id: P4-A-2
+        description: >
+          Fix all 26 sites where route handlers do
+          `raise HTTPException(detail=str(e))` or `return {..., "error": str(e)}`.
+          Replace with safe error codes + log the original exception.
+          Priority files: wallet.py, auth.py, admin_rbac.py, dealers.py,
+          dealer_commission.py, dealer_kyc.py, admin_stations.py,
+          dealer_portal_customers.py.
+        action: fix_leak_sites
+        rules:
+          - "Replace detail=str(e) with detail='Operation failed' or specific safe message."
+          - "Add logger.exception(...) BEFORE the raise to preserve audit trail."
+          - "For 400-level errors from known ValueError/validation, safe message OK."
+          - "For 500-level errors, NEVER expose str(e) to client."
+      - task_id: P4-A-3
+        description: >
+          Create tests/test_error_safety.py — AST-based CI guard that
+          scans all route files for `detail=str(e)` and `detail=f"...{str(e)}"` patterns.
+          Fails if any are found in 500-level exception raises.
+        file: tests/test_error_safety.py
+        action: create
+    db_migration_impact: none
+    test_tasks:
+      - type: unit
+        description: "Run error safety CI guard."
+        command: |
+          DATABASE_URL=sqlite:///./test_wezu.db REDIS_URL=redis://localhost:6379/0 \
+          SECRET_KEY=test_secret_for_ci_only ENVIRONMENT=testing python3.11 -m pytest -q \
+          tests/test_error_safety.py
+      - type: integration
+        description: >
+          Trigger a 500 error via TestClient; assert response body does NOT
+          contain exception class name, SQL text, or file paths.
+    acceptance_criteria:
+      - "ErrorHandlerMiddleware does not expose str(e) in production responses."
+      - "Zero route handlers pass str(e) to 500-level HTTPException detail."
+      - "CI guard test prevents future regressions."
+      - "All errors are still logged server-side with full context."
+    rollout_strategy: "Deploy to staging. Hit endpoints with bad input; verify error responses are safe."
+    rollback_strategy: "Revert. Prior behavior was insecure but functional."
+    risk_controls:
+      - "Error messages become less verbose for debugging — mitigated by structured server-side logging."
+      - "400-level validation errors may keep safe user-facing messages."
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # P4-B: Input/Output Contract Hardening (Pydantic Schemas)
+  # ─────────────────────────────────────────────────────────────────────────
+  - phase_id: P4-B
+    status: completed
+    completed_at: "2025-07-25"
+    objective: >
+      Replace untyped `dict` parameters in route handlers with Pydantic
+      schemas. Add a CI guard to prevent future raw-dict inputs.
+      This closes injection vectors and ensures OpenAPI docs are accurate.
+    risk_level: P2
+    estimated_effort: "3–4 hours"
+    file_scope:
+      - app/api/v1/profile.py
+      - app/api/v1/dealers.py
+      - app/api/v1/dealer_portal_settings.py
+      - app/api/v1/dealer_portal_dashboard.py
+      - app/api/v1/stations.py
+      - app/schemas/profile.py  # NEW or updated
+      - app/schemas/dealer.py  # updated
+      - app/schemas/station.py  # updated
+      - tests/test_input_contracts.py  # NEW
+    code_tasks:
+      - task_id: P4-B-1
+        description: >
+          Create Pydantic schemas for the 8 raw-dict route parameters:
+          1) profile.py:update_preferences → PreferencesUpdate schema
+          2) profile.py:change_password → ChangePasswordRequest schema
+          3) dealers.py:create_dealer_promotion → DealerPromotionCreate schema
+          4) dealers.py:update_dealer_promotion → DealerPromotionUpdate schema
+          5) dealers.py:update_bank_account → BankAccountUpdate schema
+          6) dealer_portal_settings.py:update_notification_preferences → NotificationPreferencesUpdate schema
+          7) stations.py:create_station_maintenance_task → MaintenanceTaskCreate schema
+          8) dealer_portal_dashboard.py:upload_dealer_document → DealerDocumentUpload schema
+        action: create_schemas
+        rules:
+          - "Each schema defines explicit fields with types and validators."
+          - "Use Field(min_length=, max_length=, ge=, le=) for boundary constraints."
+          - "Sensitive fields (passwords) use SecretStr or constrained str."
+      - task_id: P4-B-2
+        description: >
+          Replace `param: dict` with `param: NewSchema` in each route handler.
+          Update handler body to access schema attributes instead of dict keys.
+        action: replace_dict_params
+      - task_id: P4-B-3
+        description: >
+          Create tests/test_input_contracts.py — AST-based CI guard that
+          scans all route files for parameters typed as bare `dict`.
+          Fails if any POST/PUT/PATCH handler accepts `dict` body params.
+        file: tests/test_input_contracts.py
+        action: create
+    db_migration_impact: none
+    test_tasks:
+      - type: unit
+        description: "Run input contract CI guard."
+      - type: unit
+        description: "Test that each new schema rejects invalid input (missing fields, wrong types)."
+    acceptance_criteria:
+      - "Zero route handlers accept bare `dict` as body parameter."
+      - "OpenAPI spec shows typed schemas for all endpoints."
+      - "CI guard prevents future untyped inputs."
+    rollout_strategy: "Deploy to staging. Verify front-end clients send matching payloads."
+    rollback_strategy: "Revert schema + handler changes. Dict params are functional but unvalidated."
+    risk_controls:
+      - "Schema validation may reject previously-accepted malformed payloads — test with real client data."
+      - "Add Optional fields for backward compat where needed."
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # P4-C: Structured Logging Normalization (structlog)
+  # ─────────────────────────────────────────────────────────────────────────
+  - phase_id: P4-C
+    status: completed
+    completed_at: "2025-07-25"
+    objective: >
+      Standardize logging across all service files from stdlib `logging`
+      to `structlog` for consistent structured JSON output, request
+      correlation, and machine-parseable log aggregation.
+    risk_level: P3
+    estimated_effort: "3–4 hours"
+    file_scope:
+      - app/services/wallet_service.py
+      - app/services/rental_service.py
+      - app/services/auth_service.py
+      - app/services/settlement_service.py
+      - app/services/kyc_service.py
+      - app/services/notification_service.py
+      - app/services/payment_service.py
+      - app/core/logging.py
+      - tests/test_structured_logging.py  # NEW
+    code_tasks:
+      - task_id: P4-C-1
+        description: >
+          In each service file, replace:
+            import logging
+            logger = logging.getLogger(__name__)
+          with:
+            from app.core.logging import get_logger
+            logger = get_logger(__name__)
+          This switches to structlog while preserving the logger API.
+          Priority: the 7 critical service files listed in file_scope.
+        action: migrate_loggers
+      - task_id: P4-C-2
+        description: >
+          Upgrade key log calls in critical services to use structured
+          context (key-value pairs) instead of f-strings:
+            BEFORE: logger.info(f"Wallet credited {amount} for user {user_id}")
+            AFTER:  logger.info("wallet.credited", amount=amount, user_id=user_id)
+          Priority: wallet_service.py, rental_service.py, auth_service.py,
+          settlement_service.py.
+        action: upgrade_log_calls
+      - task_id: P4-C-3
+        description: >
+          Create tests/test_structured_logging.py — CI guard that:
+          1) Scans critical service files for `import logging` (should be 0).
+          2) Warns on f-string log messages in service layer (advisory).
+        file: tests/test_structured_logging.py
+        action: create
+    db_migration_impact: none
+    test_tasks:
+      - type: unit
+        description: "Run structured logging CI guard."
+      - type: integration
+        description: "Trigger a wallet operation; verify log output contains structured fields."
+    acceptance_criteria:
+      - "Critical service files use structlog via get_logger()."
+      - "Key log lines use structured key-value context."
+      - "CI guard flags stdlib logging imports in service files."
+    rollout_strategy: "Deploy to staging. Verify log aggregator parses structured output."
+    rollback_strategy: "Revert. stdlib logging still works; no runtime impact."
+    risk_controls:
+      - "structlog wraps stdlib; existing log handlers continue to work."
+      - "Incremental migration — non-critical files can migrate later."
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # P5-A: Exception Hygiene – Replace bare except-Exception with typed catches
+  # ─────────────────────────────────────────────────────────────────────────
+  - phase_id: P5-A
+    status: not-started
+    objective: >
+      Replace broad 'except Exception' catches in route handlers with
+      specific exception types (ValueError, HTTPException, SQLAlchemyError).
+      This prevents silent error swallowing, improves debuggability, and
+      ensures unexpected errors propagate to the global error handler
+      (hardened in P4-A).  Focus on the top-10 worst offender route files
+      first (54 catches across 31 files in app/api/).
+    priority: P2
+    estimated_hours: 6-8
+    dependencies: [P4-C]
+    scope:
+      target_files:
+        - app/api/v1/orders.py              # 9 bare catches
+        - app/api/v1/orders_realtime.py      # 6 bare catches
+        - app/api/v1/dealer_portal_auth.py   # 4 bare catches
+        - app/api/v1/dealer_portal_customers.py  # 3 bare catches
+        - app/api/v1/customer_auth.py        # 3 bare catches
+        - app/api/v1/auth.py                 # 3 bare catches
+        - app/api/v1/admin/users.py          # 3 bare catches
+        - app/api/v1/dealer_stations.py      # 2 bare catches
+        - app/api/v1/dealer_portal_dashboard.py  # 2 bare catches
+        - app/api/v1/dealer_kyc.py           # 2 bare catches
+      tasks:
+        - task_id: P5-A-1
+          title: "Replace bare except-Exception in top-10 route files"
+          description: >
+            For each 'except Exception as e' block:
+            1) Identify what exceptions the try block can actually raise.
+            2) Replace with specific types (ValueError, IntegrityError, etc.).
+            3) Let truly unexpected exceptions propagate to error_handler middleware.
+            4) Keep logger.exception() for ops visibility.
+          action: refactor
+        - task_id: P5-A-2
+          title: "CI guard – bare-except scanner"
+          description: >
+            AST-based test that scans app/api/ for 'except Exception' without
+            a preceding specific catch.  Starts with an allowlist for existing
+            catches outside top-10, shrink allowlist over time.
+          file: tests/test_exception_hygiene.py
+          action: create
+    db_migration_impact: none
+    test_tasks:
+      - type: unit
+        description: "Run exception hygiene CI guard."
+    acceptance_criteria:
+      - "Top-10 route files have zero bare 'except Exception' catches."
+      - "CI guard test passes with shrinking allowlist."
+      - "No silent error swallowing in critical flows."
+    rollout_strategy: "Incremental per-file refactor. Run full test suite after each file."
+    rollback_strategy: "Revert individual files; global error handler still catches everything."
+    risk_controls:
+      - "P4-A error handler is the safety net — unexpected exceptions get logged + generic 500."
+      - "Allowlist mechanism prevents CI breakage during incremental migration."
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # P5-B: db.commit Extraction – Move commits from routes to service layer
+  # ─────────────────────────────────────────────────────────────────────────
+  - phase_id: P5-B
+    status: not-started
+    objective: >
+      Extract db.commit() calls from route handlers into the service layer.
+      Routes should be thin orchestrators; persistence belongs in services.
+      This enables proper unit testing of services (mock DB), transactional
+      boundaries per business operation, and future UoW pattern adoption.
+      263 db.commit() calls exist in app/api/ across ~50 files.
+      Focus on the top-10 worst offenders first.
+    priority: P3
+    estimated_hours: 10-14
+    dependencies: [P5-A]
+    scope:
+      target_files:
+        - app/api/v1/admin_rbac.py           # 20 commits
+        - app/api/v1/auth.py                 # 18 commits
+        - app/api/admin/cms.py               # 15 commits
+        - app/api/v1/dealer_portal_auth.py   # 11 commits
+        - app/api/v1/users.py                # 10 commits
+        - app/api/v1/dealer_portal_users.py  # 10 commits
+        - app/api/admin/stations.py          # 10 commits
+        - app/api/v1/profile.py              # 9 commits
+        - app/api/v1/dealer_portal_settings.py  # 9 commits
+        - app/api/v1/dealer_portal_roles.py  # 8 commits
+      tasks:
+        - task_id: P5-B-1
+          title: "Extract db.commit from top-10 route files into services"
+          description: >
+            For each route handler with db.commit():
+            1) Identify the corresponding service method (or create one).
+            2) Move the commit into the service method.
+            3) Route handler calls service and returns result.
+            4) If no service exists, create a thin wrapper in the appropriate service.
+          action: refactor
+        - task_id: P5-B-2
+          title: "CI guard – db.commit-in-routes scanner"
+          description: >
+            AST-based test that scans route files for db.commit() calls.
+            Starts with allowlist for files not yet migrated; shrink over time.
+          file: tests/test_route_commit_hygiene.py
+          action: create
+    db_migration_impact: none
+    test_tasks:
+      - type: unit
+        description: "Run route commit hygiene CI guard."
+    acceptance_criteria:
+      - "Top-10 route files have zero db.commit() calls."
+      - "All moved commits live in service methods."
+      - "CI guard test passes with shrinking allowlist."
+    rollout_strategy: "Incremental per-file refactor. Service-layer tests validate behavior."
+    rollback_strategy: "Revert individual files; commits in routes still work."
+    risk_controls:
+      - "Each file is migrated and tested independently."
+      - "Allowlist prevents CI breakage during incremental migration."
+      - "Integration tests catch transactional boundary errors."
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # P5-C: Response Model Coverage – Add response_model to high-traffic routes
+  # ─────────────────────────────────────────────────────────────────────────
+  - phase_id: P5-C
+    status: not-started
+    objective: >
+      Add explicit response_model declarations to route handlers that
+      currently return untyped dicts.  Currently 484/1034 routes (47%)
+      lack response_model.  This improves OpenAPI documentation, enables
+      automatic response validation, and prevents accidental data leakage
+      (e.g., returning password hashes in user objects).
+      Focus on customer-facing and admin-critical routes first.
+    priority: P3
+    estimated_hours: 8-12
+    dependencies: [P5-A]
+    scope:
+      target_domains:
+        - "auth (login/register/token refresh) — highest traffic"
+        - "wallet (balance, transactions, recharge) — money-critical"
+        - "bookings (create, status, cancel) — core business"
+        - "stations (list, detail, availability) — customer-facing"
+        - "admin users (list, detail, update) — admin console"
+      tasks:
+        - task_id: P5-C-1
+          title: "Create response schemas for top-5 domains"
+          description: >
+            Define Pydantic response models in app/schemas/ for auth, wallet,
+            bookings, stations, and admin-users domains.  Use existing models
+            as base, add explicit field includes/excludes.
+          file: app/schemas/response_contracts.py
+          action: create
+        - task_id: P5-C-2
+          title: "Add response_model to high-traffic routes"
+          description: >
+            Annotate route decorators with response_model=<Schema> for
+            the top-5 domain routes.  Verify OpenAPI spec updates.
+          action: refactor
+        - task_id: P5-C-3
+          title: "CI guard – response model coverage"
+          description: >
+            Test that scans high-priority route files and asserts every
+            handler has a response_model declaration.
+          file: tests/test_response_model_coverage.py
+          action: create
+    db_migration_impact: none
+    test_tasks:
+      - type: unit
+        description: "Run response model coverage CI guard."
+    acceptance_criteria:
+      - "Auth, wallet, bookings, stations, admin-users routes all have response_model."
+      - "OpenAPI spec shows typed response schemas for covered routes."
+      - "CI guard test passes."
+    rollout_strategy: "Add schemas first, then annotate routes. Non-breaking addition."
+    rollback_strategy: "Remove response_model annotations; routes still work with Any return."
+    risk_controls:
+      - "response_model is additive — removing it is always safe."
+      - "Test with existing integration tests to catch serialization issues."
+
+# ═══════════════════════════════════════════════════════════════════════════
+# GLOBAL RISKS
+# ═══════════════════════════════════════════════════════════════════════════
+global_risks:
+  - risk_id: GR-1
+    description: >
+      Transaction schema drift: wallet_service.py writes to 6 columns that
+      don't exist in the Transaction model. These writes are silently
+      dropped by SQLModel in some DB configurations (SQLite) but may
+      cause errors in PostgreSQL strict mode.
+    severity: critical
+    mitigated_by: P1-C
+    mitigation_status: resolved
+    resolved_at: "2026-04-06"
+    resolution_note: >
+      P1-C added 6 canonical fields (type, category, balance_after,
+      reference_type, reference_id, razorpay_payment_id) to the
+      Transaction model.  Schema now matches wallet_service writes.
+    detection: >
+      Run: SELECT column_name FROM information_schema.columns
+      WHERE table_name='transactions';
+      Compare against Transaction model fields.
+
+  - risk_id: GR-2
+    description: >
+      34 duplicate route registrations cause handler shadowing.
+      FastAPI serves the first-registered handler; the second is unreachable.
+      This means 'enhanced' handlers may never execute.
+    severity: critical
+    mitigated_by: [P0-A, P0-B]
+    mitigation_status: resolved
+    resolved_at: "2026-04-06"
+    resolution_note: >
+      P0-A removed rbac_admin include (23 dupes), P0-B deconflicted
+      remaining 11 routes. test_route_collisions.py CI guard prevents
+      regression. Current duplicate count: 0.
+    detection: >
+      Run route inventory script; assert duplicate count = 0.
+
+  - risk_id: GR-3
+    description: >
+      17 endpoints call nonexistent service methods. Any request to
+      these endpoints crashes with AttributeError 500.
+    severity: high
+    mitigated_by: P1-A
+    mitigation_status: resolved
+    resolved_at: "2026-04-06"
+    resolution_note: >
+      P1-A implemented all 17 missing service methods.  P1-B CI guard
+      (test_service_contracts.py) prevents future regressions.
+    detection: >
+      Run service-contract test (P1-B).
+
+  - risk_id: GR-4
+    description: >
+      MockKYCProvider auto-approves all KYC submissions. If ENVIRONMENT
+      variable is misconfigured, production could auto-approve.
+    severity: high
+    mitigated_by: P2-B
+    mitigation_status: resolved
+    resolved_at: "2026-04-06"
+    resolution_note: >
+      KYCService.__init__ raises RuntimeError("FATAL: MockKYCProvider is
+      active in production") if production + MockKYCProvider detected.
+      Belt-and-suspenders guard present in kyc_service.py.
+    detection: >
+      Startup assertion in KYCService.__init__ (to be added in P2-B).
+
+  - risk_id: GR-5
+    description: >
+      No CI protection against future route collisions or missing
+      service methods. Regressions can be reintroduced silently.
+    severity: medium
+    mitigated_by: [P0-C, P1-B]
+    mitigation_status: resolved
+    resolved_at: "2026-04-06"
+    resolution_note: >
+      test_route_collisions.py (P0-C) prevents route dupes.
+      test_service_contracts.py (P1-B) prevents missing methods.
+      Additional CI guards added in P3-P4 for module boundaries,
+      error safety, input contracts, and structured logging.
+    detection: >
+      CI pipeline runs guard tests on every PR.
+
+  - risk_id: GR-6
+    description: >
+      Wallet operations use SELECT ... FOR UPDATE but some code paths
+      (transfer_balance in wallet.py) call a method that doesn't exist.
+      If/when implemented, race conditions are possible if FOR UPDATE
+      is not applied consistently across both sender and recipient wallets.
+    severity: high
+    mitigated_by: [P1-A, P2-A]
+    mitigation_status: resolved
+    resolved_at: "2026-04-06"
+    resolution_note: >
+      P1-A implemented WalletService.transfer_balance with dual
+      select(...).with_for_update() on both sender and recipient.
+      P3-A added conservation-law invariant tests (transfer_conserves_total_money).
+      P3-B added SLOTimer instrumentation to all wallet methods.
+    detection: >
+      Concurrent transfer stress test after P1-A implementation.
+
+# ═══════════════════════════════════════════════════════════════════════════
+# QUICK WINS (can be done independently at any time)
+# ═══════════════════════════════════════════════════════════════════════════
+quick_wins:
+  - id: QW-1
+    status: resolved
+    resolved_by: P0-A
+    resolved_at: "2026-04-06"
+    description: >
+      Remove the rbac_admin.py include from app/api/admin/__init__.py.
+      Single line deletion eliminates 23 duplicate routes instantly.
+    effort: "5 minutes"
+    risk: "negligible"
+    file: app/api/admin/__init__.py
+    change: "Delete: router.include_router(rbac_admin.router, prefix='/rbac', tags=['Admin RBAC'])"
+
+  - id: QW-2
+    status: resolved
+    resolved_by: P0-C
+    resolved_at: "2026-04-06"
+    description: >
+      Add pytest marker to run route-collision check:
+      Create a 20-line test file that fails on any duplicate.
+    effort: "15 minutes"
+    risk: "none"
+    file: tests/test_route_collisions.py
+
+  - id: QW-3
+    status: resolved
+    resolved_at: "2026-04-06"
+    resolution_note: >
+      No bug — deps.get_current_active_superuser exists at deps.py:217.
+      The import 'from app.api import deps' + 'deps.get_current_active_superuser'
+      resolves correctly.  Marked as non-issue.
+    description: >
+      Fix the notification router's import of get_current_active_superuser
+      which is referenced but not imported (will cause NameError).
+      Line 78 of app/api/v1/notifications.py references
+      deps.get_current_active_superuser but the import at top is only
+      'from app.api import deps'.
+    effort: "5 minutes"
+    risk: "negligible"
+    file: app/api/v1/notifications.py
+    change: "Verify deps.get_current_active_superuser exists; if not, add to deps or use deps.get_current_active_admin."
+
+  - id: QW-4
+    status: resolved
+    resolved_at: "2026-04-06"
+    resolution_note: >
+      Removed the unreachable second 'return KYCQueueResponse(...)' block
+      at lines 75-80 of admin_kyc.py.
+    description: >
+      In app/api/v1/admin_kyc.py, there's a duplicate return statement
+      at lines ~82-87 (two consecutive 'return KYCQueueResponse(...)').
+      Remove the second unreachable return.
+    effort: "2 minutes"
+    risk: "none"
+    file: app/api/v1/admin_kyc.py
+    change: "Delete the second 'return KYCQueueResponse(...)' block."
+
+  - id: QW-5
+    status: resolved
+    resolved_by: P0-B
+    resolved_at: "2026-04-06"
+    description: >
+      Pin down the admin users reset-password duplicate by removing the
+      handler in app/api/admin/users.py (keep the v1/admin_users.py version
+      which has richer audit logging).
+    effort: "10 minutes"
+    risk: "low"
+    file: app/api/admin/users.py
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DO NOT TOUCH (stable, already hardened, or high-risk-to-change)
+# ═══════════════════════════════════════════════════════════════════════════
+do_not_touch:
+  - path: app/middleware/rate_limit.py
+    reason: "Rate limiting is correctly configured and tested."
+  - path: app/middleware/security.py
+    reason: "Security headers middleware is production-grade."
+  - path: app/middleware/rbac_middleware.py
+    reason: "RBAC enforcement is tested and working."
+  - path: app/core/security.py
+    reason: "Password hashing and token creation are stable."
+  - path: app/api/webhooks/razorpay.py
+    reason: "Webhook handler has production traffic; changes need payment-team sign-off."
+  - path: app/services/mqtt_service.py
+    reason: "IoT MQTT integration is separate concern; low audit priority."
+  - path: app/workers/
+    reason: "Background workers are stable; change only with dedicated task."
+  - path: app/db/session.py
+    reason: "Database session management is foundational; do not modify without DBA review."
+  - path: alembic/env.py
+    reason: "Alembic environment config is shared infrastructure."
+  - path: app/api/v1/dashboard.py
+    reason: "Recently hardened (batch 1); already DB-driven."
+  - path: app/api/v1/bookings.py
+    reason: "Recently hardened (batch 1); booking lifecycle is tested."
+  - path: app/api/v1/analytics_enhanced.py
+    reason: "Recently hardened (batch 1); analytics export is tested."
+  - path: app/services/payment_method_service.py
+    reason: "Recently hardened (batch 2); shared across payments + wallet."
+  - path: app/api/v1/dealer_portal_dashboard.py
+    reason: "Recently hardened (batch 2); campaigns feed is DB-driven."
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SUMMARY TABLE
+# ═══════════════════════════════════════════════════════════════════════════
+# Phase  | Priority | Est. Hours | Routes Fixed | Methods Added | Tests Added
+# P0-A   | P0       | 0.5        | 23           | 0             | 1
+# P0-B   | P0       | 2          | 11           | 0             | 1
+# P0-C   | P1       | 0.75       | 0            | 0             | 2
+# P1-A   | P0       | 6-8        | 0            | 17            | 5+
+# P1-B   | P1       | 2          | 0            | 0             | 1
+# P1-C   | P0       | 3          | 0            | 0             | 2
+# P2-A   | P1       | 8-12       | 0            | 0             | 3+
+# P2-B   | P1       | 4-6        | 0            | 0             | 2
+# P2-C   | P2       | 4-6        | 0            | 0             | 2
+# P3-A   | P2       | 6-8        | 0            | 0             | 3
+# P3-B   | P2       | 4-6        | 0            | 0             | 2
+# P3-C   | P3       | 8-12       | 0            | 0             | 2
+# P4-A   | P1       | 3-4        | 4            | 9             | 2          ✅
+# P4-B   | P2       | 3-4        | 3            | 9             | 2          ✅
+# P4-C   | P3       | 3-4        | 4            | 5             | 1          ✅
+# P5-A   | P2       | 6-8        | 0            | 0             | 2
+# P5-B   | P3       | 10-14      | 0            | 0             | 2
+# P5-C   | P3       | 8-12       | 0            | 0             | 3
+# TOTAL  |          | 76-112h    | 45           | 40            | 36+

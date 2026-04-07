@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/branches.py
+# hypothesis_version: 6.151.11
+
+[100, 404, '/', '/{branch_id}', 'Branch not found', 'branches', 'create', 'delete', 'edit']

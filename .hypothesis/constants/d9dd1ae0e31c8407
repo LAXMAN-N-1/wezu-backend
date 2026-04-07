@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/payment_service.py
+# hypothesis_version: 6.151.11
+
+[100, 400, 'ENVIRONMENT', 'INR', 'PAYMENT_MOCK_MODE', '_mock', 'amount', 'created', 'currency', 'development', 'id', 'payment.mock_refund', 'payment_capture', 'payment_id', 'processed', 'production', 'razorpay_order_id', 'status', 'unknown', 'wezu_payments']

@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/settlements.py
+# hypothesis_version: 6.151.11
+
+[0.0, 100, 400, 404, '/', '/generate', '/{settlement_id}', 'Settlement not found', 'dealer_id', 'generated', 'paid', 'pending']

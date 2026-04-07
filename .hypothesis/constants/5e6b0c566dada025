@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/schemas/rbac.py
+# hypothesis_version: 6.151.11
+
+['RoleHierarchy', 'RoleRead', 'all', 'overwrite', 'parent_id', 'system']

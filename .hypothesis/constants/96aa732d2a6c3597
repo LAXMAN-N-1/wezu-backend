@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/invoice.py
+# hypothesis_version: 6.151.11
+
+[0.0, 'Transaction', 'User', 'invoice', 'invoices', 'transactions.id', 'users.id']

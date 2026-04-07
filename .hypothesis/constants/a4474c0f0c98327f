@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/fraud.py
+# hypothesis_version: 6.151.11
+
+[0.0, 'blacklists', 'fraud_check_logs', 'postgresql', 'risk_scores', 'users.id']

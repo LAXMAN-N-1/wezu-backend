@@ -212,30 +212,9 @@ def get_chat_history(
         
     return session.messages
 
-@router.post("/tickets/{ticket_id}/attachment")
-async def upload_ticket_attachment(
-    ticket_id: int,
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(deps.get_db)
-):
-    """Upload attachment to support ticket"""
-    ticket = db.get(SupportTicket, ticket_id)
-    if not ticket or ticket.user_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Ticket not found")
-    
-    os.makedirs("uploads/support", exist_ok=True)
-    file_name = f"ticket_{ticket_id}_{file.filename}"
-    file_path = f"uploads/support/{file_name}"
-    
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
-    return {
-        "message": "Attachment uploaded successfully",
-        "file_path": f"/static/{file_path}",
-        "file_name": file.filename
-    }
+# DECONFLICTED P0-B: POST /tickets/{ticket_id}/attachment removed.
+# Canonical handler lives in app/api/v1/support_enhanced.py.
+# Removed 2026-04-06.
 
 # --- Admin Analytics ---
 from app.schemas.support import QueueStatsResponse, AgentPerformanceResponse
@@ -296,22 +275,9 @@ async def list_faqs(
     from app.api.v1.faqs import get_faqs
     return await get_faqs(category, db)
 
-@router.get("/faq/search")
-async def search_faq(
-    q: str,
-    db: Session = Depends(deps.get_db)
-):
-    """Knowledge Base: Search FAQ by keyword"""
-    statement = select(FAQ).where(
-        (FAQ.question.contains(q)) |
-        (FAQ.answer.contains(q))
-    )
-    results = db.exec(statement).all()
-    return {
-        "query": q,
-        "results": results,
-        "count": len(results)
-    }
+# DECONFLICTED P0-B: GET /faq/search removed.
+# Canonical handler lives in app/api/v1/support_enhanced.py.
+# Removed 2026-04-06.
 
 @router.get("/faq/{faq_id}", response_model=FAQResponse)
 async def get_faq_detail(

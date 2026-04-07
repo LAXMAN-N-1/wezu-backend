@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/admin_user.py
+# hypothesis_version: 6.151.11
+
+['AdminGroup', 'Role', 'admin_groups.id', 'admin_users', 'primaryjoin', 'secondaryjoin']

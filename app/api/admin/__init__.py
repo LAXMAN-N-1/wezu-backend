@@ -18,7 +18,10 @@ router.include_router(fraud.router, prefix="/fraud", tags=["Admin Fraud"])
 router.include_router(jobs.router, prefix="/jobs", tags=["Admin Jobs"])
 router.include_router(monitoring.router, prefix="/monitoring", tags=["Admin Monitoring"])
 router.include_router(kyc_admin.router, prefix="/kyc-docs", tags=["Admin KYC Documents"])
-router.include_router(rbac_admin.router, prefix="/rbac", tags=["Admin RBAC"])
+# DECONFLICTED P0-A: RBAC routes are mounted directly in app/main.py via
+# admin_rbac.router at /api/v1/admin/rbac.  Including rbac_admin.router here
+# caused 23 duplicate route registrations because rbac_admin.py re-exports
+# the same router object.  Removed 2026-04-06.
 # Dealers are served by app.api.v1.admin_dealers and mounted directly in
 # app.main to avoid duplicate route registrations at /api/v1/admin/dealers.
 router.include_router(admin_groups.router, prefix="/groups", tags=["Admin Groups"])

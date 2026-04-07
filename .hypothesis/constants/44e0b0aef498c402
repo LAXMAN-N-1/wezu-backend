@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/bess.py
+# hypothesis_version: 6.151.11
+
+[0.0, 25.0, 50.0, 100.0, 'bess_energy_logs', 'bess_grid_events', 'bess_reports', 'bess_units', 'bess_units.id', 'grid', 'maintenance', 'offline', 'online', 'protected_namespaces', 'scheduled', 'standby']

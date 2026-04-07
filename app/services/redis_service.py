@@ -6,6 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 class RedisService:
+    _pool = None
     _client = None
     _retry_after_ts = 0.0
     _retry_cooldown_seconds = 30.0
@@ -18,13 +19,16 @@ class RedisService:
 
         if cls._client is None:
             try:
-                cls._client = redis.from_url(
-                    settings.REDIS_URL,
-                    decode_responses=True,
-                    socket_connect_timeout=1,
-                    socket_timeout=1,
-                    health_check_interval=30,
-                )
+                if cls._pool is None:
+                    cls._pool = redis.ConnectionPool.from_url(
+                        settings.REDIS_URL,
+                        decode_responses=True,
+                        socket_connect_timeout=1,
+                        socket_timeout=1,
+                        health_check_interval=30,
+                        max_connections=100
+                    )
+                cls._client = redis.Redis(connection_pool=cls._pool)
                 cls._client.ping()
             except Exception as e:
                 cls._client = None

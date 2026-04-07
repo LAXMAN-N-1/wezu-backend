@@ -54,21 +54,58 @@ def _release_once(prefix: str, unique_key: str) -> None:
         return
 
 
-def _process_telematics_event(event: dict[str, Any]) -> None:
-    payload = event.get("payload") or {}
-    data_in = TelematicsIngestService.ingest_payload_from_dict(payload)
-    dedupe_id = event.get("idempotency_key") or f"{data_in.battery_id}:{data_in.timestamp.isoformat()}"
-    if not _acquire_once("telematics", dedupe_id):
-        logger.info("Skipping duplicate telematics event id=%s", event.get("event_id"))
-        return
-
-    try:
-        with Session(engine) as session:
-            TelematicsIngestService.persist_telemetry(session, data_in=data_in)
-    except Exception:
-        _release_once("telematics", dedupe_id)
-        raise
-
+def _process_telematics_batch(messages: list[StreamMessage]) -> tuple[list[StreamMessage], list[tuple[StreamMessage, Exception]]]:
+    successful = []
+    failed = []
+    
+    # We will process all valid messages in a single transaction
+    with Session(engine) as session:
+        # Keep track of which message corresponds to which data to map successes
+        message_data_map = []
+        for message in messages:
+            event = EventStreamService.deserialize_event(message.fields)
+            payload = event.get("payload") or {}
+            try:
+                data_in = TelematicsIngestService.ingest_payload_from_dict(payload)
+                dedupe_id = event.get("idempotency_key") or f"{data_in.battery_id}:{data_in.timestamp.isoformat()}"
+                
+                if not _acquire_once("telematics", dedupe_id):
+                    logger.info("Skipping duplicate telematics event id=%s", event.get("event_id"))
+                    successful.append(message)
+                    continue
+                    
+                message_data_map.append((message, data_in, dedupe_id))
+            except Exception as exc:
+                failed.append((message, exc))
+                
+        # Now persist all valid ones
+        for msg, data_in, dedupe_id in message_data_map:
+            try:
+                TelematicsIngestService.persist_telemetry(session, data_in=data_in, commit=False)
+                successful.append(msg)
+            except Exception as exc:
+                failed.append((msg, exc))
+                _release_once("telematics", dedupe_id)
+                # We do a rollback and continue with others might be tricky if one fails,
+                # but since we want N+1 fix, if one fails we might fail the whole batch 
+                # or rollback and just mark the rest as failed for retry.
+                # Easiest is to rollback the session and mark ALL remaining as failed so they retry individually.
+                session.rollback()
+                failed.extend([(m, Exception("Batch aborted due to previous error")) for m, d, i in message_data_map if m not in successful and m != msg])
+                return successful, failed
+                
+        try:
+            session.commit()
+        except Exception as exc:
+            session.rollback()
+            # If commit fails, mark all as failed
+            for msg, data_in, dedupe_id in message_data_map:
+                if msg in successful:
+                    successful.remove(msg)
+                failed.append((msg, exc))
+                _release_once("telematics", dedupe_id)
+                
+    return successful, failed
 
 def _process_webhook_event(event: dict[str, Any]) -> None:
     payload_wrapper = event.get("payload") or {}
@@ -109,7 +146,6 @@ def _process_notification_event(event: dict[str, Any]) -> None:
         _release_once("notification", dedupe_id)
         raise
 
-
 def _run_stream_worker(
     *,
     mode: str,
@@ -119,8 +155,9 @@ def _run_stream_worker(
     batch_size: int,
     block_ms: int,
     max_retries: int,
-    process_fn: Callable[[dict[str, Any]], None],
     stop_event: threading.Event,
+    process_fn: Callable[[dict[str, Any]], None] | None = None,
+    process_batch_fn: Callable[[list[StreamMessage]], tuple[list[StreamMessage], list[tuple[StreamMessage, Exception]]]] | None = None,
 ) -> None:
     consumer = _consumer_name(mode)
     while not stop_event.is_set():
@@ -154,18 +191,16 @@ def _run_stream_worker(
         if not messages:
             continue
 
-        for message in messages:
-            if stop_event.is_set():
-                break
-            event = EventStreamService.deserialize_event(message.fields)
-            try:
-                process_fn(event)
-                EventStreamService.ack(stream_name, group_name, message.message_id)
-            except Exception as exc:
+        if process_batch_fn:
+            successful, failed = process_batch_fn(messages)
+            for msg in successful:
+                EventStreamService.ack(stream_name, group_name, msg.message_id)
+            for msg, exc in failed:
+                event = EventStreamService.deserialize_event(msg.fields)
                 logger.exception(
                     "Stream worker mode=%s failed message_id=%s event_type=%s: %s",
                     mode,
-                    message.message_id,
+                    msg.message_id,
                     event.get("event_type"),
                     exc,
                 )
@@ -173,10 +208,34 @@ def _run_stream_worker(
                     source_stream=stream_name,
                     dlq_stream=dlq_stream_name,
                     group=group_name,
-                    message=message,
+                    message=msg,
                     max_retries=max_retries,
                     error_text=str(exc),
                 )
+        elif process_fn:
+            for message in messages:
+                if stop_event.is_set():
+                    break
+                event = EventStreamService.deserialize_event(message.fields)
+                try:
+                    process_fn(event)
+                    EventStreamService.ack(stream_name, group_name, message.message_id)
+                except Exception as exc:
+                    logger.exception(
+                        "Stream worker mode=%s failed message_id=%s event_type=%s: %s",
+                        mode,
+                        message.message_id,
+                        event.get("event_type"),
+                        exc,
+                    )
+                    EventStreamService.move_to_retry_or_dlq(
+                        source_stream=stream_name,
+                        dlq_stream=dlq_stream_name,
+                        group=group_name,
+                        message=message,
+                        max_retries=max_retries,
+                        error_text=str(exc),
+                    )
 
 
 def run_telematics_ingest_worker(stop_event: threading.Event) -> None:
@@ -188,7 +247,7 @@ def run_telematics_ingest_worker(stop_event: threading.Event) -> None:
         batch_size=int(settings.TELEMATICS_STREAM_CONSUMER_BATCH_SIZE),
         block_ms=int(settings.TELEMATICS_STREAM_BLOCK_MS),
         max_retries=int(settings.TELEMATICS_STREAM_MAX_RETRIES),
-        process_fn=_process_telematics_event,
+        process_batch_fn=_process_telematics_batch,
         stop_event=stop_event,
     )
 

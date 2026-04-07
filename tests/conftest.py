@@ -4,7 +4,12 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine, select, and_
 from sqlmodel.pool import StaticPool
 import sys
+import datetime as _datetime
 from unittest.mock import MagicMock
+
+# Python 3.9 compatibility: emulate datetime.UTC used by application modules.
+if not hasattr(_datetime, "UTC"):
+    _datetime.UTC = _datetime.timezone.utc
 
 # --- MOCK FIREBASE BEFORE APP IMPORTS ---
 # Prevents "Firebase Init Error" from top-level module code
@@ -12,6 +17,13 @@ mock_firebase = MagicMock()
 sys.modules["firebase_admin"] = mock_firebase
 sys.modules["firebase_admin.credentials"] = MagicMock()
 sys.modules["firebase_admin.messaging"] = MagicMock()
+
+# --- MOCK SENTRY BEFORE APP IMPORTS ---
+mock_sentry = MagicMock()
+sys.modules["sentry_sdk"] = mock_sentry
+sentry_fastapi = MagicMock()
+setattr(sentry_fastapi, "FastApiIntegration", MagicMock())
+sys.modules["sentry_sdk.integrations.fastapi"] = sentry_fastapi
 
 from app.main import app
 from app.api import deps
@@ -78,7 +90,10 @@ def session_fixture():
         if tables:
             if _is_sqlite:
                 for table_name in reversed(list(tables)):
-                    session.execute(text(f"DELETE FROM \"{table_name}\";"))
+                    try:
+                        session.execute(text(f"DELETE FROM \"{table_name}\";"))
+                    except Exception:
+                        session.rollback()
                 session.commit()
             else:
                 truncate_stmt = f"TRUNCATE TABLE {', '.join(tables)} CASCADE;"
@@ -200,4 +215,3 @@ def normal_user_fixture(session: Session):
     session.commit()
     session.refresh(user)
     return user
-

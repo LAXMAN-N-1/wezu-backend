@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/battery_catalog.py
+# hypothesis_version: 6.151.11
+
+[0.0, 'Battery', '[Battery.sku_id]', 'battery_batches', 'battery_catalog', 'foreign_keys', 'lithium_ion', 'overlaps', 'product', 'sku']

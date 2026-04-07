@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/middleware/request_logging.py
+# hypothesis_version: 6.151.11
+
+[400, 500, 1000, '/health', 'X-Correlation-ID', 'X-Request-ID', 'auth_error', 'id', 'request.completed', 'request.failed', 'request.slow', 'user', 'user_id']

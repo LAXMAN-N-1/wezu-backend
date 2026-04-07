@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/station_stock.py
+# hypothesis_version: 6.151.11
+
+['pending', 'reorder_requests', 'stations.id', 'users.id']

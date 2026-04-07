@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/kyc.py
+# hypothesis_version: 6.151.11
+
+[400, 404, '/aadhaar-verify', '/pan-verify', '/rejection-reasons', '/resubmit', '/status', '/submit', '/utility-bill-verify', '/video-kyc', 'User not found', 'aadhaar_back', 'aadhaar_front', 'electricity', 'extracted_address', 'file_path', 'kyc_status', 'liveness_score', 'message', 'missing_docs', 'pan_card', 'pending', 'record', 'rejection_reason', 'status', 'success', 'utility_bill', 'verified', 'wb']

@@ -257,11 +257,12 @@ def get_notification_preferences(
 
 @router.put("/notification-preferences")
 def update_notification_preferences(
-    data: dict,
+    data: "NotificationPreferencesUpdate",
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Update notification preferences."""
+    from app.schemas.input_contracts import NotificationPreferencesUpdate
     prefs = db.exec(
         select(NotificationPreference).where(
             NotificationPreference.user_id == current_user.id
@@ -272,7 +273,7 @@ def update_notification_preferences(
         prefs = NotificationPreference(user_id=current_user.id)
         db.add(prefs)
 
-    for key, value in data.items():
+    for key, value in data.model_dump(exclude_unset=True).items():
         if hasattr(prefs, key):
             setattr(prefs, key, value)
 

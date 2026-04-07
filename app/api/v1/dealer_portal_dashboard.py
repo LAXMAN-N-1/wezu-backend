@@ -17,6 +17,7 @@ from app.models.dealer_inventory import DealerInventory
 from app.models.support import SupportTicket, TicketStatus
 from app.models.notification import Notification
 from app.models.rental import Rental
+from app.models.dealer_promotion import DealerPromotion, PromotionUsage
 from app.utils.runtime_cache import cached_call
 
 router = APIRouter()
@@ -264,48 +265,154 @@ def get_dealer_campaigns(
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    """Mock endpoint for Dealer Campaigns since the DB schema is currently empty."""
-    dealer = _get_dealer(db, current_user.id)
-    
-    mock_campaigns = [
-        {
-            "id": 1,
-            "title": "Summer Swap Fest",
-            "desc": "Flat 20% off on first 3 swaps",
-            "status": "Active",
-            "dates": "Mar 15 – Apr 15, 2026",
-            "redemptions": "1,240",
-            "revenue": "₹18,600",
-        },
-        {
-            "id": 2,
-            "title": "Weekend Warrior",
-            "desc": "₹50 off every weekend swap",
-            "status": "Active",
-            "dates": "Mar 01 – Mar 31, 2026",
-            "redemptions": "890",
-            "revenue": "₹12,350",
-        },
-        {
-            "id": 3,
-            "title": "New User Welcome",
-            "desc": "Free first swap for new users",
-            "status": "Scheduled",
-            "dates": "Apr 01 – Apr 30, 2026",
-            "redemptions": "0",
-            "revenue": "—",
-        },
-        {
-            "id": 4,
-            "title": "Winter Boost",
-            "desc": "10% back on wallet recharges",
-            "status": "Expired",
-            "dates": "Dec 01 – Jan 31, 2026",
-            "redemptions": "3,420",
-            "revenue": "₹45,000",
+    """Dealer campaign feed with lifecycle status and performance metrics."""
+
+    def _normalize_datetime(value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo:
+            return value.astimezone(UTC).replace(tzinfo=None)
+        return value
+
+    def _derive_status(
+        *,
+        start: datetime | None,
+        end: datetime | None,
+        is_active: bool,
+        requires_approval: bool,
+        approved_at: datetime | None,
+        now_naive_utc: datetime,
+    ) -> str:
+        if requires_approval and not approved_at:
+            return "Pending Approval"
+        if end and now_naive_utc > end:
+            return "Expired"
+        if start and now_naive_utc < start:
+            return "Scheduled"
+        if not is_active:
+            return "Paused"
+        return "Active"
+
+    def _build_campaigns() -> dict[str, Any]:
+        dealer = _get_dealer(db, current_user.id)
+        campaigns = db.exec(
+            select(DealerPromotion)
+            .where(DealerPromotion.dealer_id == dealer.id)
+            .order_by(DealerPromotion.created_at.desc())
+        ).all()
+
+        usage_rows = db.exec(
+            select(
+                PromotionUsage.promotion_id,
+                func.count(PromotionUsage.id),
+                func.coalesce(func.sum(PromotionUsage.final_amount), 0.0),
+                func.coalesce(func.sum(PromotionUsage.discount_applied), 0.0),
+            )
+            .join(DealerPromotion, DealerPromotion.id == PromotionUsage.promotion_id)
+            .where(DealerPromotion.dealer_id == dealer.id)
+            .group_by(PromotionUsage.promotion_id)
+        ).all()
+        usage_map = {
+            int(promo_id): {
+                "redemptions": int(redemptions or 0),
+                "revenue": float(revenue or 0.0),
+                "discount_given": float(discount_given or 0.0),
+            }
+            for promo_id, redemptions, revenue, discount_given in usage_rows
         }
-    ]
-    return {"data": mock_campaigns, "total": len(mock_campaigns)}
+
+        now_naive_utc = datetime.now(UTC).replace(tzinfo=None)
+        data: list[dict[str, Any]] = []
+        status_counts = {
+            "active": 0,
+            "scheduled": 0,
+            "expired": 0,
+            "paused": 0,
+            "pending_approval": 0,
+        }
+        total_redemptions = 0
+        total_revenue = 0.0
+        total_discount_given = 0.0
+
+        for campaign in campaigns:
+            usage = usage_map.get(int(campaign.id or 0), {"redemptions": 0, "revenue": 0.0, "discount_given": 0.0})
+            start = _normalize_datetime(campaign.start_date)
+            end = _normalize_datetime(campaign.end_date)
+            approved_at = _normalize_datetime(campaign.approved_at)
+            status = _derive_status(
+                start=start,
+                end=end,
+                is_active=bool(campaign.is_active),
+                requires_approval=bool(campaign.requires_approval),
+                approved_at=approved_at,
+                now_naive_utc=now_naive_utc,
+            )
+
+            budget_used_pct = None
+            if campaign.budget_limit and campaign.budget_limit > 0:
+                budget_used_pct = round((usage["discount_given"] / float(campaign.budget_limit)) * 100.0, 2)
+
+            impressions = int(campaign.impressions or 0)
+            conversion_rate_pct = round((usage["redemptions"] / impressions) * 100.0, 2) if impressions > 0 else 0.0
+
+            data.append(
+                {
+                    "id": campaign.id,
+                    "title": campaign.name,
+                    "desc": campaign.description,
+                    "promo_code": campaign.promo_code,
+                    "status": status,
+                    "is_active": bool(campaign.is_active),
+                    "dates": {
+                        "start": campaign.start_date.isoformat() if campaign.start_date else None,
+                        "end": campaign.end_date.isoformat() if campaign.end_date else None,
+                    },
+                    "redemptions": usage["redemptions"],
+                    "revenue": round(usage["revenue"], 2),
+                    "discount_given": round(usage["discount_given"], 2),
+                    "impressions": impressions,
+                    "conversion_rate_pct": conversion_rate_pct,
+                    "budget_limit": float(campaign.budget_limit) if campaign.budget_limit is not None else None,
+                    "budget_used_pct": budget_used_pct,
+                    "usage_limit_total": campaign.usage_limit_total,
+                    "usage_limit_per_user": campaign.usage_limit_per_user,
+                    "discount_type": campaign.discount_type,
+                    "discount_value": float(campaign.discount_value),
+                    "applicable_to": campaign.applicable_to,
+                }
+            )
+
+            total_redemptions += usage["redemptions"]
+            total_revenue += usage["revenue"]
+            total_discount_given += usage["discount_given"]
+
+            if status == "Active":
+                status_counts["active"] += 1
+            elif status == "Scheduled":
+                status_counts["scheduled"] += 1
+            elif status == "Expired":
+                status_counts["expired"] += 1
+            elif status == "Paused":
+                status_counts["paused"] += 1
+            elif status == "Pending Approval":
+                status_counts["pending_approval"] += 1
+
+        return {
+            "data": data,
+            "total": len(data),
+            "summary": {
+                "active_campaigns": status_counts["active"],
+                "scheduled_campaigns": status_counts["scheduled"],
+                "expired_campaigns": status_counts["expired"],
+                "paused_campaigns": status_counts["paused"],
+                "pending_approval_campaigns": status_counts["pending_approval"],
+                "total_redemptions": total_redemptions,
+                "total_revenue": round(total_revenue, 2),
+                "total_discount_given": round(total_discount_given, 2),
+            },
+        }
+
+    return _dealer_dashboard_cache(current_user.id, "campaigns", _build_campaigns)
 
 @router.get("/profile")
 def get_dealer_profile_details(
@@ -350,18 +457,19 @@ def list_dealer_documents(
 
 @router.post("/documents/upload")
 def upload_dealer_document(
-    data: dict,
+    data: "DealerDocumentUpload",
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Upload a new document or a newer version of an existing document."""
+    from app.schemas.input_contracts import DealerDocumentUpload
     dealer = _get_dealer(db, current_user.id)
     from app.models.dealer import DealerDocument
 
-    document_type = data.get("document_type", "other")
-    category = data.get("category", "verification")
-    file_url = data.get("file_url", "")
-    valid_until_str = data.get("valid_until")
+    document_type = data.document_type
+    category = data.category
+    file_url = data.file_url
+    valid_until_str = data.valid_until
 
     # Find existing and determine next version
     existing_docs = db.exec(

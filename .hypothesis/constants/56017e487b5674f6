@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/settlement_dispute.py
+# hypothesis_version: 6.151.11
+
+['open', 'settlement_disputes', 'settlements.id', 'users.id']

@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/charging_service.py
+# hypothesis_version: 6.151.11
+
+[0.2, 0.5, 1.0, 1.5, 100, 1000, 'PENDING', 'battery_id', 'charging', 'score']

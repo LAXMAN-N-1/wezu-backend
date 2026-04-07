@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/notification_preference.py
+# hypothesis_version: 6.151.11
+
+['User', 'en', 'users.id']

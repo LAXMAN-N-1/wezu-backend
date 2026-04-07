@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/route_service.py
+# hypothesis_version: 6.151.11
+
+[8.33, 6371000, 'distance_meters', 'duration_seconds', 'estimated_arrival', 'id', 'in_transit', 'lat', 'latitude', 'legs', 'lng', 'location', 'longitude', 'low', 'moderate', 'now', 'order_id', 'pending', 'polyline', 'sequence_index', 'waypoint_order', 'waypoints']

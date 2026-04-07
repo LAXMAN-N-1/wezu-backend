@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/dealer_analytics.py
+# hypothesis_version: 6.151.11
+
+[400, 403, '/comparison', '/customers', '/email-report', '/export/csv', '/export/json', '/export/pdf', '/margin-by-battery', '/overview', '/peak-hours', '/profitability', '/revenue-breakdown', '/stations', '/trends', 'Content-Disposition', 'Not a dealer', 'application/pdf', 'daily', 'month', 'monthly', 'text/csv', 'weekly']

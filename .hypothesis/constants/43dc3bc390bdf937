@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/financial.py
+# hypothesis_version: 6.151.11
+
+[0.0, 'CASHBACK', 'FINE', 'INR', 'Invoice', 'LATE_FEE', 'PURCHASE', 'REFUND', 'RENTAL_PAYMENT', 'Refund', 'Rental', 'SECURITY_DEPOSIT', 'SUBSCRIPTION', 'SWAP_FEE', 'TRANSFER', 'Transaction', 'User', 'WALLET_TOPUP', 'WITHDRAWAL', 'Wallet', 'cancelled', 'failed', 'pending', 'refunded', 'rentals.id', 'requested', 'success', 'transaction', 'transactions', 'upi', 'users.id', 'wallet', 'wallets', 'wallets.id', 'withdrawal_requests']

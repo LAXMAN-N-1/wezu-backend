@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/rentals_enhanced.py
+# hypothesis_version: 6.151.11
+
+[404, '/{rental_id}/receipt', 'Rental not found', 'battery_id', 'end_time', 'late_fee', 'medium', 'message', 'open', 'receipt_url', 'rental_fee', 'rental_id', 'rental_issue', 'start_time', 'status', 'ticket_id', 'total_fee']

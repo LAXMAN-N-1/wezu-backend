@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/utils/constants.py
+# hypothesis_version: 6.151.11
+
+['active', 'admin', 'alert', 'approved', 'available', 'cancelled', 'charging', 'completed', 'decommissioned', 'failed', 'info', 'maintenance', 'offline', 'overdue', 'pending', 'promo', 'refunded', 'rejected', 'rented', 'success', 'super_admin', 'transaction', 'uploaded', 'user']

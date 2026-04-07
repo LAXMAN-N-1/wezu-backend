@@ -1621,3 +1621,106 @@ class AnalyticsService:
             if total_batteries
             else 0,
         }
+
+    # ── P1-A-8: User-scoped analytics helpers ─────────────────────────────
+
+    @staticmethod
+    def get_rental_history_stats(user_id: int, db: Session) -> dict:
+        """Aggregate rental stats for a single user."""
+        rentals = db.exec(
+            select(Rental).where(Rental.user_id == user_id)
+        ).all()
+
+        if not rentals:
+            return {
+                "total_rentals": 0,
+                "avg_duration_hours": 0,
+                "total_spent": 0,
+                "most_used_stations": [],
+            }
+
+        durations = []
+        station_counter: Counter = Counter()
+        total_spent = 0.0
+
+        for r in rentals:
+            if r.start_time and r.end_time:
+                durations.append((r.end_time - r.start_time).total_seconds() / 3600)
+            total_spent += float(r.total_amount or 0)
+            if r.pickup_station_id:
+                station_counter[r.pickup_station_id] += 1
+
+        # Resolve station names for top-3
+        top_stations = []
+        for station_id, count in station_counter.most_common(3):
+            station = db.get(Station, station_id)
+            top_stations.append({
+                "station_id": station_id,
+                "name": station.name if station else f"Station #{station_id}",
+                "rental_count": count,
+            })
+
+        return {
+            "total_rentals": len(rentals),
+            "avg_duration_hours": round(sum(durations) / len(durations), 1) if durations else 0,
+            "total_spent": round(total_spent, 2),
+            "most_used_stations": top_stations,
+        }
+
+    @staticmethod
+    def get_cost_analytics(user_id: int, months: int, db: Session) -> dict:
+        """Monthly spending breakdown for a user over the last N months."""
+        cutoff = datetime.now(UTC) - timedelta(days=months * 30)
+        txns = db.exec(
+            select(Transaction).where(
+                Transaction.user_id == user_id,
+                Transaction.status == TransactionStatus.SUCCESS,
+                Transaction.created_at >= cutoff,
+            )
+        ).all()
+
+        monthly: dict[str, float] = defaultdict(float)
+        for t in txns:
+            key = t.created_at.strftime("%Y-%m")
+            monthly[key] += float(t.amount)
+
+        sorted_months = sorted(monthly.items())
+        values = [v for _, v in sorted_months]
+        avg = round(sum(values) / len(values), 2) if values else 0
+        trend = "up" if len(values) >= 2 and values[-1] > values[-2] else "down" if len(values) >= 2 else "flat"
+
+        return {
+            "months": [{
+                "month": m,
+                "total": round(v, 2),
+            } for m, v in sorted_months],
+            "average_monthly": avg,
+            "trend": trend,
+        }
+
+    @staticmethod
+    def get_usage_patterns(user_id: int, db: Session) -> dict:
+        """Day-of-week and hour-of-day rental heatmap for a user."""
+        rentals = db.exec(
+            select(Rental).where(Rental.user_id == user_id)
+        ).all()
+
+        day_counts: Counter = Counter()
+        hour_counts: Counter = Counter()
+        total_duration_hours = 0.0
+        count = 0
+
+        for r in rentals:
+            if r.start_time:
+                day_counts[r.start_time.strftime("%A")] += 1
+                hour_counts[r.start_time.hour] += 1
+            if r.start_time and r.end_time:
+                total_duration_hours += (r.end_time - r.start_time).total_seconds() / 3600
+                count += 1
+
+        return {
+            "by_day_of_week": dict(day_counts.most_common()),
+            "by_hour": {str(h): c for h, c in sorted(hour_counts.items())},
+            "avg_duration_hours": round(total_duration_hours / count, 1) if count else 0,
+            "total_rentals": len(rentals),
+        }

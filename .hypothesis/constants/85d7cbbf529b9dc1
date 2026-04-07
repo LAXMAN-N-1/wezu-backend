@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/dealer_campaigns.py
+# hypothesis_version: 6.151.11
+
+[403, '/bulk-create', '/bulk-toggle', '/validate', '/{campaign_id}', '/{campaign_id}/clone', 'ALL', 'Not a dealer', 'end_date', 'latin1', 'start_date', 'updated', 'utf-8-sig']

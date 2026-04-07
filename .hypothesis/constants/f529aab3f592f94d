@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/notification_service.py
+# hypothesis_version: 6.151.11
+
+[100, 200, 10000, '-', '07:00', '22:00', ':', 'ENABLE_EVENT_STREAMS', 'UTC', '_', 'all', 'allowed', 'battery_alert', 'battery_available', 'bypass_preferences', 'claimed', 'dead_letter', 'email', 'enabled', 'end_time', 'enqueued', 'failed', 'flush', 'info', 'notification.skipped', 'notification_id', 'notification_service', 'otp', 'payload', 'payment', 'payment_receipts', 'payment_reminders', 'processed', 'promotional', 'published', 'push', 'quiet_hours', 'rental', 'rental_confirmations', 'security', 'security_alerts', 'sent', 'skipped', 'sms', 'start_time', 'timezone', 'transactional', 'type', 'user_id', 'whatsapp']

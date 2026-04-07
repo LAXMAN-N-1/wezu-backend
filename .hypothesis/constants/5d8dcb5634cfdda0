@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/system.py
+# hypothesis_version: 6.151.11
+
+['/', '/config', '/health', '/health/detailed', '/version', '24/7', 'SELECT 1', 'api', 'api_version', 'apple_signin', 'battery_swap', 'biometric_auth', 'components', 'cpu_percent', 'database', 'degraded', 'disk_percent', 'e_commerce', 'email', 'environment', 'features', 'google_signin', 'healthy', 'hours', 'limits', 'max_file_size_mb', 'max_rentals_per_user', 'memory_percent', 'phone', 'python_version', 'status', 'support', 'system', 'timestamp', 'two_factor_auth', 'v1', 'version', 'video_kyc']

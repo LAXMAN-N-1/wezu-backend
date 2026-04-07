@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/warehouses.py
+# hypothesis_version: 6.151.11
+
+[100, 404, '/', '/{id}', 'Warehouse not found', 'create', 'delete', 'edit', 'view', 'warehouses']

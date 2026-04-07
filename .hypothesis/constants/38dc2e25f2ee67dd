@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/token.py
+# hypothesis_version: 6.151.11
+
+['User', 'session_tokens', 'users.id']

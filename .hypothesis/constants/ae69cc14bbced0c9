@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/late_fee.py
+# hypothesis_version: 6.151.11
+
+[0.0, 'LateFeeWaiver', 'PENDING', 'Rental', 'User', 'foreign_keys', 'invoices.id', 'late_fee', 'late_fee_waivers', 'late_fees', 'late_fees.id', 'rentals.id', 'users.id', 'waiver_request']

@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/catalog.py
+# hypothesis_version: 6.151.11
+
+[0.0, 100, 'ACCESSORY', 'ACTIVE', 'BATTERY', 'BUNDLE', 'CHARGER', 'CatalogOrderItem', 'CatalogProductImage', 'DISCONTINUED', 'INACTIVE', 'OUT_OF_STOCK', 'PENDING', 'delivery_events', 'delivery_tracking', 'delivery_tracking.id', 'images', 'items', 'order', 'order_items', 'orders', 'orders.id', 'product', 'product_images', 'product_variants', 'product_variants.id', 'products', 'products.id', 'users.id', 'variants']

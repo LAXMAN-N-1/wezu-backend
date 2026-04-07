@@ -217,12 +217,13 @@ def get_preferences(
 
 @router.put("/preferences")
 def update_preferences(
-    preferences: dict,
+    preferences: "PreferencesUpdate",
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ):
     """Update preferences"""
     from app.models.notification_preference import NotificationPreference
+    from app.schemas.input_contracts import PreferencesUpdate
     from sqlmodel import select
     
     pref = db.exec(
@@ -233,7 +234,7 @@ def update_preferences(
         pref = NotificationPreference(user_id=current_user.id)
         db.add(pref)
         
-    for key, value in preferences.items():
+    for key, value in preferences.model_dump(exclude_unset=True).items():
         if hasattr(pref, key) and key not in ["id", "user_id"]:
             setattr(pref, key, value)
 
@@ -284,16 +285,17 @@ def upload_profile_picture(
 
 @router.post("/change-password")
 def change_password(
-    data: dict,
+    data: "ChangePasswordRequest",
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ):
     """Change password"""
+    from app.schemas.input_contracts import ChangePasswordRequest
 
-    if not verify_password(data["old_password"], current_user.hashed_password):
+    if not verify_password(data.old_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect password")
 
-    current_user.hashed_password = get_password_hash(data["new_password"])
+    current_user.hashed_password = get_password_hash(data.new_password)
 
     db.add(current_user)
     db.commit()

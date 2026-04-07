@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/maintenance.py
+# hypothesis_version: 6.151.11
+
+[0.0, '/downtime', '/history', '/record', 'completed', 'create', 'maintenance', 'recorded', 'status', 'view']

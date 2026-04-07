@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/core/observability.py
+# hypothesis_version: 6.151.11
+
+[2000.0, 1000, 'budget_ms', 'elapsed_ms', 'flow_id', 'operation', 'request_id', 'slo.breach', 'slo.ok', 'state', 'wezu_observability']

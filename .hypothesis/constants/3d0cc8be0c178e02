@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/logistics_service.py
+# hypothesis_version: 6.151.11
+
+[0.0, 100, 1800, 'Order not found', 'active', 'active_drivers', 'assigned', 'delivered', 'draft', 'in_transit', 'optimized_stops', 'pending', 'ready', 'route_id', 'station', 'success_rate', 'total_distance_km', 'total_orders', 'warehouse']

@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/delivery_route.py
+# hypothesis_version: 6.151.11
+
+['DELIVERY', 'DeliveryAssignment', 'DriverProfile', 'PENDING', 'PLANNED', 'RouteStop', 'delivery_routes', 'delivery_routes.id', 'driver_profiles.id', 'postgresql', 'route', 'route_stops', 'stops']

@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/geofence_service.py
+# hypothesis_version: 6.151.11
+
+[1000.0, 'Safe Zone Boundary', 'geofence_id', 'is_allowed', 'is_violation', 'name', 'outside_safe_zone', 'reason', 'restricted_hits', 'restricted_zone', 'safe_zone', 'safe_zones_inside', 'safe_zones_total', 'station_perimeter', 'type', 'violations']

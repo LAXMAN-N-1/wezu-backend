@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/dealer_kyc.py
+# hypothesis_version: 6.151.11
+
+['ACTIVE', 'APPROVED', 'AUTO_CHECKS', 'DOC_SUBMITTED', 'KYCStateTransition', 'MANUAL_REVIEW', 'REGISTRATION', 'REJECTED', 'application', 'transitions', 'users.id']

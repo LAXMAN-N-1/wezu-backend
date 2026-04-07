@@ -28,9 +28,9 @@ def record_heartbeat(
         )
         return DataResponse(data=heartbeat, message="Heartbeat received", station_status=heartbeat_in.status)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail="Station not found")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Heartbeat processing failed")
 
 @router.post("/charging/prioritize", response_model=OptimizedQueueResponse)
 def prioritize_charging(

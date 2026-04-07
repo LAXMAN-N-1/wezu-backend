@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/dealers.py
+# hypothesis_version: 6.151.11
+
+[100, 400, 403, 404, ',', '/', '/me', '/me/bank-account', '/me/commissions', '/me/dashboard', '/me/documents', '/me/documents/{id}', '/me/inventory', '/me/promotions', '/me/promotions/{id}', '/me/sales', '/me/stations', '/me/support-tickets', '/me/transactions', '/registration-status', '/settlements', '/visits/schedule', '/{id}', 'Access denied', 'Bank account updated', 'Content-Disposition', 'Dealer not found', 'Document deleted', 'Document not found', 'Document uploaded', 'NOT_STARTED', 'Not a dealer', 'Profile updated', 'bank_details', 'business_name', 'created_at', 'current_stage', 'id', 'is_active', 'message', 'promo_code', 'text/csv', 'verified']

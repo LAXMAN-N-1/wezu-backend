@@ -390,61 +390,12 @@ async def request_battery_swap(
     
     return rental
 
-class IssueReport(BaseModel):
-    issue_type: str
-    description: str
-    severity: str = "medium"
+# DECONFLICTED P0-B: POST /{rental_id}/report-issue removed.
+# Canonical handler lives in app/api/v1/rentals_enhanced.py
+# (uses WorkflowAutomationService for ticket notification).
+# Removed 2026-04-06.
 
-@router.post("/{rental_id}/report-issue")
-async def report_rental_issue(
-    rental_id: int,
-    issue: IssueReport,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db)
-):
-    """Report an issue with a rental"""
-    rental = db.get(Rental, rental_id)
-    if not rental or rental.user_id != current_user.id:
-        raise HTTPException(status_code=404, detail="Rental not found")
-    
-    # Create support ticket for the issue
-    from app.models.support import SupportTicket
-    
-    ticket = SupportTicket(
-        user_id=current_user.id,
-        subject=f"Rental Issue - {issue.issue_type}",
-        description=f"Rental ID: {rental_id}\n{issue.description}",
-        category="rental_issue",
-        priority=issue.severity,
-        status="open"
-    )
-    db.add(ticket)
-    db.commit()
-    db.refresh(ticket)
-    
-    return {
-        "message": "Issue reported successfully",
-        "ticket_id": ticket.id,
-        "status": "open"
-    }
-
-@router.get("/{rental_id}/receipt")
-async def get_rental_receipt_v2(
-    rental_id: int,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db)
-):
-    """Generate and stream PDF receipt for a specific rental."""
-    rental = db.get(Rental, rental_id)
-    if not rental or (rental.user_id != current_user.id and not current_user.is_superuser):
-        raise HTTPException(status_code=404, detail="Rental not found")
-    
-    buffer = InvoiceService.generate_rental_invoice(rental_id, db)
-    if not buffer:
-        raise HTTPException(status_code=500, detail="Failed to generate receipt")
-        
-    return StreamingResponse(
-        buffer, 
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=receipt_{rental_id}.pdf"}
-    )
+# DECONFLICTED P0-B: GET /{rental_id}/receipt removed.
+# Canonical handler lives in app/api/v1/rentals_enhanced.py
+# (returns structured receipt JSON instead of requiring InvoiceService PDF).
+# Removed 2026-04-06.

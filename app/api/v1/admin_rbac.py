@@ -3,7 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, func, col, update
 from sqlalchemy.orm import selectinload
 from datetime import datetime, UTC
+import logging
+
 from app.api import deps
+
+logger = logging.getLogger(__name__)
 from app.models.admin_user import AdminUser
 from app.models.rbac import Role, Permission, RolePermission, AdminUserRole, UserRole
 from app.models.session import UserSession
@@ -764,7 +768,8 @@ def transfer_role_assignment(
         
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Transfer failed: {str(e)}")
+        logger.exception("role_transfer_failed")
+        raise HTTPException(status_code=500, detail="Role transfer failed")
 
 
 @router.post("/users/{user_id}/roles", response_model=rbac_schema.UserRoleAssignmentResponse)

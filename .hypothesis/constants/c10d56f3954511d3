@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/device_fingerprint.py
+# hypothesis_version: 6.151.11
+
+[0.0, 'DETECTED', 'DuplicateAccount', 'User', 'device', 'device_fingerprints', 'duplicate_accounts', 'duplicate_links', 'foreign_keys', 'postgresql', 'users.id']

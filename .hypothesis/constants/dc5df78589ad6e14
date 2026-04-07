@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/support_service.py
+# hypothesis_version: 6.151.11
+
+[1.5, 4.8, 'IN_PROGRESS', 'OPEN', 'Support', 'Support Agent Alpha', 'agent_id', 'agent_name', 'battery', 'closed', 'csat_score', 'dealer', 'in_progress', 'open', 'open_tickets', 'overdue_tickets', 'payment', 'priority_breakdown', 'refund', 'rent', 'resolved_tickets', 'warranty']

@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/battery_reservation.py
+# hypothesis_version: 6.151.11
+
+['PENDING', 'batteries.id', 'battery_reservations', 'stations.id', 'users.id']

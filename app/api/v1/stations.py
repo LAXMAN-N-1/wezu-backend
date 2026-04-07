@@ -196,12 +196,14 @@ async def read_station_maintenance_schedule(
 @router.post("/{station_id}/maintenance-schedule")
 async def create_station_maintenance_task(
     station_id: int,
-    data: dict, # Simplified for now, should use schema
+    data: "MaintenanceTaskCreate",
     current_user: User = Depends(deps.get_current_active_superuser),
     db: Session = Depends(deps.get_db),
 ):
-    data.update({"entity_type": "station", "entity_id": station_id})
-    return MaintenanceService.record_maintenance(db, current_user.id, data)
+    from app.schemas.input_contracts import MaintenanceTaskCreate
+    task_data = data.model_dump(exclude_unset=True)
+    task_data.update({"entity_type": "station", "entity_id": station_id})
+    return MaintenanceService.record_maintenance(db, current_user.id, task_data)
 
 @router.put("/{station_id}/maintenance-schedule/{task_id}")
 async def update_station_maintenance_task(
@@ -319,5 +321,5 @@ async def read_station_batteries(
         return results
     except Exception as e:
         import logging
-        logging.error(f"DATABASE_ERROR: Failed to fetch batteries for station {station_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+        logging.getLogger(__name__).exception("fetch_station_batteries_failed", extra={"station_id": station_id})
+        raise HTTPException(status_code=500, detail="Failed to fetch station batteries")

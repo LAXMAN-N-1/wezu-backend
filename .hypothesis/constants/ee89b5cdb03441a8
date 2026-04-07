@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/wallet_service.py
+# hypothesis_version: 6.151.11
+
+[100, 400, 404, 500, 600, 800, 1000, '0.00', '0.01', 'Cashback', 'Customer Request', 'Deposit', 'Insufficient balance', 'Invalid amount', 'Payment', 'Recipient not found', 'Refund not found', 'Request not found', 'Wallet not found', 'cashback', 'credit', 'debit', 'deposit', 'failed', 'medium', 'order_id', 'order_id is required', 'pending', 'processed', 'refund', 'refund_id', 'rejected', 'requested', 'sender_id', 'success', 'transfer', 'user_id', 'wallet.add_balance', 'wallet_recharge', 'wezu_wallet', 'withdrawal', 'withdrawal_processed', 'withdrawal_rejected', 'withdrawal_request', 'withdrawal_reversal']

@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/cart_service.py
+# hypothesis_version: 6.151.11
+
+['brand', 'id', 'image_url', 'name', 'price', 'product', 'product_id', 'quantity', 'variant', 'variant_id']

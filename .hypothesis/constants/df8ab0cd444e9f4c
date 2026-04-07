@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/workers/scheduler.py
+# hypothesis_version: 6.151.11
+
+[300, 'Asia/Kolkata', 'checked_at', 'coalesce', 'daily_inventory_sync', 'hourly_stock_alerts', 'id', 'job_count', 'jobs', 'max_instances', 'misfire_grace_time', 'name', 'next_run', 'running', 'trigger']

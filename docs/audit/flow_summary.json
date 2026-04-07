@@ -1,0 +1,396 @@
+{
+  "summary": {
+    "total_routes": 943,
+    "unique_paths": 755,
+    "duplicate_path_method_count": 34,
+    "by_method": {
+      "GET": 470,
+      "POST": 292,
+      "DELETE": 64,
+      "PATCH": 34,
+      "PUT": 83
+    },
+    "by_domain": {
+      "dealer/portal": 57,
+      "admin/rbac": 46,
+      "logistics": 37,
+      "auth": 33,
+      "users": 30,
+      "dealers": 28,
+      "batteries": 27,
+      "payments": 25,
+      "catalog": 24,
+      "admin/stations": 23,
+      "stations": 23,
+      "admin/cms": 21,
+      "admin/users": 19,
+      "rentals": 19,
+      "support": 19,
+      "notifications": 17,
+      "dealer/analytics": 16,
+      "admin/analytics": 15,
+      "admin/dealers": 15,
+      "wallet": 15,
+      "admin/notifications": 14,
+      "admin/support": 14,
+      "orders": 14,
+      "profile": 14,
+      "admin/finance": 12,
+      "admin/financial-reports": 12,
+      "admin/bess": 11,
+      "admin/kyc": 11,
+      "admin/logistics": 11,
+      "admin/batteries": 10,
+      "admin/health": 10,
+      "admin/iot": 10,
+      "admin/settings": 10,
+      "dealer-stations": 10,
+      "dealer/campaigns": 10,
+      "locations": 10,
+      "admin/security": 9,
+      "dealer/onboarding": 9,
+      "admin/rentals": 8,
+      "admin/stock": 8,
+      "dealer/auth": 8,
+      "admin/fraud": 7,
+      "admin/jobs": 7,
+      "bookings": 7,
+      "inventory": 7,
+      "admin/monitoring": 6,
+      "analytics": 6,
+      "location": 6,
+      "organizations": 6,
+      "admin/blogs": 5,
+      "admin/kyc-docs": 5,
+      "admin/legal": 5,
+      "audit": 5,
+      "branches": 5,
+      "dashboard": 5,
+      "fraud": 5,
+      "manifests": 5,
+      "menus": 5,
+      "roles": 5,
+      "stock": 5,
+      "telemetry": 5,
+      "warehouses": 5,
+      "admin/audit-logs": 4,
+      "admin/banners": 4,
+      "admin/groups": 4,
+      "faqs": 4,
+      "purchases": 4,
+      "root": 4,
+      "admin/audit-trails": 3,
+      "drivers": 3,
+      "favorites": 3,
+      "iot": 3,
+      "maintenance": 3,
+      "role-rights": 3,
+      "settlements": 3,
+      "station-monitoring": 3,
+      "vehicles": 3,
+      "warehouse": 3,
+      "admin/invoices": 2,
+      "customer": 2,
+      "health": 2,
+      "i18n": 2,
+      "ml": 2,
+      "promo": 2,
+      "sessions": 2,
+      "swaps": 2,
+      "telematics": 2,
+      "transactions": 2,
+      ".well-known": 1,
+      "aadhaar-verify": 1,
+      "admin/stats": 1,
+      "api/internal": 1,
+      "api/webhooks": 1,
+      "config": 1,
+      "me": 1,
+      "pan-verify": 1,
+      "rejection-reasons": 1,
+      "resubmit": 1,
+      "routes": 1,
+      "screens": 1,
+      "status": 1,
+      "submit": 1,
+      "utility-bill-verify": 1,
+      "utils": 1,
+      "version": 1,
+      "video-kyc": 1
+    }
+  },
+  "duplicates": [
+    {
+      "path": "/api/v1/admin/rbac/hierarchy",
+      "method": "GET",
+      "handlers": [
+        "app.api.v1.admin_rbac::get_role_hierarchy",
+        "app.api.v1.admin_rbac::get_role_hierarchy"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/permissions",
+      "method": "GET",
+      "handlers": [
+        "app.api.v1.admin_rbac::read_permissions",
+        "app.api.v1.admin_rbac::read_permissions"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/permissions",
+      "method": "POST",
+      "handlers": [
+        "app.api.v1.admin_rbac::create_permission",
+        "app.api.v1.admin_rbac::create_permission"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/roles",
+      "method": "GET",
+      "handlers": [
+        "app.api.v1.admin_rbac::read_roles",
+        "app.api.v1.admin_rbac::read_roles"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/roles",
+      "method": "POST",
+      "handlers": [
+        "app.api.v1.admin_rbac::create_role",
+        "app.api.v1.admin_rbac::create_role"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/roles/bulk-assign",
+      "method": "POST",
+      "handlers": [
+        "app.api.v1.admin_rbac::bulk_assign_roles",
+        "app.api.v1.admin_rbac::bulk_assign_roles"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/roles/{role_id}",
+      "method": "DELETE",
+      "handlers": [
+        "app.api.v1.admin_rbac::delete_role",
+        "app.api.v1.admin_rbac::delete_role"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/roles/{role_id}",
+      "method": "GET",
+      "handlers": [
+        "app.api.v1.admin_rbac::get_role_detail",
+        "app.api.v1.admin_rbac::get_role_detail"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/roles/{role_id}",
+      "method": "PUT",
+      "handlers": [
+        "app.api.v1.admin_rbac::update_role",
+        "app.api.v1.admin_rbac::update_role"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/roles/{role_id}/duplicate",
+      "method": "POST",
+      "handlers": [
+        "app.api.v1.admin_rbac::duplicate_role",
+        "app.api.v1.admin_rbac::duplicate_role"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/roles/{role_id}/permissions",
+      "method": "GET",
+      "handlers": [
+        "app.api.v1.admin_rbac::get_role_permissions",
+        "app.api.v1.admin_rbac::get_role_permissions"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/roles/{role_id}/permissions",
+      "method": "POST",
+      "handlers": [
+        "app.api.v1.admin_rbac::assign_permissions_to_role",
+        "app.api.v1.admin_rbac::assign_permissions_to_role"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/roles/{role_id}/users",
+      "method": "GET",
+      "handlers": [
+        "app.api.v1.admin_rbac::get_users_by_role",
+        "app.api.v1.admin_rbac::get_users_by_role"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/users/{source_user_id}/roles/transfer",
+      "method": "POST",
+      "handlers": [
+        "app.api.v1.admin_rbac::transfer_role_assignment",
+        "app.api.v1.admin_rbac::transfer_role_assignment"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/users/{user_id}/access-paths",
+      "method": "GET",
+      "handlers": [
+        "app.api.v1.admin_rbac::get_user_access_paths",
+        "app.api.v1.admin_rbac::get_user_access_paths"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/users/{user_id}/access-paths",
+      "method": "POST",
+      "handlers": [
+        "app.api.v1.admin_rbac::assign_access_path",
+        "app.api.v1.admin_rbac::assign_access_path"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/users/{user_id}/access-paths/{path_id}",
+      "method": "DELETE",
+      "handlers": [
+        "app.api.v1.admin_rbac::remove_access_path",
+        "app.api.v1.admin_rbac::remove_access_path"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/users/{user_id}/access-paths/{path_id}",
+      "method": "PUT",
+      "handlers": [
+        "app.api.v1.admin_rbac::update_access_path",
+        "app.api.v1.admin_rbac::update_access_path"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/users/{user_id}/permissions",
+      "method": "GET",
+      "handlers": [
+        "app.api.v1.admin_rbac::get_user_permissions",
+        "app.api.v1.admin_rbac::get_user_permissions"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/users/{user_id}/permissions/check",
+      "method": "GET",
+      "handlers": [
+        "app.api.v1.admin_rbac::check_user_permission",
+        "app.api.v1.admin_rbac::check_user_permission"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/users/{user_id}/roles",
+      "method": "GET",
+      "handlers": [
+        "app.api.v1.admin_rbac::get_user_roles",
+        "app.api.v1.admin_rbac::get_user_roles"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/users/{user_id}/roles",
+      "method": "POST",
+      "handlers": [
+        "app.api.v1.admin_rbac::assign_roles_to_user",
+        "app.api.v1.admin_rbac::assign_roles_to_user"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/rbac/users/{user_id}/roles/{role_id}",
+      "method": "DELETE",
+      "handlers": [
+        "app.api.v1.admin_rbac::remove_role_from_user",
+        "app.api.v1.admin_rbac::remove_role_from_user"
+      ]
+    },
+    {
+      "path": "/api/v1/admin/users/{user_id}/reset-password",
+      "method": "POST",
+      "handlers": [
+        "app.api.admin.users::reset_user_password",
+        "app.api.v1.admin_users::admin_reset_password"
+      ]
+    },
+    {
+      "path": "/api/v1/notifications/device-token",
+      "method": "POST",
+      "handlers": [
+        "app.api.v1.notifications::register_device_token",
+        "app.api.v1.notifications_enhanced::register_device_token"
+      ]
+    },
+    {
+      "path": "/api/v1/notifications/read-all",
+      "method": "PATCH",
+      "handlers": [
+        "app.api.v1.notifications::mark_all_notifications_read",
+        "app.api.v1.notifications_enhanced::mark_all_notifications_read"
+      ]
+    },
+    {
+      "path": "/api/v1/payments/methods",
+      "method": "POST",
+      "handlers": [
+        "app.api.v1.payments::add_payment_method",
+        "app.api.v1.payments_enhanced::add_payment_method"
+      ]
+    },
+    {
+      "path": "/api/v1/payments/methods/{method_id}",
+      "method": "DELETE",
+      "handlers": [
+        "app.api.v1.payments::delete_payment_method",
+        "app.api.v1.payments_enhanced::delete_payment_method"
+      ]
+    },
+    {
+      "path": "/api/v1/rentals/{rental_id}/receipt",
+      "method": "GET",
+      "handlers": [
+        "app.api.v1.rentals::get_rental_receipt_v2",
+        "app.api.v1.rentals_enhanced::get_rental_receipt"
+      ]
+    },
+    {
+      "path": "/api/v1/rentals/{rental_id}/report-issue",
+      "method": "POST",
+      "handlers": [
+        "app.api.v1.rentals::report_rental_issue",
+        "app.api.v1.rentals_enhanced::report_rental_issue"
+      ]
+    },
+    {
+      "path": "/api/v1/support/faq/search",
+      "method": "GET",
+      "handlers": [
+        "app.api.v1.support::search_faq",
+        "app.api.v1.support_enhanced::search_faq"
+      ]
+    },
+    {
+      "path": "/api/v1/support/tickets/{ticket_id}/attachment",
+      "method": "POST",
+      "handlers": [
+        "app.api.v1.support::upload_ticket_attachment",
+        "app.api.v1.support_enhanced::upload_ticket_attachment"
+      ]
+    },
+    {
+      "path": "/api/v1/wallet/cashback",
+      "method": "GET",
+      "handlers": [
+        "app.api.v1.wallet::get_cashback_history",
+        "app.api.v1.wallet_enhanced::get_cashback_history"
+      ]
+    },
+    {
+      "path": "/api/v1/wallet/transfer",
+      "method": "POST",
+      "handlers": [
+        "app.api.v1.wallet::transfer_to_user",
+        "app.api.v1.wallet_enhanced::transfer_to_user"
+      ]
+    }
+  ]
+}

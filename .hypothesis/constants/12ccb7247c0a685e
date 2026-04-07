@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/middleware/proxy_host.py
+# hypothesis_version: 6.151.11
+
+['"', "'", ',', ';', '=', 'forwarded', 'host', 'x-forwarded-host']

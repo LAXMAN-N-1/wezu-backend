@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/charging_queue.py
+# hypothesis_version: 6.151.11
+
+[0.0, 'batteries.id', 'charging_queue', 'stations.id']

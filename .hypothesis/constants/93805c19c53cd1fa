@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/routes.py
+# hypothesis_version: 6.151.11
+
+[400, 503, '/optimize', 'distance_meters', 'duration_seconds', 'estimated_arrival', 'id', 'lat', 'lng', 'location', 'order_id', 'polyline', 'sequence_index', 'waypoints']

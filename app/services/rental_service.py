@@ -448,6 +448,21 @@ class RentalService:
         ).all()
 
     @staticmethod
+    def get_current_rental(db: Session, user_id: int) -> Optional[Rental]:
+        """Return the single most-recent active or pending rental for a user, or None."""
+        from sqlalchemy.orm import selectinload
+
+        return db.exec(
+            select(Rental)
+            .options(selectinload(Rental.battery), selectinload(Rental.events))
+            .where(
+                Rental.user_id == user_id,
+                Rental.status.in_(["active", "pending_payment"]),
+            )
+            .order_by(Rental.created_at.desc())
+        ).first()
+
+    @staticmethod
     def get_history(db: Session, user_id: int) -> List[Rental]:
         from sqlalchemy.orm import selectinload
 
@@ -465,7 +480,7 @@ class RentalService:
             raise HTTPException(status_code=400, detail="Invalid rental")
 
         rental.status = "completed"
-        rental.drop_station_id = station_id
+        rental.end_station_id = station_id
         rental.end_time = datetime.utcnow()
 
         battery = db.exec(select(Battery).where(Battery.id == rental.battery_id).with_for_update()).first()

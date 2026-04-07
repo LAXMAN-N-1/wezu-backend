@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/branch.py
+# hypothesis_version: 6.151.11
+
+['Organization', 'User', 'Warehouse', 'branch', 'branches', 'organizations.id', 'users.id']

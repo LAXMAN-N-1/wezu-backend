@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/idempotency.py
+# hypothesis_version: 6.151.11
+
+['idempotency_key', 'idempotency_keys', 'request_method', 'request_path', 'user_id', 'users.id']

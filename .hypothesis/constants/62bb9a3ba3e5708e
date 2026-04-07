@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/core/public_url.py
+# hypothesis_version: 6.151.11
+
+['/', 'http://', 'https://', 'uploads/']

@@ -51,7 +51,7 @@ from slowapi.errors import RateLimitExceeded
 # ── Router imports (all from Laxman + Hardened) ────────────────────────────
 from app.api.v1 import (
     auth, customer_auth, sessions, users, profile, kyc, stations, batteries,
-    rentals, wallet, payments, notifications, support, favorites, analytics,
+    rentals, bookings, wallet, payments, notifications, support, favorites, analytics,
     transactions, promo, faqs, iot, swaps, i18n, fraud, branches, organizations,
     warehouses, screens, stock, dealers, logistics, settlements, telemetry,
     telematics, vehicles, locations, system, roles, menus, role_rights,
@@ -553,6 +553,7 @@ app.include_router(stations.router, prefix=f"{v1_str}/stations", tags=["Stations
 app.include_router(batteries.router, prefix=f"{v1_str}/batteries", tags=["Batteries"])
 app.include_router(battery_catalog.router, prefix=f"{v1_str}/batteries", tags=["Battery Catalog"])
 app.include_router(rentals.router, prefix=f"{v1_str}/rentals", tags=["Rentals"])
+app.include_router(bookings.router, prefix=f"{v1_str}/bookings", tags=["Bookings"])
 app.include_router(vehicles.router, prefix=f"{v1_str}/vehicles", tags=["Vehicles"])
 app.include_router(swaps.router, prefix=f"{v1_str}/swaps", tags=["Swaps"])
 app.include_router(maintenance.router, prefix=f"{v1_str}/maintenance", tags=["Maintenance"])

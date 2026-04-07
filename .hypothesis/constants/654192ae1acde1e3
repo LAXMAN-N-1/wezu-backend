@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/drivers.py
+# hypothesis_version: 6.151.11
+
+[404, '/me', '/onboard', '/routes', 'driver', 'driver_profiles', 'unique constraint', 'user_role', 'user_roles']

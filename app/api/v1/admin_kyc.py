@@ -72,13 +72,6 @@ def get_pending_kyc_queue(
         size=size
     )
 
-    return KYCQueueResponse(
-        items=items,
-        total=total,
-        page=page,
-        size=size
-    )
-
 @router.post("/{user_id}/verify", response_model=Any)
 def verify_kyc_submission(
     user_id: int,

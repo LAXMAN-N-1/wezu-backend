@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/admin_audit.py
+# hypothesis_version: 6.151.11
+
+[200, '/', '/export/csv', '/export/json', '/stats', 'Content-Disposition', 'Filter by user ID', 'Pagination limit', 'Pagination offset', 'action', 'count', 'data', 'limit', 'resource_type', 'skip', 'text/csv', 'top_actions', 'top_resource_types', 'total', 'total_logs']

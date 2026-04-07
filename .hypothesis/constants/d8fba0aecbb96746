@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/schemas/order.py
+# hypothesis_version: 6.151.11
+
+['0.0', 'Walk-in Customer', 'after', 'assigned', 'before', 'canceled', 'capturedAt', 'captured_at', 'code', 'completed', 'current_status', 'delivery', 'failed', 'id', 'imagePublicUrl', 'imageUrl', 'image_public_url', 'image_url', 'in_progress', 'name', 'none', 'normal', 'notes', 'orderState', 'order_status', 'out_for_delivery', 'pending', 'proofOfDelivery', 'proofOfDeliveryNotes', 'proofOfDeliveryUrl', 'proof_of_delivery', 'recipientName', 'recipient_name', 'signaturePublicUrl', 'signatureUrl', 'signature_public_url', 'signature_url', 'state', 'status', 'value']

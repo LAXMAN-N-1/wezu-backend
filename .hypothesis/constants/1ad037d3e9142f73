@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/utils/cors.py
+# hypothesis_version: 6.151.11
+
+['/', 'Origin', 'Vary', 'true']

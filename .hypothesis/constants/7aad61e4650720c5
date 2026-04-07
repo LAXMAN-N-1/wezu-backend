@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/referral.py
+# hypothesis_version: 6.151.11
+
+[0.0, 'User', 'foreign_keys', 'pending', 'referrals', 'users.id']

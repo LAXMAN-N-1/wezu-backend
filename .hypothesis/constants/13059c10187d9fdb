@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/passkeys.py
+# hypothesis_version: 6.151.11
+
+['/auth/options', '/auth/verify', '/passkeys', '/register/options', '/register/verify', '/{credential_id}', 'Passkey', 'Passkey removed', 'forwarded', 'hashed_password', 'name', 'x-forwarded-for', 'x-real-ip']

@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/kyc.py
+# hypothesis_version: 6.151.11
+
+['User', '[KYCRecord.user_id]', 'aadhaar', 'driving_license', 'foreign_keys', 'kyc_documents', 'kyc_records', 'kyc_requests', 'pan', 'passport', 'pending', 'rejected', 'users.id', 'verified']

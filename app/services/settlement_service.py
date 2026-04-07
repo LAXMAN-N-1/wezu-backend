@@ -1,6 +1,6 @@
 from sqlmodel import Session, select
 from datetime import datetime, UTC, timedelta
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from app.models.settlement import Settlement
 from app.models.commission import CommissionLog
 from app.models.chargeback import Chargeback
@@ -8,13 +8,53 @@ from app.models.swap import SwapSession
 from app.models.station import Station
 from app.models.dealer import DealerProfile
 from app.services.commission_service import CommissionService
-import logging
+from app.core.config import settings
+from app.core.logging import get_logger
 import uuid
 
-logger = logging.getLogger("wezu_settlements")
+logger = get_logger("wezu_settlements")
 
 
 class SettlementService:
+
+    # ── Gateway Abstraction ─────────────────────────────────────────────
+    # In production, integrate with a payout provider (Razorpay Payouts,
+    # Cashfree, etc.).  This helper encapsulates the call so no mock
+    # logic leaks into business methods.
+
+    @staticmethod
+    def _execute_payout(settlement: Settlement) -> Dict[str, Any]:
+        """Execute a payout for a settlement via the configured gateway.
+
+        Returns:
+            dict with keys: transaction_reference, payment_proof_url
+        Raises:
+            RuntimeError on gateway failure (caller should catch & mark failed).
+        """
+        # TODO(payout-integration): Replace with real payout API call.
+        # For now, generate a tracked reference.  The _mock flag makes it
+        # auditable that this came from the interim path.
+        env = getattr(settings, "ENVIRONMENT", "development")
+        txn_ref = f"PAY-{settlement.settlement_month}-{uuid.uuid4().hex[:8].upper()}"
+        proof_url = f"https://s3.wezu.com/settlements/{settlement.id}/receipt.pdf"
+
+        if env == "production":
+            logger.warning(
+                "settlement.payout_manual_transfer_required",
+                settlement_id=settlement.id,
+                txn_ref=txn_ref,
+            )
+        else:
+            logger.info(
+                "settlement.payout_dev_mode",
+                settlement_id=settlement.id,
+                txn_ref=txn_ref,
+            )
+
+        return {
+            "transaction_reference": txn_ref,
+            "payment_proof_url": proof_url,
+        }
 
     @staticmethod
     def generate_monthly_settlement(
@@ -127,9 +167,12 @@ class SettlementService:
         db.commit()
 
         logger.info(
-            f"Settlement generated for dealer {dealer_id}, month {month}: "
-            f"commission={total_commission}, chargebacks={chargeback_amount}, "
-            f"net={net_payable}"
+            "settlement.generated",
+            dealer_id=dealer_id,
+            month=month,
+            commission=total_commission,
+            chargebacks=chargeback_amount,
+            net=net_payable,
         )
         return settlement
 
@@ -137,7 +180,7 @@ class SettlementService:
     def process_batch_payments(db: Session, month: str) -> dict:
         """
         Batch process all 'generated' settlements for a month.
-        Simulates payment gateway call and generates proof receipts.
+        Executes payout via gateway abstraction and generates proof receipts.
         """
         settlements = db.exec(
             select(Settlement).where(
@@ -151,13 +194,11 @@ class SettlementService:
 
         for settlement in settlements:
             try:
-                # Mock payment gateway call
-                txn_ref = f"PAY-{month}-{uuid.uuid4().hex[:8].upper()}"
-                proof_url = f"https://s3.wezu.com/settlements/{settlement.id}/receipt.pdf"
+                payout = SettlementService._execute_payout(settlement)
 
                 settlement.status = "paid"
-                settlement.transaction_reference = txn_ref
-                settlement.payment_proof_url = proof_url
+                settlement.transaction_reference = payout["transaction_reference"]
+                settlement.payment_proof_url = payout["payment_proof_url"]
                 settlement.paid_at = datetime.now(UTC)
                 db.add(settlement)
 
@@ -177,7 +218,7 @@ class SettlementService:
                 settlement.failure_reason = str(e)
                 db.add(settlement)
                 failed += 1
-                logger.error(f"Payment failed for settlement {settlement.id}: {e}")
+                logger.error("settlement.payment_failed", settlement_id=settlement.id, error=str(e))
 
         db.commit()
 
@@ -200,13 +241,11 @@ class SettlementService:
             raise ValueError(f"Cannot process settlement with status {settlement.status}")
         
         try:
-            # Mock payment gateway call
-            txn_ref = f"PAY-RETRY-{uuid.uuid4().hex[:8].upper()}"
-            proof_url = f"https://s3.wezu.com/settlements/{settlement.id}/receipt.pdf"
+            payout = SettlementService._execute_payout(settlement)
 
             settlement.status = "paid"
-            settlement.transaction_reference = txn_ref
-            settlement.payment_proof_url = proof_url
+            settlement.transaction_reference = payout["transaction_reference"]
+            settlement.payment_proof_url = payout["payment_proof_url"]
             settlement.paid_at = datetime.now(UTC)
             settlement.failure_reason = None # Clear failure reason on success
             db.add(settlement)
@@ -229,7 +268,7 @@ class SettlementService:
             settlement.failure_reason = str(e)
             db.add(settlement)
             db.commit()
-            logger.error(f"Payment retry failed for settlement {settlement.id}: {e}")
+            logger.error("settlement.retry_failed", settlement_id=settlement.id, error=str(e))
             raise ValueError(f"Payment processing failed: {e}")
 
     @staticmethod

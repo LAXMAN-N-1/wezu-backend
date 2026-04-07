@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/settlement_service.py
+# hypothesis_version: 6.151.11
+
+[0.0, 0.18, 200, 365, '%Y-%m', '-', 'Arial', 'B', 'C', 'ENVIRONMENT', 'L', 'Settlement Statement', 'Settlement not found', 'amount', 'chargeback_items', 'chargebacks', 'commission_items', 'completed', 'count', 'created_at', 'current_month', 'dealer_id', 'deducted', 'development', 'failed', 'generated', 'generated_at', 'history', 'id', 'month', 'net_payable', 'paid', 'paid_at', 'paid_settlements', 'payment_proof_url', 'payment_reference', 'pending', 'pending_settlements', 'processed', 'processing', 'production', 'reason', 'settlement_id', 'status', 'summary', 'swap_session_id', 'title', 'total', 'total_amount', 'total_chargebacks', 'total_commission', 'total_revenue', 'transaction_id', 'uploads/settlements', 'wezu_settlements']

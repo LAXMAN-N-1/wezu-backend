@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/order.py
+# hypothesis_version: 6.151.11
+
+['0.0', 'DriverProfile', 'Walk-in Customer', 'batteries.id', 'battery_id', 'delivery', 'driver_profiles.id', 'logistics_orders', 'logistics_orders.id', 'none', 'normal', 'order_id', 'pending']

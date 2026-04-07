@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/station_service.py
+# hypothesis_version: 6.151.11
+
+[0.0, 50.0, 60.0, 100, 6371, 'CRITICAL', 'HARDWARE', 'availability', 'available_batteries', 'avg_duration_minutes', 'charging', 'daily_rentals', 'daily_revenue', 'distance', 'empty', 'intensity', 'latitude', 'longitude', 'network_latency', 'power_consumption', 'rating', 'ready', 'satisfaction_score', 'station', 'temperature']

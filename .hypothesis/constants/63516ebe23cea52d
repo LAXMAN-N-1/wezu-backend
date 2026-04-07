@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/manifests.py
+# hypothesis_version: 6.151.11
+
+[100, 120, 200, 255, 400, 404, 409, 500, '-', '/', '/manifests', '/{manifest_id}', 'IN PROGRESS', 'IN TRANSIT', 'Idempotency-Key', 'In Progress', 'In Transit', 'POST', 'PROCESSED', 'Processed', 'RECEIVED', 'Received', 'Unknown', '_', 'available', 'battery_id', 'created', 'damage_photo_path', 'damage_report', 'damaged', 'date', 'extra', 'id', 'items', 'items.battery_id', 'maintenance', 'manifest.status', 'manifest_extra', 'manifest_id', 'manifest_missing', 'manifest_pending', 'manifest_scanned', 'missing', 'pending', 'scanned', 'skip must be >= 0', 'source', 'status', 'type', 'warehouse', 'warehouse_id']

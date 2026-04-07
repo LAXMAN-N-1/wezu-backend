@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/login_history.py
+# hypothesis_version: 6.151.11
+
+['User', 'login_history', 'success', 'unknown', 'users.id']

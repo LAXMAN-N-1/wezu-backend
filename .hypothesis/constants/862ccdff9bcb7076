@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/rbac_service.py
+# hypothesis_version: 6.151.11
+
+['children', 'create', 'delete', 'edit', 'icon', 'label', 'path', 'view']

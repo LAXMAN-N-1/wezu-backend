@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/integrations/google_maps.py
+# hypothesis_version: 6.151.11
+
+[5000, 'OK', 'address', 'distance', 'distance_meters', 'distance_text', 'driving', 'duration', 'duration_seconds', 'duration_text', 'elements', 'end_address', 'formatted_address', 'geometry', 'html_instructions', 'instruction', 'lat', 'latitude', 'legs', 'lng', 'location', 'longitude', 'name', 'overview_polyline', 'place_id', 'points', 'polyline', 'rating', 'results', 'rows', 'start_address', 'status', 'steps', 'text', 'types', 'value', 'vicinity']

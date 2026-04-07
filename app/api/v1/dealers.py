@@ -359,17 +359,18 @@ def delete_dealer_document(
 
 @router.post("/me/promotions", response_model=DataResponse[dict])
 def create_dealer_promotion(
-    request: dict = Body(...),
+    request: "DealerPromotionCreate" = Body(...),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
     """Dealer: create a discount/promotion campaign"""
+    from app.schemas.input_contracts import DealerPromotionCreate
     profile = DealerService.get_dealer_by_user(session, current_user.id)
     if not profile:
         raise HTTPException(status_code=404, detail="Not a dealer")
     
     from app.models.dealer_promotion import DealerPromotion
-    promo = DealerPromotion(dealer_id=profile.id, **request)
+    promo = DealerPromotion(dealer_id=profile.id, **request.model_dump(exclude_unset=True))
     session.add(promo)
     session.commit()
     return DataResponse(success=True, data={"id": promo.id, "promo_code": promo.promo_code})
@@ -427,11 +428,12 @@ def get_dealer_sales(
 @router.put("/me/promotions/{id}", response_model=DataResponse[dict])
 def update_dealer_promotion(
     id: int,
-    request: dict = Body(...),
+    request: "DealerPromotionUpdate" = Body(...),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
     """Update or deactivate a campaign"""
+    from app.schemas.input_contracts import DealerPromotionUpdate
     profile = DealerService.get_dealer_by_user(session, current_user.id)
     if not profile:
         raise HTTPException(status_code=404, detail="Not a dealer")
@@ -455,20 +457,21 @@ def get_bank_account(
 
 @router.post("/me/bank-account", response_model=DataResponse[dict])
 def update_bank_account(
-    request: dict = Body(...),
+    request: "BankAccountUpdate" = Body(...),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
     """Dealer: submit or update bank details"""
+    from app.schemas.input_contracts import BankAccountUpdate
     profile = DealerService.get_dealer_by_user(session, current_user.id)
     if not profile:
         raise HTTPException(status_code=404, detail="Not a dealer")
     
-    # Inject verified status default
-    request["verified"] = False
+    bank_data = request.model_dump()
+    bank_data["verified"] = False
     
-    profile.bank_details = request
+    profile.bank_details = bank_data
     session.add(profile)
     session.commit()
     
-    return DataResponse(success=True, data={"message": "Bank account updated", "bank_details": request})
+    return DataResponse(success=True, data={"message": "Bank account updated", "bank_details": bank_data})

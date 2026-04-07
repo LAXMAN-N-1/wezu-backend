@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/inventory_audit.py
+# hypothesis_version: 6.151.11
+
+['batteries.id', 'inventory_audit_logs', 'users.id']
