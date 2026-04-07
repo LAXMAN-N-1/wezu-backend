@@ -20,6 +20,7 @@ from app.core.security import (
     create_refresh_token,
     get_password_hash,
     verify_password,
+    verify_and_update_password,
 )
 from app.repositories.user_repository import user_repository
 from app.services.auth_service import AuthService
@@ -90,11 +91,15 @@ def customer_login(
     if not user or not user.hashed_password:
         raise HTTPException(status_code=401, detail="Invalid email/phone or password")
 
-    if not verify_password(login_data.password, user.hashed_password):
+    ok, new_hash = verify_and_update_password(login_data.password, user.hashed_password)
+    if not ok:
         raise HTTPException(status_code=401, detail="Invalid email/phone or password")
 
     if user.status != UserStatus.ACTIVE:
         raise HTTPException(status_code=403, detail="Account is inactive or suspended")
+
+    if new_hash:
+        user.hashed_password = new_hash
 
     # Generate tokens
     token_jti = str(uuid.uuid4())

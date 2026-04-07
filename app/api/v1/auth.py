@@ -12,7 +12,7 @@ from app.services.auth_service import AuthService
 from app.services.otp_service import OTPService
 from app.services.fraud_service import FraudService
 from app.services.token_service import TokenService
-from app.core.security import create_access_token, create_refresh_token, get_password_hash, verify_password
+from app.core.security import create_access_token, create_refresh_token, get_password_hash, verify_password, verify_and_update_password
 from app.core.proxy import get_client_ip
 from app.schemas.user import TokenPayload
 from app.core.config import settings
@@ -173,8 +173,7 @@ def _process_login(username: str, password: str, db: Session, request: Request) 
         # Try by phone number if email fails
         user = user_repository.get_by_phone(db, username)
 
-    if not user or not verify_password(password, user.hashed_password):
-        # Extract IP and User-Agent
+    if not user:
         ip_address = get_client_ip(request)
         user_agent = request.headers.get("user-agent")
         AuditLogger.log_event(
@@ -187,6 +186,24 @@ def _process_login(username: str, password: str, db: Session, request: Request) 
             user_agent=user_agent
         )
         raise HTTPException(status_code=400, detail="Incorrect email or password")
+
+    ok, new_hash = verify_and_update_password(password, user.hashed_password)
+    if not ok:
+        ip_address = get_client_ip(request)
+        user_agent = request.headers.get("user-agent")
+        AuditLogger.log_event(
+            db, 
+            None, 
+            "FAILED_LOGIN", 
+            "AUTH", 
+            metadata={"username": username, "reason": "invalid_credentials"},
+            ip_address=ip_address,
+            user_agent=user_agent
+        )
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
+    if new_hash:
+        user.hashed_password = new_hash
+        db.add(user)
     
     if user.status != UserStatus.ACTIVE:
         AuditLogger.log_event(db, user.id, "FAILED_LOGIN", "AUTH", metadata={"reason": "inactive_account"})
@@ -715,7 +732,6 @@ def login(
     """
     Login with password. Supports multi-role users.
     """
-    from app.core.security import verify_password
     
     # 1. Find User (by email or phone) using normalized credential
     credential = login_data.credential.strip()
@@ -737,10 +753,13 @@ def login(
             metadata={"credential": credential, "reason": "user_not_found"},
         )
         raise HTTPException(status_code=401, detail="Invalid credentials")
-        
-    if not verify_password(login_data.password, user.hashed_password):
+
+    ok, new_hash = verify_and_update_password(login_data.password, user.hashed_password)
+    if not ok:
         AuditLogger.log_event(db, user.id, "FAILED_LOGIN", "AUTH", metadata={"reason": "invalid_password"})
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    if new_hash:
+        user.hashed_password = new_hash
         
     if user.status != UserStatus.ACTIVE:
          AuditLogger.log_event(db, user.id, "FAILED_LOGIN", "AUTH", metadata={"reason": "inactive_account"})
@@ -1193,27 +1212,27 @@ def admin_login(
     Admin login endpoint (JSON body).
     Validates credentials and ensures the user has an admin-level role.
     """
-    # Prefer index-friendly equality lookups before falling back to a
-    # case-insensitive scan for legacy mixed-case rows.
-    username_raw = login_data.username.strip()
-    username_clean = username_raw.lower()
-    base_statement = select(User).options(joinedload(User.role))
+    username_clean = login_data.username.strip().lower()
 
-    user = db.exec(base_statement.where(User.email == username_clean)).first()
-    if not user and username_raw != username_clean:
-        user = db.exec(base_statement.where(User.email == username_raw)).first()
-    if not user:
-        user = db.exec(
-            base_statement.where(func.lower(User.email) == username_clean)
-        ).first()
+    # Single case-insensitive lookup (func.lower hits the expression index
+    # ix_users_email_lower added in migration b2c3d4e5f6a7).
+    user = db.exec(
+        select(User)
+        .options(joinedload(User.role))
+        .where(func.lower(User.email) == username_clean)
+    ).first()
 
     if not user:
         logger.warning(f"Admin login - user not found: {login_data.username}")
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
-    if not verify_password(login_data.password, user.hashed_password):
+    # verify_and_update_password transparently re-hashes old pbkdf2 → bcrypt
+    ok, new_hash = verify_and_update_password(login_data.password, user.hashed_password)
+    if not ok:
         logger.warning(f"Admin login - invalid password for: {login_data.username}")
         raise HTTPException(status_code=400, detail="Incorrect email or password")
+    if new_hash:
+        user.hashed_password = new_hash  # persisted with the last_login commit below
 
     if user.status != UserStatus.ACTIVE:
         raise HTTPException(status_code=400, detail="Inactive user")

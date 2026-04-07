@@ -20,6 +20,7 @@ from app.core.security import (
     create_refresh_token,
     get_password_hash,
     verify_password,
+    verify_and_update_password,
 )
 from app.repositories.user_repository import user_repository
 
@@ -168,7 +169,8 @@ def dealer_login(
             detail=f"Account locked due to too many failed attempts. Try again in {remaining} minutes."
         )
 
-    if not verify_password(login_data.password, user.hashed_password):
+    ok, new_hash = verify_and_update_password(login_data.password, user.hashed_password)
+    if not ok:
         # Increment failed attempts
         user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
         if user.failed_login_attempts >= MAX_LOGIN_ATTEMPTS:
@@ -183,6 +185,8 @@ def dealer_login(
         db.add(user)
         db.commit()
         raise HTTPException(status_code=401, detail="Invalid credentials")
+    if new_hash:
+        user.hashed_password = new_hash  # persisted with the commit below
 
     if user.status not in [UserStatus.ACTIVE, UserStatus.PENDING_VERIFICATION]:
         if user.status == UserStatus.PENDING:

@@ -5,7 +5,10 @@ from jose import jwt
 from passlib.context import CryptContext
 from app.core.config import settings
 
-pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+# bcrypt is ~250ms vs pbkdf2_sha256 ~3s on 0.75-CPU VPS.
+# "deprecated=auto" means existing pbkdf2 hashes still verify
+# and get transparently re-hashed to bcrypt on next successful login.
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated=["pbkdf2_sha256"])
 
 def create_access_token(subject: Union[str, Any], expires_delta: timedelta = None, extra_claims: dict = None) -> str:
     if expires_delta:
@@ -42,6 +45,16 @@ def create_refresh_token(subject: Union[str, Any], jti: str = None) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
+
+def verify_and_update_password(plain_password: str, hashed_password: str) -> tuple[bool, str | None]:
+    """Verify password and return (is_valid, new_hash_or_None).
+    
+    If the hash uses a deprecated scheme (e.g. pbkdf2_sha256) and the
+    password is correct, new_hash will contain the re-hashed value using
+    the current preferred scheme (bcrypt).  Callers should persist it.
+    """
+    ok, new_hash = pwd_context.verify_and_update(plain_password, hashed_password)
+    return ok, new_hash
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
