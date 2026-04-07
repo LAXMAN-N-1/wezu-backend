@@ -145,9 +145,10 @@ class MaintenanceService:
 
         # 2. Process Stations
         station_schedules = MaintenanceService._select_active_schedules(db, entity_type="station")
+        # Load stations once outside the loop (was inside, causing repeated full-table scans)
+        all_non_maint_stations = db.exec(select(Station).where(Station.status != "maintenance")).all()
         for schedule in station_schedules:
-            stations = db.exec(select(Station).where(Station.status != "maintenance")).all()
-            for station in stations:
+            for station in all_non_maint_stations:
                 last_date = station.last_maintenance_date or station.created_at
                 if schedule.interval_days and (datetime.utcnow() - last_date).days >= schedule.interval_days:
                     station.status = "maintenance"

@@ -136,11 +136,12 @@ def create_role(
     db.commit()
     db.refresh(role)
     
-    # 3. Assign Permissions
-    for slug in permissions_to_assign:
-        permission = db.exec(select(Permission).where(Permission.slug == slug)).first()
-        if permission:
-            # Check if link exists (unlikely for new role but safe)
+    # 3. Assign Permissions (batch lookup instead of per-slug query)
+    if permissions_to_assign:
+        found_perms = db.exec(
+            select(Permission).where(col(Permission.slug).in_(list(permissions_to_assign)))
+        ).all()
+        for permission in found_perms:
             link = RolePermission(role_id=role.id, permission_id=permission.id)
             db.add(link)
     
@@ -497,9 +498,20 @@ def bulk_assign_roles(
     
     assigned_by_admin_id = _resolve_assigned_by_admin_id(db, current_user)
 
+    # Batch-load users + existing links (eliminates 2 N+1 per user)
+    batch_users = db.exec(select(User).where(User.id.in_(assignment.user_ids))).all()
+    batch_users_map = {u.id: u for u in batch_users}
+    existing_links_list = db.exec(
+        select(UserRole).where(
+            UserRole.user_id.in_(assignment.user_ids),
+            UserRole.role_id == role.id,
+        )
+    ).all()
+    existing_link_set = {el.user_id for el in existing_links_list}
+
     for uid in assignment.user_ids:
         try:
-            user = db.get(User, uid)
+            user = batch_users_map.get(uid)
             if not user:
                 results.append(rbac_schema.BulkAssignmentResult(user_id=uid, success=False, message="User not found"))
                 fail_count += 1
@@ -511,13 +523,7 @@ def bulk_assign_roles(
                 db.add(user)
                 
             # Check existing
-            existing_link = db.exec(
-                select(UserRole)
-                .where(UserRole.user_id == uid)
-                .where(UserRole.role_id == role.id)
-            ).first()
-            
-            if existing_link:
+            if uid in existing_link_set:
                  # Already assigned, consider success or updated
                  results.append(rbac_schema.BulkAssignmentResult(user_id=uid, success=True, message="Already assigned"))
                  success_count += 1
@@ -1026,13 +1032,15 @@ def update_role(
         for link in existing_links:
             db.delete(link)
             
-        # Add new
+        # Add new (batch lookup instead of per-slug query)
         added_perms = []
-        for slug in role_in.permissions:
-            permission = db.exec(select(Permission).where(Permission.slug == slug)).first()
-            if permission:
-                 db.add(RolePermission(role_id=role.id, permission_id=permission.id))
-                 added_perms.append(slug)
+        if role_in.permissions:
+            found_perms = db.exec(
+                select(Permission).where(col(Permission.slug).in_(list(role_in.permissions)))
+            ).all()
+            for permission in found_perms:
+                db.add(RolePermission(role_id=role.id, permission_id=permission.id))
+                added_perms.append(permission.slug)
         changes.append(f"Permissions set to: {', '.join(added_perms)}")
         
         # 4. Session Invalidation (Security)

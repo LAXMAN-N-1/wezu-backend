@@ -515,10 +515,10 @@ def get_dealer_transactions(
 ) -> Any:
     """Get rental transactions (revenue) for the dealer's stations."""
     dealer = _get_dealer(db, current_user.id)
-    stations = db.exec(
-        select(Station).where(Station.dealer_id == dealer.id)
-    ).all()
-    station_ids = [s.id for s in stations]
+    # Select only IDs — avoids loading full Station objects
+    station_ids = list(db.exec(
+        select(Station.id).where(Station.dealer_id == dealer.id)
+    ).all())
 
     if not station_ids:
         return {"data": [], "total": 0}

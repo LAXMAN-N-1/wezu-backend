@@ -140,12 +140,13 @@ def create_role(
     db.commit()
     db.refresh(role)
     
-    # Assign permissions if provided
+    # Assign permissions if provided (batch lookup)
     if role_in.permissions:
-        for slug in role_in.permissions:
-            perm = db.exec(select(Permission).where(Permission.slug == slug)).first()
-            if perm:
-                db.add(RolePermission(role_id=role.id, permission_id=perm.id))
+        found_perms = db.exec(
+            select(Permission).where(Permission.slug.in_(list(role_in.permissions)))
+        ).all()
+        for perm in found_perms:
+            db.add(RolePermission(role_id=role.id, permission_id=perm.id))
         db.commit()
         db.refresh(role)
     
@@ -194,11 +195,13 @@ def update_role(
     db.add(role)
     
     if permissions is not None:
-        # Clear existing and add new
+        # Clear existing and add new (batch lookup)
         db.exec(sa.delete(RolePermission).where(RolePermission.role_id == role.id))
-        for slug in permissions:
-            perm = db.exec(select(Permission).where(Permission.slug == slug)).first()
-            if perm:
+        if permissions:
+            found_perms = db.exec(
+                select(Permission).where(Permission.slug.in_(list(permissions)))
+            ).all()
+            for perm in found_perms:
                 db.add(RolePermission(role_id=role.id, permission_id=perm.id))
                 
     db.commit()

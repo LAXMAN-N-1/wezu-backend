@@ -50,18 +50,18 @@ class SupportService:
         if not support_agents:
             return None
             
-        # 2. Count active tickets per agent
-        # We'll pick the agent with the least 'OPEN' or 'IN_PROGRESS' tickets
-        agent_workloads = []
-        for agent in support_agents:
-            open_count = db.exec(
-                select(func.count(SupportTicket.id))
-                .where(
-                    SupportTicket.assigned_to == agent.id,
-                    SupportTicket.status.in_(["open", "in_progress"])
-                )
-            ).one() or 0
-            agent_workloads.append((agent.id, open_count))
+        # 2. Count active tickets per agent — single GROUP BY query (no N+1)
+        agent_ids = [a.id for a in support_agents]
+        workload_rows = db.exec(
+            select(SupportTicket.assigned_to, func.count(SupportTicket.id))
+            .where(
+                SupportTicket.assigned_to.in_(agent_ids),
+                SupportTicket.status.in_(["open", "in_progress"]),
+            )
+            .group_by(SupportTicket.assigned_to)
+        ).all()
+        workload_map = {row[0]: row[1] for row in workload_rows}
+        agent_workloads = [(a.id, workload_map.get(a.id, 0)) for a in support_agents]
             
         # 3. Sort by workload and pick best agent
         agent_workloads.sort(key=lambda x: x[1])

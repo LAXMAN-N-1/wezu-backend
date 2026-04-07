@@ -354,7 +354,31 @@ async def get_station_health(
 ):
     _ = current_user
 
-    stations = db.exec(select(Station)).all()
+    from sqlalchemy import case as sa_case, literal_column
+
+    # Resolved station_id expression for batteries
+    _resolved_station = func.coalesce(
+        Battery.station_id,
+        sa_case(
+            (Battery.location_type == "station", Battery.location_id),
+            else_=literal_column("NULL"),
+        ),
+    )
+
+    # 1. Avg health per station — single SQL query instead of loading ALL batteries
+    health_rows = db.exec(
+        select(
+            _resolved_station.label("sid"),
+            func.avg(Battery.health_percentage),
+        )
+        .where(_resolved_station.isnot(None))
+        .where(Battery.health_percentage.isnot(None))
+        .group_by(literal_column("sid"))
+    ).all()
+    health_by_station: dict[int, float] = {int(row[0]): round(float(row[1]), 1) for row in health_rows if row[0] is not None}
+
+    # 2. Only load station id/name/status (compact columns)
+    stations = db.exec(select(Station.id, Station.name, Station.status)).all()
     if not stations:
         return {
             "distribution": [
@@ -366,24 +390,19 @@ async def get_station_health(
             "worst_performing": [],
         }
 
-    station_ids = {int(station.id) for station in stations if station.id is not None}
+    station_ids = [int(s[0]) for s in stations if s[0] is not None]
 
-    batteries = db.exec(select(Battery)).all()
-    health_by_station: dict[int, list[float]] = defaultdict(list)
-    battery_to_station: dict[int, int] = {}
-
-    for battery in batteries:
-        station_id = _resolve_station_id(battery)
-        if station_id is None or station_id not in station_ids:
-            continue
-        if battery.health_percentage is not None:
-            health_by_station[station_id].append(float(battery.health_percentage))
-        if battery.id is not None:
-            battery_to_station[int(battery.id)] = station_id
-
+    # 3. Health history trends — batch via SQL AVG per station per window
     now = datetime.now(UTC)
     current_window_start = now - timedelta(days=7)
     previous_window_start = now - timedelta(days=14)
+
+    # Get battery→station mapping only for batteries at stations (SQL, no full table load)
+    battery_station_rows = db.exec(
+        select(Battery.id, _resolved_station.label("sid"))
+        .where(_resolved_station.in_(station_ids))
+    ).all()
+    battery_to_station: dict[int, int] = {int(r[0]): int(r[1]) for r in battery_station_rows if r[0] is not None and r[1] is not None}
 
     history_by_station_current: dict[int, list[float]] = defaultdict(list)
     history_by_station_previous: dict[int, list[float]] = defaultdict(list)
@@ -406,10 +425,9 @@ async def get_station_health(
                 history_by_station_previous[station_id].append(float(health_pct or 0.0))
 
     worst_stations = []
-    for station in stations:
-        station_id = int(station.id)
-        station_health_samples = health_by_station.get(station_id, [])
-        health_score = round(sum(station_health_samples) / len(station_health_samples), 1) if station_health_samples else 0.0
+    for sid, sname, sstatus in stations:
+        station_id = int(sid)
+        health_score = health_by_station.get(station_id, 0.0)
 
         current_hist = history_by_station_current.get(station_id, [])
         previous_hist = history_by_station_previous.get(station_id, [])
@@ -429,11 +447,11 @@ async def get_station_health(
 
         worst_stations.append(
             {
-                "id": station.id,
-                "station_name": station.name,
+                "id": sid,
+                "station_name": sname,
                 "health_score": health_score,
                 "trend": trend,
-                "status": station.status,
+                "status": sstatus,
             }
         )
 
@@ -609,12 +627,21 @@ async def get_dashboard_top_stations(
         if station_id is not None
     }
 
-    batteries = db.exec(select(Battery)).all()
-    battery_count_by_station: dict[int, int] = defaultdict(int)
-    for battery in batteries:
-        station_id = _resolve_station_id(battery)
-        if station_id is not None:
-            battery_count_by_station[int(station_id)] += 1
+    # SQL GROUP BY for battery count per station (replaces loading ALL batteries)
+    from sqlalchemy import case as sa_case, literal_column
+    _resolved_station = func.coalesce(
+        Battery.station_id,
+        sa_case(
+            (Battery.location_type == "station", Battery.location_id),
+            else_=literal_column("NULL"),
+        ),
+    )
+    battery_count_rows = db.exec(
+        select(_resolved_station.label("sid"), func.count(Battery.id))
+        .where(_resolved_station.isnot(None))
+        .group_by(literal_column("sid"))
+    ).all()
+    battery_count_by_station: dict[int, int] = {int(r[0]): int(r[1]) for r in battery_count_rows if r[0] is not None}
 
     payload = []
     for station_id, station in station_index.items():

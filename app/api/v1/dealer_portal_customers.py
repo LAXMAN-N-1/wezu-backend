@@ -24,10 +24,11 @@ def _get_dealer_station_ids(db: Session, user_id: int) -> list:
     ).first()
     if not dealer:
         raise HTTPException(status_code=403, detail="Not a dealer")
-    stations = db.exec(
-        select(Station).where(Station.dealer_id == dealer.id)
+    # Select only IDs — avoids loading full Station objects
+    ids = db.exec(
+        select(Station.id).where(Station.dealer_id == dealer.id)
     ).all()
-    return [s.id for s in stations]
+    return list(ids)
 
 
 @router.get("/rentals/active")
@@ -102,7 +103,7 @@ def list_customers(
     try:
         from app.models.rental import Rental
 
-        # Get distinct customer IDs
+        # Get distinct customer IDs for the page query
         customer_query = (
             select(Rental.user_id)
             .where(Rental.start_station_id.in_(station_ids))
@@ -121,7 +122,10 @@ def list_customers(
                 User.phone_number.ilike(f"%{search}%")
             )
 
-        total = len(customer_ids)
+        # Use SQL COUNT instead of Python len() on full ID list
+        total = db.exec(
+            select(func.count()).select_from(query.subquery())
+        ).one()
         users = db.exec(query.offset((page - 1) * limit).limit(limit)).all()
 
         # Batch rental-count for this page of users (eliminates N+1 COUNT per user)

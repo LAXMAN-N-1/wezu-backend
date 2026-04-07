@@ -680,8 +680,12 @@ def bulk_action(
     dealer = _get_dealer(db, current_user.id)
     results = {"success": 0, "failed": 0, "errors": []}
 
+    # Batch-load all users at once (eliminates per-user db.get N+1)
+    batch_users = db.exec(select(User).where(User.id.in_(data.user_ids))).all()
+    batch_users_map = {u.id: u for u in batch_users}
+
     for uid in data.user_ids:
-        user = db.get(User, uid)
+        user = batch_users_map.get(uid)
         if not user or user.created_by_dealer_id != dealer.id or user.id == current_user.id:
             results["failed"] += 1
             results["errors"].append(f"User {uid}: not found or cannot modify")
