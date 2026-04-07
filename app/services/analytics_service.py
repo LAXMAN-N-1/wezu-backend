@@ -14,6 +14,7 @@ from app.models.financial import Transaction, TransactionType, TransactionStatus
 from app.models.rental import Rental, RentalStatus
 from app.models.station import Station, StationSlot
 from app.models.battery import Battery
+from app.utils.runtime_cache import cached_call
 
 logger = logging.getLogger(__name__)
 
@@ -53,15 +54,31 @@ class AnalyticsService:
         period: str = "30d",
         activity_type: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """First-render admin dashboard payload with section-level timing."""
+        """First-render admin dashboard payload with section-level timing.
+
+        Each section is fetched through ``cached_call`` using the **same**
+        cache keys that the individual ``/analytics/*`` endpoints use.  This
+        means the dashboard and the per-section endpoints share a single
+        cache entry: whichever fires first populates the cache and the other
+        gets an instant hit — eliminating the duplicate DB work that was
+        exhausting the connection pool.
+        """
+        ttl = settings.ANALYTICS_CACHE_TTL_SECONDS
         section_timings_ms: Dict[str, float] = {}
         section_errors: Dict[str, str] = {}
         started_at = monotonic()
 
-        def build_section(name: str, loader):
+        def build_section(name: str, cache_key: str, loader, *extra_parts):
+            """Run *loader* through the shared analytics cache."""
             section_started = monotonic()
             try:
-                return loader()
+                return cached_call(
+                    "admin-analytics",
+                    cache_key,
+                    *extra_parts,
+                    ttl_seconds=ttl,
+                    call=loader,
+                )
             except Exception:
                 logger.exception(
                     "admin.analytics.dashboard.section_failed",
@@ -76,39 +93,43 @@ class AnalyticsService:
             "period": period,
             "generated_at": datetime.now(UTC),
             "overview": build_section(
-                "overview",
+                "overview", "overview",
                 lambda: AnalyticsService.get_platform_overview(db, period),
+                period,
             ),
             "trends": build_section(
-                "trends",
+                "trends", "trends",
                 lambda: AnalyticsService.get_trends(db, period),
+                period,
             ),
             "conversion_funnel": build_section(
-                "conversion_funnel",
+                "conversion_funnel", "conversion-funnel",
                 lambda: AnalyticsService.get_conversion_funnel(db),
             ),
             "battery_health_distribution": build_section(
-                "battery_health_distribution",
+                "battery_health_distribution", "battery-health-distribution",
                 lambda: AnalyticsService.get_battery_health_distribution(db),
             ),
             "inventory_status": build_section(
-                "inventory_status",
+                "inventory_status", "inventory-status",
                 lambda: AnalyticsService.get_fleet_inventory_status(db),
             ),
             "demand_forecast": build_section(
-                "demand_forecast",
+                "demand_forecast", "demand-forecast",
                 lambda: AnalyticsService.get_demand_forecast_per_station(db),
             ),
             "revenue_by_station": build_section(
-                "revenue_by_station",
+                "revenue_by_station", "revenue-by-station",
                 lambda: AnalyticsService.get_revenue_by_station_detailed(db, period),
+                period,
             ),
             "recent_activity": build_section(
-                "recent_activity",
+                "recent_activity", "recent-activity",
                 lambda: AnalyticsService.get_recent_activity(db, activity_type),
+                activity_type or "all",
             ),
             "top_stations": build_section(
-                "top_stations",
+                "top_stations", "top-stations",
                 lambda: AnalyticsService.get_top_stations(db),
             ),
             "_errors": section_errors,

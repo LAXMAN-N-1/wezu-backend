@@ -14,9 +14,9 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str # No default allowed, must be provided in env
     SQLALCHEMY_ECHO: bool = False
-    DB_POOL_SIZE: int = 10
-    DB_MAX_OVERFLOW: int = 20
-    DB_POOL_TIMEOUT: int = 60
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 5
+    DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 1800
     DB_POOL_PRE_PING: bool = True
     DB_POOL_USE_LIFO: bool = True
@@ -136,7 +136,7 @@ class Settings(BaseSettings):
     LOG_HEALTHCHECKS: bool = False
     LOG_SLOW_REQUEST_THRESHOLD_MS: int = 2000
     AUTH_TOKEN_CACHE_TTL_SECONDS: int = 5
-    ANALYTICS_CACHE_TTL_SECONDS: int = 30
+    ANALYTICS_CACHE_TTL_SECONDS: int = 120
     DEALER_PORTAL_CACHE_TTL_SECONDS: int = 30
     USER_ADMIN_CACHE_TTL_SECONDS: int = 30
     SESSION_CACHE_TTL_SECONDS: int = 10
