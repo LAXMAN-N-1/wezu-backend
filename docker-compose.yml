@@ -14,7 +14,7 @@ services:
     environment:
       # Keep DATABASE_URL / REDIS_URL out of compose-level environment
       # so platforms like Coolify can manage/delete them directly.
-      - GUNICORN_WORKERS=2
+      - GUNICORN_WORKERS=1
       - GUNICORN_TIMEOUT=120
       - GUNICORN_GRACEFUL_TIMEOUT=45
       - DB_POOL_SIZE=10

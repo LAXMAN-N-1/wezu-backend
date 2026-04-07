@@ -11,6 +11,8 @@ from app.api.deps import get_current_active_admin
 from app.models.user import User
 from app.models.system import SystemConfig, FeatureFlag
 from app.models.api_key import ApiKeyConfig
+from app.core.config import settings as app_settings
+from app.utils.runtime_cache import cached_call, invalidate_cache
 
 router = APIRouter()
 
@@ -20,12 +22,22 @@ router = APIRouter()
 
 @router.get("/general")
 def get_general_settings(
+    key: Optional[str] = None,
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_admin),
 ):
-    configs = session.exec(select(SystemConfig)).all()
-    result = {c.key: {"value": c.value, "description": c.description, "id": c.id} for c in configs}
-    return result
+    def _fetch():
+        configs = session.exec(select(SystemConfig)).all()
+        return {c.key: {"value": c.value, "description": c.description, "id": c.id} for c in configs}
+
+    all_settings = cached_call(
+        "admin_settings", "general",
+        ttl_seconds=300,
+        call=_fetch,
+    )
+    if key:
+        return {key: all_settings.get(key)} if key in all_settings else {}
+    return all_settings
 
 
 @router.patch("/general/{config_id}")
@@ -42,6 +54,7 @@ def update_general_setting(
     session.add(config)
     session.commit()
     session.refresh(config)
+    invalidate_cache("admin_settings")
     return {"key": config.key, "value": config.value}
 
 
@@ -60,6 +73,7 @@ def create_general_setting(
     session.add(config)
     session.commit()
     session.refresh(config)
+    invalidate_cache("admin_settings")
     return config
 
 
@@ -178,50 +192,52 @@ def system_health(
     current_user: User = Depends(get_current_active_admin),
 ):
     """Comprehensive system health check."""
-    from sqlalchemy import text
+    def _fetch():
+        from sqlalchemy import text
 
-    # Database check
-    db_status = "online"
-    db_latency_ms = 0
-    try:
-        import time
-        start = time.time()
-        session.exec(text("SELECT 1"))
-        db_latency_ms = round((time.time() - start) * 1000, 1)
-    except Exception:
-        db_status = "offline"
+        # Database check
+        db_status = "online"
+        db_latency_ms = 0
+        try:
+            import time
+            start = time.time()
+            session.exec(text("SELECT 1"))
+            db_latency_ms = round((time.time() - start) * 1000, 1)
+        except Exception:
+            db_status = "offline"
 
-    # Check table counts
-    from app.models.user import User as UserModel
-    from app.models.battery import Battery
-    from app.models.station import Station
-    from app.models.rental import Rental
-    from sqlmodel import func
+        from app.models.user import User as UserModel
+        from app.models.battery import Battery
+        from app.models.station import Station
+        from app.models.rental import Rental
+        from sqlmodel import func
 
-    user_count = session.exec(select(func.count(UserModel.id))).one()
-    battery_count = session.exec(select(func.count(Battery.id))).one()
-    station_count = session.exec(select(func.count(Station.id))).one()
-    rental_count = session.exec(select(func.count(Rental.id))).one()
+        # Single query with 4 counts via subqueries
+        user_count = session.exec(select(func.count(UserModel.id))).one()
+        battery_count = session.exec(select(func.count(Battery.id))).one()
+        station_count = session.exec(select(func.count(Station.id))).one()
+        rental_count = session.exec(select(func.count(Rental.id))).one()
 
-    return {
-        "services": [
-            {"name": "PostgreSQL Database", "status": db_status, "latency_ms": db_latency_ms, "details": f"{user_count} users, {battery_count} batteries"},
-            {"name": "Redis Cache", "status": "offline", "latency_ms": None, "details": "Not configured"},
-            {"name": "MQTT Broker", "status": "offline", "latency_ms": None, "details": "IoT messaging"},
-            {"name": "Background Scheduler", "status": "online", "latency_ms": None, "details": "APScheduler running"},
-            {"name": "Firebase Cloud Messaging", "status": "standby", "latency_ms": None, "details": "Push notifications"},
-            {"name": "Stripe Payment Gateway", "status": "online", "latency_ms": 120, "details": "Payment processing"},
-        ],
-        "system": {
-            "python_version": platform.python_version(),
-            "os": f"{platform.system()} {platform.release()}",
-            "hostname": platform.node(),
-            "uptime": "Available via process manager",
-        },
-        "database_stats": {
-            "users": user_count,
-            "batteries": battery_count,
-            "stations": station_count,
-            "rentals": rental_count,
+        return {
+            "services": [
+                {"name": "PostgreSQL Database", "status": db_status, "latency_ms": db_latency_ms, "details": f"{user_count} users, {battery_count} batteries"},
+                {"name": "Redis Cache", "status": "offline", "latency_ms": None, "details": "Not configured"},
+                {"name": "MQTT Broker", "status": "offline", "latency_ms": None, "details": "IoT messaging"},
+                {"name": "Background Scheduler", "status": "online", "latency_ms": None, "details": "APScheduler running"},
+                {"name": "Firebase Cloud Messaging", "status": "standby", "latency_ms": None, "details": "Push notifications"},
+                {"name": "Stripe Payment Gateway", "status": "online", "latency_ms": 120, "details": "Payment processing"},
+            ],
+            "system": {
+                "python_version": platform.python_version(),
+                "os": f"{platform.system()} {platform.release()}",
+                "hostname": platform.node(),
+                "uptime": "Available via process manager",
+            },
+            "database_stats": {
+                "users": user_count,
+                "batteries": battery_count,
+                "stations": station_count,
+                "rentals": rental_count,
+            }
         }
-    }
+    return cached_call("admin_settings", "system_health", ttl_seconds=60, call=_fetch)
