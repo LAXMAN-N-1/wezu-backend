@@ -936,7 +936,19 @@ class AnalyticsService:
 
         activity_union = union_all(*selected_branches).subquery()
         rows = db.exec(
-            select(activity_union)
+            select(
+                activity_union.c.event_type,
+                activity_union.c.timestamp,
+                activity_union.c.entity_id,
+                activity_union.c.user_id,
+                activity_union.c.station_id,
+                activity_union.c.battery_id,
+                activity_union.c.amount,
+                activity_union.c.payment_method,
+                activity_union.c.status_text,
+                activity_union.c.priority_text,
+                activity_union.c.subject,
+            )
             .order_by(activity_union.c.timestamp.desc())
             .limit(limit)
         ).all()

@@ -12,6 +12,122 @@ from app.models.system import SystemConfig
 
 router = APIRouter()
 
+
+# ============================================================================
+# Security Dashboard (aggregate view)
+# ============================================================================
+
+@router.get("/dashboard")
+def security_dashboard(
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_admin),
+):
+    """Aggregated security dashboard for admin UI."""
+    now = datetime.now(UTC)
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_ago = today - timedelta(days=7)
+    month_ago = today - timedelta(days=30)
+
+    # Audit log stats
+    audit_total = session.exec(select(func.count(AuditLog.id))).one() or 0
+    audit_today = session.exec(
+        select(func.count(AuditLog.id)).where(AuditLog.timestamp >= today)
+    ).one() or 0
+
+    # Security events breakdown
+    total_events = session.exec(select(func.count(SecurityEvent.id))).one() or 0
+    unresolved_events = session.exec(
+        select(func.count(SecurityEvent.id)).where(SecurityEvent.is_resolved == False)
+    ).one() or 0
+    critical_events = session.exec(
+        select(func.count(SecurityEvent.id)).where(
+            SecurityEvent.severity == "critical",
+            SecurityEvent.is_resolved == False,
+        )
+    ).one() or 0
+    events_this_week = session.exec(
+        select(func.count(SecurityEvent.id)).where(SecurityEvent.timestamp >= week_ago)
+    ).one() or 0
+
+    # Recent events
+    recent = session.exec(
+        select(SecurityEvent)
+        .order_by(SecurityEvent.timestamp.desc())
+        .limit(5)
+    ).all()
+
+    return {
+        "audit_logs": {
+            "total": audit_total,
+            "today": audit_today,
+        },
+        "security_events": {
+            "total": total_events,
+            "unresolved": unresolved_events,
+            "critical_unresolved": critical_events,
+            "this_week": events_this_week,
+        },
+        "threat_level": "critical" if critical_events > 0 else "normal",
+        "recent_events": [
+            {
+                "id": e.id,
+                "event_type": e.event_type,
+                "severity": e.severity,
+                "details": e.details,
+                "timestamp": e.timestamp,
+                "is_resolved": e.is_resolved,
+            }
+            for e in recent
+        ],
+    }
+
+
+# ============================================================================
+# Fraud Alerts
+# ============================================================================
+
+@router.get("/fraud-alerts")
+def list_fraud_alerts(
+    session: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 50,
+    severity: Optional[str] = None,
+    current_user: User = Depends(get_current_active_admin),
+):
+    """List security events flagged as fraud-related."""
+    fraud_types = [
+        "suspicious_login", "brute_force", "account_takeover",
+        "unusual_transaction", "velocity_check_failed", "ip_anomaly",
+        "device_fingerprint_mismatch", "fraud",
+    ]
+    query = select(SecurityEvent).where(SecurityEvent.event_type.in_(fraud_types))
+    if severity:
+        query = query.where(SecurityEvent.severity == severity)
+
+    total = session.exec(
+        select(func.count(SecurityEvent.id)).where(SecurityEvent.event_type.in_(fraud_types))
+    ).one() or 0
+    alerts = session.exec(
+        query.order_by(SecurityEvent.timestamp.desc()).offset(skip).limit(limit)
+    ).all()
+
+    return {
+        "items": [
+            {
+                "id": a.id,
+                "event_type": a.event_type,
+                "severity": a.severity,
+                "details": a.details,
+                "source_ip": a.source_ip,
+                "user_id": a.user_id,
+                "timestamp": a.timestamp,
+                "is_resolved": a.is_resolved,
+            }
+            for a in alerts
+        ],
+        "total_count": total,
+    }
+
 # ============================================================================
 # Audit Logs (enhanced)
 # ============================================================================
