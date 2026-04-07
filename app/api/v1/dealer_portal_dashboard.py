@@ -230,23 +230,18 @@ def get_customers_list(
     """Get the list of unique customers who rented from the dealer's stations."""
     dealer = _get_dealer(db, current_user.id)
     
+    # Single query: users + rental count via GROUP BY (replaces N+1)
     statement = (
-        select(User)
+        select(User, func.count(Rental.id).label("rental_count"))
         .join(Rental, Rental.user_id == User.id)
         .join(Station, Rental.start_station_id == Station.id)
         .where(Station.dealer_id == dealer.id)
-        .distinct()
+        .group_by(User.id)
     )
-    users = db.exec(statement).all()
+    rows = db.exec(statement).all()
     
     data = []
-    for u in users:
-        rental_count = db.exec(
-            select(func.count(Rental.id))
-            .join(Station, Rental.start_station_id == Station.id)
-            .where(Station.dealer_id == dealer.id, Rental.user_id == u.id)
-        ).one_or_none()
-        
+    for u, rental_count in rows:
         data.append({
             "id": u.id,
             "name": u.full_name or (u.email.split('@')[0] if u.email else "Unknown"),

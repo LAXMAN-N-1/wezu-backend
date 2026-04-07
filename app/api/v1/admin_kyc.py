@@ -42,10 +42,18 @@ def get_pending_kyc_queue(
     total = db.exec(select(func.count()).select_from(query.subquery())).one()
     users = db.exec(query.offset(offset).limit(size)).all()
     
+    # Batch-load all KYC documents for this page's users in 1 query (not N)
+    user_ids = [u.id for u in users]
+    all_docs = db.exec(
+        select(KYCDocument).where(KYCDocument.user_id.in_(user_ids))
+    ).all() if user_ids else []
+    docs_by_user: dict = {}
+    for d in all_docs:
+        docs_by_user.setdefault(d.user_id, []).append(d)
+
     items = []
     for user in users:
-        # Fetch documents
-        docs = db.exec(select(KYCDocument).where(KYCDocument.user_id == user.id)).all()
+        docs = docs_by_user.get(user.id, [])
         
         # Determine User Type (Basic logic for now)
         # In a real scenario, we'd check user.roles
@@ -182,20 +190,21 @@ def get_kyc_stats(
     current_user: Any = Depends(deps.get_current_active_superuser),
 ) -> Any:
     """Admin: KYC Global Stats"""
-    docs = db.exec(select(KYCDocument.status)).all()
-    
-    total = len(docs)
-    pending = sum(1 for d in docs if d == "PENDING")
-    verified = sum(1 for d in docs if d == "VERIFIED")
-    rejected = sum(1 for d in docs if d == "REJECTED")
+    # Use SQL GROUP BY instead of fetching all rows into Python
+    status_counts = db.exec(
+        select(KYCDocument.status, func.count(KYCDocument.id))
+        .group_by(KYCDocument.status)
+    ).all()
+    counts = {status: count for status, count in status_counts}
+    total = sum(counts.values())
     
     pending_users = db.exec(select(func.count(User.id)).where(User.kyc_status == "PENDING")).one()
     
     return {
         "total_documents": total,
-        "total_pending": pending,
-        "total_verified": verified,
-        "total_rejected": rejected,
+        "total_pending": counts.get("PENDING", 0),
+        "total_verified": counts.get("VERIFIED", 0),
+        "total_rejected": counts.get("REJECTED", 0),
         "pending_users": pending_users
     }
 

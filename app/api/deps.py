@@ -3,7 +3,7 @@ import hashlib
 from threading import Lock
 from time import monotonic
 from typing import Generator, Optional
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError, ExpiredSignatureError
 from pydantic import ValidationError
@@ -110,6 +110,7 @@ oauth2_scheme = OAuth2PasswordBearer(
 )
 
 def get_current_user(
+    request: Request,
     db: Session = Depends(get_db),
     token: Optional[str] = Depends(oauth2_scheme)
 ) -> User:
@@ -212,6 +213,21 @@ def get_current_user(
                     headers={"WWW-Authenticate": "Bearer"},
                 )
     
+    # Populate request.state for audit/logging middleware and
+    # endpoint-level role checks (e.g. stations.py row-level filtering).
+    # This replaces the previous DB query that was in RBAC middleware.
+    request.state.user = user
+    from app.models.roles import RoleEnum
+    role_names = [r.name.lower() for r in getattr(user, "roles", [])]
+    if RoleEnum.ADMIN.value in role_names:
+        request.state.user_role = RoleEnum.ADMIN
+    elif RoleEnum.DEALER.value in role_names:
+        request.state.user_role = RoleEnum.DEALER
+    elif RoleEnum.DRIVER.value in role_names:
+        request.state.user_role = RoleEnum.DRIVER
+    elif RoleEnum.CUSTOMER.value in role_names:
+        request.state.user_role = RoleEnum.CUSTOMER
+
     return user
 
 def get_current_active_superuser(

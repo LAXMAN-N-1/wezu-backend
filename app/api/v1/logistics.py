@@ -322,6 +322,8 @@ def get_route_details_endpoint(
 @router.get("/routes/history", response_model=DataResponse[List[dict]])
 def get_route_history_endpoint(
     driver_id: Optional[int] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     session: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_superuser),
 ):
@@ -330,7 +332,7 @@ def get_route_history_endpoint(
     statement = select(DeliveryRoute)
     if driver_id:
         statement = statement.where(DeliveryRoute.driver_id == driver_id)
-    routes = session.exec(statement).all()
+    routes = session.exec(statement.offset(skip).limit(limit)).all()
     return DataResponse(success=True, data=routes)
 
 @router.put("/routes/{id}/recalculate")
