@@ -135,17 +135,13 @@ class AuditService:
     async def get_logs_advanced(
         self,
         db: Session,
-        user_id: int = None,
-        action: str = None,
-        resource_type: str = None,
-        target_id: int = None,
-        module: str = None,
-        status: str = None,
-        trace_id: str = None,
         date_from: datetime = None,
         date_to: datetime = None,
         page: int = 1,
         limit: int = 50,
+        level: str = None,
+        is_suspicious: bool = None,
+        ip_address: str = None,
     ):
         """Standardized enterprise-grade paginated log retrieval."""
         query = self._build_query(
@@ -158,7 +154,10 @@ class AuditService:
             status=status,
             trace_id=trace_id,
             date_from=date_from,
-            date_to=date_to
+            date_to=date_to,
+            level=level,
+            is_suspicious=is_suspicious,
+            ip_address=ip_address
         )
         
         # Count total
@@ -183,9 +182,11 @@ class AuditService:
         target_id: int = None,
         date_from: datetime = None,
         date_to: datetime = None,
-        module: str = None,
         status: str = None,
         trace_id: str = None,
+        level: str = None,
+        is_suspicious: bool = None,
+        ip_address: str = None,
     ):
         """Build a filtered query for audit logs (shared by list/export)."""
         query = select(AuditLog)
@@ -207,8 +208,50 @@ class AuditService:
             query = query.where(AuditLog.status == status)
         if trace_id is not None:
             query = query.where(AuditLog.trace_id == trace_id)
+        if level is not None:
+            query = query.where(AuditLog.level == level)
+        if is_suspicious is not None:
+            query = query.where(AuditLog.is_suspicious == is_suspicious)
+        if ip_address is not None:
+            query = query.where(AuditLog.ip_address == ip_address)
             
         return query.order_by(AuditLog.timestamp.desc())
+
+    @staticmethod
+    def get_dashboard_counts(db: Session) -> Dict[str, Any]:
+        """Aggregate counts for the Audit & Security Dashboard status cards."""
+        from sqlalchemy import func
+        today = datetime.now(UTC).date()
+        
+        total_today = db.exec(
+            select(func.count(AuditLog.id)).where(func.date(AuditLog.timestamp) == today)
+        ).one()
+        
+        admin_actions = db.exec(
+            select(func.count(AuditLog.id))
+            .where(func.date(AuditLog.timestamp) == today)
+            .where(AuditLog.role_prefix == "ADM")
+        ).one()
+        
+        failed_logins = db.exec(
+            select(func.count(AuditLog.id))
+            .where(func.date(AuditLog.timestamp) == today)
+            .where(AuditLog.action == "AUTH_LOGIN")
+            .where(AuditLog.status == "failure")
+        ).one()
+        
+        critical_events = db.exec(
+            select(func.count(AuditLog.id))
+            .where(func.date(AuditLog.timestamp) == today)
+            .where(AuditLog.level == "CRITICAL")
+        ).one()
+        
+        return {
+            "total_today": total_today,
+            "admin_actions": admin_actions,
+            "failed_logins": failed_logins,
+            "critical_events": critical_events
+        }
 
     @staticmethod
     def export_logs_csv(

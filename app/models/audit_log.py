@@ -74,6 +74,9 @@ class AuditLog(SQLModel, table=True):
     # Diagnostics & Errors
     response_time_ms: Optional[float] = None
     stack_trace: Optional[str] = None
+    
+    # Security Marking
+    is_suspicious: bool = Field(default=False, index=True)
 
     # Lifecycle - timestamp is fundamentally 'created_at' and explicitly indexed DESC above via table_args
     timestamp: datetime = Field(

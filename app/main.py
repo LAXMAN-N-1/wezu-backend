@@ -49,7 +49,7 @@ from app.api.v1 import (
     dealer_documents, dealer_portal_roles, dealer_portal_users, 
     dealer_analytics, dealer_campaigns, dealer_stations, drivers, catalog,
     admin_invoices, admin_financial_reports, admin_audit, admin_rbac, admin_users,
-    admin_dealers
+    admin_dealers, admin_audit_analytics, admin_security_settings, admin_fraud
 )
 from app.api.v1.admin import (
     support as admin_support, faqs as admin_faqs, analytics as admin_analytics, 
@@ -320,6 +320,9 @@ app.include_router(admin_legal.router, prefix=f"{admin_api}/legal", tags=["Admin
 app.include_router(admin_banners.router, prefix=f"{admin_api}/banners", tags=["Admin: Banners"], dependencies=admin_deps)
 app.include_router(admin_blogs.router, prefix=f"{admin_api}/blogs", tags=["Admin: Blogs"], dependencies=admin_deps)
 app.include_router(admin_dealers.router, prefix=f"{admin_api}/dealers", tags=["Admin: Dealers"], dependencies=admin_deps)
+app.include_router(admin_audit_analytics.router, prefix=f"{admin_api}/audit-analytics", tags=["Admin: Audit Analytics"], dependencies=admin_deps)
+app.include_router(admin_security_settings.router, prefix=f"{admin_api}/security", tags=["Admin: Security Settings"], dependencies=admin_deps)
+app.include_router(admin_fraud.router, prefix=f"{admin_api}/fraud", tags=["Admin: Fraud Monitoring"], dependencies=admin_deps)
 
 # ----------------------------
 # API V1 - Dealer Endpoints
