@@ -58,8 +58,7 @@ def setup_logging() -> None:
     """
     shared_processors = _shared_processors()
     renderer: structlog.types.Processor
-    env = settings.ENVIRONMENT.lower()
-    if env == "production":
+    if settings.ENVIRONMENT.lower() == "production":
         renderer = structlog.processors.JSONRenderer()
     else:
         renderer = structlog.dev.ConsoleRenderer()
@@ -78,17 +77,6 @@ def setup_logging() -> None:
     root_logger.handlers.clear()
     root_logger.addHandler(handler)
     root_logger.setLevel(getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO))
-
-    logging.captureWarnings(True)
-
-    # Emit a raw stderr line BEFORE structlog is configured so we can
-    # verify the renderer choice even if structlog itself is misconfigured.
-    print(
-        f"[logging-setup] ENVIRONMENT={settings.ENVIRONMENT!r} "
-        f"resolved_env={env!r} renderer={renderer.__class__.__name__}",
-        file=sys.stderr,
-        flush=True,
-    )
 
     logging.captureWarnings(True)
 
