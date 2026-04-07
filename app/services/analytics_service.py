@@ -152,57 +152,77 @@ class AnalyticsService:
     @staticmethod
     def get_revenue_stats(db: Session, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
         """Aggregate revenue by type and count transactions for a period"""
-        # Base query for success transactions in range
-        base_stmt = select(Transaction).where(
-            Transaction.status == TransactionStatus.SUCCESS,
-            Transaction.created_at >= start_date,
-            Transaction.created_at <= end_date
-        )
-        transactions = db.exec(base_stmt).all()
-        
-        total_rev = sum(t.amount for t in transactions)
-        rental_rev = sum(t.amount for t in transactions if t.transaction_type == TransactionType.RENTAL_PAYMENT)
-        purchase_rev = sum(t.amount for t in transactions if t.transaction_type == TransactionType.PURCHASE)
-        
-        # Simple comparison logic (mocking previous period for now or querying if needed)
-        # For production, we would query the preceding period of same duration
-        
+        # Single SQL query with conditional aggregation instead of loading all rows
+        row = db.exec(
+            select(
+                func.coalesce(func.sum(Transaction.amount), 0.0),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (Transaction.transaction_type == TransactionType.RENTAL_PAYMENT, Transaction.amount),
+                            else_=0.0,
+                        )
+                    ),
+                    0.0,
+                ),
+                func.coalesce(
+                    func.sum(
+                        case(
+                            (Transaction.transaction_type == TransactionType.PURCHASE, Transaction.amount),
+                            else_=0.0,
+                        )
+                    ),
+                    0.0,
+                ),
+                func.count(Transaction.id),
+            ).where(
+                Transaction.status == TransactionStatus.SUCCESS,
+                Transaction.created_at >= start_date,
+                Transaction.created_at <= end_date,
+            )
+        ).one()
+
         return {
             "period": f"{start_date.date()} to {end_date.date()}",
-            "total_revenue": round(total_rev, 2),
-            "rental_revenue": round(rental_rev, 2),
-            "purchase_revenue": round(purchase_rev, 2),
-            "transaction_count": len(transactions),
-            "comparison_percentage": 5.2 # Mocked growth
+            "total_revenue": round(float(row[0]), 2),
+            "rental_revenue": round(float(row[1]), 2),
+            "purchase_revenue": round(float(row[2]), 2),
+            "transaction_count": int(row[3]),
+            "comparison_percentage": 5.2  # Mocked growth
         }
 
     @staticmethod
     def get_revenue_by_station(db: Session) -> List[Dict[str, Any]]:
-        """Revenue breakdown per station"""
-        # Join Rental with Transaction to get revenue per station
-        # Note: Some transactions might not be linked to rentals (topups/purchases)
-        results = []
-        stations = db.exec(select(Station)).all()
-        
-        for station in stations:
-            # Sum rental payments linked to this station
-            stmt = select(func.sum(Transaction.amount)).join(Rental).where(
-                Rental.start_station_id == station.id,
-                Transaction.status == TransactionStatus.SUCCESS
+        """Revenue breakdown per station — single grouped query."""
+        rows = db.exec(
+            select(
+                Station.id,
+                Station.name,
+                func.coalesce(func.sum(Transaction.amount), 0.0),
+                func.coalesce(func.count(Rental.id), 0),
             )
-            revenue = db.exec(stmt).one() or 0.0
-            
-            # Count rentals
-            rental_count = db.exec(select(func.count(Rental.id)).where(Rental.start_station_id == station.id)).one() or 0
-            
-            results.append({
-                "station_id": station.id,
-                "station_name": station.name,
-                "revenue": round(float(revenue), 2),
-                "rental_count": rental_count
-            })
-            
-        return sorted(results, key=lambda x: x["revenue"], reverse=True)
+            .select_from(Station)
+            .outerjoin(Rental, Rental.start_station_id == Station.id)
+            .outerjoin(
+                Transaction,
+                and_(
+                    Transaction.rental_id == Rental.id,
+                    Transaction.status == TransactionStatus.SUCCESS,
+                ),
+            )
+            .group_by(Station.id, Station.name)
+            .order_by(func.coalesce(func.sum(Transaction.amount), 0.0).desc())
+        ).all()
+
+        return [
+            {
+                "station_id": row[0],
+                "station_name": row[1],
+                "revenue": round(float(row[2]), 2),
+                "rental_count": int(row[3]),
+            }
+            for row in rows
+        ]
 
     @staticmethod
     def calculate_revenue_forecast(db: Session, days: int = 30) -> List[Dict[str, Any]]:
@@ -241,48 +261,60 @@ class AnalyticsService:
     def get_profit_margins(db: Session, period: str = "30d") -> List[Dict[str, Any]]:
         """
         Margin analysis (Revenue vs REAL COGS: Battery depreciation + OpEx).
+        Single-query approach instead of N+1 per station.
         """
         start, end, _, _, days = AnalyticsService._period_to_range(period)
-        
-        # 1. Revenue by station in period
-        stations = db.exec(select(Station)).all()
-        results = []
-        
-        for station in stations:
-            # Sum rental revenue
-            stmt = select(func.coalesce(func.sum(Transaction.amount), 0.0)).join(Rental, Rental.id == Transaction.rental_id).where(
-                Rental.start_station_id == station.id,
-                Transaction.status == TransactionStatus.SUCCESS,
-                Transaction.created_at >= start,
-                Transaction.created_at <= end
+
+        # 1. Revenue by station in period — single grouped query
+        revenue_rows = db.exec(
+            select(
+                Station.id,
+                Station.name,
+                func.coalesce(func.sum(Transaction.amount), 0.0),
             )
-            revenue = db.exec(stmt).one() or 0.0
-            
-            # 2. Calculate COGS (Depreciation)
-            # Find batteries currently at this station or assigned to it
-            # For simplicity, we calculate depreciation for all batteries associated with the station
-            batteries = db.exec(select(Battery).where(Battery.station_id == station.id)).all()
-            total_depreciation = 0.0
-            for b in batteries:
-                # Daily depreciation = Purchase Cost / 1000 days (approx 3 years)
-                daily_dep = (b.purchase_cost or 25000.0) / 1000.0
-                total_depreciation += daily_dep * days
-                
-            # 3. OpEx (Electricity, Maintenance) - Estimating 10% of revenue
+            .select_from(Station)
+            .outerjoin(Rental, Rental.start_station_id == Station.id)
+            .outerjoin(
+                Transaction,
+                and_(
+                    Transaction.rental_id == Rental.id,
+                    Transaction.status == TransactionStatus.SUCCESS,
+                    Transaction.created_at >= start,
+                    Transaction.created_at <= end,
+                ),
+            )
+            .group_by(Station.id, Station.name)
+        ).all()
+        revenue_map = {row[0]: (row[1], float(row[2] or 0.0)) for row in revenue_rows}
+
+        # 2. Depreciation by station — aggregate battery purchase_cost per station
+        depreciation_rows = db.exec(
+            select(
+                Battery.station_id,
+                func.coalesce(func.sum(func.coalesce(Battery.purchase_cost, 25000.0) / 1000.0), 0.0),
+            )
+            .where(Battery.station_id.is_not(None))
+            .group_by(Battery.station_id)
+        ).all()
+        # daily_dep_sum per station → multiply by days
+        dep_map = {int(row[0]): float(row[1] or 0.0) * days for row in depreciation_rows}
+
+        results = []
+        for station_id, (station_name, revenue) in revenue_map.items():
+            total_depreciation = dep_map.get(station_id, 0.0)
             opex = revenue * 0.10
-            
             total_cost = total_depreciation + opex
             margin_percent = round(((revenue - total_cost) / revenue * 100), 2) if revenue > 0 else 0.0
-            
+
             results.append({
-                "station_name": station.name,
+                "station_name": station_name,
                 "revenue": round(revenue, 2),
                 "cogs_depreciation": round(total_depreciation, 2),
                 "opex": round(opex, 2),
                 "total_cost": round(total_cost, 2),
-                "margin_percentage": margin_percent
+                "margin_percentage": margin_percent,
             })
-            
+
         return results
 
     @staticmethod
@@ -292,11 +324,18 @@ class AnalyticsService:
         """
         # Get current monthly average
         revenue_history = AnalyticsService.calculate_revenue_forecast(db, months * 30)
-        
+
         forecast = []
-        # Estimate fixed monthly costs (all batteries * daily dep * 30)
-        total_batteries = db.exec(select(Battery)).all()
-        monthly_fixed_cost = sum((b.purchase_cost or 25000.0) / 1000.0 for b in total_batteries) * 30
+        # Estimate fixed monthly costs using SQL aggregation (not loading all batteries)
+        monthly_fixed_cost_row = db.exec(
+            select(
+                func.coalesce(
+                    func.sum(func.coalesce(Battery.purchase_cost, 25000.0) / 1000.0),
+                    0.0,
+                )
+            )
+        ).one()
+        monthly_fixed_cost = float(monthly_fixed_cost_row or 0.0) * 30
         
         for i in range(months):
             # Sum projected revenue for that month (every 30 days)
@@ -501,16 +540,18 @@ class AnalyticsService:
             round((rented_batteries / total_batteries) * 100, 2) if total_batteries else 0.0
         )
 
-        active_stations = int(db.exec(select(func.count(Station.id))).one() or 0)
-        active_dealers = int(db.exec(select(func.count(DealerProfile.id))).one() or 0)
-        open_tickets = int(
-            db.exec(
+        active_stations, active_dealers, open_tickets = db.exec(
+            select(
+                select(func.count(Station.id)).correlate(None).scalar_subquery(),
+                select(func.count(DealerProfile.id)).correlate(None).scalar_subquery(),
                 select(func.count(SupportTicket.id)).where(
                     SupportTicket.status == TicketStatus.OPEN
-                )
-            ).one()
-            or 0
-        )
+                ).correlate(None).scalar_subquery(),
+            )
+        ).one()
+        active_stations = int(active_stations or 0)
+        active_dealers = int(active_dealers or 0)
+        open_tickets = int(open_tickets or 0)
 
         revenue_per_rental = (
             round(revenue_current / rentals_current, 2) if rentals_current else 0.0
@@ -678,24 +719,19 @@ class AnalyticsService:
                 "drop_off_rate": drop,
             }
 
-        total_users = (
-            db.exec(select(func.count(User.id)).where(User.user_type == UserType.CUSTOMER)).one()
-            or 0
-        )
+        funnel_row = db.exec(
+            select(
+                select(func.count(User.id)).where(User.user_type == UserType.CUSTOMER).correlate(None).scalar_subquery(),
+                select(func.count(KYCRecord.id)).where(KYCRecord.status == "verified").correlate(None).scalar_subquery(),
+                select(func.count(func.distinct(Rental.user_id))).correlate(None).scalar_subquery(),
+            )
+        ).one()
+        total_users = int(funnel_row[0] or 0)
 
         installs = int(total_users * 1.15) + 50  # lightweight estimate
         registrations = total_users
-        kyc_verified = (
-            db.exec(
-                select(func.count(KYCRecord.id)).where(
-                    KYCRecord.status == "verified"
-                )
-            ).one()
-            or 0
-        )
-        first_rental = (
-            db.exec(select(func.count(func.distinct(Rental.user_id)))).one() or 0
-        )
+        kyc_verified = int(funnel_row[1] or 0)
+        first_rental = int(funnel_row[2] or 0)
 
         stages = [
             build_stage("App Installs", installs, None),
@@ -717,32 +753,30 @@ class AnalyticsService:
             / 60.0
         )
 
-        avg_session = (
-            db.exec(
-                select(func.coalesce(func.avg(duration_minutes_expr), 0.0)).where(
-                    Rental.created_at >= lookback,
-                    Rental.start_time.is_not(None),
-                    Rental.end_time.is_not(None),
-                )
-            ).one()
-            or 0.0
-        )
-        avg_session = round(float(avg_session), 2)
-
-        total_rentals = (
-            db.exec(
-                select(func.count(Rental.id)).where(Rental.created_at >= lookback)
-            ).one()
-            or 0
-        )
-        distinct_users_count = (
-            db.exec(
-                select(func.count(func.distinct(Rental.user_id))).where(
-                    Rental.created_at >= lookback
-                )
-            ).one()
-            or 0
-        )
+        agg_row = db.exec(
+            select(
+                func.coalesce(
+                    func.avg(
+                        case(
+                            (
+                                and_(
+                                    Rental.start_time.is_not(None),
+                                    Rental.end_time.is_not(None),
+                                ),
+                                duration_minutes_expr,
+                            ),
+                            else_=None,
+                        )
+                    ),
+                    0.0,
+                ),
+                func.count(Rental.id),
+                func.count(func.distinct(Rental.user_id)),
+            ).where(Rental.created_at >= lookback)
+        ).one()
+        avg_session = round(float(agg_row[0] or 0.0), 2)
+        total_rentals = int(agg_row[1] or 0)
+        distinct_users_count = int(agg_row[2] or 0)
         avg_rentals_per_user = (
             round(total_rentals / distinct_users_count, 2) if distinct_users_count else 0.0
         )

@@ -35,7 +35,7 @@ class Transaction(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     
     user_id: int = Field(foreign_key="users.id", index=True)
-    rental_id: Optional[int] = Field(default=None, foreign_key="rentals.id")
+    rental_id: Optional[int] = Field(default=None, foreign_key="rentals.id", index=True)
     wallet_id: Optional[int] = Field(default=None, foreign_key="wallets.id")
     
     amount: float

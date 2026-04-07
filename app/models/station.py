@@ -98,7 +98,7 @@ class StationImage(SQLModel, table=True):
 class StationSlot(SQLModel, table=True):
     __tablename__ = "station_slots"
     id: Optional[int] = Field(default=None, primary_key=True)
-    station_id: int = Field(foreign_key="stations.id")
+    station_id: int = Field(foreign_key="stations.id", index=True)
     
     slot_number: int
     status: str = Field(default="empty") # empty, charging, ready, maintenance, error
