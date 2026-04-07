@@ -13,14 +13,14 @@ Covers the most queried foreign-key columns that lack indexes:
 - user_roles.role_id     (role distribution GROUP BY)
 
 Revision ID: ef440e24c619
-Revises: ed574375ad16
+Revises: 3f9b2a1c4d5e
 Create Date: 2025-01-01 00:00:00.000000
 """
 from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "ef440e24c619"
-down_revision = "ed574375ad16"
+down_revision = "3f9b2a1c4d5e"
 branch_labels = None
 depends_on = None
 
