@@ -41,6 +41,7 @@ class EventStreamService:
         try:
             return json.loads(raw)
         except Exception:
+            logger.warning("event_stream.json_decode_failed", exc_info=True)
             return None
 
     @staticmethod
@@ -170,6 +171,7 @@ class EventStreamService:
         try:
             client.xack(stream, group, message_id)
         except Exception:
+            logger.warning("event_stream.ack_failed stream=%s msg=%s", stream, message_id, exc_info=True)
             return
 
     @staticmethod
@@ -217,4 +219,5 @@ class EventStreamService:
                 return int(pending[0])
             return 0
         except Exception:
+            logger.warning("event_stream.pending_count_failed stream=%s group=%s", stream, group, exc_info=True)
             return None

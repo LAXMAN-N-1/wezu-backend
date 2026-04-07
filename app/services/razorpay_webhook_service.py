@@ -96,6 +96,7 @@ class RazorpayWebhookService:
         try:
             client.delete(RazorpayWebhookService._processed_key(event_id))
         except Exception:
+            logger.warning("webhook.clear_processing_marker_failed event_id=%s", event_id, exc_info=True)
             return
 
     @staticmethod

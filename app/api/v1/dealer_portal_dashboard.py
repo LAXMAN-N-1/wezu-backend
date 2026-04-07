@@ -58,7 +58,7 @@ def get_dashboard_summary(
                 func.coalesce(
                     func.sum(
                         case(
-                            (func.upper(Station.status).in_(("ACTIVE", "OPERATIONAL")), 1),
+                            (Station.status == "active", 1),
                             else_=0,
                         )
                     ),

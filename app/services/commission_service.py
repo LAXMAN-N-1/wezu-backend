@@ -70,7 +70,7 @@ class CommissionService:
         """
         rate = CommissionService.get_applicable_rate(
             db,
-            transaction_type=transaction.type,
+            transaction_type=transaction.transaction_type.value if transaction.transaction_type else "unknown",
         )
 
         amount = 0.0

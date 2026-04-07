@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/passkey_service.py
+# hypothesis_version: 6.151.11
+
+[60000, '/', '@', 'Inactive user', 'Passkey not found', 'User not found', 'authentication', 'challenge_id', 'expires_at', 'http://', 'https://', 'id', 'public_key', 'rawId', 'registration', 'response', 'transports', 'utf-8']

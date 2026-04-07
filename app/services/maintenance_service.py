@@ -335,7 +335,7 @@ class MaintenanceService:
         try:
             query = query.where(MaintenanceSchedule.is_active == True)  # noqa: E712
         except Exception:
-            pass
+            logger.warning("maintenance.is_active_filter_failed", exc_info=True)
         return db.exec(query.order_by(MaintenanceSchedule.created_at.desc())).all()
 
     @staticmethod

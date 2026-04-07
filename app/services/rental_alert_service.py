@@ -19,16 +19,13 @@ class RentalAlertService:
         window_start = target_time - timedelta(minutes=5)
         window_end = target_time + timedelta(minutes=5)
         
-        # rentals are created with rental_duration_days
-        # so expiry = start_time + duration_days
-        
         statement = select(Rental).where(Rental.status == "active")
         all_active = db.exec(statement).all()
         
         expiring = []
         for rental in all_active:
-            expiry = rental.start_time + timedelta(days=rental.rental_duration_days)
-            if window_start <= expiry <= window_end:
+            expiry = rental.expected_end_time
+            if expiry and window_start <= expiry <= window_end:
                 expiring.append(rental)
                 
         return expiring

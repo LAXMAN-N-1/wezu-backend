@@ -1,4 +1,4 @@
-from sqlmodel import Session, select, func, and_, or_
+from sqlmodel import Session, select, func, and_
 from datetime import datetime, UTC, timedelta
 from typing import Dict, Any, List
 from app.models.rental import Rental
@@ -214,10 +214,10 @@ class AdminAnalyticsService:
         since = datetime.now(UTC) - timedelta(days=days)
 
         rows = db.execute(
-            select(Battery.model_number, func.sum(Rental.total_amount), func.count(Rental.id))
+            select(Battery.battery_type, func.sum(Rental.total_amount), func.count(Rental.id))
             .join(Rental, Rental.battery_id == Battery.id)
             .where(Rental.start_time >= since)
-            .group_by(Battery.model_number)
+            .group_by(Battery.battery_type)
             .order_by(func.sum(Rental.total_amount).desc())
         ).all()
 
@@ -402,26 +402,26 @@ class AdminAnalyticsService:
 
     @staticmethod
     def get_inventory_status(db: Session) -> Dict[str, Any]:
-        """Real battery inventory by status and model."""
+        """Real battery inventory by status and type."""
         total = db.exec(select(func.count(Battery.id))).one() or 0
         available = db.exec(select(func.count(Battery.id)).where(Battery.status == "available")).one()
-        in_use = db.exec(select(func.count(Battery.id)).where(or_(Battery.status == "in_use", Battery.status == "rented"))).one()
+        in_use = db.exec(select(func.count(Battery.id)).where(Battery.status == "rented")).one()
         charging = db.exec(select(func.count(Battery.id)).where(Battery.status == "charging")).one()
         maintenance = db.exec(select(func.count(Battery.id)).where(Battery.status == "maintenance")).one()
 
-        model_rows = db.execute(select(Battery.model_number, func.count(Battery.id)).group_by(Battery.model_number)).all()
+        type_rows = db.execute(select(Battery.battery_type, func.count(Battery.id)).group_by(Battery.battery_type)).all()
         inventory = []
-        for row in model_rows:
-            m_num, cnt = row
-            m_avail = db.exec(select(func.count(Battery.id)).where(and_(Battery.model_number == m_num, Battery.status == "available"))).one()
-            m_rented = db.exec(select(func.count(Battery.id)).where(and_(Battery.model_number == m_num, Battery.status.in_(["in_use", "rented"])))).one()
-            m_maint = db.exec(select(func.count(Battery.id)).where(and_(Battery.model_number == m_num, Battery.status == "maintenance"))).one()
+        for row in type_rows:
+            b_type, cnt = row
+            b_avail = db.exec(select(func.count(Battery.id)).where(and_(Battery.battery_type == b_type, Battery.status == "available"))).one()
+            b_rented = db.exec(select(func.count(Battery.id)).where(and_(Battery.battery_type == b_type, Battery.status == "rented"))).one()
+            b_maint = db.exec(select(func.count(Battery.id)).where(and_(Battery.battery_type == b_type, Battery.status == "maintenance"))).one()
             inventory.append({
-                "category": m_num,
+                "category": b_type,
                 "total": int(cnt),
-                "available": int(m_avail),
-                "rented": int(m_rented),
-                "maintenance": int(m_maint),
+                "available": int(b_avail),
+                "rented": int(b_rented),
+                "maintenance": int(b_maint),
             })
 
         return {

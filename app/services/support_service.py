@@ -57,8 +57,8 @@ class SupportService:
             open_count = db.exec(
                 select(func.count(SupportTicket.id))
                 .where(
-                    SupportTicket.assigned_to_id == agent.id,
-                    SupportTicket.status.in_(["OPEN", "IN_PROGRESS"])
+                    SupportTicket.assigned_to == agent.id,
+                    SupportTicket.status.in_(["open", "in_progress"])
                 )
             ).one() or 0
             agent_workloads.append((agent.id, open_count))
@@ -70,8 +70,8 @@ class SupportService:
         # 4. Update ticket
         ticket = db.get(SupportTicket, ticket_id)
         if ticket:
-            ticket.assigned_to_id = best_agent_id
-            ticket.status = "IN_PROGRESS"
+            ticket.assigned_to = best_agent_id
+            ticket.status = "in_progress"
             db.add(ticket)
             db.commit()
             return best_agent_id

@@ -42,6 +42,6 @@ async def get_invoice(
     if not invoice:
         # Auto generate? Or return 404? 
         # Usually generated on completion. We can generate on fly if missing.
-        invoice = FinancialService.create_invoice(id, current_user.id)
+        invoice = FinancialService.create_invoice(db, id, current_user.id)
         
     return invoice

@@ -178,8 +178,10 @@ class CampaignService:
                 allowed_stations = json.loads(promo.applicable_station_ids)
                 if allowed_stations and station_id not in allowed_stations:
                     raise HTTPException(status_code=400, detail="Promo code not applicable at this station")
+            except HTTPException:
+                raise
             except Exception:
-                pass
+                logger.warning("campaign.station_ids_parse_failed promo_id=%s", promo.id, exc_info=True)
 
         # Minimum order
         if promo.min_purchase_amount and order_amount < promo.min_purchase_amount:

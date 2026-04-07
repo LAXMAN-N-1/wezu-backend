@@ -1,5 +1,4 @@
 from sqlmodel import Session, select
-from app.core.database import engine
 from app.models.invoice import Invoice
 from app.models.financial import Transaction
 from app.models.commission import CommissionLog
@@ -33,33 +32,32 @@ class FinancialService:
             return f"{prefix}{uuid.uuid4().hex[:4].upper()}"
 
     @staticmethod
-    def create_invoice(transaction_id: int, user_id: int) -> Invoice:
-        with Session(engine) as session:
-            txn = session.get(Transaction, transaction_id)
-            if not txn:
-                raise ValueError("Transaction not found")
-            
-            # GST Calculation: 18% included in total
-            total = txn.amount
-            subtotal = round(total / 1.18, 2)
-            tax = round(total - subtotal, 2)
-            
-            invoice = Invoice(
-                user_id=user_id,
-                transaction_id=transaction_id,
-                invoice_number=FinancialService._get_next_invoice_number(session),
-                amount=total,
-                subtotal=subtotal,
-                tax_amount=tax,
-                total=total,
-                gstin="27AAACW1234X1ZX",
-                pdf_url=f"/api/v1/invoices/{transaction_id}/pdf", # Updated to local API
-                created_at=datetime.now(UTC)
-            )
-            session.add(invoice)
-            session.commit()
-            session.refresh(invoice)
-            return invoice
+    def create_invoice(db: Session, transaction_id: int, user_id: int) -> Invoice:
+        txn = db.get(Transaction, transaction_id)
+        if not txn:
+            raise ValueError("Transaction not found")
+        
+        # GST Calculation: 18% included in total
+        total = txn.amount
+        subtotal = round(total / 1.18, 2)
+        tax = round(total - subtotal, 2)
+        
+        invoice = Invoice(
+            user_id=user_id,
+            transaction_id=transaction_id,
+            invoice_number=FinancialService._get_next_invoice_number(db),
+            amount=total,
+            subtotal=subtotal,
+            tax_amount=tax,
+            total=total,
+            gstin="27AAACW1234X1ZX",
+            pdf_url=f"/api/v1/invoices/{transaction_id}/pdf",
+            created_at=datetime.now(UTC)
+        )
+        db.add(invoice)
+        db.commit()
+        db.refresh(invoice)
+        return invoice
 
     @staticmethod
     def generate_settlement(db: Session, dealer_id: int, start_date: datetime, end_date: datetime) -> Settlement:
@@ -80,15 +78,17 @@ class FinancialService:
             
         total_comm = sum(c.amount for c in commissions)
         deductions = total_comm * 0.02 # Example 2% platform TDS/Fee
-        net_payable = total_comm - deductions
+        net_payable_amount = total_comm - deductions
         
         settlement = Settlement(
             dealer_id=dealer_id,
+            settlement_month=start_date.strftime("%Y-%m"),
             start_date=start_date,
             end_date=end_date,
             total_revenue=total_comm, # Total commission pool
+            total_commission=total_comm,
             platform_fee=deductions,
-            payable_amount=net_payable,
+            net_payable=net_payable_amount,
             status="generated",
             created_at=datetime.now(UTC)
         )

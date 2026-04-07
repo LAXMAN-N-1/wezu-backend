@@ -21,6 +21,16 @@ class BookingService:
     DEFAULT_RESERVATION_MINUTES = 30
 
     @staticmethod
+    def _safe_commit(db: Session, *, context: str = "booking_service") -> None:
+        """Commit with rollback-on-failure and logging."""
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("db.commit_failed context=%s", context)
+            raise
+
+    @staticmethod
     def _utcnow() -> datetime:
         # Store/query as naive UTC for compatibility across engines (SQLite/Postgres).
         return datetime.now(UTC).replace(tzinfo=None)
@@ -58,7 +68,7 @@ class BookingService:
             db.add(reservation)
 
         if expired:
-            db.commit()
+            BookingService._safe_commit(db, context="release_expired_reservations")
         return len(expired)
 
     @staticmethod
@@ -76,7 +86,7 @@ class BookingService:
         reservation.status = "EXPIRED"
         reservation.updated_at = now
         db.add(reservation)
-        db.commit()
+        BookingService._safe_commit(db, context="mark_expired_if_due")
         db.refresh(reservation)
         return True
 
@@ -191,7 +201,7 @@ class BookingService:
         )
 
         db.add(reservation)
-        db.commit()
+        BookingService._safe_commit(db, context="create_reservation")
         db.refresh(reservation)
 
         reminder_time = reservation.end_time - timedelta(minutes=10)

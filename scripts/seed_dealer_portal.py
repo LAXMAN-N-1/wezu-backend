@@ -121,11 +121,11 @@ def seed_all():
         # ── 3. Seed stations ──────────────────────────────────────
         print("\n[3/10] Seeding stations...")
         station_configs = [
-            ("Madhapur SwapHub", "Plot 42, Madhapur IT Park", "Hyderabad", 17.4484, 78.3908, "OPERATIONAL", 12, True, 4.7),
-            ("Gachibowli EnergyPoint", "DLF Cyber City, Gachibowli", "Hyderabad", 17.4401, 78.3489, "OPERATIONAL", 15, True, 4.5),
-            ("Banjara Hills Station", "Road No. 12, Banjara Hills", "Hyderabad", 17.4156, 78.4347, "OPERATIONAL", 10, False, 4.3),
-            ("Hitech City Hub", "Hitech City Metro, Cyber Towers", "Hyderabad", 17.4474, 78.3762, "MAINTENANCE", 8, True, 4.1),
-            ("Kukatpally Power Center", "KPHB Colony Main Road", "Hyderabad", 17.4947, 78.3996, "OPERATIONAL", 20, True, 4.8),
+            ("Madhapur SwapHub", "Plot 42, Madhapur IT Park", "Hyderabad", 17.4484, 78.3908, "active", 12, True, 4.7),
+            ("Gachibowli EnergyPoint", "DLF Cyber City, Gachibowli", "Hyderabad", 17.4401, 78.3489, "active", 15, True, 4.5),
+            ("Banjara Hills Station", "Road No. 12, Banjara Hills", "Hyderabad", 17.4156, 78.4347, "active", 10, False, 4.3),
+            ("Hitech City Hub", "Hitech City Metro, Cyber Towers", "Hyderabad", 17.4474, 78.3762, "maintenance", 8, True, 4.1),
+            ("Kukatpally Power Center", "KPHB Colony Main Road", "Hyderabad", 17.4947, 78.3996, "active", 20, True, 4.8),
         ]
         stations = []
         for name, addr, city, lat, lng, status, slots, is_24, rating in station_configs:

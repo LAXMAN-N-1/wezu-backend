@@ -20,7 +20,7 @@ def monitor_stations():
             threshold = datetime.now(UTC) - timedelta(days=365)
             
             offline_query = select(Station).where(
-                Station.status == StationStatus.OPERATIONAL,
+                Station.status == StationStatus.ACTIVE,
                 Station.updated_at < threshold
             )
             offline_stations = session.exec(offline_query).all()

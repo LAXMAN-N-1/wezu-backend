@@ -163,17 +163,20 @@ async def request_extension(
         raise HTTPException(status_code=400, detail="Rental is not active")
     
     # Calculate extension days and cost
-    extension_days = (req.requested_end_date - rental.end_date).days
+    extension_days = (req.requested_end_date - rental.end_time).days if rental.end_time else 0
     if extension_days <= 0:
         raise HTTPException(status_code=400, detail="Extension date must be after current end date")
     
-    # Simple cost calculation (should be in service)
-    additional_cost = extension_days * rental.daily_rate
+    # Compute daily rate from total_amount and original duration
+    duration_secs = (rental.expected_end_time - rental.start_time).total_seconds() if rental.expected_end_time else 86400
+    original_days = max(1, int(duration_secs / 86400))
+    daily_rate = rental.total_amount / original_days if original_days > 0 else 0
+    additional_cost = extension_days * daily_rate
     
     extension = RentalExtension(
         rental_id=rental_id,
         user_id=current_user.id,
-        current_end_date=rental.end_date,
+        current_end_date=rental.end_time,
         requested_end_date=req.requested_end_date,
         extension_days=extension_days,
         additional_cost=additional_cost,
@@ -206,8 +209,12 @@ async def request_pause(
     if pause_days <= 0:
         raise HTTPException(status_code=400, detail="Invalid pause period")
     
+    # Compute daily rate from total_amount and original duration
+    duration_secs = (rental.expected_end_time - rental.start_time).total_seconds() if rental.expected_end_time else 86400
+    original_days = max(1, int(duration_secs / 86400))
+    daily_rate = rental.total_amount / original_days if original_days > 0 else 0
     # Reduced rate during pause (e.g., 20% of daily rate)
-    daily_pause_charge = rental.daily_rate * 0.2
+    daily_pause_charge = daily_rate * 0.2
     total_pause_cost = daily_pause_charge * pause_days
     
     pause = RentalPause(
@@ -382,8 +389,16 @@ async def request_battery_swap(
     if rental.status != "active":
          raise HTTPException(status_code=400, detail="Rental is not active")
     
-    rental.swap_station_id = req.station_id
-    rental.swap_requested_at = datetime.now(UTC)
+    # Record swap request as a RentalEvent (Rental model has no swap fields)
+    from app.models.rental_event import RentalEvent as SwapRentalEvent
+    swap_event = SwapRentalEvent(
+        rental_id=rental.id,
+        event_type="swap_requested",
+        station_id=req.station_id,
+        battery_id=rental.battery_id,
+        description=f"Swap requested at station #{req.station_id}: {req.reason}",
+    )
+    db.add(swap_event)
     db.add(rental)
     db.commit()
     db.refresh(rental)

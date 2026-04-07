@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/maintenance_service.py
+# hypothesis_version: 6.151.11
+
+[0.0, '1', ';', '=', 'Battery not found', 'DAILY', 'FREQ', 'FREQ=', 'INTERVAL', 'MONTHLY', 'Station not found', 'WEEKLY', 'active', 'alerts_sent', 'battery', 'cost', 'days_overdue', 'description', 'due_date', 'entity_id', 'entity_type', 'maintenance', 'maintenance_due', 'maintenance_type', 'model_name', 'overdue_items', 'parts_replaced', 'preventive', 'ready', 'schedule_id', 'schedule_name', 'station', 'template_id', 'unknown', 'wezu_maintenance']

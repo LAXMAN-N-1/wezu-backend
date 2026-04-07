@@ -11,6 +11,10 @@ from app.models.station import Station, StationSlot
 from app.models.dealer_inventory import DealerInventory
 from app.models.maintenance import StationDowntime
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class DealerStationService:
 
@@ -215,7 +219,7 @@ class DealerStationService:
                  if current_time < start_time or current_time > end_time:
                       return False, "Station is currently closed outside of operating hours"
              except Exception:
-                 pass # Soft fallback if hours are misformatted
+                 logger.warning("dealer_station.operating_hours_parse_failed", exc_info=True)
                  
         return True, "Operational"
 

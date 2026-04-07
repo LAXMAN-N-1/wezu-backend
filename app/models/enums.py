@@ -61,9 +61,11 @@ class BatteryStatus(str, Enum):
 # ── Station ───────────────────────────────────────────────────────────
 class StationStatus(str, Enum):
     ACTIVE = "active"
+    INACTIVE = "inactive"
     MAINTENANCE = "maintenance"
+    CLOSED = "closed"
+    ERROR = "error"
     OFFLINE = "offline"
-    DECOMMISSIONED = "decommissioned"
 
 
 # ── Rental ────────────────────────────────────────────────────────────

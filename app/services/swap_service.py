@@ -11,13 +11,23 @@ from app.models.battery import Battery
 from app.models.station import Station
 from app.services.gps_service import GPSTrackingService
 from app.services.battery_consistency import apply_battery_transition
-import logging
+from app.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger("wezu_swaps")
 
 class SwapService:
     """Battery swap management"""
-    
+
+    @staticmethod
+    def _safe_commit(session: Session, *, context: str = "swap_service") -> None:
+        """Commit with rollback-on-failure and structured logging."""
+        try:
+            session.commit()
+        except Exception:
+            session.rollback()
+            logger.exception("db.commit_failed", context=context)
+            raise
+
     @staticmethod
     def get_swap_suggestions(
         rental_id: int,
@@ -93,7 +103,7 @@ class SwapService:
                 'best_battery_soc': max(b.current_charge for b in available_batteries),
                 'latitude': station.latitude,
                 'longitude': station.longitude,
-                'operating_hours': f"{station.opening_time} - {station.closing_time}" if station.opening_time else "24/7"
+                'operating_hours': station.operating_hours or ("24/7" if station.is_24x7 else "N/A")
             })
         
         # Sort by distance
@@ -178,14 +188,14 @@ class SwapService:
             )
             session.add(swap_event)
             
-            session.commit()
+            SwapService._safe_commit(session, context="execute_swap")
             
-            logger.info(f"Battery swap completed for rental {rental_id}")
+            logger.info("swap.completed", rental_id=rental_id, old_battery=old_battery.serial_number, new_battery=new_battery.serial_number)
             return True
             
         except Exception as e:
             session.rollback()
-            logger.error(f"Failed to execute swap: {str(e)}")
+            logger.error("swap.failed", rental_id=rental_id, error=str(e))
             return False
     
     @staticmethod

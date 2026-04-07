@@ -26,7 +26,7 @@ class TicketResponse(BaseModel):
     priority: str
     status: str
     created_at: datetime
-    assigned_to_id: Optional[int] = None
+    assigned_to: Optional[int] = None
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -51,7 +51,7 @@ class SupportTicketResponse(BaseModel):
     priority: str
     status: str
     created_at: datetime
-    assigned_to_id: Optional[int] = None
+    assigned_to: Optional[int] = None
     
     model_config = ConfigDict(from_attributes=True)
 

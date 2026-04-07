@@ -564,6 +564,12 @@ def apply_battery_transition(
     battery.location_id = target_location_id
     battery.updated_at = datetime.utcnow()
 
+    # Keep legacy station_id in sync with the canonical location fields.
+    if target_location_type == "station" and target_location_id is not None:
+        battery.station_id = target_location_id
+    elif target_location_type != "station":
+        battery.station_id = None
+
     if target_status == "retired":
         now = datetime.utcnow()
         if battery.retirement_date is None:

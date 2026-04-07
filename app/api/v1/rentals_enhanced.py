@@ -86,8 +86,8 @@ def get_rental_receipt(
         "battery_id": rental.battery_id,
         "start_time": rental.start_time,
         "end_time": rental.end_time,
-        "rental_fee": float(rental.total_price),
-        "late_fee": float(rental.late_fee_amount),
-        "total_fee": float(rental.total_price + rental.late_fee_amount),
+        "rental_fee": float(rental.total_amount),
+        "late_fee": float(rental.late_fee),
+        "total_fee": float(rental.total_amount + rental.late_fee),
         "receipt_url": f"/receipts/rental_{rental.id}.pdf"
     }

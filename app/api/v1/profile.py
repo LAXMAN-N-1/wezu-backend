@@ -46,9 +46,6 @@ def update_profile(
     if user_in.full_name:
         current_user.full_name = user_in.full_name
 
-    if user_in.phone:
-        current_user.phone = user_in.phone
-
     if user_in.date_of_birth:
         current_user.date_of_birth = user_in.date_of_birth
 

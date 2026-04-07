@@ -161,7 +161,7 @@ class MQTTService:
         try:
             return int(battery_key)
         except (TypeError, ValueError):
-            pass
+            logger.debug(f"battery_key '{battery_key}' is not numeric, resolving by serial_number")
 
         with Session(engine) as session:
             battery = session.exec(

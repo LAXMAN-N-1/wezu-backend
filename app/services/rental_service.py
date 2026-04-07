@@ -11,6 +11,7 @@ from sqlmodel import Session, select
 
 from app.core.config import settings
 from app.models.battery import Battery
+from app.models.battery_catalog import BatteryCatalog
 from app.models.late_fee import LateFee, LateFeeWaiver
 from app.models.payment import PaymentTransaction
 from app.models.promo_code import PromoCode
@@ -20,9 +21,22 @@ from app.models.rental_modification import RentalExtension, RentalPause
 from app.schemas.rental import RentalCreate
 from app.services.battery_consistency import apply_battery_transition
 from app.services.payment_service import PaymentService
+from app.core.logging import get_logger
+
+logger = get_logger("wezu_rentals")
 
 
 class RentalService:
+    @staticmethod
+    def _safe_commit(db: Session, *, context: str = "rental_service") -> None:
+        """Commit with rollback-on-failure and structured logging."""
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("db.commit_failed", context=context)
+            raise
+
     @staticmethod
     def _to_money(value: Decimal | float | int | str) -> Decimal:
         try:
@@ -56,7 +70,7 @@ class RentalService:
                 RentalEvent(
                     rental_id=rental.id,
                     event_type="payment_timeout_cancelled",
-                    station_id=rental.pickup_station_id,
+                    station_id=rental.start_station_id,
                     battery_id=rental.battery_id,
                     description="Pending payment timed out; rental cancelled and battery released",
                 )
@@ -71,13 +85,13 @@ class RentalService:
                     battery=battery,
                     to_status="available",
                     to_location_type="station",
-                    to_location_id=rental.pickup_station_id,
+                    to_location_id=rental.start_station_id,
                     event_type="rental_reservation_timeout_release",
                     event_description=f"Released reservation for expired rental #{rental.id}",
                     actor_id=rental.user_id,
                 )
 
-        db.commit()
+        RentalService._safe_commit(db, context="cleanup_stale_pending_rentals")
         return len(stale_rentals)
 
     @staticmethod
@@ -89,8 +103,10 @@ class RentalService:
         if not battery:
             raise HTTPException(status_code=404, detail="Battery not found")
 
-        daily_rate = battery.rental_price_per_day or Decimal("0")
-        deposit = battery.damage_deposit_amount or Decimal("0")
+        # Pricing comes from the BatteryCatalog (SKU) linked to the battery
+        catalog = db.get(BatteryCatalog, battery.sku_id) if battery.sku_id else None
+        daily_rate = Decimal(str(catalog.price_per_day)) if catalog and catalog.price_per_day else Decimal("0")
+        deposit = Decimal(str(battery.purchase_cost)) * Decimal("0.10") if battery.purchase_cost else Decimal("0")
         total_rent = daily_rate * duration_days
         discount = Decimal("0")
         promo_id = None
@@ -171,11 +187,11 @@ class RentalService:
                 status_code=400,
                 detail=f"Battery is not available for rental (current status: {battery.status})",
             )
-        if battery.location_type != "station" or battery.location_id != rental_in.pickup_station_id:
+        if battery.location_type != "station" or battery.location_id != rental_in.start_station_id:
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    f"Battery is not available at pickup station {rental_in.pickup_station_id}. "
+                    f"Battery is not available at pickup station {rental_in.start_station_id}. "
                     f"Current location: {battery.location_type} #{battery.location_id}"
                 ),
             )
@@ -206,16 +222,12 @@ class RentalService:
         rental = Rental(
             user_id=user_id,
             battery_id=rental_in.battery_id,
-            pickup_station_id=rental_in.pickup_station_id,
+            start_station_id=rental_in.start_station_id,
             start_time=datetime.utcnow(),
-            end_time=datetime.utcnow() + timedelta(days=rental_in.duration_days),
+            expected_end_time=datetime.utcnow() + timedelta(days=rental_in.duration_days),
             status="pending_payment",
-            rental_duration_days=rental_in.duration_days,
-            daily_rate=price_details["daily_rate"],
-            damage_deposit=price_details["deposit"],
-            discount_amount=price_details["discount"],
-            total_price=price_details["total_payable"],
-            promo_code_id=price_details["promo_code_id"],
+            total_amount=price_details["total_payable"],
+            security_deposit=price_details["deposit"],
         )
         db.add(rental)
         db.flush()
@@ -225,13 +237,13 @@ class RentalService:
             battery=battery,
             to_status="reserved",
             to_location_type="station",
-            to_location_id=rental_in.pickup_station_id,
+            to_location_id=rental_in.start_station_id,
             event_type="rental_reserved",
             event_description=f"Reserved for rental #{rental.id}",
             actor_id=user_id,
         )
 
-        db.commit()
+        RentalService._safe_commit(db, context="initiate_rental")
         db.refresh(rental)
         return rental
 
@@ -249,7 +261,7 @@ class RentalService:
             "user_id": str(user_id),
         }
         receipt = f"rental_{rental.id}_{int(datetime.utcnow().timestamp())}"
-        amount = RentalService._to_money(rental.total_price)
+        amount = RentalService._to_money(rental.total_amount)
         order = PaymentService.create_order(
             amount=float(amount),
             receipt=receipt,
@@ -284,12 +296,12 @@ class RentalService:
             RentalEvent(
                 rental_id=rental.id,
                 event_type="payment_order_created",
-                station_id=rental.pickup_station_id,
+                station_id=rental.start_station_id,
                 battery_id=rental.battery_id,
                 description=f"Created payment order {order.get('id')}",
             )
         )
-        db.commit()
+        RentalService._safe_commit(db, context="create_rental_payment_order")
         db.refresh(payment_txn)
 
         return {
@@ -349,7 +361,7 @@ class RentalService:
         if payment_status not in {"captured", "authorized"}:
             raise HTTPException(status_code=400, detail=f"Payment not settled (status={payment_status})")
 
-        required_amount = RentalService._to_money(rental.total_price)
+        required_amount = RentalService._to_money(rental.total_amount)
         paid_amount = RentalService._to_money(Decimal(str(payment.get("amount", 0))) / Decimal("100"))
         if paid_amount < required_amount:
             raise HTTPException(status_code=400, detail="Paid amount is below rental payable amount")
@@ -392,12 +404,11 @@ class RentalService:
         db.add(payment_txn)
 
         rental.status = "active"
-        rental.terms_accepted_at = datetime.utcnow()
         db.add(
             RentalEvent(
                 rental_id=rental.id,
                 event_type="payment_confirmed",
-                station_id=rental.pickup_station_id,
+                station_id=rental.start_station_id,
                 battery_id=rental.battery_id,
                 description=(
                     f"Rental payment verified. payment_id={razorpay_payment_id} "
@@ -406,13 +417,8 @@ class RentalService:
             )
         )
 
-        if rental.promo_code_id:
-            promo = db.get(PromoCode, rental.promo_code_id)
-            if promo:
-                if promo.usage_limit > 0 and promo.usage_count >= promo.usage_limit:
-                    raise HTTPException(status_code=409, detail="Promo code usage limit reached")
-                promo.usage_count += 1
-                db.add(promo)
+        # Note: Promo code usage count was already incremented during calculate_price()
+        # in initiate_rental(). No phantom promo_code_id field needed.
 
         battery = db.exec(select(Battery).where(Battery.id == rental.battery_id).with_for_update()).first()
         if not battery:
@@ -429,7 +435,7 @@ class RentalService:
         )
 
         db.add(rental)
-        db.commit()
+        RentalService._safe_commit(db, context="confirm_rental_verified")
         db.refresh(rental)
         return rental
 
@@ -508,7 +514,7 @@ class RentalService:
             )
         )
 
-        db.commit()
+        RentalService._safe_commit(db, context="return_battery")
         db.refresh(rental)
         return rental
 
@@ -542,7 +548,11 @@ class RentalService:
         if existing_pending:
             raise HTTPException(status_code=409, detail="An extension request is already pending")
 
-        additional_cost = RentalService._to_money(rental.daily_rate) * Decimal(extension_days)
+        # Compute daily rate from total_amount and original duration
+        duration_secs = (rental.expected_end_time - rental.start_time).total_seconds()
+        original_days = max(1, int(ceil(duration_secs / 86400)))
+        computed_daily_rate = RentalService._to_money(rental.total_amount) / Decimal(original_days)
+        additional_cost = computed_daily_rate * Decimal(extension_days)
         extension = RentalExtension(
             rental_id=rental_id,
             user_id=user_id,
@@ -558,12 +568,12 @@ class RentalService:
             RentalEvent(
                 rental_id=rental.id,
                 event_type="extension_requested",
-                station_id=rental.pickup_station_id,
+                station_id=rental.start_station_id,
                 battery_id=rental.battery_id,
                 description=f"Extension requested until {requested_end_date.isoformat()}",
             )
         )
-        db.commit()
+        RentalService._safe_commit(db, context="request_extension")
         db.refresh(extension)
         return extension
 
@@ -599,7 +609,7 @@ class RentalService:
                 RentalEvent(
                     rental_id=rental.id,
                     event_type="extension_approved",
-                    station_id=rental.pickup_station_id,
+                    station_id=rental.start_station_id,
                     battery_id=rental.battery_id,
                     description=f"Extension approved to {extension.requested_end_date.isoformat()}",
                 )
@@ -610,7 +620,7 @@ class RentalService:
                 RentalEvent(
                     rental_id=rental.id,
                     event_type="extension_rejected",
-                    station_id=rental.pickup_station_id,
+                    station_id=rental.start_station_id,
                     battery_id=rental.battery_id,
                     description=admin_notes or "Extension request rejected",
                 )
@@ -618,7 +628,7 @@ class RentalService:
 
         db.add(rental)
         db.add(extension)
-        db.commit()
+        RentalService._safe_commit(db, context="review_extension")
         db.refresh(extension)
         return extension
 
@@ -650,7 +660,11 @@ class RentalService:
         if existing_pending:
             raise HTTPException(status_code=409, detail="A pause request is already active")
 
-        daily_pause_charge = RentalService._to_money(rental.daily_rate) * Decimal("0.20")
+        # Compute daily rate from total_amount and original duration
+        duration_secs = (rental.expected_end_time - rental.start_time).total_seconds()
+        original_days = max(1, int(ceil(duration_secs / 86400)))
+        computed_daily_rate = RentalService._to_money(rental.total_amount) / Decimal(original_days)
+        daily_pause_charge = computed_daily_rate * Decimal("0.20")
         total_pause_cost = RentalService._to_money(daily_pause_charge * Decimal(pause_days))
 
         pause = RentalPause(
@@ -669,12 +683,12 @@ class RentalService:
             RentalEvent(
                 rental_id=rental.id,
                 event_type="pause_requested",
-                station_id=rental.pickup_station_id,
+                station_id=rental.start_station_id,
                 battery_id=rental.battery_id,
                 description=f"Pause requested from {pause_start_date.isoformat()} to {pause_end_date.isoformat()}",
             )
         )
-        db.commit()
+        RentalService._safe_commit(db, context="request_pause")
         db.refresh(pause)
         return pause
 
@@ -698,7 +712,7 @@ class RentalService:
         pause.admin_notes = admin_notes
         pause.status = "APPROVED" if approve else "REJECTED"
         db.add(pause)
-        db.commit()
+        RentalService._safe_commit(db, context="review_pause")
         db.refresh(pause)
         return pause
 
@@ -719,7 +733,7 @@ class RentalService:
         pause.status = "COMPLETED"
         pause.battery_reclaimed_at = datetime.utcnow()
         db.add(pause)
-        db.commit()
+        RentalService._safe_commit(db, context="resume_pause")
         db.refresh(pause)
         return pause
 
@@ -767,7 +781,7 @@ class RentalService:
             status="PENDING",
         )
         db.add(waiver)
-        db.commit()
+        RentalService._safe_commit(db, context="request_late_fee_waiver")
         db.refresh(waiver)
         return waiver
 
@@ -821,6 +835,6 @@ class RentalService:
             waiver.rejection_reason = admin_notes or "Waiver request rejected"
 
         db.add(waiver)
-        db.commit()
+        RentalService._safe_commit(db, context="review_late_fee_waiver")
         db.refresh(waiver)
         return waiver

@@ -57,7 +57,7 @@ def seed_data():
             latitude=12.9784,
             longitude=77.6408,
             total_slots=8,
-            status=StationStatus.OPERATIONAL
+            status=StationStatus.ACTIVE
         )
         session.add(station1)
         session.commit()

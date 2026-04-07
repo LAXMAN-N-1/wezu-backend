@@ -89,6 +89,7 @@ class BackgroundRuntimeService:
             age = (datetime.now(timezone.utc) - parsed.astimezone(timezone.utc)).total_seconds()
             return age <= ttl_seconds
         except Exception:
+            logger.debug("background_runtime.heartbeat_check_failed", exc_info=True)
             return False
 
     @classmethod

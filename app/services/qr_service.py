@@ -16,6 +16,10 @@ from app.core.config import settings
 from app.models.battery import Battery
 from app.services.battery_consistency import normalize_battery_serial
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 @dataclass(frozen=True)
 class ResolvedBatteryQR:
@@ -89,6 +93,7 @@ class BatteryQRCodeService:
         try:
             payload = json.loads(payload_bytes.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError):
+            logger.warning("qr.decode_failed: invalid payload encoding")
             return None
 
         try:
@@ -103,6 +108,7 @@ class BatteryQRCodeService:
 
             serial = normalize_battery_serial(payload.get("sn"), field_name="sn")
         except Exception:
+            logger.warning("qr.payload_validation_failed", exc_info=True)
             return None
 
         return {
@@ -254,6 +260,7 @@ class BatteryQRCodeService:
         try:
             serial = normalize_battery_serial(value, field_name="reference")
         except Exception:
+            logger.warning("qr.reference_normalize_failed ref=%s", value, exc_info=True)
             return None
 
         rows = session.exec(
@@ -292,6 +299,7 @@ class BatteryQRCodeService:
         try:
             return base64.urlsafe_b64decode(padded.encode("ascii"))
         except Exception:
+            logger.warning("qr.b64url_decode_failed", exc_info=True)
             return None
 
 

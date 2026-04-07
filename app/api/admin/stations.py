@@ -226,7 +226,7 @@ def get_station_stats(
 ):
     """Get station network statistics."""
     total = db.exec(select(func.count()).select_from(Station)).one()
-    operational = db.exec(select(func.count()).where(Station.status == StationStatus.OPERATIONAL)).one()
+    operational = db.exec(select(func.count()).where(Station.status == StationStatus.ACTIVE)).one()
     maintenance = db.exec(select(func.count()).where(Station.status == StationStatus.MAINTENANCE)).one()
     offline = db.exec(select(func.count()).where(Station.status == StationStatus.OFFLINE)).one()
     closed = db.exec(select(func.count()).where(Station.status == StationStatus.CLOSED)).one()
@@ -269,7 +269,7 @@ def create_station(
         contact_phone=request.contact_phone,
         operating_hours=request.operating_hours,
         is_24x7=request.is_24x7,
-        status=StationStatus.OPERATIONAL,
+        status=StationStatus.ACTIVE,
         available_slots=request.total_slots,
     )
     db.add(station)

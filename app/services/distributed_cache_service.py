@@ -41,6 +41,7 @@ class DistributedCacheService:
                 return decoder(parsed)
             return parsed
         except Exception:
+            logger.warning("cache.decode_failed", exc_info=True)
             return None
 
     @staticmethod

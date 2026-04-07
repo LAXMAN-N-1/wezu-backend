@@ -119,7 +119,7 @@ def financial_reconciliation():
                 select(Transaction)
                 .where(Transaction.created_at >= last_month_start)
                 .where(Transaction.created_at < first_of_month)
-                .where(Transaction.status == "completed")
+                .where(Transaction.status == "success")
             ).all()
             
             total_transactions = len(transactions)

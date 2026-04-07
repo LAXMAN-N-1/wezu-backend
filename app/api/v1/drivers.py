@@ -28,7 +28,7 @@ def onboard_driver(
     Creates a DriverProfile linked to the current user.
     """
     # 1. Check if profile already exists
-    existing_profile = DriverService.get_profile(current_user.id)
+    existing_profile = DriverService.get_profile(session, current_user.id)
     if existing_profile:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, 
@@ -37,7 +37,7 @@ def onboard_driver(
     
     # 2. Create Profile
     try:
-        profile = DriverService.create_profile(current_user.id, profile_in.model_dump())
+        profile = DriverService.create_profile(session, current_user.id, profile_in.model_dump())
         
         # 3. Assign 'Driver' role if not present
         from app.models.rbac import Role, UserRole
@@ -85,7 +85,7 @@ def get_my_driver_profile(
     session: Session = Depends(get_session)
 ):
     """Get current user's driver profile."""
-    profile = DriverService.get_profile(current_user.id)
+    profile = DriverService.get_profile(session, current_user.id)
     if not profile:
         raise HTTPException(status_code=404, detail="Driver profile not found")
         
@@ -102,7 +102,7 @@ def get_assigned_routes(
     from app.models.roles import RoleEnum
     
     # Check driver profile existence
-    profile = DriverService.get_profile(current_user.id)
+    profile = DriverService.get_profile(session, current_user.id)
     if not profile:
         raise HTTPException(status_code=404, detail="Driver profile not found")
         

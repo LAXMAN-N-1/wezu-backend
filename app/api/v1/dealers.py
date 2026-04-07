@@ -73,7 +73,7 @@ def get_dealer_dashboard(
     if not profile:
         raise HTTPException(status_code=403, detail="Access denied")
         
-    stats = DealerService.get_dashboard_stats(profile.id)
+    stats = DealerService.get_dashboard_stats(session, profile.id)
     return DataResponse(data=stats)
 
 # Admin Endpoints (Should be protected by superuser dependency in real app)
@@ -85,7 +85,7 @@ def update_stage(
     session: Session = Depends(get_db)
 ):
     try:
-        app = DealerService.update_application_stage(app_id, update_in.stage, update_in.note)
+        app = DealerService.update_application_stage(session, app_id, update_in.stage, update_in.notes or "")
         return DataResponse(data=app)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -96,7 +96,7 @@ def schedule_visit(
     current_user: User = Depends(get_current_user), # Check Is Admin
     session: Session = Depends(get_db)
 ):
-    visit = DealerService.schedule_field_visit(visit_in.application_id, visit_in.officer_id, visit_in.date)
+    visit = DealerService.schedule_field_visit(session, visit_in.application_id, visit_in.officer_id, visit_in.date)
     return DataResponse(data=visit)
 
 from app.services.financial_service import FinancialService

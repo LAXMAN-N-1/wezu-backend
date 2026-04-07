@@ -5,6 +5,10 @@ from app.core.proxy import get_client_ip
 from fastapi import HTTPException, status, Request
 from sqlmodel import Session, select
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class AuthService:
     @staticmethod
     async def verify_google_token(token: str):
@@ -277,6 +281,7 @@ class AuthService:
                 payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
                 token_jti = payload.get("jti")
             except Exception:
+                logger.warning("auth.refresh_token_decode_failed_for_jti", exc_info=True)
                 token_jti = "unknown"
 
         # 4. Create Session
@@ -327,6 +332,7 @@ class AuthService:
             new_token_jti = payload.get("jti")
             user_id = int(payload.get("sub"))
         except Exception:
+            logger.warning("auth.refresh_token_rotate_decode_failed", exc_info=True)
             return None # Cannot update invalid token
             
         # 3. Hash new refresh token

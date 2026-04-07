@@ -17,6 +17,17 @@ logger = get_logger("wezu_settlements")
 
 class SettlementService:
 
+    # ── Safe Commit ─────────────────────────────────────────────────────
+    @staticmethod
+    def _safe_commit(db: Session, *, context: str = "settlement_service") -> None:
+        """Commit with rollback-on-failure and structured logging."""
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("db.commit_failed", context=context)
+            raise
+
     # ── Gateway Abstraction ─────────────────────────────────────────────
     # In production, integrate with a payout provider (Razorpay Payouts,
     # Cashfree, etc.).  This helper encapsulates the call so no mock
@@ -112,7 +123,7 @@ class SettlementService:
                         SwapSession.completed_at <= end_date,
                     )
                 ).all()
-                total_revenue = round(sum(s.amount for s in swaps), 2)
+                total_revenue = round(sum(s.swap_amount for s in swaps), 2)
 
         # 3. Deduct chargebacks
         chargebacks = db.exec(
@@ -149,7 +160,7 @@ class SettlementService:
             status="generated",
         )
         db.add(settlement)
-        db.commit()
+        SettlementService._safe_commit(db, context="generate_monthly_settlement.create")
         db.refresh(settlement)
 
         # Link commissions to this settlement
@@ -164,7 +175,7 @@ class SettlementService:
             cb.status = "deducted"
             db.add(cb)
 
-        db.commit()
+        SettlementService._safe_commit(db, context="generate_monthly_settlement.link")
 
         logger.info(
             "settlement.generated",
@@ -220,7 +231,7 @@ class SettlementService:
                 failed += 1
                 logger.error("settlement.payment_failed", settlement_id=settlement.id, error=str(e))
 
-        db.commit()
+        SettlementService._safe_commit(db, context="process_batch_payments")
 
         return {
             "month": month,
@@ -260,14 +271,14 @@ class SettlementService:
                 cl.status = "paid"
                 db.add(cl)
             
-            db.commit()
+            SettlementService._safe_commit(db, context="process_single_payment.success")
             db.refresh(settlement)
             return settlement
         except Exception as e:
             settlement.status = "failed"
             settlement.failure_reason = str(e)
             db.add(settlement)
-            db.commit()
+            SettlementService._safe_commit(db, context="process_single_payment.failure")
             logger.error("settlement.retry_failed", settlement_id=settlement.id, error=str(e))
             raise ValueError(f"Payment processing failed: {e}")
 

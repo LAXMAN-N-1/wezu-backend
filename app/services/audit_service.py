@@ -47,7 +47,7 @@ class AuditService:
             try:
                 db.rollback()
             except Exception:
-                pass
+                logger.warning("audit.rollback_failed_after_write", exc_info=True)
             logger.error(f"Failed to write audit log: {e}")
 
     async def log_event(
@@ -78,7 +78,7 @@ class AuditService:
                 try:
                     db.rollback()
                 except Exception:
-                    pass
+                    logger.warning("audit.rollback_failed_after_event", exc_info=True)
                 logger.error(f"Failed to log event: {e}")
 
     async def log_security_event(self, user_id: int, event: str, metadata: Dict[str, Any]):
@@ -118,7 +118,7 @@ class AuditService:
             try:
                 db.rollback()
             except Exception:
-                pass
+                logger.warning("audit.rollback_failed_after_security_event", exc_info=True)
             logger.error(f"Failed to write security event: {e}")
 
     async def get_logs(self, user_id: int = None, page: int = 1, limit: int = 20):

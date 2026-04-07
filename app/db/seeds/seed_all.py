@@ -130,7 +130,7 @@ def seed():
                 total_slots=12,
                 available_slots=12,
                 available_batteries=0,
-                status=StationStatus.OPERATIONAL
+                status=StationStatus.ACTIVE
             )
             db.add(s)
             stations.append(s)

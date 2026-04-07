@@ -44,9 +44,9 @@ class StationMetricsService:
         )
 
         for rental in rentals:
-            if station_id is not None and rental.pickup_station_id != station_id:
+            if station_id is not None and rental.start_station_id != station_id:
                 continue
-            key = (int(rental.pickup_station_id), rental.start_time.date())
+            key = (int(rental.start_station_id), rental.start_time.date())
             aggregate[key]["started"] += 1
             if rental.end_time and rental.end_time >= rental.start_time:
                 aggregate[key]["completed"] += 1

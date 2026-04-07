@@ -1647,8 +1647,8 @@ class AnalyticsService:
             if r.start_time and r.end_time:
                 durations.append((r.end_time - r.start_time).total_seconds() / 3600)
             total_spent += float(r.total_amount or 0)
-            if r.pickup_station_id:
-                station_counter[r.pickup_station_id] += 1
+            if r.start_station_id:
+                station_counter[r.start_station_id] += 1
 
         # Resolve station names for top-3
         top_stations = []

@@ -11,8 +11,8 @@ from pydantic import BaseModel
 
 class BatteryCreate(BaseModel):
     serial_number: str
-    model: str
-    capacity_ah: float
+    battery_type: Optional[str] = None
+    manufacturer: Optional[str] = None
     status: str = "available"
 
 
@@ -20,6 +20,7 @@ class BatteryUpdate(BaseModel):
     status: Optional[str] = None
     current_charge: Optional[float] = None
     health_percentage: Optional[float] = None
+    station_id: Optional[int] = None
 
 
 class BatteryRepository(BaseRepository[Battery, BatteryCreate, BatteryUpdate]):
@@ -70,16 +71,16 @@ class BatteryRepository(BaseRepository[Battery, BatteryCreate, BatteryUpdate]):
         ).offset(skip).limit(limit)
         return list(db.exec(query).all())
     
-    def get_by_model(
+    def get_by_battery_type(
         self,
         db: Session,
-        model: str,
+        battery_type: str,
         *,
         skip: int = 0,
         limit: int = 100
     ) -> List[Battery]:
-        """Get batteries by model"""
-        return self.get_multi_by_field(db, "model", model, skip=skip, limit=limit)
+        """Get batteries by battery type"""
+        return self.get_multi_by_field(db, "battery_type", battery_type, skip=skip, limit=limit)
 
 
 # Singleton instance

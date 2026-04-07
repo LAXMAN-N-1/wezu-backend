@@ -31,6 +31,10 @@ from app.core.config import settings
 from app.models.passkey import PasskeyChallenge, PasskeyCredential
 from app.models.user import User
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class PasskeyService:
     CEREMONY_REGISTRATION = "registration"
@@ -112,6 +116,7 @@ class PasskeyService:
             if isinstance(parsed, list):
                 return [str(item).strip() for item in parsed if str(item).strip()]
         except Exception:
+            logger.warning("passkey.transports_parse_failed", exc_info=True)
             return []
         return []
 
@@ -182,6 +187,7 @@ class PasskeyService:
             try:
                 credential_bytes = base64url_to_bytes(passkey.credential_id)
             except Exception:
+                logger.warning("passkey.credential_decode_failed id=%s", passkey.credential_id, exc_info=True)
                 continue
 
             transports: list[AuthenticatorTransport] = []
@@ -189,6 +195,7 @@ class PasskeyService:
                 try:
                     transports.append(AuthenticatorTransport(value))
                 except Exception:
+                    logger.debug("passkey.transport_unknown value=%s", value)
                     continue
 
             descriptor = PublicKeyCredentialDescriptor(id=credential_bytes)

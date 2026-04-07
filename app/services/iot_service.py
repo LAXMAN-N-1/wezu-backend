@@ -114,8 +114,8 @@ class IoTService:
                     meta["last_lat"] = telemetry.latitude
                     meta["last_lng"] = telemetry.longitude
                     active_rental.metadata = json.dumps(meta)
-                except:
-                    pass
+                except Exception:
+                    logger.warning("iot.rental_metadata_update_failed rental_id=%s", active_rental.id, exc_info=True)
                 
                 session.add(active_rental)
 

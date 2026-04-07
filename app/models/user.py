@@ -1,10 +1,13 @@
 from sqlmodel import SQLModel, Field, Relationship
+# NOTE: These eager imports are REQUIRED for SQLAlchemy mapper registration.
+# The models below define tables referenced by User's Relationship() declarations.
+# Without them, SQLAlchemy cannot resolve back_populates at class-init time.
 from app.models.kyc import KYCRecord, KYCDocument
 from app.models.rbac import UserRole
 from app.models.two_factor_auth import TwoFactorAuth
-from app.models.device import Device  # Ensure SQLAlchemy registry has Device for User.devices relationship.
-from app.models.dealer import DealerProfile  # Ensure registry has DealerProfile for User.dealer_profile relationship.
-from app.models.staff import StaffProfile  # Ensure registry has StaffProfile for User.staff_profile relationship.
+from app.models.device import Device
+from app.models.dealer import DealerProfile
+from app.models.staff import StaffProfile
 
 from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime, UTC
@@ -15,12 +18,8 @@ if TYPE_CHECKING:
     from app.models.session import UserSession
     from app.models.financial import Wallet
     from app.models.location import Address
-    from app.models.kyc import KYCDocument, KYCRecord
-    from app.models.device import Device
     from app.models.vehicle import Vehicle
-    from app.models.dealer import DealerProfile
     from app.models.driver_profile import DriverProfile
-    from app.models.staff import StaffProfile
     from app.models.rbac import Role, UserAccessPath
     from app.models.token import SessionToken
     from app.models.notification_preference import NotificationPreference

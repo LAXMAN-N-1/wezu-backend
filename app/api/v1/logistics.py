@@ -42,7 +42,7 @@ def update_driver_status(
     """Update driver availability status"""
     from app.services.driver_service import DriverService
     is_online = status == "online"
-    DriverService.toggle_status(id, is_online)
+    DriverService.toggle_status(session, id, is_online)
     return {"status": "success", "driver_id": id, "online": is_online}
 
 @router.get("/me/assignments", response_model=DataResponse[List[DeliveryOrderResponse]])
@@ -200,7 +200,7 @@ def create_driver(
 ):
     """Create a new driver profile"""
     from app.services.driver_service import DriverService
-    profile = DriverService.create_profile(request.user_id, request.dict(exclude={"user_id"}))
+    profile = DriverService.create_profile(session, request.user_id, request.dict(exclude={"user_id"}))
     return DataResponse(success=True, data=profile)
 
 @router.get("/drivers", response_model=DataResponse[List[DriverProfileResponse]])
@@ -257,7 +257,7 @@ def toggle_driver_availability(
 ):
     """Toggle driver availability"""
     from app.services.driver_service import DriverService
-    DriverService.toggle_status(id, is_online)
+    DriverService.toggle_status(session, id, is_online)
     return DataResponse(success=True, data={"id": id, "is_online": is_online})
 
 @router.get("/drivers/{id}/performance", response_model=DataResponse[DriverPerformanceResponse])

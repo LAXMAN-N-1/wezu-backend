@@ -1,0 +1,4 @@
+# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/station.py
+# hypothesis_version: 6.151.11
+
+[0.0, 20.0, 'DealerProfile', 'Review', 'Station', 'StationImage', 'StationSlot', 'Zone', 'active', 'approved', 'automated', 'batteries.id', 'closed', 'dealer_profiles.id', 'default', 'empty', 'error', 'images', 'inactive', 'maintenance', 'offline', 'slots', 'station', 'station_images', 'station_slots', 'stations', 'stations.id', 'users.id', 'vendors.id', 'zones.id']

@@ -32,27 +32,24 @@ class FraudService:
     def is_blacklisted(db: Session, user_id: Optional[int] = None, phone: Optional[str] = None) -> bool:
         """
         Check if a user or phone number is in the system blacklist.
+        Blacklist model fields: type (PHONE/EMAIL/IP/DEVICE_ID/PAN), value, reason.
         """
-        if user_id:
-            block = db.exec(select(Blacklist).where(Blacklist.user_id == user_id, Blacklist.is_active == True)).first()
-            if block: return True
-            
         if phone:
-            block = db.exec(select(Blacklist).where(Blacklist.identifier == phone, Blacklist.is_active == True)).first()
-            if block: return True
-            
+            block = db.exec(select(Blacklist).where(Blacklist.type == "PHONE", Blacklist.value == phone)).first()
+            if block:
+                return True
+
         return False
 
     @staticmethod
-    def add_to_blacklist(db: Session, identifier: str, reason: str, user_id: Optional[int] = None):
+    def add_to_blacklist(db: Session, identifier: str, reason: str, bl_type: str = "PHONE"):
         """
-        Manually add an identifier or user to the blacklist.
+        Manually add an identifier to the blacklist.
         """
         entry = Blacklist(
-            identifier=identifier,
-            user_id=user_id,
+            type=bl_type,
+            value=identifier,
             reason=reason,
-            is_active=True
         )
         db.add(entry)
         db.commit()
