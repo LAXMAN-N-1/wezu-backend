@@ -1,18 +1,28 @@
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from app.models.roles import RoleEnum
-from app.core.database import engine
 from jose import jwt, JWTError, ExpiredSignatureError
 from app.core.config import settings
-from app.models.user import User
 from app.schemas.user import TokenPayload
-from sqlmodel import Session, select
-from sqlalchemy.orm import selectinload
 import logging
 
 logger = logging.getLogger(__name__)
 
+# ── Role priority derived from JWT claims only — no DB hit. ──
+_ROLE_PRIORITY = [
+    (RoleEnum.ADMIN, RoleEnum.ADMIN.value),
+    (RoleEnum.DEALER, RoleEnum.DEALER.value),
+    (RoleEnum.DRIVER, RoleEnum.DRIVER.value),
+    (RoleEnum.CUSTOMER, RoleEnum.CUSTOMER.value),
+]
+
+
 class RBACMiddleware(BaseHTTPMiddleware):
+    """Lightweight auth middleware — decodes JWT, sets ``request.state``
+    hints for downstream handlers.  **No database query is performed**;
+    the authoritative user load happens once in ``deps.get_current_user``.
+    """
+
     async def dispatch(self, request: Request, call_next):
         # Default states
         request.state.user = None
@@ -21,20 +31,20 @@ class RBACMiddleware(BaseHTTPMiddleware):
         # Never authenticate/authorize CORS preflight requests.
         if request.method == "OPTIONS":
             return await call_next(request)
-        
+
         # Skip for openapi and auth
         public_paths = [
             f"{settings.API_V1_STR}/auth/login",
             f"{settings.API_V1_STR}/auth/register",
             "/docs",
             "/openapi.json",
-            "/redoc"
+            "/redoc",
         ]
-        
+
         if any(request.url.path.startswith(p) for p in public_paths):
             return await call_next(request)
 
-        # Try to resolve token and user role
+        # Try to resolve token and user role from JWT claims only
         auth_header = request.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header.split(" ")[1]
@@ -43,28 +53,20 @@ class RBACMiddleware(BaseHTTPMiddleware):
                     token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
                 )
                 token_data = TokenPayload(**payload)
-                
+
                 if token_data.sub:
-                    # Provide a fresh DB session for middleware 
-                    with Session(engine) as db:
-                        user = db.exec(select(User).where(User.id == int(token_data.sub)).options(selectinload(User.role))).first()
-                        if user and user.is_active:
-                            request.state.user = user
-                            # Find the highest priority role or the primary role
-                            # For granular RBAC, we assign the primary matching Enum
-                            role_names = [r.name.lower() for r in user.roles]
-                            
-                            if RoleEnum.ADMIN.value in role_names:
-                                request.state.user_role = RoleEnum.ADMIN
-                            elif RoleEnum.DEALER.value in role_names:
-                                request.state.user_role = RoleEnum.DEALER
-                            elif RoleEnum.DRIVER.value in role_names:
-                                request.state.user_role = RoleEnum.DRIVER
-                            elif RoleEnum.CUSTOMER.value in role_names:
-                                request.state.user_role = RoleEnum.CUSTOMER
-                                
+                    # Store the user-id so deps can skip a re-decode when needed
+                    request.state.token_user_id = int(token_data.sub)
+
+                    # Derive role hint from JWT "role" claim (set at login)
+                    role_claim = (payload.get("role") or "").lower()
+                    if role_claim:
+                        for role_enum, role_value in _ROLE_PRIORITY:
+                            if role_claim == role_value:
+                                request.state.user_role = role_enum
+                                break
+
             except ExpiredSignatureError:
-                # Middleware is non-blocking, but keep explicit diagnostics.
                 request.state.auth_error = "token_expired"
                 logger.warning("rbac.token_decode_failed", extra={"auth_error": "token_expired"})
             except JWTError:
@@ -76,6 +78,6 @@ class RBACMiddleware(BaseHTTPMiddleware):
                     "rbac.token_decode_failed",
                     extra={"auth_error": "token_invalid", "error": str(e)},
                 )
-                
+
         response = await call_next(request)
         return response

@@ -132,11 +132,12 @@ def create_role(
     db.commit()
     db.refresh(role)
     
-    # 3. Assign Permissions
-    for slug in permissions_to_assign:
-        permission = db.exec(select(Permission).where(Permission.slug == slug)).first()
-        if permission:
-            # Check if link exists (unlikely for new role but safe)
+    # 3. Assign Permissions — batch lookup instead of per-slug query
+    if permissions_to_assign:
+        found_perms = db.exec(
+            select(Permission).where(col(Permission.slug).in_(permissions_to_assign))
+        ).all()
+        for permission in found_perms:
             link = RolePermission(role_id=role.id, permission_id=permission.id)
             db.add(link)
     
@@ -419,21 +420,33 @@ def get_user_roles(
         raise HTTPException(status_code=404, detail="User not found")
         
     # Query UserRole with Role and AdminUser (assigned_by)
-    # We can fetch UserRoles and then join or just iterate since likely small number
     user_roles = db.exec(select(UserRole).where(UserRole.user_id == user_id)).all()
+    
+    # Batch-load Roles and AdminUsers to avoid N+1
+    role_ids = {ur.role_id for ur in user_roles}
+    admin_ids = {ur.assigned_by for ur in user_roles if ur.assigned_by}
+    
+    roles_map = {}
+    if role_ids:
+        roles_list = db.exec(select(Role).where(col(Role.id).in_(role_ids))).all()
+        roles_map = {r.id: r for r in roles_list}
+    
+    admins_map = {}
+    if admin_ids:
+        admins_list = db.exec(select(AdminUser).where(col(AdminUser.id).in_(admin_ids))).all()
+        admins_map = {a.id: a for a in admins_list}
     
     results = []
     now = datetime.now(UTC)
     
     for ur in user_roles:
-        role = db.get(Role, ur.role_id)
+        role = roles_map.get(ur.role_id)
         if not role:
-            # Should not happen with FK constraint but safe check
             continue
             
         assigned_by_name = None
         if ur.assigned_by:
-            admin = db.get(AdminUser, ur.assigned_by)
+            admin = admins_map.get(ur.assigned_by)
             if admin:
                 assigned_by_name = admin.full_name or admin.email
         
@@ -487,9 +500,22 @@ def bulk_assign_roles(
     
     assigned_by_admin_id = _resolve_assigned_by_admin_id(db, current_user)
 
+    # Batch-preload all target users to avoid per-uid db.get
+    all_users = db.exec(select(User).where(col(User.id).in_(assignment.user_ids))).all()
+    users_map = {u.id: u for u in all_users}
+    
+    # Batch-preload existing links
+    existing_links_list = db.exec(
+        select(UserRole).where(
+            col(UserRole.user_id).in_(assignment.user_ids),
+            UserRole.role_id == role.id,
+        )
+    ).all()
+    existing_link_set = {el.user_id for el in existing_links_list}
+
     for uid in assignment.user_ids:
         try:
-            user = db.get(User, uid)
+            user = users_map.get(uid)
             if not user:
                 results.append(rbac_schema.BulkAssignmentResult(user_id=uid, success=False, message="User not found"))
                 fail_count += 1
@@ -500,15 +526,7 @@ def bulk_assign_roles(
                 user.role_id = role.id
                 db.add(user)
                 
-            # Check existing
-            existing_link = db.exec(
-                select(UserRole)
-                .where(UserRole.user_id == uid)
-                .where(UserRole.role_id == role.id)
-            ).first()
-            
-            if existing_link:
-                 # Already assigned, consider success or updated
+            if uid in existing_link_set:
                  results.append(rbac_schema.BulkAssignmentResult(user_id=uid, success=True, message="Already assigned"))
                  success_count += 1
             else:
@@ -934,12 +952,20 @@ def remove_role_from_user(
     active_perms = set()
     first_role_name = None
     
-    # Reload user.roles
+    # Reload user.roles — batch fetch roles and their permissions
     user_roles = db.exec(select(UserRole).where(UserRole.user_id == user_id)).all()
-    # Need to fetch Role objects
-    for ur in user_roles:
-        r = db.get(Role, ur.role_id)
-        if r and r.is_active:
+    role_ids_remaining = [ur.role_id for ur in user_roles]
+    
+    if role_ids_remaining:
+        remaining_roles = db.exec(
+            select(Role).where(col(Role.id).in_(role_ids_remaining))
+            .options(selectinload(Role.permissions))
+        ).all()
+    else:
+        remaining_roles = []
+    
+    for r in remaining_roles:
+        if r.is_active:
             if not first_role_name:
                 first_role_name = r.name
             for p in r.permissions:

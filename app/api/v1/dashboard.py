@@ -188,25 +188,32 @@ async def get_station_health(
     # Aggregate health tiers for the donut
     # Excellent (90-100), Good (80-89), Fair (60-79), Critical (<60)
 
-    # 5 Worst stations
+    # SQL pushdown: compute avg battery health per station in a single query
+    # instead of loading all stations + per-station battery queries
+    from sqlalchemy import case as sa_case, literal_column
+
     stations = db.exec(select(Station)).all()
 
-    # Calculate a mock score if no score exists, or real if available
-    # Ideally: aggregate avg battery health per station
+    # Batch: avg battery health per station via GROUP BY
+    health_rows = db.exec(
+        select(
+            Battery.location_id,
+            func.avg(Battery.health_percentage),
+        )
+        .where(Battery.location_type == "station")
+        .group_by(Battery.location_id)
+    ).all()
+    health_map = {int(loc_id): float(avg_h) for loc_id, avg_h in health_rows if avg_h is not None}
+
     worst_stations = []
     for s in stations:
-        # Check batteries at this station
-        bats = db.exec(select(Battery).where(Battery.location_id == s.id, Battery.location_type == "station")).all()
-        if bats:
-            avg_health = sum(b.health_percentage for b in bats if b.health_percentage) / len(bats)
-        else:
-            avg_health = 100.0 # No batteries = healthy enough
+        avg_health = health_map.get(s.id, 100.0)  # No batteries = healthy enough
 
         worst_stations.append({
             "id": s.id,
             "station_name": s.name,
             "health_score": round(avg_health, 1),
-            "trend": "down", # Mock trend
+            "trend": "down",  # Mock trend
             "status": s.status
         })
 

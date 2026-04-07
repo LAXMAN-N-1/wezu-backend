@@ -111,21 +111,15 @@ async def get_role_distribution(
     # 2. Get all roles
     roles = db.exec(select(Role)).all()
     
-    # 3. Users per role
-    users_per_role = []
-    role_counts = {}
-    
-    for role in roles:
-        count = db.exec(
-            select(func.count(UserRole.user_id.distinct()))
-            .where(UserRole.role_id == role.id)
-        ).one()
-        role_counts[role.id] = count
-        users_per_role.append({
-            "role": role,
-            "count": count
-        })
-    
+    # 3. Users per role — single GROUP BY instead of per-role COUNT loop
+    count_rows = db.exec(
+        select(UserRole.role_id, func.count(UserRole.user_id.distinct()))
+        .group_by(UserRole.role_id)
+    ).all()
+    role_counts = {rid: cnt for rid, cnt in count_rows}
+
+    users_per_role = [{"role": role, "count": role_counts.get(role.id, 0)} for role in roles]
+
     total_users_with_roles = db.exec(
         select(func.count(UserRole.user_id.distinct()))
     ).one()
@@ -146,30 +140,20 @@ async def get_role_distribution(
     users_per_role_response.sort(key=lambda x: x.user_count, reverse=True)
     
     # 4. Role growth trends (compare with 30 days ago)
-    # This requires historical data from audit logs
     month_ago = datetime.now(UTC) - timedelta(days=30)
     
-    role_growth_trends = []
+    # Batch: historical counts (users assigned before 30 days ago) per role
+    hist_rows = db.exec(
+        select(UserRole.role_id, func.count(UserRole.user_id.distinct()))
+        .where(UserRole.created_at <= month_ago)
+        .group_by(UserRole.role_id)
+    ).all()
+    hist_counts = {rid: cnt for rid, cnt in hist_rows}
     
-    # For growth, we'll estimate based on user_role created_at if available
-    # Otherwise, we'll show current counts with 0 growth
+    role_growth_trends = []
     for role in roles:
-        current_count = role_counts[role.id]
-        
-        # Try to get historical count from audit or estimate
-        # For now, using a simple heuristic
-        try:
-            # Count users assigned to this role before 30 days ago
-            previous_count = db.exec(
-                select(func.count(UserRole.user_id.distinct()))
-                .where(
-                    UserRole.role_id == role.id,
-                    UserRole.created_at <= month_ago
-                )
-            ).one()
-        except Exception:
-            previous_count = current_count  # Fallback
-        
+        current_count = role_counts.get(role.id, 0)
+        previous_count = hist_counts.get(role.id, current_count)
         growth = ((current_count - previous_count) / max(previous_count, 1)) * 100
         
         role_growth_trends.append(RoleGrowthTrend(

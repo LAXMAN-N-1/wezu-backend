@@ -132,8 +132,13 @@ def bulk_deactivate_users(
     deactivated = 0
     errors = []
 
+    # Batch-preload all target users
+    from sqlmodel import col
+    all_users = db.exec(select(User).where(col(User.id).in_(request.user_ids))).all()
+    users_map = {u.id: u for u in all_users}
+
     for user_id in request.user_ids:
-        user = db.get(User, user_id)
+        user = users_map.get(user_id)
         if not user:
             errors.append(f"User {user_id} not found")
             continue
@@ -176,8 +181,13 @@ def bulk_role_change(
     changed = 0
     errors = []
 
+    # Batch-preload all target users
+    from sqlmodel import col
+    all_users = db.exec(select(User).where(col(User.id).in_(request.user_ids))).all()
+    users_map = {u.id: u for u in all_users}
+
     for user_id in request.user_ids:
-        user = db.get(User, user_id)
+        user = users_map.get(user_id)
         if not user:
             errors.append(f"User {user_id} not found")
             continue

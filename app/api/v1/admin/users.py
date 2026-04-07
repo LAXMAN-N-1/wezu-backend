@@ -656,10 +656,17 @@ async def get_suspension_history(
     """View all suspension/reactivation events for a user"""
     logs = UserService.get_status_history(db, id)
     
+    # Batch-preload actors
+    actor_ids = {log.actor_id for log in logs if log.actor_id}
+    actors_map = {}
+    if actor_ids:
+        from sqlmodel import col
+        actors_list = db.exec(select(User).where(col(User.id).in_(actor_ids))).all()
+        actors_map = {u.id: u for u in actors_list}
+    
     results = []
     for log in logs:
-        # Resolve actor name
-        actor = db.get(User, log.actor_id)
+        actor = actors_map.get(log.actor_id) if log.actor_id else None
         results.append(UserHistoryResponse(
             id=log.id,
             action_type=log.action_type,
@@ -680,10 +687,15 @@ async def bulk_user_action(
     """Bulk activate, deactivate, or message users"""
     if req.action not in ["activate", "deactivate", "message"]:
         raise HTTPException(status_code=400, detail="Invalid action")
+    
+    # Batch-preload all target users
+    from sqlmodel import col
+    all_users = db.exec(select(User).where(col(User.id).in_(req.user_ids))).all()
+    users_map = {u.id: u for u in all_users}
         
     updated_count = 0
     for uid in req.user_ids:
-        user = db.get(User, uid)
+        user = users_map.get(uid)
         if not user: continue
         
         if req.action == "activate":

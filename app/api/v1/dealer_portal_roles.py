@@ -40,10 +40,21 @@ def get_roles(
     )
     roles = db.exec(statement).all()
     
+    # Batch: user counts per role via GROUP BY
+    role_ids = [r.id for r in roles]
+    user_count_map = {}
+    if role_ids:
+        from sqlmodel import col
+        count_rows = db.exec(
+            select(User.role_id, func.count(User.id))
+            .where(col(User.role_id).in_(role_ids))
+            .group_by(User.role_id)
+        ).all()
+        user_count_map = {rid: cnt for rid, cnt in count_rows}
+    
     results = []
     for role in roles:
-        # Count users in this role (User.role_id == role.id)
-        user_count = db.exec(select(func.count(User.id)).where(User.role_id == role.id)).one() or 0
+        user_count = user_count_map.get(role.id, 0)
         
         # Structured permissions for Matrix (Title Case for frontend)
         perms_matrix = {}
@@ -140,12 +151,14 @@ def create_role(
     db.commit()
     db.refresh(role)
     
-    # Assign permissions if provided
+    # Assign permissions if provided — batch lookup
     if role_in.permissions:
-        for slug in role_in.permissions:
-            perm = db.exec(select(Permission).where(Permission.slug == slug)).first()
-            if perm:
-                db.add(RolePermission(role_id=role.id, permission_id=perm.id))
+        from sqlmodel import col
+        found_perms = db.exec(
+            select(Permission).where(col(Permission.slug).in_(role_in.permissions))
+        ).all()
+        for perm in found_perms:
+            db.add(RolePermission(role_id=role.id, permission_id=perm.id))
         db.commit()
         db.refresh(role)
     
@@ -194,11 +207,14 @@ def update_role(
     db.add(role)
     
     if permissions is not None:
-        # Clear existing and add new
+        # Clear existing and add new — batch lookup
         db.exec(sa.delete(RolePermission).where(RolePermission.role_id == role.id))
-        for slug in permissions:
-            perm = db.exec(select(Permission).where(Permission.slug == slug)).first()
-            if perm:
+        if permissions:
+            from sqlmodel import col
+            found_perms = db.exec(
+                select(Permission).where(col(Permission.slug).in_(permissions))
+            ).all()
+            for perm in found_perms:
                 db.add(RolePermission(role_id=role.id, permission_id=perm.id))
                 
     db.commit()
@@ -375,9 +391,17 @@ def get_role_audit_log(
         ).order_by(AuditLog.timestamp.desc())
     ).all()
     
+    # Batch-preload users for log entries
+    log_user_ids = {log.user_id for log in logs if log.user_id}
+    users_map = {}
+    if log_user_ids:
+        from sqlmodel import col
+        users_list = db.exec(select(User).where(col(User.id).in_(log_user_ids))).all()
+        users_map = {u.id: u for u in users_list}
+    
     results = []
     for log in logs:
-        user = db.get(User, log.user_id) if log.user_id else None
+        user = users_map.get(log.user_id) if log.user_id else None
         results.append(RoleAuditLog(
             action=log.action,
             user_name=user.full_name if user else "System",

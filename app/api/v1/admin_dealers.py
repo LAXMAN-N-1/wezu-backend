@@ -127,9 +127,17 @@ def list_dealers(
     total = db.exec(count_query).one()
     dealers = db.exec(query.offset(skip).limit(limit).order_by(DealerProfile.created_at.desc())).all()
 
+    # Batch-preload users for all dealers in this page
+    user_ids = [dp.user_id for dp in dealers]
+    users_map = {}
+    if user_ids:
+        from sqlmodel import col
+        users_list = db.exec(select(User).where(col(User.id).in_(user_ids))).all()
+        users_map = {u.id: u for u in users_list}
+
     results = []
     for dp in dealers:
-        user = db.get(User, dp.user_id)
+        user = users_map.get(dp.user_id)
         results.append(_dealer_to_dict(dp, user))
 
     return {"dealers": results, "total_count": total}
@@ -249,10 +257,24 @@ def list_applications(
         query = query.where(DealerApplication.current_stage == stage)
     apps = db.exec(query.order_by(DealerApplication.updated_at.desc())).all()
 
+    # Batch-preload dealer profiles and users
+    dealer_ids = {a.dealer_id for a in apps}
+    dp_map = {}
+    if dealer_ids:
+        from sqlmodel import col
+        dp_list = db.exec(select(DealerProfile).where(col(DealerProfile.id).in_(dealer_ids))).all()
+        dp_map = {dp.id: dp for dp in dp_list}
+
+    user_ids = {dp.user_id for dp in dp_map.values()}
+    users_map = {}
+    if user_ids:
+        users_list = db.exec(select(User).where(col(User.id).in_(user_ids))).all()
+        users_map = {u.id: u for u in users_list}
+
     results = []
     for a in apps:
-        dp = db.get(DealerProfile, a.dealer_id)
-        user = db.get(User, dp.user_id) if dp else None
+        dp = dp_map.get(a.dealer_id)
+        user = users_map.get(dp.user_id) if dp else None
         results.append({
             "id": a.id,
             "dealer_id": a.dealer_id,
@@ -325,9 +347,17 @@ def list_kyc_documents(
         query = query.where(DealerDocument.document_type == doc_type)
     docs = db.exec(query.order_by(DealerDocument.uploaded_at.desc())).all()
 
+    # Batch-preload dealer profiles for all documents
+    doc_dealer_ids = {d.dealer_id for d in docs}
+    dp_map_kyc = {}
+    if doc_dealer_ids:
+        from sqlmodel import col
+        dp_list_kyc = db.exec(select(DealerProfile).where(col(DealerProfile.id).in_(doc_dealer_ids))).all()
+        dp_map_kyc = {dp.id: dp for dp in dp_list_kyc}
+
     results = []
     for d in docs:
-        dp = db.get(DealerProfile, d.dealer_id)
+        dp = dp_map_kyc.get(d.dealer_id)
         results.append({
             "id": d.id,
             "dealer_id": d.dealer_id,
@@ -377,9 +407,17 @@ def list_all_documents(
         query = query.where(DealerDocument.document_type == doc_type)
     docs = db.exec(query.order_by(DealerDocument.uploaded_at.desc())).all()
 
+    # Batch-preload dealer profiles
+    doc_dealer_ids_all = {d.dealer_id for d in docs}
+    dp_map_all = {}
+    if doc_dealer_ids_all:
+        from sqlmodel import col
+        dp_list_all = db.exec(select(DealerProfile).where(col(DealerProfile.id).in_(doc_dealer_ids_all))).all()
+        dp_map_all = {dp.id: dp for dp in dp_list_all}
+
     results = []
     for d in docs:
-        dp = db.get(DealerProfile, d.dealer_id)
+        dp = dp_map_all.get(d.dealer_id)
         results.append({
             "id": d.id,
             "dealer_id": d.dealer_id,
@@ -406,14 +444,27 @@ def list_all_documents(
 def list_commission_configs(db: Session = Depends(deps.get_db)):
     """List all commission configurations."""
     configs = db.exec(select(CommissionConfig).order_by(CommissionConfig.created_at.desc())).all()
+
+    # Batch-preload dealer users and profiles
+    dealer_ids = {c.dealer_id for c in configs if c.dealer_id}
+    users_map = {}
+    dp_map_comm = {}
+    if dealer_ids:
+        from sqlmodel import col
+        users_list = db.exec(select(User).where(col(User.id).in_(dealer_ids))).all()
+        users_map = {u.id: u for u in users_list}
+        user_ids = {u.id for u in users_list}
+        if user_ids:
+            dp_list = db.exec(select(DealerProfile).where(col(DealerProfile.user_id).in_(user_ids))).all()
+            dp_map_comm = {dp.user_id: dp for dp in dp_list}
+
     results = []
     for c in configs:
-        # Resolve dealer name
         dealer_name = "Global"
         if c.dealer_id:
-            user = db.get(User, c.dealer_id)
+            user = users_map.get(c.dealer_id)
             if user:
-                dp = db.exec(select(DealerProfile).where(DealerProfile.user_id == user.id)).first()
+                dp = dp_map_comm.get(user.id)
                 dealer_name = dp.business_name if dp else user.full_name
 
         results.append({

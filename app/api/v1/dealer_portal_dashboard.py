@@ -3,7 +3,7 @@ Dealer Portal Dashboard — Aggregated KPIs, alerts, and activity feed.
 """
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, col
 from datetime import datetime, UTC, timedelta
 from sqlalchemy import case
 
@@ -238,20 +238,26 @@ def get_customers_list(
     )
     users = db.exec(statement).all()
     
+    # Batch rental counts — single GROUP BY instead of per-user COUNT
+    user_ids = [u.id for u in users]
+    rental_counts_map = {}
+    if user_ids:
+        count_rows = db.exec(
+            select(Rental.user_id, func.count(Rental.id))
+            .join(Station, Rental.start_station_id == Station.id)
+            .where(Station.dealer_id == dealer.id, col(Rental.user_id).in_(user_ids))
+            .group_by(Rental.user_id)
+        ).all()
+        rental_counts_map = {uid: cnt for uid, cnt in count_rows}
+    
     data = []
     for u in users:
-        rental_count = db.exec(
-            select(func.count(Rental.id))
-            .join(Station, Rental.start_station_id == Station.id)
-            .where(Station.dealer_id == dealer.id, Rental.user_id == u.id)
-        ).one_or_none()
-        
         data.append({
             "id": u.id,
             "name": u.full_name or (u.email.split('@')[0] if u.email else "Unknown"),
             "email": u.email,
             "phone": u.phone_number or "N/A",
-            "total_rentals": rental_count or 0,
+            "total_rentals": rental_counts_map.get(u.id, 0),
             "status": "Active" if u.is_active else "Inactive",
             "joined_at": str(u.created_at) if hasattr(u, 'created_at') and u.created_at else None
         })
@@ -427,10 +433,21 @@ def get_dealer_transactions(
         .limit(100)
     ).all()
 
+    # Batch-preload customers and stations for the page
+    user_ids = {r.user_id for r in rentals}
+    stn_ids = {r.start_station_id for r in rentals if r.start_station_id}
+
+    customers_map = {}
+    if user_ids:
+        cust_list = db.exec(select(User).where(col(User.id).in_(user_ids))).all()
+        customers_map = {u.id: u for u in cust_list}
+
+    stations_map = {s.id: s for s in stations}  # already loaded above
+
     data = []
     for r in rentals:
-        customer = db.get(User, r.user_id)
-        station = db.get(Station, r.start_station_id) if r.start_station_id else None
+        customer = customers_map.get(r.user_id)
+        station = stations_map.get(r.start_station_id) if r.start_station_id else None
         data.append({
             "id": r.id,
             "transaction_type": "Rental",

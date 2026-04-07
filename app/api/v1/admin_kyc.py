@@ -42,10 +42,18 @@ def get_pending_kyc_queue(
     total = db.exec(select(func.count()).select_from(query.subquery())).one()
     users = db.exec(query.offset(offset).limit(size)).all()
     
+    # Batch-preload KYC documents for all users on this page
+    user_ids = [user.id for user in users]
+    docs_map: dict = {}
+    if user_ids:
+        from sqlmodel import col
+        all_docs = db.exec(select(KYCDocument).where(col(KYCDocument.user_id).in_(user_ids))).all()
+        for doc in all_docs:
+            docs_map.setdefault(doc.user_id, []).append(doc)
+    
     items = []
     for user in users:
-        # Fetch documents
-        docs = db.exec(select(KYCDocument).where(KYCDocument.user_id == user.id)).all()
+        docs = docs_map.get(user.id, [])
         
         # Determine User Type (Basic logic for now)
         # In a real scenario, we'd check user.roles

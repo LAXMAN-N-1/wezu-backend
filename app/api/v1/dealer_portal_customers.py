@@ -3,7 +3,7 @@ Dealer Portal Customers — Customer list, detail, and active rentals.
 """
 from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session, select, func
+from sqlmodel import Session, select, func, col
 from datetime import datetime, UTC
 
 from app.db.session import get_session
@@ -50,11 +50,34 @@ def get_active_rentals(
             .order_by(Rental.created_at.desc())
         ).all()
 
+        if not rentals:
+            return {"rentals": [], "total": 0}
+
+        # Batch-preload customers, batteries, and stations
+        user_ids = {r.user_id for r in rentals}
+        battery_ids = {r.battery_id for r in rentals if r.battery_id}
+        station_id_set = {r.start_station_id for r in rentals if r.start_station_id}
+
+        customers_map = {}
+        if user_ids:
+            customers = db.exec(select(User).where(col(User.id).in_(user_ids))).all()
+            customers_map = {u.id: u for u in customers}
+
+        batteries_map = {}
+        if battery_ids:
+            batteries = db.exec(select(Battery).where(col(Battery.id).in_(battery_ids))).all()
+            batteries_map = {b.id: b for b in batteries}
+
+        stations_map = {}
+        if station_id_set:
+            stn_list = db.exec(select(Station).where(col(Station.id).in_(station_id_set))).all()
+            stations_map = {s.id: s for s in stn_list}
+
         result = []
         for r in rentals:
-            customer = db.get(User, r.user_id)
-            battery = db.get(Battery, r.battery_id) if r.battery_id else None
-            station = db.get(Station, r.start_station_id) if r.start_station_id else None
+            customer = customers_map.get(r.user_id)
+            battery = batteries_map.get(r.battery_id) if r.battery_id else None
+            station = stations_map.get(r.start_station_id) if r.start_station_id else None
 
             result.append({
                 "rental_id": r.id,
@@ -111,21 +134,28 @@ def list_customers(
         total = len(customer_ids)
         users = db.exec(query.offset((page - 1) * limit).limit(limit)).all()
 
-        customers = []
-        for u in users:
-            rental_count = db.exec(
-                select(func.count(Rental.id)).where(
-                    Rental.user_id == u.id,
+        # Batch rental counts — single GROUP BY instead of per-user COUNT
+        fetched_user_ids = [u.id for u in users]
+        rental_counts_map = {}
+        if fetched_user_ids:
+            count_rows = db.exec(
+                select(Rental.user_id, func.count(Rental.id))
+                .where(
+                    col(Rental.user_id).in_(fetched_user_ids),
                     Rental.start_station_id.in_(station_ids),
                 )
-            ).one() or 0
+                .group_by(Rental.user_id)
+            ).all()
+            rental_counts_map = {uid: cnt for uid, cnt in count_rows}
 
+        customers = []
+        for u in users:
             customers.append({
                 "id": u.id,
                 "full_name": u.full_name or "Unknown",
                 "email": u.email,
                 "phone_number": u.phone_number,
-                "total_rentals": rental_count,
+                "total_rentals": rental_counts_map.get(u.id, 0),
                 "last_login": str(u.last_login) if u.last_login else None,
                 "created_at": str(u.created_at),
             })
@@ -157,9 +187,16 @@ def get_customer_detail(
             ).order_by(Rental.created_at.desc())
         ).all()
 
+        # Batch-preload stations for rental list
+        stn_ids = {r.start_station_id for r in rentals if r.start_station_id}
+        stations_map = {}
+        if stn_ids:
+            stn_list = db.exec(select(Station).where(col(Station.id).in_(stn_ids))).all()
+            stations_map = {s.id: s for s in stn_list}
+
         rental_list = []
         for r in rentals:
-            station = db.get(Station, r.start_station_id) if r.start_station_id else None
+            station = stations_map.get(r.start_station_id) if r.start_station_id else None
             rental_list.append({
                 "rental_id": r.id,
                 "station_name": station.name if station else "N/A",
