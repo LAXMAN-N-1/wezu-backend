@@ -13,11 +13,12 @@ class AdminAnalyticsService:
 
     @staticmethod
     def get_overview(db: Session) -> Dict[str, Any]:
+        from sqlalchemy import case
         now = datetime.now(UTC)
         month_ago = now - timedelta(days=30)
         two_months_ago = now - timedelta(days=60)
 
-        # 1. Rental & Revenue Metrics (Current vs Last Month)
+        # 1. Rental & Revenue Metrics (Current vs Last Month) — single query
         cm = db.execute(select(func.sum(Rental.total_amount), func.count(Rental.id)).where(Rental.start_time >= month_ago)).first()
         lm = db.execute(select(func.sum(Rental.total_amount), func.count(Rental.id)).where(and_(Rental.start_time >= two_months_ago, Rental.start_time < month_ago))).first()
 
@@ -29,21 +30,31 @@ class AdminAnalyticsService:
         rentals_last = lm[1] or 0
         rentals_change = round(((rentals_current - rentals_last) / rentals_last * 100), 1) if rentals_last > 0 else (100.0 if rentals_current > 0 else 0.0)
 
-        # 2. User Metrics
-        total_users = db.exec(select(func.count(User.id))).one() or 0
-        users_last_month = db.exec(select(func.count(User.id)).where(User.created_at < month_ago)).one() or 0
+        # 2. User Metrics + Active Rentals — single query
+        user_row = db.execute(select(
+            func.count(User.id),
+            func.count(case((User.created_at < month_ago, 1))),
+        )).first()
+        total_users = int(user_row[0] or 0)
+        users_last_month = int(user_row[1] or 0)
         users_change = round(((total_users - users_last_month) / users_last_month * 100), 1) if users_last_month > 0 else 0.0
 
-        # 3. Fleet & Station Metrics
         active_rentals = db.exec(select(func.count(Rental.id)).where(Rental.status == "active")).one() or 0
-        total_batt = db.exec(select(func.count(Battery.id))).one() or 1
-        rented_batt = db.exec(select(func.count(Battery.id)).where(Battery.status == "rented")).one() or 0
+
+        # 3. Fleet & Station Metrics — single battery query with CASE
+        batt_row = db.execute(select(
+            func.count(Battery.id),
+            func.count(case((Battery.status == "rented", 1))),
+            func.coalesce(func.avg(Battery.health_percentage), 0.0),
+        )).first()
+        total_batt = max(int(batt_row[0] or 1), 1)
+        rented_batt = int(batt_row[1] or 0)
+        avg_health = float(batt_row[2] or 0.0)
         utilization = round((rented_batt / total_batt * 100), 1)
 
-        # Batch small counts
+        # 4. Remaining small counts — single query each (already fast)
         active_stations = db.exec(select(func.count(Station.id)).where(Station.status == "active")).one() or 0
         active_dealers = db.exec(select(func.count(DealerProfile.id)).where(DealerProfile.is_active == True)).one() or 0
-        avg_health = db.exec(select(func.avg(Battery.health_percentage))).one() or 0.0
         open_tickets = db.exec(select(func.count(SupportTicket.id)).where(SupportTicket.status == "open")).one() or 0
 
         return {
@@ -121,11 +132,19 @@ class AdminAnalyticsService:
 
     @staticmethod
     def get_battery_health_distribution(db: Session) -> Dict[str, Any]:
-        total = db.exec(select(func.count(Battery.id))).one() or 0
-        excellent = db.exec(select(func.count(Battery.id)).where(Battery.health_percentage >= 90)).one()
-        good = db.exec(select(func.count(Battery.id)).where(and_(Battery.health_percentage >= 70, Battery.health_percentage < 90))).one()
-        fair = db.exec(select(func.count(Battery.id)).where(and_(Battery.health_percentage >= 50, Battery.health_percentage < 70))).one()
-        critical = db.exec(select(func.count(Battery.id)).where(Battery.health_percentage < 50)).one()
+        """Battery health bucket distribution (single query)."""
+        from sqlalchemy import case
+        row = db.execute(
+            select(
+                func.count(Battery.id),
+                func.count(case((Battery.health_percentage >= 90, 1))),
+                func.count(case((and_(Battery.health_percentage >= 70, Battery.health_percentage < 90), 1))),
+                func.count(case((and_(Battery.health_percentage >= 50, Battery.health_percentage < 70), 1))),
+                func.count(case((Battery.health_percentage < 50, 1))),
+            )
+        ).first()
+
+        total, excellent, good, fair, critical = (int(v or 0) for v in row)
 
         def pct(count):
             return round((count / total * 100), 1) if total > 0 else 0.0
@@ -171,9 +190,23 @@ class AdminAnalyticsService:
 
     @staticmethod
     def get_revenue_by_station(db: Session, period: str = '30d') -> Dict[str, Any]:
-        """Revenue aggregated per station from real rentals."""
+        """Revenue aggregated per station from real rentals (single query)."""
         days = 90 if period == '90d' else 30
         since = datetime.now(UTC) - timedelta(days=days)
+
+        # Subqueries for utilization (avoid N+1)
+        batt_sub = (
+            select(Battery.location_id, func.count(Battery.id).label("batt_count"))
+            .where(Battery.location_type == "station")
+            .group_by(Battery.location_id)
+            .subquery()
+        )
+        active_sub = (
+            select(Rental.start_station_id, func.count(Rental.id).label("active_count"))
+            .where(Rental.status == "active")
+            .group_by(Rental.start_station_id)
+            .subquery()
+        )
 
         rows = db.execute(
             select(
@@ -181,23 +214,24 @@ class AdminAnalyticsService:
                 Station.name,
                 Station.address,
                 func.sum(Rental.total_amount).label("revenue"),
-                func.count(Rental.id).label("rentals")
+                func.count(Rental.id).label("rentals"),
+                func.coalesce(batt_sub.c.batt_count, 1),
+                func.coalesce(active_sub.c.active_count, 0),
             )
             .join(Rental, Rental.start_station_id == Station.id)
+            .outerjoin(batt_sub, batt_sub.c.location_id == Station.id)
+            .outerjoin(active_sub, active_sub.c.start_station_id == Station.id)
             .where(Rental.start_time >= since)
-            .group_by(Station.id, Station.name, Station.address)
+            .group_by(Station.id, Station.name, Station.address,
+                      batt_sub.c.batt_count, active_sub.c.active_count)
             .order_by(func.sum(Rental.total_amount).desc())
         ).all()
 
         total_rev = sum(float(r[3] or 0) for r in rows) or 1.0
         stations = []
         for r in rows:
-            sid, name, address, revenue, rentals = r
-            batteries_here = db.exec(select(func.count(Battery.id)).where(and_(Battery.location_id == sid, Battery.location_type == "station"))).one() or 1
-            active_here = db.exec(
-                select(func.count(Rental.id)).where(and_(Rental.start_station_id == sid, Rental.status == "active"))
-            ).one()
-            utilization = round(min((active_here / batteries_here) * 100, 100.0), 1)
+            sid, name, address, revenue, rentals, batt_count, active_count = r
+            utilization = round(min((int(active_count) / max(int(batt_count), 1)) * 100, 100.0), 1)
             stations.append({
                 "name": name,
                 "revenue": float(revenue or 0),
@@ -235,13 +269,25 @@ class AdminAnalyticsService:
 
     @staticmethod
     def get_conversion_funnel(db: Session) -> Dict[str, Any]:
-        """Real user conversion funnel from DB counts."""
-        total_users = db.exec(select(func.count(User.id))).one() or 0
-        active_users = db.exec(select(func.count(User.id)).where(User.is_active == True)).one() or 0
-        users_with_rentals = db.exec(select(func.count(func.distinct(Rental.user_id)))).one() or 0
-        users_completed = db.exec(
-            select(func.count(func.distinct(Rental.user_id))).where(Rental.status == "completed")
-        ).one() or 0
+        """Real user conversion funnel from DB counts (single query for user counts)."""
+        from sqlalchemy import case
+        user_row = db.execute(
+            select(
+                func.count(User.id),
+                func.count(case((User.is_active == True, 1))),
+            )
+        ).first()
+        total_users = int(user_row[0] or 0)
+        active_users = int(user_row[1] or 0)
+
+        rental_row = db.execute(
+            select(
+                func.count(func.distinct(Rental.user_id)),
+                func.count(func.distinct(case((Rental.status == "completed", Rental.user_id)))),
+            )
+        ).first()
+        users_with_rentals = int(rental_row[0] or 0)
+        users_completed = int(rental_row[1] or 0)
 
         def safe_rate(num, den):
             return round((num / den) * 100, 1) if den > 0 else 0.0
@@ -300,27 +346,46 @@ class AdminAnalyticsService:
 
     @staticmethod
     def get_top_stations(db: Session) -> Dict[str, Any]:
-        """Top performing stations by total rental revenue (last 30 days)."""
+        """Top performing stations by total rental revenue (last 30 days, single query)."""
         since = datetime.now(UTC) - timedelta(days=30)
+
+        # Subquery: batteries per station
+        batt_sub = (
+            select(Battery.location_id, func.count(Battery.id).label("batt_count"))
+            .where(Battery.location_type == "station")
+            .group_by(Battery.location_id)
+            .subquery()
+        )
+        # Subquery: active rentals per station
+        active_sub = (
+            select(Rental.start_station_id, func.count(Rental.id).label("active_count"))
+            .where(Rental.status == "active")
+            .group_by(Rental.start_station_id)
+            .subquery()
+        )
+
         rows = db.execute(
             select(
                 Station.id, Station.name, Station.address,
                 func.sum(Rental.total_amount),
-                func.count(Rental.id)
+                func.count(Rental.id),
+                func.coalesce(batt_sub.c.batt_count, 1),
+                func.coalesce(active_sub.c.active_count, 0),
             )
             .join(Rental, Rental.start_station_id == Station.id)
+            .outerjoin(batt_sub, batt_sub.c.location_id == Station.id)
+            .outerjoin(active_sub, active_sub.c.start_station_id == Station.id)
             .where(Rental.start_time >= since)
-            .group_by(Station.id, Station.name, Station.address)
+            .group_by(Station.id, Station.name, Station.address,
+                      batt_sub.c.batt_count, active_sub.c.active_count)
             .order_by(func.sum(Rental.total_amount).desc())
             .limit(10)
         ).all()
 
         stations = []
         for idx, r in enumerate(rows):
-            sid, sname, saddress, revenue, rentals = r
-            batteries_here = db.exec(select(func.count(Battery.id)).where(and_(Battery.location_id == sid, Battery.location_type == "station"))).one() or 1
-            active_here = db.exec(select(func.count(Rental.id)).where(and_(Rental.start_station_id == sid, Rental.status == "active"))).one()
-            utilization = round(min((active_here / batteries_here) * 100, 100.0), 1)
+            sid, sname, saddress, revenue, rentals, batt_count, active_count = r
+            utilization = round(min((int(active_count) / max(int(batt_count), 1)) * 100, 100.0), 1)
             stations.append({
                 "id": f"STN-{sid:02d}",
                 "name": sname,
@@ -402,27 +467,40 @@ class AdminAnalyticsService:
 
     @staticmethod
     def get_inventory_status(db: Session) -> Dict[str, Any]:
-        """Real battery inventory by status and model."""
-        total = db.exec(select(func.count(Battery.id))).one() or 0
-        available = db.exec(select(func.count(Battery.id)).where(Battery.status == "available")).one()
-        in_use = db.exec(select(func.count(Battery.id)).where(or_(Battery.status == "in_use", Battery.status == "rented"))).one()
-        charging = db.exec(select(func.count(Battery.id)).where(Battery.status == "charging")).one()
-        maintenance = db.exec(select(func.count(Battery.id)).where(Battery.status == "maintenance")).one()
+        """Real battery inventory by status and model (2 queries)."""
+        # 1. Global summary by status
+        status_rows = db.execute(
+            select(Battery.status, func.count(Battery.id))
+            .group_by(Battery.status)
+        ).all()
+        status_map = {r[0]: int(r[1]) for r in status_rows}
+        total = sum(status_map.values())
+        available = status_map.get("available", 0)
+        in_use = status_map.get("in_use", 0) + status_map.get("rented", 0)
+        charging = status_map.get("charging", 0)
+        maintenance = status_map.get("maintenance", 0)
 
-        model_rows = db.execute(select(Battery.model_number, func.count(Battery.id)).group_by(Battery.model_number)).all()
-        inventory = []
-        for row in model_rows:
-            m_num, cnt = row
-            m_avail = db.exec(select(func.count(Battery.id)).where(and_(Battery.model_number == m_num, Battery.status == "available"))).one()
-            m_rented = db.exec(select(func.count(Battery.id)).where(and_(Battery.model_number == m_num, Battery.status.in_(["in_use", "rented"])))).one()
-            m_maint = db.exec(select(func.count(Battery.id)).where(and_(Battery.model_number == m_num, Battery.status == "maintenance"))).one()
-            inventory.append({
-                "category": m_num,
-                "total": int(cnt),
-                "available": int(m_avail),
-                "rented": int(m_rented),
-                "maintenance": int(m_maint),
-            })
+        # 2. Per-model breakdown (single grouped query)
+        model_rows = db.execute(
+            select(Battery.model_number, Battery.status, func.count(Battery.id))
+            .group_by(Battery.model_number, Battery.status)
+        ).all()
+        models: Dict[str, Dict[str, int]] = {}
+        for model, bstatus, cnt in model_rows:
+            if model not in models:
+                models[model] = {"total": 0, "available": 0, "rented": 0, "maintenance": 0}
+            models[model]["total"] += int(cnt)
+            if bstatus == "available":
+                models[model]["available"] += int(cnt)
+            elif bstatus in ("in_use", "rented"):
+                models[model]["rented"] += int(cnt)
+            elif bstatus == "maintenance":
+                models[model]["maintenance"] += int(cnt)
+
+        inventory = [
+            {"category": model, **counts}
+            for model, counts in models.items()
+        ]
 
         return {
             "total_batteries": total,
@@ -433,30 +511,39 @@ class AdminAnalyticsService:
 
     @staticmethod
     def get_demand_forecast(db: Session) -> Dict[str, Any]:
-        """7-day demand forecast using historical weekday averages."""
+        """7-day demand forecast using historical weekday averages (single query)."""
+        from sqlalchemy import extract
         now = datetime.now(UTC)
-        weekday_avgs: Dict[int, float] = {}
-        for wd in range(7):
-            counts = []
-            for week in range(1, 5):
-                day_start = now - timedelta(days=(now.weekday() - wd) % 7 + week * 7)
-                day_end = day_start + timedelta(days=1)
-                cnt = db.exec(select(func.count(Rental.id)).where(and_(Rental.start_time >= day_start, Rental.start_time < day_end))).one() or 0
-                counts.append(cnt)
-            weekday_avgs[wd] = round(sum(counts) / len(counts), 1)
+        four_weeks_ago = now - timedelta(days=28)
+
+        # Single query: count rentals per weekday over last 4 weeks
+        rows = db.execute(
+            select(
+                extract('dow', Rental.start_time).label('dow'),
+                func.count(Rental.id),
+            )
+            .where(Rental.start_time >= four_weeks_ago)
+            .group_by(extract('dow', Rental.start_time))
+        ).all()
+        weekday_totals = {int(r[0]): int(r[1]) for r in rows}
+
+        # Today's actual count
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        today_actual = db.exec(
+            select(func.count(Rental.id)).where(Rental.start_time >= today_start)
+        ).one() or 0
 
         forecast = []
         for i in range(7):
             day = now + timedelta(days=i)
-            wd = day.weekday()
-            actual = None
-            if i == 0:
-                day_start = now.replace(hour=0, minute=0, second=0)
-                actual = db.exec(select(func.count(Rental.id)).where(Rental.start_time >= day_start)).one() or 0
+            # Python weekday: Mon=0..Sun=6. Postgres DOW: Sun=0..Sat=6.
+            pg_dow = (day.weekday() + 1) % 7
+            total = weekday_totals.get(pg_dow, 0)
+            predicted = round(total / 4.0, 1)  # average over 4 weeks
             forecast.append({
                 "date": day.strftime("%Y-%m-%d"),
-                "predicted": weekday_avgs.get(wd, 0.0),
-                "actual": actual,
+                "predicted": predicted,
+                "actual": today_actual if i == 0 else None,
             })
         return {"forecast": forecast}
 
