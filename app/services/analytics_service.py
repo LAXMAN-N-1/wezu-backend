@@ -55,13 +55,22 @@ class AnalyticsService:
     ) -> Dict[str, Any]:
         """First-render admin dashboard payload with section-level timing."""
         section_timings_ms: Dict[str, float] = {}
+        section_errors: Dict[str, str] = {}
         started_at = monotonic()
 
         def build_section(name: str, loader):
             section_started = monotonic()
-            result = loader()
-            section_timings_ms[name] = round((monotonic() - section_started) * 1000, 2)
-            return result
+            try:
+                return loader()
+            except Exception:
+                logger.exception(
+                    "admin.analytics.dashboard.section_failed",
+                    extra={"section": name, "period": period},
+                )
+                section_errors[name] = "section_unavailable"
+                return {}
+            finally:
+                section_timings_ms[name] = round((monotonic() - section_started) * 1000, 2)
 
         payload = {
             "period": period,
@@ -102,6 +111,7 @@ class AnalyticsService:
                 "top_stations",
                 lambda: AnalyticsService.get_top_stations(db),
             ),
+            "_errors": section_errors,
         }
 
         total_duration_ms = round((monotonic() - started_at) * 1000, 2)
@@ -112,6 +122,7 @@ class AnalyticsService:
                     "period": period,
                     "total_duration_ms": total_duration_ms,
                     "section_timings_ms": section_timings_ms,
+                    "section_errors": section_errors,
                 },
             )
 

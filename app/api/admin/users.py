@@ -150,6 +150,7 @@ def _serialize_user(user: User, role_name: Optional[str] = None) -> dict:
     }
 
 
+@router.get("", include_in_schema=False)
 @router.get("/")
 def list_users(
     skip: int = 0,
