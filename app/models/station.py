@@ -36,7 +36,7 @@ class Station(SQLModel, table=True):
     # Ownership
     owner_id: Optional[int] = Field(default=None, foreign_key="users.id") # Dealer/Owner
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id") # Assuming vendor is in finance or core? I'll check.
-    dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id")
+    dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id", index=True)
     
     # Hardware Specs
     station_type: str = Field(default="automated") # automated, manual, hybrid

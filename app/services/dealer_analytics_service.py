@@ -269,46 +269,65 @@ class DealerAnalyticsService:
             select(Station).where(Station.dealer_id == dealer_id)
         ).all()
 
+        if not stations:
+            return []
+
         now = datetime.now(UTC)
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        station_ids = [s.id for s in stations]
+
+        # Batch: swaps per station this month
+        swap_counts = db.exec(
+            select(SwapSession.station_id, func.count(SwapSession.id))
+            .where(
+                SwapSession.station_id.in_(station_ids),
+                SwapSession.status == "completed",
+                SwapSession.created_at >= month_start,
+            )
+            .group_by(SwapSession.station_id)
+        ).all()
+        swap_map = {row[0]: row[1] for row in swap_counts}
+
+        # Batch: revenue per station this month
+        revenue_rows = db.exec(
+            select(SwapSession.station_id, func.coalesce(func.sum(SwapSession.swap_amount), 0.0))
+            .where(
+                SwapSession.station_id.in_(station_ids),
+                SwapSession.status == "completed",
+                SwapSession.created_at >= month_start,
+            )
+            .group_by(SwapSession.station_id)
+        ).all()
+        revenue_map = {row[0]: row[1] for row in revenue_rows}
+
+        # Batch: occupied slots per station
+        occupied_rows = db.exec(
+            select(StationSlot.station_id, func.count(StationSlot.id))
+            .where(
+                StationSlot.station_id.in_(station_ids),
+                StationSlot.battery_id.isnot(None),
+            )
+            .group_by(StationSlot.station_id)
+        ).all()
+        occupied_map = {row[0]: row[1] for row in occupied_rows}
+
+        # Batch: avg battery health per station
+        from app.models.battery import Battery
+        health_rows = db.exec(
+            select(StationSlot.station_id, func.coalesce(func.avg(Battery.health_percentage), 0.0))
+            .join(Battery, StationSlot.battery_id == Battery.id)
+            .where(StationSlot.station_id.in_(station_ids))
+            .group_by(StationSlot.station_id)
+        ).all()
+        health_map = {row[0]: row[1] for row in health_rows}
+
         metrics = []
-
         for s in stations:
-            swaps = db.exec(
-                select(func.count(SwapSession.id)).where(
-                    SwapSession.station_id == s.id,
-                    SwapSession.status == "completed",
-                    SwapSession.created_at >= month_start,
-                )
-            ).one() or 0
-
-            revenue = db.exec(
-                select(func.coalesce(func.sum(SwapSession.swap_amount), 0.0)).where(
-                    SwapSession.station_id == s.id,
-                    SwapSession.status == "completed",
-                    SwapSession.created_at >= month_start,
-                )
-            ).one() or 0.0
-
-            # Utilization: slots with batteries / total slots
-            occupied = db.exec(
-                select(func.count(StationSlot.id)).where(
-                    StationSlot.station_id == s.id,
-                    StationSlot.battery_id.isnot(None),
-                )
-            ).one() or 0
-
+            swaps = swap_map.get(s.id, 0)
+            revenue = revenue_map.get(s.id, 0.0)
+            occupied = occupied_map.get(s.id, 0)
             utilization = (occupied / s.total_slots * 100) if s.total_slots > 0 else 0.0
-
-            # Battery Health Score (average health of batteries present)
-            from app.models.battery import Battery
-            avg_health = db.exec(
-                select(func.coalesce(func.avg(Battery.health_percentage), 0.0)).join(
-                    StationSlot, StationSlot.battery_id == Battery.id
-                ).where(
-                    StationSlot.station_id == s.id
-                )
-            ).one() or 0.0
+            avg_health = health_map.get(s.id, 0.0)
 
             metrics.append({
                 "station_id": s.id,

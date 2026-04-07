@@ -530,10 +530,16 @@ def get_dealer_transactions(
         .limit(100)
     ).all()
 
+    # Batch-load users + stations (eliminates 2 N+1 queries per rental)
+    user_ids = list({r.user_id for r in rentals if r.user_id})
+    stn_ids = list({r.start_station_id for r in rentals if r.start_station_id})
+    users_map = {u.id: u for u in db.exec(select(User).where(User.id.in_(user_ids))).all()} if user_ids else {}
+    stations_map = {s.id: s for s in db.exec(select(Station).where(Station.id.in_(stn_ids))).all()} if stn_ids else {}
+
     data = []
     for r in rentals:
-        customer = db.get(User, r.user_id)
-        station = db.get(Station, r.start_station_id) if r.start_station_id else None
+        customer = users_map.get(r.user_id)
+        station = stations_map.get(r.start_station_id)
         data.append({
             "id": r.id,
             "transaction_type": "Rental",

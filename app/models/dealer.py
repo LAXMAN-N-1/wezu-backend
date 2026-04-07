@@ -14,7 +14,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 class DealerProfile(SQLModel, table=True):
     __tablename__ = "dealer_profiles"
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="users.id", unique=True)
+    user_id: int = Field(foreign_key="users.id", unique=True, index=True)
     
     business_name: str
     gst_number: Optional[str] = None
@@ -65,7 +65,7 @@ class DealerProfile(SQLModel, table=True):
 class DealerDocument(SQLModel, table=True):
     __tablename__ = "dealer_documents"
     id: Optional[int] = Field(default=None, primary_key=True)
-    dealer_id: int = Field(foreign_key="dealer_profiles.id")
+    dealer_id: int = Field(foreign_key="dealer_profiles.id", index=True)
     document_type: str = Field(index=True) # gst, pan, registration, cancelled_cheque
     category: Optional[str] = Field(default="verification") # verification, business, operational
     
@@ -82,7 +82,7 @@ class DealerDocument(SQLModel, table=True):
 class DealerApplication(SQLModel, table=True):
     __tablename__ = "dealer_applications"
     id: Optional[int] = Field(default=None, primary_key=True)
-    dealer_id: int = Field(foreign_key="dealer_profiles.id", unique=True)
+    dealer_id: int = Field(foreign_key="dealer_profiles.id", unique=True, index=True)
     
     # Stages: SUBMITTED, AUTOMATED_CHECKS_PASSED, KYC_SUBMITTED, MANUAL_REVIEW_PASSED, 
     # FIELD_VISIT_SCHEDULED, FIELD_VISIT_COMPLETED, REJECTED, APPROVED, TRAINING_COMPLETED, ACTIVE

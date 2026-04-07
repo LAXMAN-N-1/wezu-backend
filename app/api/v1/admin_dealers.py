@@ -127,9 +127,13 @@ def list_dealers(
     total = db.exec(count_query).one()
     dealers = db.exec(query.offset(skip).limit(limit).order_by(DealerProfile.created_at.desc())).all()
 
+    # Batch-load users for this page (eliminates N+1 db.get per dealer)
+    user_ids = list({dp.user_id for dp in dealers if dp.user_id})
+    users_map = {u.id: u for u in db.exec(select(User).where(User.id.in_(user_ids))).all()} if user_ids else {}
+
     results = []
     for dp in dealers:
-        user = db.get(User, dp.user_id)
+        user = users_map.get(dp.user_id)
         results.append(_dealer_to_dict(dp, user))
 
     return {"dealers": results, "total_count": total}

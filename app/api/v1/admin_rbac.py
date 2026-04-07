@@ -426,18 +426,24 @@ def get_user_roles(
     # We can fetch UserRoles and then join or just iterate since likely small number
     user_roles = db.exec(select(UserRole).where(UserRole.user_id == user_id)).all()
     
+    # Batch-load roles + admin users (eliminates 2 N+1 per user-role)
+    role_ids = list({ur.role_id for ur in user_roles if ur.role_id})
+    admin_ids = list({ur.assigned_by for ur in user_roles if ur.assigned_by})
+    roles_map = {r.id: r for r in db.exec(select(Role).where(Role.id.in_(role_ids))).all()} if role_ids else {}
+    admins_map = {a.id: a for a in db.exec(select(AdminUser).where(AdminUser.id.in_(admin_ids))).all()} if admin_ids else {}
+
     results = []
     now = datetime.now(UTC)
     
     for ur in user_roles:
-        role = db.get(Role, ur.role_id)
+        role = roles_map.get(ur.role_id)
         if not role:
             # Should not happen with FK constraint but safe check
             continue
             
         assigned_by_name = None
         if ur.assigned_by:
-            admin = db.get(AdminUser, ur.assigned_by)
+            admin = admins_map.get(ur.assigned_by)
             if admin:
                 assigned_by_name = admin.full_name or admin.email
         
@@ -941,9 +947,11 @@ def remove_role_from_user(
     
     # Reload user.roles
     user_roles = db.exec(select(UserRole).where(UserRole.user_id == user_id)).all()
-    # Need to fetch Role objects
+    # Batch-load Role objects (eliminates N+1 per role)
+    ur_role_ids = list({ur.role_id for ur in user_roles})
+    ur_roles_map = {r.id: r for r in db.exec(select(Role).where(Role.id.in_(ur_role_ids))).all()} if ur_role_ids else {}
     for ur in user_roles:
-        r = db.get(Role, ur.role_id)
+        r = ur_roles_map.get(ur.role_id)
         if r and r.is_active:
             if not first_role_name:
                 first_role_name = r.name

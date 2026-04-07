@@ -111,16 +111,16 @@ async def get_role_distribution(
     # 2. Get all roles
     roles = db.exec(select(Role)).all()
     
-    # 3. Users per role
+    # 3. Users per role — single GROUP BY query (eliminates N+1 COUNT per role)
+    count_rows = db.exec(
+        select(UserRole.role_id, func.count(UserRole.user_id.distinct()))
+        .group_by(UserRole.role_id)
+    ).all()
+    role_counts = {row[0]: row[1] for row in count_rows}
+
     users_per_role = []
-    role_counts = {}
-    
     for role in roles:
-        count = db.exec(
-            select(func.count(UserRole.user_id.distinct()))
-            .where(UserRole.role_id == role.id)
-        ).one()
-        role_counts[role.id] = count
+        count = role_counts.get(role.id, 0)
         users_per_role.append({
             "role": role,
             "count": count
@@ -154,7 +154,7 @@ async def get_role_distribution(
     # For growth, we'll estimate based on user_role created_at if available
     # Otherwise, we'll show current counts with 0 growth
     for role in roles:
-        current_count = role_counts[role.id]
+        current_count = role_counts.get(role.id, 0)
         
         # Try to get historical count from audit or estimate
         # For now, using a simple heuristic

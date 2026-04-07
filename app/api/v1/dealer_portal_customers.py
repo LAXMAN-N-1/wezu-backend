@@ -53,11 +53,20 @@ def get_active_rentals(
             .order_by(Rental.created_at.desc())
         ).all()
 
+        # Batch-load related entities (eliminates 3 N+1 queries per rental)
+        user_ids = list({r.user_id for r in rentals if r.user_id})
+        battery_ids = list({r.battery_id for r in rentals if r.battery_id})
+        stn_ids = list({r.start_station_id for r in rentals if r.start_station_id})
+
+        users_map = {u.id: u for u in db.exec(select(User).where(User.id.in_(user_ids))).all()} if user_ids else {}
+        batteries_map = {b.id: b for b in db.exec(select(Battery).where(Battery.id.in_(battery_ids))).all()} if battery_ids else {}
+        stations_map = {s.id: s for s in db.exec(select(Station).where(Station.id.in_(stn_ids))).all()} if stn_ids else {}
+
         result = []
         for r in rentals:
-            customer = db.get(User, r.user_id)
-            battery = db.get(Battery, r.battery_id) if r.battery_id else None
-            station = db.get(Station, r.start_station_id) if r.start_station_id else None
+            customer = users_map.get(r.user_id)
+            battery = batteries_map.get(r.battery_id)
+            station = stations_map.get(r.start_station_id)
 
             result.append({
                 "rental_id": r.id,
@@ -115,21 +124,26 @@ def list_customers(
         total = len(customer_ids)
         users = db.exec(query.offset((page - 1) * limit).limit(limit)).all()
 
+        # Batch rental-count for this page of users (eliminates N+1 COUNT per user)
+        page_user_ids = [u.id for u in users]
+        rental_counts_rows = db.exec(
+            select(Rental.user_id, func.count(Rental.id))
+            .where(
+                Rental.user_id.in_(page_user_ids),
+                Rental.start_station_id.in_(station_ids),
+            )
+            .group_by(Rental.user_id)
+        ).all() if page_user_ids else []
+        rental_count_map = {row[0]: row[1] for row in rental_counts_rows}
+
         customers = []
         for u in users:
-            rental_count = db.exec(
-                select(func.count(Rental.id)).where(
-                    Rental.user_id == u.id,
-                    Rental.start_station_id.in_(station_ids),
-                )
-            ).one() or 0
-
             customers.append({
                 "id": u.id,
                 "full_name": u.full_name or "Unknown",
                 "email": u.email,
                 "phone_number": u.phone_number,
-                "total_rentals": rental_count,
+                "total_rentals": rental_count_map.get(u.id, 0),
                 "last_login": str(u.last_login) if u.last_login else None,
                 "created_at": str(u.created_at),
             })
@@ -162,9 +176,13 @@ def get_customer_detail(
             ).order_by(Rental.created_at.desc())
         ).all()
 
+        # Batch-load stations (eliminates N+1 per rental)
+        rental_stn_ids = list({r.start_station_id for r in rentals if r.start_station_id})
+        stations_map = {s.id: s for s in db.exec(select(Station).where(Station.id.in_(rental_stn_ids))).all()} if rental_stn_ids else {}
+
         rental_list = []
         for r in rentals:
-            station = db.get(Station, r.start_station_id) if r.start_station_id else None
+            station = stations_map.get(r.start_station_id)
             rental_list.append({
                 "rental_id": r.id,
                 "station_name": station.name if station else "N/A",

@@ -134,12 +134,12 @@ async def export_analytics_data(
     from sqlmodel import select
     import datetime
     
-    # Get rentals
-    rentals_stmt = select(Rental).where(Rental.user_id == current_user.id)
+    # Get rentals (capped at 5000 to prevent unbounded export)
+    rentals_stmt = select(Rental).where(Rental.user_id == current_user.id).limit(5000)
     rentals = session.exec(rentals_stmt).all()
     
-    # Get transactions
-    txn_stmt = select(Transaction).where(Transaction.user_id == current_user.id)
+    # Get transactions (capped at 5000 to prevent unbounded export)
+    txn_stmt = select(Transaction).where(Transaction.user_id == current_user.id).limit(5000)
     transactions = session.exec(txn_stmt).all()
     
     data = {

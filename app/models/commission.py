@@ -52,12 +52,12 @@ class CommissionLog(SQLModel, table=True):
     transaction_id: int = Field(foreign_key="transactions.id")
 
     # Beneficiary
-    dealer_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    dealer_id: Optional[int] = Field(default=None, foreign_key="users.id", index=True)
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id")
 
     # Earnings
     amount: float
-    status: str = Field(default="pending")  # pending, paid, reversed
+    status: str = Field(default="pending", index=True)  # pending, paid, reversed
 
     # Settlement linkage
     settlement_id: Optional[int] = Field(default=None, foreign_key="settlements.id")

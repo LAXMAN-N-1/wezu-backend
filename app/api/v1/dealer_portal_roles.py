@@ -375,9 +375,13 @@ def get_role_audit_log(
         ).order_by(AuditLog.timestamp.desc())
     ).all()
     
+    # Batch-load users (eliminates N+1 per log entry)
+    log_user_ids = list({log.user_id for log in logs if log.user_id})
+    users_map = {u.id: u for u in db.exec(select(User).where(User.id.in_(log_user_ids))).all()} if log_user_ids else {}
+
     results = []
     for log in logs:
-        user = db.get(User, log.user_id) if log.user_id else None
+        user = users_map.get(log.user_id) if log.user_id else None
         results.append(RoleAuditLog(
             action=log.action,
             user_name=user.full_name if user else "System",
