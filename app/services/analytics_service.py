@@ -53,13 +53,28 @@ class AnalyticsService:
         period: str = "30d",
         activity_type: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """First-render admin dashboard payload with section-level timing."""
+        """First-render admin dashboard payload with section-level timing.
+
+        Each section is individually wrapped so a single failure (e.g. a
+        missing table on a fresh production DB) does not crash the entire
+        dashboard.  Failed sections return an empty dict and the error is
+        logged for triage.
+        """
         section_timings_ms: Dict[str, float] = {}
+        section_errors: Dict[str, str] = {}
         started_at = monotonic()
 
         def build_section(name: str, loader):
             section_started = monotonic()
-            result = loader()
+            try:
+                result = loader()
+            except Exception:
+                logger.exception(
+                    "admin.analytics.dashboard.section_failed",
+                    extra={"section": name, "period": period},
+                )
+                section_errors[name] = "unavailable"
+                result = {}
             section_timings_ms[name] = round((monotonic() - section_started) * 1000, 2)
             return result
 
@@ -103,6 +118,9 @@ class AnalyticsService:
                 lambda: AnalyticsService.get_top_stations(db),
             ),
         }
+
+        if section_errors:
+            payload["_errors"] = section_errors
 
         total_duration_ms = round((monotonic() - started_at) * 1000, 2)
         if total_duration_ms >= settings.LOG_SLOW_REQUEST_THRESHOLD_MS:

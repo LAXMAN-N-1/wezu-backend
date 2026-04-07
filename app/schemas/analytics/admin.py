@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -18,6 +18,8 @@ class AdminOverviewResponse(BaseModel):
 
 
 class AdminDashboardBootstrapResponse(BaseModel):
+    model_config = {"populate_by_name": True}
+
     period: str
     generated_at: datetime
     overview: Dict[str, Any] = Field(default_factory=dict)
@@ -29,3 +31,4 @@ class AdminDashboardBootstrapResponse(BaseModel):
     revenue_by_station: Dict[str, Any] = Field(default_factory=dict)
     recent_activity: Dict[str, Any] = Field(default_factory=dict)
     top_stations: Dict[str, Any] = Field(default_factory=dict)
+    errors: Optional[Dict[str, str]] = Field(default=None, alias="_errors")
