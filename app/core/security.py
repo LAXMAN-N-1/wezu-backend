@@ -5,10 +5,14 @@ from jose import jwt
 from passlib.context import CryptContext
 from app.core.config import settings
 
-# bcrypt is ~250ms vs pbkdf2_sha256 ~3s on 0.75-CPU VPS.
-# Both schemes must be listed; marking pbkdf2 as deprecated means
-# existing hashes still verify but get re-hashed to bcrypt on next login.
-pwd_context = CryptContext(schemes=["bcrypt", "pbkdf2_sha256"], deprecated=["pbkdf2_sha256"])
+# bcrypt rounds=10 is OWASP minimum and ~300ms on 0.75-CPU VPS.
+# Default rounds=12 was taking ~2.5s on this hardware.
+# Both schemes listed; pbkdf2 deprecated = auto-rehash on next login.
+pwd_context = CryptContext(
+    schemes=["bcrypt", "pbkdf2_sha256"],
+    deprecated=["pbkdf2_sha256"],
+    bcrypt__rounds=10,
+)
 
 def create_access_token(subject: Union[str, Any], expires_delta: timedelta = None, extra_claims: dict = None) -> str:
     if expires_delta:
