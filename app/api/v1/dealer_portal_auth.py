@@ -144,7 +144,7 @@ def _build_dealer_auth_user(user: User, db: Session) -> DealerAuthUser:
 # ── Endpoints ────────────────────────────────────────────
 
 @router.post("/login")
-async def dealer_login(
+def dealer_login(
     login_data: DealerLoginRequest,
     request: Request,
     db: Session = Depends(deps.get_db),
@@ -239,7 +239,7 @@ async def dealer_login(
 
 
 @router.post("/register", response_model=DealerAuthResponse)
-async def dealer_register(
+def dealer_register(
     data: DealerRegisterRequest,
     request: Request,
     db: Session = Depends(deps.get_db),

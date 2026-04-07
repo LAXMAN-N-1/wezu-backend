@@ -71,7 +71,7 @@ class CustomerAuthResponse(BaseModel):
 # ── Endpoints ──────────────────────────────────────────────────────
 
 @router.post("/login", response_model=CustomerAuthResponse)
-async def customer_login(
+def customer_login(
     login_data: CustomerLoginRequest,
     request: Request,
     db: Session = Depends(deps.get_db),
@@ -128,7 +128,7 @@ async def customer_login(
 
 
 @router.post("/register", response_model=CustomerAuthResponse)
-async def customer_register(
+def customer_register(
     register_data: CustomerRegisterRequest,
     request: Request,
     db: Session = Depends(deps.get_db),

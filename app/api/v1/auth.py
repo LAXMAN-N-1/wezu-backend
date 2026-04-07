@@ -61,7 +61,7 @@ class UserCreate(BaseModel):
 from app.schemas.user import UserResponse
 
 @router.post("/register", response_model=UserResponse)
-async def register(
+def register(
     user_in: UserCreate,
     db: Session = Depends(deps.get_db)
 ):
@@ -149,7 +149,7 @@ class EmailPasswordRequestForm:
 
 @router.post("/token", response_model=Token, tags=["authentication"])
 @limiter.limit("5/minute")
-async def login_access_token(
+def login_access_token(
     request: Request,
     db: Session = Depends(deps.get_db),
     form_data: EmailPasswordRequestForm = Depends()
@@ -157,14 +157,14 @@ async def login_access_token(
     """
     OAuth2 compatible token login, get an access token for future requests (uses 'email' as username)
     """
-    return await _process_login(
+    return _process_login(
         username=form_data.username,
         password=form_data.password,
         db=db,
         request=request
     )
 
-async def _process_login(username: str, password: str, db: Session, request: Request) -> Any:
+def _process_login(username: str, password: str, db: Session, request: Request) -> Any:
     logger.info(f"Authenticating: {username}")
     
     user = user_repository.get_by_email(db, username)
@@ -401,7 +401,7 @@ async def verify_otp_alias(
 from app.schemas.auth import SocialLoginRequest, LoginResponse, MenuConfig, ForgotPasswordRequest
 
 @router.post("/social-login", response_model=LoginResponse)
-async def social_login(
+def social_login(
     auth_data: SocialLoginRequest,
     request: Request,
     db: Session = Depends(get_session)
@@ -558,7 +558,7 @@ async def social_login(
     )
 
 @router.post("/register/password", response_model=Token)
-async def register_with_password(
+def register_with_password(
     register_data: PasswordRegisterRequest,
     db: Session = Depends(deps.get_db)
 ):
@@ -620,7 +620,7 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 @router.post("/refresh", response_model=Token)
-async def refresh_token(
+def refresh_token(
     refresh_data: RefreshRequest,
     request: Request,
     db: Session = Depends(get_session)
@@ -688,7 +688,7 @@ async def refresh_token(
         )
 
 @router.post("/logout")
-async def logout(
+def logout(
     current_user: User = Depends(deps.get_current_user),
     token: str = Depends(deps.oauth2_scheme),
     db: Session = Depends(deps.get_db)
@@ -707,7 +707,7 @@ async def logout(
 from app.schemas.auth import LoginRequest, LoginResponse, MenuConfig, RoleSelectRequest
 
 @router.post("/login", response_model=LoginResponse)
-async def login(
+def login(
     login_data: LoginRequest,
     request: Request,
     db: Session = Depends(get_session)
@@ -791,7 +791,7 @@ async def login(
     )
 
 @router.post("/select-role", response_model=LoginResponse)
-async def select_role(
+def select_role(
     role_data: RoleSelectRequest,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
@@ -838,7 +838,7 @@ async def select_role(
         menu=menu_data
     )
 @router.post("/logout-all")
-async def logout_all(
+def logout_all(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
 ):
@@ -940,7 +940,7 @@ class VerifyEmailRequest(BaseModel):
 
 @router.post("/email/send-verification")
 @router.post("/resend-verification")
-async def send_email_verification(
+def send_email_verification(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
 ):
@@ -986,7 +986,7 @@ async def send_email_verification(
 # --- NEW AUTH GAPS ENDPOINTS ---
 
 @router.post("/verify-email")
-async def verify_email(
+def verify_email(
     data: VerifyEmailRequest,
     db: Session = Depends(deps.get_db)
 ):
@@ -1009,7 +1009,7 @@ async def verify_email(
     return {"message": "Email verified successfully", "email": user.email}
 
 @router.post("/change-password")
-async def change_password(
+def change_password(
     data: ChangePasswordRequest,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
@@ -1043,7 +1043,7 @@ class Verify2FARequest(BaseModel):
     code: str
 
 @router.post("/enable-2fa", response_model=TwoFASetupResponse)
-async def enable_2fa_request(
+def enable_2fa_request(
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
 ):
@@ -1055,7 +1055,7 @@ async def enable_2fa_request(
     return setup_data
 
 @router.post("/verify-2fa")
-async def verify_2fa_and_enable(
+def verify_2fa_and_enable(
     data: TwoFAVerifyRequest,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
@@ -1070,7 +1070,7 @@ async def verify_2fa_and_enable(
     raise HTTPException(status_code=400, detail="Invalid TOTP code")
 
 @router.post("/2fa/disable")
-async def disable_2fa(
+def disable_2fa(
     data: TwoFADisableRequest,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
@@ -1087,7 +1087,7 @@ async def disable_2fa(
     return {"message": "2FA disabled successfully"}
 
 @router.post("/biometric/register")
-async def biometric_register(
+def biometric_register(
     data: BiometricRegisterRequest,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
@@ -1099,7 +1099,7 @@ async def biometric_register(
     return {"message": "Biometric credential registered successfully"}
 
 @router.post("/biometric-login", response_model=Token)
-async def biometric_login(
+def biometric_login(
     data: BiometricLoginRequest,
     request: Request,
     db: Session = Depends(deps.get_db)
@@ -1129,14 +1129,14 @@ async def biometric_login(
     raise HTTPException(status_code=401, detail="Biometric verification failed")
 
 @router.get("/security-questions", response_model=List[SecurityQuestionResponse])
-async def list_security_questions(
+def list_security_questions(
     db: Session = Depends(deps.get_db)
 ):
     """Fetch list of available security questions"""
     return SecurityService.get_available_questions(db)
 
 @router.post("/security-questions/set")
-async def set_security_question(
+def set_security_question(
     data: SetSecurityQuestionRequest,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
@@ -1146,7 +1146,7 @@ async def set_security_question(
     return {"message": "Security question set successfully"}
 
 @router.post("/security-questions/verify")
-async def verify_security_question_route(
+def verify_security_question_route(
     data: VerifySecurityQuestionRequest,
     user_id: int, # Sent in body or query during recovery flow
     db: Session = Depends(deps.get_db)
@@ -1184,7 +1184,7 @@ class AdminLoginRequest(BaseModel):
         return username
 
 @router.post("/admin/login")
-async def admin_login(
+def admin_login(
     request: Request,
     login_data: AdminLoginRequest,
     db: Session = Depends(get_session)
