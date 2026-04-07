@@ -44,7 +44,7 @@ class AuditLog(SQLModel, table=True):
 
     ip_address: Optional[str] = None
     user_agent: Optional[str] = None
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), index=True)
 
 
 class SecurityEvent(SQLModel, table=True):
@@ -55,5 +55,5 @@ class SecurityEvent(SQLModel, table=True):
     details: Optional[str] = None
     source_ip: Optional[str] = None
     user_id: Optional[int] = None
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), index=True)
     is_resolved: bool = Field(default=False)

@@ -9,6 +9,8 @@ Covers the most queried foreign-key columns that lack indexes:
 - batteries.location_id  (station health, inventory)
 - kyc_documents.user_id  (KYC queue)
 - audit_logs.user_id     (admin audit logs)
+- audit_logs.timestamp   (time-range filtering on security dashboard/audit)
+- security_events.timestamp (security dashboard, fraud alerts)
 - user_roles.user_id     (RBAC bulk ops, role distribution)
 - user_roles.role_id     (role distribution GROUP BY)
 
@@ -49,6 +51,8 @@ def upgrade() -> None:
     _safe_create_index("ix_batteries_location_id_type", "batteries", ["location_id", "location_type"])
     _safe_create_index("ix_kyc_documents_user_id", "kyc_documents", ["user_id"])
     _safe_create_index("ix_audit_logs_user_id", "audit_logs", ["user_id"])
+    _safe_create_index("ix_audit_logs_timestamp", "audit_logs", ["timestamp"])
+    _safe_create_index("ix_security_events_timestamp", "security_events", ["timestamp"])
     _safe_create_index("ix_user_roles_user_id", "user_roles", ["user_id"])
     _safe_create_index("ix_user_roles_role_id", "user_roles", ["role_id"])
     _safe_create_index("ix_dealer_profiles_user_id", "dealer_profiles", ["user_id"])
@@ -62,6 +66,8 @@ def downgrade() -> None:
         "ix_dealer_profiles_user_id",
         "ix_user_roles_role_id",
         "ix_user_roles_user_id",
+        "ix_security_events_timestamp",
+        "ix_audit_logs_timestamp",
         "ix_audit_logs_user_id",
         "ix_kyc_documents_user_id",
         "ix_batteries_location_id_type",

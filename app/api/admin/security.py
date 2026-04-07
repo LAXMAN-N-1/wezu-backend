@@ -26,28 +26,25 @@ def security_dashboard(
     now = datetime.now(UTC)
     today = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_ago = today - timedelta(days=7)
-    month_ago = today - timedelta(days=30)
 
-    # Audit log stats
-    audit_total = session.exec(select(func.count(AuditLog.id))).one() or 0
+    # ── Audit log stats (single query) ──
     audit_today = session.exec(
         select(func.count(AuditLog.id)).where(AuditLog.timestamp >= today)
     ).one() or 0
 
-    # Security events breakdown
-    total_events = session.exec(select(func.count(SecurityEvent.id))).one() or 0
-    unresolved_events = session.exec(
-        select(func.count(SecurityEvent.id)).where(SecurityEvent.is_resolved == False)
-    ).one() or 0
-    critical_events = session.exec(
-        select(func.count(SecurityEvent.id)).where(
-            SecurityEvent.severity == "critical",
-            SecurityEvent.is_resolved == False,
+    # ── Security events breakdown (single aggregation query) ──
+    se_rows = session.exec(
+        select(
+            func.count(SecurityEvent.id).label("total"),
+            func.count(SecurityEvent.id).filter(SecurityEvent.is_resolved == False).label("unresolved"),
+            func.count(SecurityEvent.id).filter(
+                SecurityEvent.severity == "critical",
+                SecurityEvent.is_resolved == False,
+            ).label("critical"),
+            func.count(SecurityEvent.id).filter(SecurityEvent.timestamp >= week_ago).label("this_week"),
         )
-    ).one() or 0
-    events_this_week = session.exec(
-        select(func.count(SecurityEvent.id)).where(SecurityEvent.timestamp >= week_ago)
-    ).one() or 0
+    ).one()
+    total_events, unresolved_events, critical_events, events_this_week = se_rows
 
     # Recent events
     recent = session.exec(
@@ -58,16 +55,15 @@ def security_dashboard(
 
     return {
         "audit_logs": {
-            "total": audit_total,
             "today": audit_today,
         },
         "security_events": {
-            "total": total_events,
-            "unresolved": unresolved_events,
-            "critical_unresolved": critical_events,
-            "this_week": events_this_week,
+            "total": total_events or 0,
+            "unresolved": unresolved_events or 0,
+            "critical_unresolved": critical_events or 0,
+            "this_week": events_this_week or 0,
         },
-        "threat_level": "critical" if critical_events > 0 else "normal",
+        "threat_level": "critical" if (critical_events or 0) > 0 else "normal",
         "recent_events": [
             {
                 "id": e.id,
@@ -100,15 +96,16 @@ def list_fraud_alerts(
         "unusual_transaction", "velocity_check_failed", "ip_anomaly",
         "device_fingerprint_mismatch", "fraud",
     ]
-    query = select(SecurityEvent).where(SecurityEvent.event_type.in_(fraud_types))
+    filters = [SecurityEvent.event_type.in_(fraud_types)]
     if severity:
-        query = query.where(SecurityEvent.severity == severity)
+        filters.append(SecurityEvent.severity == severity)
 
     total = session.exec(
-        select(func.count(SecurityEvent.id)).where(SecurityEvent.event_type.in_(fraud_types))
+        select(func.count(SecurityEvent.id)).where(*filters)
     ).one() or 0
     alerts = session.exec(
-        query.order_by(SecurityEvent.timestamp.desc()).offset(skip).limit(limit)
+        select(SecurityEvent).where(*filters)
+        .order_by(SecurityEvent.timestamp.desc()).offset(skip).limit(limit)
     ).all()
 
     return {
@@ -144,16 +141,22 @@ def list_audit_logs(
     current_user: User = Depends(get_current_active_admin),
 ):
     since = datetime.now(UTC) - timedelta(days=days)
-    query = select(AuditLog).where(AuditLog.timestamp >= since)
-    if action:
-        query = query.where(AuditLog.action == action)
-    if resource_type:
-        query = query.where(AuditLog.resource_type == resource_type)
-    if user_id:
-        query = query.where(AuditLog.user_id == user_id)
 
-    total = session.exec(select(func.count(AuditLog.id)).where(AuditLog.timestamp >= since)).one()
-    logs = session.exec(query.order_by(AuditLog.timestamp.desc()).offset(skip).limit(limit)).all()
+    # Build a shared WHERE clause so count and data queries match
+    filters = [AuditLog.timestamp >= since]
+    if action:
+        filters.append(AuditLog.action == action)
+    if resource_type:
+        filters.append(AuditLog.resource_type == resource_type)
+    if user_id:
+        filters.append(AuditLog.user_id == user_id)
+
+    total = session.exec(select(func.count(AuditLog.id)).where(*filters)).one()
+    logs = session.exec(
+        select(AuditLog).where(*filters)
+        .order_by(AuditLog.timestamp.desc())
+        .offset(skip).limit(limit)
+    ).all()
 
     return {
         "items": [
@@ -178,7 +181,6 @@ def audit_stats(
     today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     week_ago = today - timedelta(days=7)
 
-    total = session.exec(select(func.count(AuditLog.id))).one()
     today_count = session.exec(
         select(func.count(AuditLog.id)).where(AuditLog.timestamp >= today)
     ).one()
@@ -186,14 +188,18 @@ def audit_stats(
         select(func.count(AuditLog.id)).where(AuditLog.timestamp >= week_ago)
     ).one()
 
-    # Action breakdown
+    # Action breakdown (last 30 days only to avoid full table scan)
+    month_ago = today - timedelta(days=30)
     actions = {}
-    logs = session.exec(select(AuditLog.action, func.count(AuditLog.id)).group_by(AuditLog.action)).all()
-    for action, count in logs:
+    rows = session.exec(
+        select(AuditLog.action, func.count(AuditLog.id))
+        .where(AuditLog.timestamp >= month_ago)
+        .group_by(AuditLog.action)
+    ).all()
+    for action, count in rows:
         actions[action] = count
 
     return {
-        "total": total,
         "today": today_count,
         "this_week": week_count,
         "by_action": actions,
@@ -215,15 +221,21 @@ def list_security_events(
     current_user: User = Depends(get_current_active_admin),
 ):
     query = select(SecurityEvent)
+    filters = []
     if severity:
-        query = query.where(SecurityEvent.severity == severity)
+        filters.append(SecurityEvent.severity == severity)
     if event_type:
-        query = query.where(SecurityEvent.event_type == event_type)
+        filters.append(SecurityEvent.event_type == event_type)
     if is_resolved is not None:
-        query = query.where(SecurityEvent.is_resolved == is_resolved)
+        filters.append(SecurityEvent.is_resolved == is_resolved)
+    if filters:
+        query = query.where(*filters)
 
+    total = session.exec(
+        select(func.count(SecurityEvent.id)).where(*filters) if filters
+        else select(func.count(SecurityEvent.id))
+    ).one()
     events = session.exec(query.order_by(SecurityEvent.timestamp.desc()).offset(skip).limit(limit)).all()
-    total = session.exec(select(func.count(SecurityEvent.id))).one()
 
     return {
         "items": [
