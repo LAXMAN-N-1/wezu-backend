@@ -241,18 +241,34 @@ def update_dealer(
 @router.get("/applications")
 def list_applications(
     stage: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(deps.get_db),
 ):
     """List all dealer applications, optionally filtered by stage."""
     query = select(DealerApplication)
     if stage:
         query = query.where(DealerApplication.current_stage == stage)
-    apps = db.exec(query.order_by(DealerApplication.updated_at.desc())).all()
+    apps = db.exec(
+        query.order_by(DealerApplication.updated_at.desc()).offset(skip).limit(limit)
+    ).all()
+
+    if not apps:
+        return {"applications": [], "count": 0}
+
+    # Batch-load DealerProfiles and Users to avoid N+1
+    dealer_ids = list({a.dealer_id for a in apps if a.dealer_id})
+    profiles = db.exec(select(DealerProfile).where(DealerProfile.id.in_(dealer_ids))).all() if dealer_ids else []
+    profile_map = {dp.id: dp for dp in profiles}
+
+    user_ids = list({dp.user_id for dp in profiles if dp.user_id})
+    users = db.exec(select(User).where(User.id.in_(user_ids))).all() if user_ids else []
+    user_map = {u.id: u for u in users}
 
     results = []
     for a in apps:
-        dp = db.get(DealerProfile, a.dealer_id)
-        user = db.get(User, dp.user_id) if dp else None
+        dp = profile_map.get(a.dealer_id)
+        user = user_map.get(dp.user_id) if dp else None
         results.append({
             "id": a.id,
             "dealer_id": a.dealer_id,
@@ -265,7 +281,7 @@ def list_applications(
             "updated_at": a.updated_at.isoformat() if a.updated_at else None,
             "user_name": user.full_name if user else "",
         })
-    return results
+    return {"applications": results, "count": len(results)}
 
 
 @router.put("/applications/{app_id}/stage")
@@ -317,17 +333,38 @@ def update_application_stage(
 def list_kyc_documents(
     search: Optional[str] = None,
     doc_type: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(deps.get_db),
 ):
     """List all KYC documents across dealers."""
     query = select(DealerDocument)
     if doc_type:
         query = query.where(DealerDocument.document_type == doc_type)
-    docs = db.exec(query.order_by(DealerDocument.uploaded_at.desc())).all()
+    if search:
+        # Push search into SQL instead of post-filter
+        pattern = f"%{search}%"
+        dealer_ids_q = select(DealerProfile.id).where(
+            DealerProfile.business_name.ilike(pattern)
+        )
+        query = query.where(
+            or_(
+                DealerDocument.document_type.ilike(pattern),
+                DealerDocument.dealer_id.in_(dealer_ids_q),
+            )
+        )
+    docs = db.exec(
+        query.order_by(DealerDocument.uploaded_at.desc()).offset(skip).limit(limit)
+    ).all()
+
+    # Batch-load dealer profiles to avoid N+1
+    dealer_ids = list({d.dealer_id for d in docs if d.dealer_id})
+    profiles = db.exec(select(DealerProfile).where(DealerProfile.id.in_(dealer_ids))).all() if dealer_ids else []
+    profile_map = {dp.id: dp for dp in profiles}
 
     results = []
     for d in docs:
-        dp = db.get(DealerProfile, d.dealer_id)
+        dp = profile_map.get(d.dealer_id)
         results.append({
             "id": d.id,
             "dealer_id": d.dealer_id,
@@ -339,10 +376,6 @@ def list_kyc_documents(
             "is_verified": d.is_verified,
             "uploaded_at": d.uploaded_at.isoformat() if d.uploaded_at else None,
         })
-
-    if search:
-        pattern = search.lower()
-        results = [r for r in results if pattern in r["business_name"].lower() or pattern in r["document_type"].lower()]
 
     return results
 
@@ -369,17 +402,32 @@ def verify_document(
 def list_all_documents(
     search: Optional[str] = None,
     doc_type: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(deps.get_db),
 ):
     """List all dealer documents with optional filters."""
     query = select(DealerDocument)
     if doc_type:
         query = query.where(DealerDocument.document_type == doc_type)
-    docs = db.exec(query.order_by(DealerDocument.uploaded_at.desc())).all()
+    if search:
+        pattern = f"%{search}%"
+        dealer_ids_q = select(DealerProfile.id).where(
+            DealerProfile.business_name.ilike(pattern)
+        )
+        query = query.where(DealerDocument.dealer_id.in_(dealer_ids_q))
+    docs = db.exec(
+        query.order_by(DealerDocument.uploaded_at.desc()).offset(skip).limit(limit)
+    ).all()
+
+    # Batch-load dealer profiles to avoid N+1
+    dealer_ids = list({d.dealer_id for d in docs if d.dealer_id})
+    profiles = db.exec(select(DealerProfile).where(DealerProfile.id.in_(dealer_ids))).all() if dealer_ids else []
+    profile_map = {dp.id: dp for dp in profiles}
 
     results = []
     for d in docs:
-        dp = db.get(DealerProfile, d.dealer_id)
+        dp = profile_map.get(d.dealer_id)
         results.append({
             "id": d.id,
             "dealer_id": d.dealer_id,
@@ -391,10 +439,6 @@ def list_all_documents(
             "uploaded_at": d.uploaded_at.isoformat() if d.uploaded_at else None,
         })
 
-    if search:
-        pattern = search.lower()
-        results = [r for r in results if pattern in r["business_name"].lower()]
-
     return results
 
 
@@ -403,17 +447,31 @@ def list_all_documents(
 # ═══════════════════════════════════════════════════════════════════════════
 
 @router.get("/commissions/configs")
-def list_commission_configs(db: Session = Depends(deps.get_db)):
+def list_commission_configs(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(deps.get_db),
+):
     """List all commission configurations."""
-    configs = db.exec(select(CommissionConfig).order_by(CommissionConfig.created_at.desc())).all()
+    configs = db.exec(
+        select(CommissionConfig).order_by(CommissionConfig.created_at.desc()).offset(skip).limit(limit)
+    ).all()
+
+    # Batch-load dealer names to avoid N+1
+    dealer_ids = list({c.dealer_id for c in configs if c.dealer_id})
+    users = db.exec(select(User).where(User.id.in_(dealer_ids))).all() if dealer_ids else []
+    user_map = {u.id: u for u in users}
+    user_ids_list = [u.id for u in users]
+    profiles = db.exec(select(DealerProfile).where(DealerProfile.user_id.in_(user_ids_list))).all() if user_ids_list else []
+    profile_by_user = {dp.user_id: dp for dp in profiles}
+
     results = []
     for c in configs:
-        # Resolve dealer name
         dealer_name = "Global"
         if c.dealer_id:
-            user = db.get(User, c.dealer_id)
+            user = user_map.get(c.dealer_id)
             if user:
-                dp = db.exec(select(DealerProfile).where(DealerProfile.user_id == user.id)).first()
+                dp = profile_by_user.get(user.id)
                 dealer_name = dp.business_name if dp else user.full_name
 
         results.append({

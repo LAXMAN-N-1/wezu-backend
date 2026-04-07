@@ -417,14 +417,25 @@ def _readiness_payload() -> tuple[dict[str, str], bool]:
             db.execute(text("SELECT 1"))
             db_ok = True
     except Exception as e:
-        logger.error(f"Readiness DB failure: {e}")
+        logger.error("Readiness DB failure: %s", e)
     try:
-        import redis
-        r = redis.from_url(settings.REDIS_URL, socket_connect_timeout=1, socket_timeout=1)
+        import redis as _redis
+        # Reuse a module-level connection pool so /health doesn't create
+        # a new TCP connection per call (Traefik calls every 20s).
+        _health_redis_pool = getattr(_readiness_payload, "_redis_pool", None)
+        if _health_redis_pool is None:
+            _health_redis_pool = _redis.ConnectionPool.from_url(
+                settings.REDIS_URL,
+                socket_connect_timeout=2,
+                socket_timeout=2,
+                max_connections=2,
+            )
+            _readiness_payload._redis_pool = _health_redis_pool  # type: ignore[attr-defined]
+        r = _redis.Redis(connection_pool=_health_redis_pool)
         r.ping()
         redis_ok = True
     except Exception as e:
-        logger.error(f"Readiness Redis failure: {e}")
+        logger.error("Readiness Redis failure: %s", e)
     if mongo_configured:
         try:
             from pymongo import MongoClient
@@ -437,7 +448,7 @@ def _readiness_payload() -> tuple[dict[str, str], bool]:
             client.admin.command("ping")
             mongo_ok = True
         except Exception as e:
-            logger.error(f"Readiness MongoDB failure: {e}")
+            logger.error("Readiness MongoDB failure: %s", e)
 
     dependencies = {
         "database": "online" if db_ok else "offline",

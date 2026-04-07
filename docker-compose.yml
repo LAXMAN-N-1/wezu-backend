@@ -5,7 +5,8 @@ services:
     restart: "on-failure:5"
     init: true
     stop_grace_period: 30s
-    cpus: "0.75"
+    cpus: "1.5"
+    mem_limit: "768m"
     expose:
       - "8000"
     # In Coolify/production, inject env vars from platform UI.
@@ -13,13 +14,21 @@ services:
     environment:
       # Keep DATABASE_URL / REDIS_URL out of compose-level environment
       # so platforms like Coolify can manage/delete them directly.
-      - GUNICORN_WORKERS=1
+      #
+      # Tuned for Hostinger VPS (2-4 vCPU, 4-8 GB RAM):
+      - GUNICORN_WORKERS=2
       - GUNICORN_TIMEOUT=120
       - GUNICORN_GRACEFUL_TIMEOUT=45
-      - DB_POOL_SIZE=5
-      - DB_MAX_OVERFLOW=5
-      - DB_POOL_TIMEOUT=30
-      - DB_POOL_RECYCLE=1800
+      - GUNICORN_KEEPALIVE=65
+      # DB pool: 3 conns × 2 workers = 6 base, +3 overflow = 9 max.
+      # Keeps well within Neon/small PG limits (25-50 connections).
+      - DB_POOL_SIZE=3
+      - DB_MAX_OVERFLOW=3
+      - DB_POOL_TIMEOUT=20
+      - DB_POOL_RECYCLE=900
+      - DB_POOL_PRE_PING=true
+      - DB_POOL_USE_LIFO=true
+      - SQL_SLOW_QUERY_LOG_MS=500
       - AUDIT_REQUEST_LOGGING_ENABLED=true
       - AUDIT_REQUEST_QUEUE_MAXSIZE=2000
       - AUDIT_REQUEST_BATCH_SIZE=50
