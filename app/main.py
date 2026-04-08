@@ -182,6 +182,15 @@ async def lifespan(app: FastAPI):
     if settings.AUDIT_REQUEST_LOGGING_ENABLED:
         await request_audit_queue.start()
         request_audit_started = True
+
+    # Warm up password hashing backend during startup to avoid first-login latency spikes.
+    try:
+        from app.core.security import get_password_hash, verify_password
+        _probe_secret = "warmup-password"
+        _probe_hash = get_password_hash(_probe_secret)
+        verify_password(_probe_secret, _probe_hash)
+    except Exception:
+        logger.warning("Password hash backend warmup failed", exc_info=True)
     
     yield
     

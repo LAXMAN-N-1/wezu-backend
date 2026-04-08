@@ -19,12 +19,11 @@ from app.schemas.battery_health import (
 )
 from sqlalchemy import case, and_
 from app.core.config import settings
-from app.utils.runtime_cache import cached_call
+from app.utils.runtime_cache import cached_call, invalidate_cache
+from sqlalchemy.orm import aliased
 
 router = APIRouter()
 
-
-from collections import defaultdict
 
 def _parse_battery_id(value: str) -> int:
     try:
@@ -33,39 +32,77 @@ def _parse_battery_id(value: str) -> int:
         raise HTTPException(status_code=422, detail="Battery ID must be an integer") from exc
 
 
+def _invalidate_health_caches() -> None:
+    invalidate_cache("admin-health")
+    invalidate_cache("health_overview")
+    invalidate_cache("health_analytics")
+
+
 def _compute_bulk_degradation_rates(battery_ids: List[int], db: Session, days: int = 90) -> dict:
     if not battery_ids:
         return {}
     cutoff = datetime.now(UTC) - timedelta(days=days)
-    snapshots = db.exec(
-        select(BatteryHealthSnapshot)
+    rates = {bid: 0.0 for bid in battery_ids}
+
+    bounds_subquery = (
+        select(
+            BatteryHealthSnapshot.battery_id.label("battery_id"),
+            func.min(col(BatteryHealthSnapshot.recorded_at)).label("first_recorded_at"),
+            func.max(col(BatteryHealthSnapshot.recorded_at)).label("last_recorded_at"),
+        )
         .where(BatteryHealthSnapshot.battery_id.in_(battery_ids))
         .where(col(BatteryHealthSnapshot.recorded_at) >= cutoff)
-        .order_by(BatteryHealthSnapshot.battery_id, col(BatteryHealthSnapshot.recorded_at))
+        .group_by(BatteryHealthSnapshot.battery_id)
+        .subquery()
+    )
+
+    first_snapshot = aliased(BatteryHealthSnapshot)
+    last_snapshot = aliased(BatteryHealthSnapshot)
+
+    rows = db.exec(
+        select(
+            bounds_subquery.c.battery_id,
+            first_snapshot.health_percentage,
+            first_snapshot.recorded_at,
+            last_snapshot.health_percentage,
+            last_snapshot.recorded_at,
+        )
+        .join(
+            first_snapshot,
+            and_(
+                first_snapshot.battery_id == bounds_subquery.c.battery_id,
+                col(first_snapshot.recorded_at) == bounds_subquery.c.first_recorded_at,
+            ),
+        )
+        .join(
+            last_snapshot,
+            and_(
+                last_snapshot.battery_id == bounds_subquery.c.battery_id,
+                col(last_snapshot.recorded_at) == bounds_subquery.c.last_recorded_at,
+            ),
+        )
     ).all()
 
-    grouped = defaultdict(list)
-    for s in snapshots:
-        grouped[s.battery_id].append(s)
+    for row in rows:
+        bid = row[0]
+        first_health = row[1]
+        first_recorded_at = _coerce_datetime(row[2])
+        last_health = row[3]
+        last_recorded_at = _coerce_datetime(row[4])
 
-    rates = {}
-    for bid in battery_ids:
-        snaps = grouped.get(bid, [])
-        if len(snaps) < 2:
-            rates[bid] = 0.0
-            continue
-        first, last = snaps[0], snaps[-1]
-        first_recorded_at = _coerce_datetime(first.recorded_at)
-        last_recorded_at = _coerce_datetime(last.recorded_at)
         if not first_recorded_at or not last_recorded_at:
-            rates[bid] = 0.0
             continue
-        days_diff = (last_recorded_at - first_recorded_at).days
-        if days_diff <= 0:
-            rates[bid] = 0.0
+
+        elapsed_days = (last_recorded_at - first_recorded_at).total_seconds() / 86400
+        if elapsed_days <= 0:
             continue
-        drop = first.health_percentage - last.health_percentage
-        rates[bid] = round((drop / days_diff) * 30, 2)
+
+        drop = float(first_health or 0) - float(last_health or 0)
+        if drop <= 0:
+            continue
+
+        rates[bid] = round((drop / elapsed_days) * 30, 2)
+
     return rates
 
 def _compute_degradation_rate(battery_id: int, db: Session, days: int = 90) -> float:
@@ -113,6 +150,76 @@ def _coerce_datetime(value: object) -> Optional[datetime]:
 def _serialize_dt(dt: Optional[datetime]) -> Optional[str]:
     normalized = _coerce_datetime(dt)
     return normalized.isoformat() if normalized else None
+
+
+def _latest_snapshots_by_battery(
+    battery_ids: List[int], db: Session
+) -> dict[int, BatteryHealthSnapshot]:
+    if not battery_ids:
+        return {}
+
+    latest_snapshot_subquery = (
+        select(
+            BatteryHealthSnapshot.battery_id.label("battery_id"),
+            func.max(col(BatteryHealthSnapshot.recorded_at)).label("latest_recorded_at"),
+        )
+        .where(BatteryHealthSnapshot.battery_id.in_(battery_ids))
+        .group_by(BatteryHealthSnapshot.battery_id)
+        .subquery()
+    )
+
+    snapshots = db.exec(
+        select(BatteryHealthSnapshot)
+        .join(
+            latest_snapshot_subquery,
+            and_(
+                BatteryHealthSnapshot.battery_id == latest_snapshot_subquery.c.battery_id,
+                col(BatteryHealthSnapshot.recorded_at) == latest_snapshot_subquery.c.latest_recorded_at,
+            ),
+        )
+    ).all()
+
+    snapshot_map: dict[int, BatteryHealthSnapshot] = {}
+    for snapshot in snapshots:
+        if snapshot.battery_id not in snapshot_map:
+            snapshot_map[snapshot.battery_id] = snapshot
+    return snapshot_map
+
+
+def _latest_completed_maintenance_by_battery(
+    battery_ids: List[int], db: Session
+) -> dict[int, BatteryMaintenanceSchedule]:
+    if not battery_ids:
+        return {}
+
+    latest_maintenance_subquery = (
+        select(
+            BatteryMaintenanceSchedule.battery_id.label("battery_id"),
+            func.max(col(BatteryMaintenanceSchedule.completed_at)).label("latest_completed_at"),
+        )
+        .where(BatteryMaintenanceSchedule.battery_id.in_(battery_ids))
+        .where(BatteryMaintenanceSchedule.status == MaintenanceStatus.COMPLETED)
+        .where(BatteryMaintenanceSchedule.completed_at.is_not(None))
+        .group_by(BatteryMaintenanceSchedule.battery_id)
+        .subquery()
+    )
+
+    maintenance_rows = db.exec(
+        select(BatteryMaintenanceSchedule)
+        .join(
+            latest_maintenance_subquery,
+            and_(
+                BatteryMaintenanceSchedule.battery_id == latest_maintenance_subquery.c.battery_id,
+                col(BatteryMaintenanceSchedule.completed_at) == latest_maintenance_subquery.c.latest_completed_at,
+            ),
+        )
+    ).all()
+
+    maintenance_map: dict[int, BatteryMaintenanceSchedule] = {}
+    for maintenance in maintenance_rows:
+        if maintenance.battery_id not in maintenance_map:
+            maintenance_map[maintenance.battery_id] = maintenance
+    return maintenance_map
 
 # ============================================================
 # GET /health/overview — Fleet-wide health summary
@@ -181,124 +288,120 @@ def get_health_batteries(
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
-    # ── 1. Build base query with SQL-level filters ──────────────────
-    query = select(Battery)
-    if search:
-        query = query.where(Battery.serial_number.ilike(f"%{search}%"))
+    cache_sort = sort_by or "health_desc"
+    cache_search = (search or "").strip().lower()
+    cache_needs_attention = "none" if needs_attention is None else str(needs_attention).lower()
 
-    # Apply health_range filter at SQL level
-    if health_range == "good":
-        query = query.where(Battery.health_percentage > 80)
-    elif health_range == "fair":
-        query = query.where(and_(Battery.health_percentage > 50, Battery.health_percentage <= 80))
-    elif health_range == "poor":
-        query = query.where(and_(Battery.health_percentage > 30, Battery.health_percentage <= 50))
-    elif health_range == "critical":
-        query = query.where(Battery.health_percentage <= 30)
+    def _load() -> list[dict]:
+        # ── 1. Build base query with SQL-level filters ──────────────────
+        query = select(Battery)
+        if search:
+            query = query.where(Battery.serial_number.ilike(f"%{search}%"))
 
-    # ── 2. Determine if we can use SQL pagination ───────────────────
-    # degradation_rate and needs_attention require post-fetch filtering,
-    # so we only use SQL pagination for simple health sorts.
-    can_sql_paginate = not needs_attention and sort_by in ("health_asc", "health_desc", None)
+        # Apply health_range filter at SQL level
+        if health_range == "good":
+            query = query.where(Battery.health_percentage > 80)
+        elif health_range == "fair":
+            query = query.where(and_(Battery.health_percentage > 50, Battery.health_percentage <= 80))
+        elif health_range == "poor":
+            query = query.where(and_(Battery.health_percentage > 30, Battery.health_percentage <= 50))
+        elif health_range == "critical":
+            query = query.where(Battery.health_percentage <= 30)
 
-    if can_sql_paginate:
-        # SQL-level sort + paginate — avoids loading all batteries
-        if sort_by == "health_asc":
-            query = query.order_by(Battery.health_percentage.asc())
+        # ── 2. Determine if we can use SQL pagination ───────────────────
+        # degradation_rate and needs_attention require post-fetch filtering,
+        # so we only use SQL pagination for simple health sorts.
+        can_sql_paginate = not needs_attention and sort_by in ("health_asc", "health_desc", None)
+
+        if can_sql_paginate:
+            # SQL-level sort + paginate — avoids loading all batteries
+            if sort_by == "health_asc":
+                query = query.order_by(Battery.health_percentage.asc())
+            else:
+                query = query.order_by(Battery.health_percentage.desc())
+
+            offset = (page - 1) * limit
+            batteries = db.exec(query.offset(offset).limit(limit)).all()
         else:
-            query = query.order_by(Battery.health_percentage.desc())
+            # Must load all for post-processing sorts / filters
+            batteries = db.exec(query).all()
 
-        offset = (page - 1) * limit
-        batteries = db.exec(query.offset(offset).limit(limit)).all()
-    else:
-        # Must load all for post-processing sorts / filters
-        batteries = db.exec(query).all()
+        if not batteries:
+            return []
 
-    if not batteries:
-        return []
+        # ── 3. Bulk fetch related data only for batteries in scope ──────
+        b_ids = [b.id for b in batteries]
+        rates = _compute_bulk_degradation_rates(b_ids, db)
+        snaps_map = _latest_snapshots_by_battery(b_ids, db)
+        maint_map = _latest_completed_maintenance_by_battery(b_ids, db)
 
-    # ── 3. Bulk fetch related data only for batteries in scope ──────
-    b_ids = [b.id for b in batteries]
-    rates = _compute_bulk_degradation_rates(b_ids, db)
+        # ── 4. Build response list ──────────────────────────────────────
+        results: list[dict] = []
+        now = datetime.now(UTC)
 
-    # Latest snapshot per battery using a single query with distinct-on logic
-    all_snaps = db.exec(
-        select(BatteryHealthSnapshot)
-        .where(BatteryHealthSnapshot.battery_id.in_(b_ids))
-        .order_by(BatteryHealthSnapshot.battery_id, col(BatteryHealthSnapshot.recorded_at).desc())
-    ).all()
-    snaps_map: dict = {}
-    for snapshot in all_snaps:
-        if snapshot.battery_id not in snaps_map:
-            snaps_map[snapshot.battery_id] = snapshot
+        for b in batteries:
+            health = b.health_percentage
+            status = _get_health_status(health)
+            deg_rate = rates.get(b.id, 0.0)
 
-    # Latest completed maintenance per battery
-    all_maint = db.exec(
-        select(BatteryMaintenanceSchedule)
-        .where(BatteryMaintenanceSchedule.battery_id.in_(b_ids))
-        .where(BatteryMaintenanceSchedule.status == MaintenanceStatus.COMPLETED)
-        .where(BatteryMaintenanceSchedule.completed_at.is_not(None))
-        .order_by(BatteryMaintenanceSchedule.battery_id, col(BatteryMaintenanceSchedule.completed_at).desc())
-    ).all()
-    maint_map: dict = {}
-    for maintenance in all_maint:
-        if maintenance.battery_id not in maint_map:
-            maint_map[maintenance.battery_id] = maintenance
+            # Post-filter: needs_attention (only when can't SQL paginate)
+            if needs_attention and health >= 60 and deg_rate <= 3:
+                continue
 
-    # ── 4. Build response list ──────────────────────────────────────
-    results = []
-    now = datetime.now(UTC)
+            latest = snaps_map.get(b.id)
+            last_maint = maint_map.get(b.id)
 
-    for b in batteries:
-        health = b.health_percentage
-        status = _get_health_status(health)
-        deg_rate = rates.get(b.id, 0.0)
+            days_since = None
+            completed_at = _coerce_datetime(last_maint.completed_at) if last_maint else None
+            if completed_at:
+                days_since = (now - completed_at).days
 
-        # Post-filter: needs_attention (only when can't SQL paginate)
-        if needs_attention and health >= 60 and deg_rate <= 3:
-            continue
+            results.append({
+                "id": str(b.id),
+                "serial_number": b.serial_number,
+                "manufacturer": b.manufacturer,
+                "battery_type": b.battery_type,
+                "status": b.status.value if hasattr(b.status, "value") else str(b.status),
+                "health_percentage": health,
+                "health_status": status,
+                "voltage": latest.voltage if latest else None,
+                "temperature": latest.temperature if latest else None,
+                "internal_resistance": latest.internal_resistance if latest else None,
+                "charge_cycles": latest.charge_cycles if latest else None,
+                "degradation_rate": deg_rate,
+                "last_reading_at": _serialize_dt(latest.recorded_at) if latest else None,
+                "last_maintenance_at": _serialize_dt(last_maint.completed_at) if last_maint else None,
+                "days_since_maintenance": days_since,
+            })
 
-        latest = snaps_map.get(b.id)
-        last_maint = maint_map.get(b.id)
+        # ── 5. Post-processing sort + paginate (only when needed) ───────
+        if not can_sql_paginate:
+            if sort_by == "health_asc":
+                results.sort(key=lambda x: x["health_percentage"])
+            elif sort_by == "health_desc":
+                results.sort(key=lambda x: x["health_percentage"], reverse=True)
+            elif sort_by == "degradation_rate":
+                results.sort(key=lambda x: x["degradation_rate"], reverse=True)
+            elif sort_by == "last_service":
+                results.sort(key=lambda x: x["days_since_maintenance"] or 9999, reverse=True)
 
-        days_since = None
-        completed_at = _coerce_datetime(last_maint.completed_at) if last_maint else None
-        if completed_at:
-            days_since = (now - completed_at).days
+            start = (page - 1) * limit
+            results = results[start:start + limit]
 
-        results.append(HealthBatteryResponse(
-            id=str(b.id),
-            serial_number=b.serial_number,
-            manufacturer=b.manufacturer,
-            battery_type=b.battery_type,
-            status=b.status.value if hasattr(b.status, 'value') else str(b.status),
-            health_percentage=health,
-            health_status=status,
-            voltage=latest.voltage if latest else None,
-            temperature=latest.temperature if latest else None,
-            internal_resistance=latest.internal_resistance if latest else None,
-            charge_cycles=latest.charge_cycles if latest else None,
-            degradation_rate=deg_rate,
-            last_reading_at=_serialize_dt(latest.recorded_at) if latest else None,
-            last_maintenance_at=_serialize_dt(last_maint.completed_at) if last_maint else None,
-            days_since_maintenance=days_since,
-        ))
+        return results
 
-    # ── 5. Post-processing sort + paginate (only when needed) ───────
-    if not can_sql_paginate:
-        if sort_by == "health_asc":
-            results.sort(key=lambda x: x.health_percentage)
-        elif sort_by == "health_desc":
-            results.sort(key=lambda x: x.health_percentage, reverse=True)
-        elif sort_by == "degradation_rate":
-            results.sort(key=lambda x: x.degradation_rate, reverse=True)
-        elif sort_by == "last_service":
-            results.sort(key=lambda x: x.days_since_maintenance or 9999, reverse=True)
-
-        start = (page - 1) * limit
-        results = results[start:start + limit]
-
-    return results
+    return cached_call(
+        "admin-health",
+        "batteries",
+        health_range or "",
+        cache_sort,
+        cache_needs_attention,
+        cache_search,
+        page,
+        limit,
+        ttl_seconds=min(settings.ANALYTICS_CACHE_TTL_SECONDS, 60),
+        call=_load,
+    )
 
 
 # ============================================================
@@ -527,6 +630,7 @@ def record_health_snapshot(
 
     db.commit()
     db.refresh(snapshot)
+    _invalidate_health_caches()
 
     return HealthSnapshotResponse(
         id=snapshot.id, health_percentage=snapshot.health_percentage,
@@ -601,6 +705,7 @@ def resolve_health_alert(
     alert.resolution_reason = data.reason
     db.add(alert)
     db.commit()
+    _invalidate_health_caches()
 
     return {"status": "success", "message": "Alert resolved"}
 
@@ -632,6 +737,7 @@ def schedule_maintenance(
     db.add(sched)
     db.commit()
     db.refresh(sched)
+    _invalidate_health_caches()
 
     return MaintenanceScheduleResponse(
         id=sched.id, battery_id=str(sched.battery_id),
