@@ -43,13 +43,38 @@ def _user_self_cache(user_id: int, key: str, call):
         "user-self",
         user_id,
         key,
-        ttl_seconds=settings.SESSION_CACHE_TTL_SECONDS,
+        ttl_seconds=max(settings.SESSION_CACHE_TTL_SECONDS, 30),
         call=call,
     )
 
 
 def _invalidate_user_self_cache(user_id: int) -> None:
     invalidate_cache("user-self", user_id)
+
+
+def _role_access_cache(role_name: str, db: Session) -> dict:
+    role_lookup = (role_name or "").strip()
+    normalized_role = role_lookup.lower()
+    if not normalized_role:
+        return {"permissions": [], "menu": []}
+
+    def _load_access() -> dict:
+        permissions = AuthService.get_permissions_for_role(db, role_lookup)
+        menu = AuthService.get_menu_for_role(db, role_lookup)
+        # Fallback for mixed-case role names.
+        if role_lookup != normalized_role:
+            if not permissions:
+                permissions = AuthService.get_permissions_for_role(db, normalized_role)
+            if not menu:
+                menu = AuthService.get_menu_for_role(db, normalized_role)
+        return {"permissions": permissions, "menu": menu}
+
+    return cached_call(
+        "role-access",
+        normalized_role,
+        ttl_seconds=max(settings.SESSION_CACHE_TTL_SECONDS, 30),
+        call=_load_access,
+    )
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 @audit_log("CREATE_USER", "USER")
@@ -162,16 +187,13 @@ def _build_user_profile_response(user: User, db: Session = None) -> UserProfileR
     
     # Get permissions and menu for current role
     if current_role:
-        permissions = (
-            AuthService.get_permissions_for_role(db, current_role)
-            if db is not None
-            else AuthService.get_permissions_for_role(current_role)
-        )
-        menu = (
-            AuthService.get_menu_for_role(db, current_role)
-            if db is not None
-            else AuthService.get_menu_for_role(current_role)
-        )
+        if db is not None:
+            access = _role_access_cache(current_role, db)
+            permissions = access.get("permissions", [])
+            menu = access.get("menu", [])
+        else:
+            permissions = AuthService.get_permissions_for_role(current_role)
+            menu = AuthService.get_menu_for_role(current_role)
     else:
         permissions = []
         menu = []

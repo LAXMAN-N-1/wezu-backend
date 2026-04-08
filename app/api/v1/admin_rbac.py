@@ -9,8 +9,15 @@ from app.models.rbac import Role, Permission, RolePermission, AdminUserRole, Use
 from app.models.session import UserSession
 from app.services.auth_service import AuthService
 from app.schemas import rbac as rbac_schema
+from app.core.config import settings
+from app.utils.runtime_cache import cached_call, invalidate_cache
 
 router = APIRouter()
+
+
+def _invalidate_admin_rbac_cache() -> None:
+    invalidate_cache("admin-rbac")
+
 
 def _resolve_assigned_by_admin_id(db: Session, current_user: Any) -> Optional[int]:
     """
@@ -49,49 +56,58 @@ def read_roles(
     """
     Retrieve roles.
     """
-    # Pre-fetch permissions efficiently
-    query = select(Role).options(selectinload(Role.permissions))
-    
-    if category:
-        query = query.where(Role.category == category)
-        
-    if active_only:
-        query = query.where(Role.is_active == True)
-        
-    roles = db.exec(query.offset(skip).limit(limit)).all()
-    
-    # Enrichment
-    results = []
-    
-    # Batch count users for these roles to avoid N+1 and slow relationship loading
-    role_ids = [r.id for r in roles]
-    user_counts = {}
-    if role_ids:
-        from app.models.rbac import UserRole
-        # Efficient count query grouping by role_id
-        count_data = db.exec(
-            select(UserRole.role_id, func.count(UserRole.user_id))
-            .where(col(UserRole.role_id).in_(role_ids))
-            .group_by(UserRole.role_id)
-        ).all()
-        user_counts = {rid: count for rid, count in count_data}
+    def _load() -> list[dict]:
+        # Pre-fetch permissions efficiently
+        query = select(Role).options(selectinload(Role.permissions))
 
-    for role in roles:
-        # Use pre-fetched permissions
-        perms = role.permissions
-        
-        role_data = rbac_schema.RoleRead.model_validate(role)
-        role_data.permission_count = len(perms)
-        
-        # Use batch-fetched user count
-        role_data.user_count = user_counts.get(role.id, 0)
-            
-        if not include_permissions:
-            role_data.permissions = None
-        
-        results.append(role_data)
-        
-    return results
+        if category:
+            query = query.where(Role.category == category)
+
+        if active_only:
+            query = query.where(Role.is_active == True)
+
+        roles = db.exec(query.offset(skip).limit(limit)).all()
+
+        # Enrichment
+        results = []
+
+        # Batch count users for these roles to avoid N+1 and slow relationship loading
+        role_ids = [r.id for r in roles]
+        user_counts = {}
+        if role_ids:
+            from app.models.rbac import UserRole
+            # Efficient count query grouping by role_id
+            count_data = db.exec(
+                select(UserRole.role_id, func.count(UserRole.user_id))
+                .where(col(UserRole.role_id).in_(role_ids))
+                .group_by(UserRole.role_id)
+            ).all()
+            user_counts = {rid: count for rid, count in count_data}
+
+        for role in roles:
+            perms = role.permissions
+            role_data = rbac_schema.RoleRead.model_validate(role).model_dump(mode="json")
+            role_data["permission_count"] = len(perms)
+            role_data["user_count"] = user_counts.get(role.id, 0)
+
+            if not include_permissions:
+                role_data["permissions"] = None
+
+            results.append(role_data)
+
+        return results
+
+    return cached_call(
+        "admin-rbac",
+        "roles",
+        skip,
+        limit,
+        category or "",
+        active_only,
+        include_permissions,
+        ttl_seconds=max(settings.ANALYTICS_CACHE_TTL_SECONDS, 120),
+        call=_load,
+    )
 
 @router.post("/roles", response_model=rbac_schema.RoleRead)
 def create_role(
@@ -131,6 +147,7 @@ def create_role(
     db.add(role)
     db.commit()
     db.refresh(role)
+    _invalidate_admin_rbac_cache()
     
     # 3. Assign Permissions — batch lookup instead of per-slug query
     if permissions_to_assign:
@@ -143,6 +160,7 @@ def create_role(
     
     db.commit()
     db.refresh(role)
+    _invalidate_admin_rbac_cache()
     
     # Audit Log
     from app.services.audit_service import AuditService
@@ -363,6 +381,7 @@ def assign_permissions_to_role(
         
     db.commit()
     db.refresh(role)
+    _invalidate_admin_rbac_cache()
     
     # Audit Log
     from app.services.audit_service import AuditService
@@ -548,6 +567,9 @@ def bulk_assign_roles(
             db.rollback()
             results.append(rbac_schema.BulkAssignmentResult(user_id=uid, success=False, message=str(e)))
             fail_count += 1
+
+    if success_count:
+        _invalidate_admin_rbac_cache()
     
     return rbac_schema.BulkRoleAssignResponse(
         total_requested=len(assignment.user_ids),
@@ -771,6 +793,7 @@ def transfer_role_assignment(
         AuthService.revoke_all_user_sessions(db, target_user.id)
                 
         db.commit()
+        _invalidate_admin_rbac_cache()
         # No ID to refresh for new_link
             
         return rbac_schema.RoleTransferResponse(
@@ -849,6 +872,7 @@ def assign_roles_to_user(
         db.add(new_link)
         
     db.commit()
+    _invalidate_admin_rbac_cache()
     
     # 3. Side Effects: Invalidate User Session
     AuthService.revoke_all_user_sessions(db, user_id)
@@ -926,6 +950,7 @@ def remove_role_from_user(
 
     db.commit()
     db.refresh(user)
+    _invalidate_admin_rbac_cache()
     
     # 5. Invalidate Session
     user_sessions = db.exec(select(UserSession).where(UserSession.user_id == user_id).where(UserSession.is_active == True)).all()
@@ -946,6 +971,7 @@ def remove_role_from_user(
     )
     db.add(audit_log)
     db.commit()
+    _invalidate_admin_rbac_cache()
 
     # 7. Prepare Response (Refresh perms)
     # Re-calculate permissions
@@ -1065,6 +1091,7 @@ def update_role(
         db.commit()
         
     db.refresh(role)
+    _invalidate_admin_rbac_cache()
     
     # Audit Log
     from app.services.audit_service import AuditService
@@ -1166,6 +1193,7 @@ def delete_role(
     role.is_active = False
     db.add(role)
     db.commit()
+    _invalidate_admin_rbac_cache()
     
     # 3. Soft Delete
     role.is_active = False
@@ -1363,6 +1391,7 @@ def duplicate_role(
     db.add(new_role)
     db.commit()
     db.refresh(new_role)
+    _invalidate_admin_rbac_cache()
     
     # 4. Copy Permissions
     source_perms = db.exec(select(Permission).join(RolePermission).where(RolePermission.role_id == source_role.id)).all()

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
 from sqlalchemy import case
+from sqlalchemy.orm import load_only
 from typing import List, Optional
 from datetime import datetime, UTC
 from pydantic import BaseModel
@@ -164,26 +165,51 @@ def list_users(
 ):
     """List all users with pagination, search, and filters."""
     def _load_users() -> dict:
-        statement = select(User).where(User.is_deleted == False)
+        filters = [User.is_deleted == False]
 
         if search:
-            statement = statement.where(
+            filters.append(
                 (User.full_name.ilike(f"%{search}%")) |
                 (User.email.ilike(f"%{search}%")) |
                 (User.phone_number.ilike(f"%{search}%"))
             )
 
         if status:
-            statement = statement.where(User.status == status.lower())
+            filters.append(User.status == status.lower())
 
         if user_type:
-            statement = statement.where(User.user_type == user_type)
+            filters.append(User.user_type == user_type)
 
         if kyc_status:
-            statement = statement.where(User.kyc_status == kyc_status)
+            filters.append(User.kyc_status == kyc_status)
 
-        total_count = db.exec(select(func.count()).select_from(statement.subquery())).one()
-        users = db.exec(statement.order_by(User.created_at.desc()).offset(skip).limit(limit)).all()
+        total_count = db.exec(select(func.count(User.id)).where(*filters)).one() or 0
+        users = db.exec(
+            select(User)
+            .where(*filters)
+            .options(
+                load_only(
+                    User.id,
+                    User.full_name,
+                    User.email,
+                    User.phone_number,
+                    User.user_type,
+                    User.status,
+                    User.kyc_status,
+                    User.is_active,
+                    User.profile_picture,
+                    User.role_id,
+                    User.is_superuser,
+                    User.created_at,
+                    User.last_login,
+                    User.deletion_reason,
+                    User.force_password_change,
+                )
+            )
+            .order_by(User.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        ).all()
 
         role_ids = {u.role_id for u in users if u.role_id}
         role_map = (
@@ -193,11 +219,7 @@ def list_users(
 
         user_list = []
         for u in users:
-            role_name = None
-            if u.role:
-                role_name = u.role.name
-            elif u.role_id:
-                role_name = role_map.get(u.role_id)
+            role_name = role_map.get(u.role_id) if u.role_id else None
             user_list.append(_serialize_user(u, role_name=role_name))
 
         return {
@@ -210,14 +232,13 @@ def list_users(
     return cached_call(
         "admin-users",
         "list",
-        current_user.id,
         skip,
         limit,
         search or "",
         status or "",
         user_type or "",
         kyc_status or "",
-        ttl_seconds=settings.USER_ADMIN_CACHE_TTL_SECONDS,
+        ttl_seconds=max(settings.USER_ADMIN_CACHE_TTL_SECONDS, 120),
         call=_load_users,
     )
 
@@ -250,8 +271,7 @@ def get_user_summary(
     return cached_call(
         "admin-users",
         "summary",
-        current_user.id,
-        ttl_seconds=settings.USER_ADMIN_CACHE_TTL_SECONDS,
+        ttl_seconds=max(settings.USER_ADMIN_CACHE_TTL_SECONDS, 120),
         call=_load_summary,
     )
 

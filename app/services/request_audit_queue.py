@@ -165,22 +165,21 @@ class RequestAuditQueueService:
                 pending_batch = []
 
     async def _flush_batch(self, batch: list[Dict[str, Any]]) -> None:
-        db: Optional[Session] = None
         try:
-            with Session(engine) as db:
-                logs = [AuditLog(**event) for event in batch]
-                db.add_all(logs)
-                db.commit()
+            # DB I/O is synchronous; run it off the event loop to avoid
+            # stalling request handling under bursty traffic.
+            await asyncio.to_thread(self._persist_batch_sync, batch)
             self._flushed += len(batch)
         except Exception as exc:  # pragma: no cover - defensive path
-            if db is not None:
-                try:
-                    db.rollback()
-                except Exception:
-                    # Defensive rollback path; avoid surfacing secondary errors.
-                    pass
             self._flush_errors += 1
             logger.error("Failed request-audit batch flush: %s", exc)
+
+    @staticmethod
+    def _persist_batch_sync(batch: list[Dict[str, Any]]) -> None:
+        with Session(engine) as db:
+            logs = [AuditLog(**event) for event in batch]
+            db.add_all(logs)
+            db.commit()
 
 
 request_audit_queue = RequestAuditQueueService(
