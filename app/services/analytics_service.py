@@ -1068,6 +1068,33 @@ class AnalyticsService:
     @staticmethod
     def get_top_stations(db: Session) -> Dict[str, Any]:
         """Top stations formatted for the dashboard (revenue + utilization + sparkline)."""
+        now = datetime.now(UTC)
+
+        # ── 1. Single query: stations + rental counts + revenue ─────────
+        rental_stats_sq = (
+            select(
+                Rental.start_station_id.label("station_id"),
+                func.count(Rental.id).label("rental_count"),
+            )
+            .where(Rental.start_station_id.is_not(None))
+            .group_by(Rental.start_station_id)
+            .subquery()
+        )
+        revenue_sq = (
+            select(
+                Rental.start_station_id.label("station_id"),
+                func.coalesce(func.sum(Transaction.amount), 0).label("revenue"),
+            )
+            .select_from(Rental)
+            .join(Transaction, Transaction.rental_id == Rental.id)
+            .where(
+                Rental.start_station_id.is_not(None),
+                Transaction.status == TransactionStatus.SUCCESS,
+            )
+            .group_by(Rental.start_station_id)
+            .subquery()
+        )
+
         stations = db.exec(
             select(
                 Station.id,
@@ -1077,39 +1104,18 @@ class AnalyticsService:
                 Station.total_slots,
                 Station.available_batteries,
                 Station.rating,
+                func.coalesce(rental_stats_sq.c.rental_count, 0),
+                func.coalesce(revenue_sq.c.revenue, 0),
             )
+            .outerjoin(rental_stats_sq, rental_stats_sq.c.station_id == Station.id)
+            .outerjoin(revenue_sq, revenue_sq.c.station_id == Station.id)
         ).all()
         if not stations:
             return {"stations": []}
 
-        station_ids = [row.id for row in stations]
-        now = datetime.now(UTC)
+        station_ids = [row[0] for row in stations]
 
-        rental_count_rows = db.exec(
-            select(
-                Rental.start_station_id,
-                func.count(Rental.id),
-            )
-            .where(Rental.start_station_id.in_(station_ids))
-            .group_by(Rental.start_station_id)
-        ).all()
-        rental_count_map = {int(row[0]): int(row[1] or 0) for row in rental_count_rows}
-
-        revenue_rows = db.exec(
-            select(
-                Rental.start_station_id,
-                func.coalesce(func.sum(Transaction.amount), 0),
-            )
-            .select_from(Rental)
-            .join(Transaction, Transaction.rental_id == Rental.id)
-            .where(
-                Rental.start_station_id.in_(station_ids),
-                Transaction.status == TransactionStatus.SUCCESS,
-            )
-            .group_by(Rental.start_station_id)
-        ).all()
-        revenue_map = {int(row[0]): float(row[1] or 0) for row in revenue_rows}
-
+        # ── 2. Slot statuses + sparklines (2 queries) ──────────────────
         slot_rows = db.exec(
             select(
                 StationSlot.station_id,
@@ -1140,16 +1146,17 @@ class AnalyticsService:
         for station_id, _, count in spark_rows:
             spark_map[int(station_id)].append(int(count or 0))
 
+        # ── 3. Build response ───────────────────────────────────────────
         station_data: List[Dict[str, Any]] = []
 
         for station in stations:
-            station_id = int(station.id)
-            rental_count = rental_count_map.get(station_id, 0)
-            revenue = revenue_map.get(station_id, 0.0)
+            station_id = int(station[0])
+            rental_count = int(station[7] or 0)
+            revenue = float(station[8] or 0)
 
             status_counts = slot_status_map.get(station_id, {})
             total_slots = (
-                int(station.total_slots or 0)
+                int(station[4] or 0)
                 or sum(status_counts.values())
                 or 1
             )
@@ -1161,8 +1168,8 @@ class AnalyticsService:
                 round((rental_count / (total_slots * 30)) * 100, 2) if total_slots else 0
             )
             rating = (
-                float(station.rating)
-                if station.rating and float(station.rating) > 0
+                float(station[6])
+                if station[6] and float(station[6]) > 0
                 else 4.5
             )
             spark = spark_map.get(station_id, [])
@@ -1170,8 +1177,8 @@ class AnalyticsService:
             station_data.append(
                 {
                     "id": str(station_id),
-                    "name": station.name,
-                    "location": station.city or station.address,
+                    "name": station[1],
+                    "location": station[2] or station[3],
                     "rentals": rental_count,
                     "revenue": round(float(revenue), 2),
                     "utilization": utilization,

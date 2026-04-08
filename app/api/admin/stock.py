@@ -141,7 +141,7 @@ def get_stations_stock(
             total = available + rented + maintenance
             utilization = (rented / total * 100) if total > 0 else 0.0
 
-            reorder_point = config.reorder_point if config else int((config.max_capacity if config else 50) * 0.1)
+            reorder_point = config.reorder_point if config else 5
             is_low_stock = available < reorder_point
 
             if alert_only and not is_low_stock:
@@ -373,7 +373,7 @@ def get_active_stock_alerts(db: Session = Depends(get_db)):
             stat = s_stats_map.get(station.id, {"total": 0, "available": 0, "rented": 0})
             utilization = (stat["rented"] / max(stat["total"], 1)) * 100
             config = config_map.get(station.id)
-            reorder_point = config.reorder_point if config else int((config.max_capacity if config else 50) * 0.1)
+            reorder_point = config.reorder_point if config else 5
 
             if stat["available"] < reorder_point and station.id not in active_dismissals:
                 alerts.append(StockAlertResponse(

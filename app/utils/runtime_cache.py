@@ -82,8 +82,8 @@ def _get_redis_client():
                 _redis_client = redis.from_url(
                     settings.REDIS_URL,
                     decode_responses=True,
-                    socket_connect_timeout=0.2,
-                    socket_timeout=0.2,
+                    socket_connect_timeout=0.5,
+                    socket_timeout=1.0,
                     health_check_interval=30,
                 )
             except Exception:
