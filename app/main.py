@@ -3,6 +3,7 @@ import sys
 import ssl
 import asyncio
 import os
+import time
 from contextlib import asynccontextmanager
 from app.core.logging import setup_logging, get_logger
 
@@ -208,6 +209,13 @@ app = FastAPI(
 # ----------------------------
 # Middlewares & Global Config
 # ----------------------------
+@app.middleware("http")
+async def add_timing(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    response.headers["X-Response-Time"] = f"{(time.perf_counter()-start)*1000:.2f}ms"
+    return response
+
 app.state.limiter = limiter
 add_exception_handlers(app)
 

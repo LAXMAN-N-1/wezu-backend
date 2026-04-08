@@ -1,5 +1,6 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import ORJSONResponse
 from sqlmodel import Session, select, func, case
 from typing import Any, List, Optional
 from datetime import datetime, UTC
@@ -16,7 +17,7 @@ from app.core.database import get_db
 from app.core.config import settings
 from app.utils.runtime_cache import cached_call
 
-router = APIRouter()
+router = APIRouter(default_response_class=ORJSONResponse)
 
 
 class StationCreateRequest(BaseModel):
@@ -166,28 +167,23 @@ def list_stations(
 ):
     """List all stations with pagination, search, and filters."""
     def _load():
-        statement = select(Station)
-
+        filters = []
         if search:
-            statement = statement.where(
+            filters.append(
                 (Station.name.ilike(f"%{search}%")) |
                 (Station.address.ilike(f"%{search}%")) |
                 (Station.city.ilike(f"%{search}%"))
             )
-
         if status:
-            statement = statement.where(Station.status == status)
-
+            filters.append(Station.status == status)
         if city:
-            statement = statement.where(Station.city.ilike(f"%{city}%"))
-
+            filters.append(Station.city.ilike(f"%{city}%"))
         if station_type:
-            statement = statement.where(Station.station_type == station_type)
+            filters.append(Station.station_type == station_type)
 
-        count_stmt = select(func.count()).select_from(statement.subquery())
-        total_count = db.exec(count_stmt).one()
+        total_count = db.exec(select(func.count(Station.id)).where(*filters)).one() or 0
 
-        statement = statement.order_by(Station.created_at.desc()).offset(skip).limit(limit)
+        statement = select(Station).where(*filters).order_by(Station.created_at.desc()).offset(skip).limit(limit)
         stations = db.exec(statement).all()
 
         result = []

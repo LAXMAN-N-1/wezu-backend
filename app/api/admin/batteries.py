@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi.responses import ORJSONResponse
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select, func, or_, and_
 from typing import List, Optional
@@ -18,7 +19,7 @@ from app.api.deps import get_current_active_admin
 from app.models.user import User
 from app.utils.runtime_cache import cached_call
 
-router = APIRouter()
+router = APIRouter(default_response_class=ORJSONResponse)
 
 @router.get("", response_model=BatteryListResponse)
 def list_batteries(
@@ -177,29 +178,39 @@ def bulk_update_batteries(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_admin)
 ):
-    """Bulk update battery status."""
-    updated = 0
-    for bid in req.battery_ids:
-        battery = session.get(Battery, bid)
-        if battery:
-            old_status = battery.status
-            battery.status = req.status
-            battery.updated_at = datetime.now(UTC)
-            session.add(battery)
+    """Bulk update battery status using optimized batch operations."""
+    if not req.battery_ids:
+        return {"updated_count": 0, "total_requested": 0}
 
-            audit = BatteryAuditLog(
-                battery_id=bid,
-                changed_by=current_user.id,
-                field_changed="status",
-                old_value=str(old_status),
-                new_value=req.status,
-                reason=f"Bulk update by admin"
-            )
-            session.add(audit)
-            updated += 1
+    # Retrieve current statuses to log old_value correctly before updating
+    current_batteries = session.exec(select(Battery.id, Battery.status).where(Battery.id.in_(req.battery_ids))).all()
+    battery_map = {b.id: b.status for b in current_batteries}
+    
+    if not battery_map:
+        return {"updated_count": 0, "total_requested": len(req.battery_ids)}
+
+    from sqlalchemy import update
+    stmt = update(Battery).where(Battery.id.in_(battery_map.keys())).values(
+        status=req.status,
+        updated_at=datetime.now(UTC)
+    )
+    session.exec(stmt)
+
+    audit_logs = [
+        BatteryAuditLog(
+            battery_id=bid,
+            changed_by=current_user.id,
+            field_changed="status",
+            old_value=str(old_status),
+            new_value=req.status,
+            reason="Bulk update by admin"
+        ) for bid, old_status in battery_map.items()
+    ]
+    if audit_logs:
+        session.add_all(audit_logs)
 
     session.commit()
-    return {"updated_count": updated, "total_requested": len(req.battery_ids)}
+    return {"updated_count": len(battery_map), "total_requested": len(req.battery_ids)}
 
 @router.get("/{battery_id}", response_model=BatteryDetailResponse)
 def get_battery_detail(
