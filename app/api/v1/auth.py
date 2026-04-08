@@ -1268,7 +1268,6 @@ def admin_login(
     # Persist last login alongside the new session in the same commit.
     user.last_login = datetime.now(UTC)
     db.add(user)
-    db.flush()  # ensure hashed_password + last_login hit the DB before session commit
 
     AuthService.create_user_session(
         db, 

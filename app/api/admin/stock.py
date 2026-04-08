@@ -51,15 +51,25 @@ def get_stock_overview(db: Session = Depends(get_db)):
     """Fleet-wide stock summary"""
     def _load():
         stations_count = db.exec(select(func.count(Station.id))).first() or 0
-        total_batteries = db.exec(select(func.count(Battery.id))).first() or 0
 
-        total_rented = db.exec(select(func.count(Battery.id)).where(Battery.status == BatteryStatus.RENTED)).first() or 0
-        total_available = db.exec(select(func.count(Battery.id)).where(Battery.status == BatteryStatus.AVAILABLE)).first() or 0
-        total_maintenance = db.exec(select(func.count(Battery.id)).where(Battery.status == BatteryStatus.MAINTENANCE)).first() or 0
+        # Single aggregation query replaces 6 separate COUNT queries
+        from sqlalchemy import case
+        row = db.exec(select(
+            func.count(Battery.id),
+            func.coalesce(func.sum(case((Battery.status == BatteryStatus.RENTED, 1), else_=0)), 0),
+            func.coalesce(func.sum(case((Battery.status == BatteryStatus.AVAILABLE, 1), else_=0)), 0),
+            func.coalesce(func.sum(case((Battery.status == BatteryStatus.MAINTENANCE, 1), else_=0)), 0),
+            func.coalesce(func.sum(case((Battery.location_type == LocationType.WAREHOUSE, 1), else_=0)), 0),
+            func.coalesce(func.sum(case((Battery.location_type == LocationType.SERVICE_CENTER, 1), else_=0)), 0),
+        )).one()
+
+        total_batteries = int(row[0])
+        total_rented = int(row[1])
+        total_available = int(row[2])
+        total_maintenance = int(row[3])
+        warehouse_count = int(row[4])
+        service_count = int(row[5])
         avg_utilization = (total_rented / total_batteries * 100) if total_batteries > 0 else 0.0
-
-        warehouse_count = db.exec(select(func.count(Battery.id)).where(Battery.location_type == LocationType.WAREHOUSE)).first() or 0
-        service_count = db.exec(select(func.count(Battery.id)).where(Battery.location_type == LocationType.SERVICE_CENTER)).first() or 0
 
         # Grouped battery stats by station ID
         b_stats = db.exec(

@@ -35,49 +35,62 @@ def list_batteries(
     limit: int = 20,
     current_user: User = Depends(get_current_active_admin)
 ):
-    from sqlalchemy.orm import selectinload
-    query = select(Battery).options(
-        selectinload(Battery.sku),
-        selectinload(Battery.iot_device)
-    )
-    count_query = select(func.count(Battery.id))
-
-    # Apply filters to both queries
-    if status:
-        query = query.where(Battery.status == status)
-        count_query = count_query.where(Battery.status == status)
-    if location_type:
-        query = query.where(Battery.location_type == location_type)
-        count_query = count_query.where(Battery.location_type == location_type)
-    if battery_type:
-        query = query.where(Battery.battery_type == battery_type)
-        count_query = count_query.where(Battery.battery_type == battery_type)
-    if min_health is not None:
-        query = query.where(Battery.health_percentage >= min_health)
-        count_query = count_query.where(Battery.health_percentage >= min_health)
-    if max_health is not None:
-        query = query.where(Battery.health_percentage <= max_health)
-        count_query = count_query.where(Battery.health_percentage <= max_health)
-    if search:
-        search_filter = or_(
-            Battery.serial_number.ilike(f"%{search}%"),
-            Battery.manufacturer.ilike(f"%{search}%"),
-            Battery.notes.ilike(f"%{search}%")
+    def _load():
+        from sqlalchemy.orm import selectinload
+        query = select(Battery).options(
+            selectinload(Battery.sku),
+            selectinload(Battery.iot_device)
         )
-        query = query.where(search_filter)
-        count_query = count_query.where(search_filter)
+        count_query = select(func.count(Battery.id))
 
-    # Sorting
-    sort_column = getattr(Battery, sort_by, Battery.created_at)
-    if sort_order == "asc":
-        query = query.order_by(sort_column.asc())
-    else:
-        query = query.order_by(sort_column.desc())
+        nonlocal status, location_type, battery_type, min_health, max_health, search
 
-    total_count = session.exec(count_query).one()
-    items = session.exec(query.offset(offset).limit(limit)).all()
+        # Apply filters to both queries
+        if status:
+            query = query.where(Battery.status == status)
+            count_query = count_query.where(Battery.status == status)
+        if location_type:
+            query = query.where(Battery.location_type == location_type)
+            count_query = count_query.where(Battery.location_type == location_type)
+        if battery_type:
+            query = query.where(Battery.battery_type == battery_type)
+            count_query = count_query.where(Battery.battery_type == battery_type)
+        if min_health is not None:
+            query = query.where(Battery.health_percentage >= min_health)
+            count_query = count_query.where(Battery.health_percentage >= min_health)
+        if max_health is not None:
+            query = query.where(Battery.health_percentage <= max_health)
+            count_query = count_query.where(Battery.health_percentage <= max_health)
+        if search:
+            search_filter = or_(
+                Battery.serial_number.ilike(f"%{search}%"),
+                Battery.manufacturer.ilike(f"%{search}%"),
+                Battery.notes.ilike(f"%{search}%")
+            )
+            query = query.where(search_filter)
+            count_query = count_query.where(search_filter)
 
-    return {"items": items, "total_count": total_count}
+        # Sorting
+        sort_column = getattr(Battery, sort_by, Battery.created_at)
+        if sort_order == "asc":
+            query = query.order_by(sort_column.asc())
+        else:
+            query = query.order_by(sort_column.desc())
+
+        total_count = session.exec(count_query).one()
+        items = session.exec(query.offset(offset).limit(limit)).all()
+
+        return {"items": [item.model_dump() for item in items], "total_count": total_count}
+
+    return cached_call(
+        "admin-batteries", "list",
+        status or "", location_type or "", battery_type or "",
+        str(min_health or ""), str(max_health or ""),
+        search or "", sort_by or "created_at", sort_order or "desc",
+        offset, limit,
+        ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS,
+        call=_load,
+    )
 
 @router.get("/summary", response_model=BatteryUtilizationResponse)
 def get_battery_summary(

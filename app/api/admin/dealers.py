@@ -80,27 +80,34 @@ def list_applications(
     current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """List dealer onboarding applications in the queue."""
-    statement = select(DealerApplication)
-    if stage:
-        statement = statement.where(DealerApplication.current_stage == stage)
-    
-    applications = db.exec(statement).all()
-    
-    dealer_ids = {app.dealer_id for app in applications if app.dealer_id}
-    dealer_map = {d.id: d for d in db.exec(select(DealerProfile).where(DealerProfile.id.in_(dealer_ids))).all()} if dealer_ids else {}
+    def _load():
+        statement = select(DealerApplication)
+        if stage:
+            statement = statement.where(DealerApplication.current_stage == stage)
 
-    result = []
-    for app in applications:
-        dealer = dealer_map.get(app.dealer_id)
-        result.append({
-            "id": app.id,
-            "dealer_id": app.dealer_id,
-            "business_name": dealer.business_name if dealer else "Unknown",
-            "current_stage": app.current_stage,
-            "created_at": app.created_at,
-            "updated_at": app.updated_at
-        })
-    return result
+        applications = db.exec(statement).all()
+
+        dealer_ids = {app.dealer_id for app in applications if app.dealer_id}
+        dealer_map = {d.id: d for d in db.exec(select(DealerProfile).where(DealerProfile.id.in_(dealer_ids))).all()} if dealer_ids else {}
+
+        result = []
+        for app in applications:
+            dealer = dealer_map.get(app.dealer_id)
+            result.append({
+                "id": app.id,
+                "dealer_id": app.dealer_id,
+                "business_name": dealer.business_name if dealer else "Unknown",
+                "current_stage": app.current_stage,
+                "created_at": app.created_at,
+                "updated_at": app.updated_at
+            })
+        return result
+
+    return cached_call(
+        "admin-dealers", "applications", stage or "",
+        ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS,
+        call=_load,
+    )
 
 @router.put("/applications/{app_id}/stage")
 def update_application_stage(

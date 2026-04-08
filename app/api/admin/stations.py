@@ -165,61 +165,69 @@ def list_stations(
     current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """List all stations with pagination, search, and filters."""
-    statement = select(Station)
+    def _load():
+        statement = select(Station)
 
-    if search:
-        statement = statement.where(
-            (Station.name.ilike(f"%{search}%")) |
-            (Station.address.ilike(f"%{search}%")) |
-            (Station.city.ilike(f"%{search}%"))
-        )
+        if search:
+            statement = statement.where(
+                (Station.name.ilike(f"%{search}%")) |
+                (Station.address.ilike(f"%{search}%")) |
+                (Station.city.ilike(f"%{search}%"))
+            )
 
-    if status:
-        statement = statement.where(Station.status == status)
+        if status:
+            statement = statement.where(Station.status == status)
 
-    if city:
-        statement = statement.where(Station.city.ilike(f"%{city}%"))
+        if city:
+            statement = statement.where(Station.city.ilike(f"%{city}%"))
 
-    if station_type:
-        statement = statement.where(Station.station_type == station_type)
+        if station_type:
+            statement = statement.where(Station.station_type == station_type)
 
-    count_stmt = select(func.count()).select_from(statement.subquery())
-    total_count = db.exec(count_stmt).one()
+        count_stmt = select(func.count()).select_from(statement.subquery())
+        total_count = db.exec(count_stmt).one()
 
-    statement = statement.order_by(Station.created_at.desc()).offset(skip).limit(limit)
-    stations = db.exec(statement).all()
+        statement = statement.order_by(Station.created_at.desc()).offset(skip).limit(limit)
+        stations = db.exec(statement).all()
 
-    result = []
-    for s in stations:
-        result.append({
-            "id": s.id,
-            "name": s.name,
-            "address": s.address,
-            "city": s.city,
-            "latitude": s.latitude,
-            "longitude": s.longitude,
-            "status": s.status.value if hasattr(s.status, 'value') else str(s.status),
-            "station_type": s.station_type,
-            "total_slots": s.total_slots,
-            "available_batteries": s.available_batteries,
-            "available_slots": s.available_slots,
-            "power_rating_kw": s.power_rating_kw,
-            "rating": s.rating,
-            "total_reviews": s.total_reviews,
-            "contact_phone": s.contact_phone,
-            "operating_hours": s.operating_hours,
-            "is_24x7": s.is_24x7,
-            "image_url": s.image_url,
-            "last_heartbeat": s.last_heartbeat.isoformat() if s.last_heartbeat else None,
-            "created_at": s.created_at.isoformat() if s.created_at else None,
-        })
+        result = []
+        for s in stations:
+            result.append({
+                "id": s.id,
+                "name": s.name,
+                "address": s.address,
+                "city": s.city,
+                "latitude": s.latitude,
+                "longitude": s.longitude,
+                "status": s.status.value if hasattr(s.status, 'value') else str(s.status),
+                "station_type": s.station_type,
+                "total_slots": s.total_slots,
+                "available_batteries": s.available_batteries,
+                "available_slots": s.available_slots,
+                "power_rating_kw": s.power_rating_kw,
+                "rating": s.rating,
+                "total_reviews": s.total_reviews,
+                "contact_phone": s.contact_phone,
+                "operating_hours": s.operating_hours,
+                "is_24x7": s.is_24x7,
+                "image_url": s.image_url,
+                "last_heartbeat": s.last_heartbeat.isoformat() if s.last_heartbeat else None,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+            })
 
-    return {
-        "stations": result,
-        "total_count": total_count,
-        "page": skip // limit + 1 if limit > 0 else 1,
-        "page_size": limit,
-    }
+        return {
+            "stations": result,
+            "total_count": total_count,
+            "page": skip // limit + 1 if limit > 0 else 1,
+            "page_size": limit,
+        }
+
+    return cached_call(
+        "admin-stations", "list",
+        skip, limit, search or "", status or "", city or "", station_type or "",
+        ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS,
+        call=_load,
+    )
 
 
 @router.get("/stats")
