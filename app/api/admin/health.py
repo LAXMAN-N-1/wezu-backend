@@ -846,23 +846,61 @@ def get_health_analytics(db: Session = Depends(get_db)):
             "critical": dist_row.critical,
         }
 
-        # 3. Top 5 worst degraders — only fetch IDs + needed fields
-        batteries = db.exec(select(Battery)).all()
-        degraders = []
-        if batteries:
-            b_ids = [b.id for b in batteries]
-            rates = _compute_bulk_degradation_rates(b_ids, db)
-            
-            for b in batteries:
-                rate = rates.get(b.id, 0.0)
-                degraders.append(WorstDegrader(
-                    battery_id=str(b.id),
-                    serial_number=b.serial_number,
-                    degradation_rate=rate,
-                    current_health=b.health_percentage
-                ))
-            degraders.sort(key=lambda x: x.degradation_rate, reverse=True)
-        top5 = degraders[:5]
+        # 3. Top 5 worst degraders — computed purely in SQL
+        thirty_days_ago = now - timedelta(days=30)
+        
+        # Subquery for the first reading in last 30 days
+        first_readings = (
+            select(
+                BatteryHealthSnapshot.battery_id,
+                func.min(col(BatteryHealthSnapshot.recorded_at)).label("first_time")
+            )
+            .where(col(BatteryHealthSnapshot.recorded_at) >= thirty_days_ago)
+            .group_by(BatteryHealthSnapshot.battery_id)
+            .subquery()
+        )
+        
+        # Subquery for the last reading in last 30 days
+        last_readings = (
+            select(
+                BatteryHealthSnapshot.battery_id,
+                func.max(col(BatteryHealthSnapshot.recorded_at)).label("last_time")
+            )
+            .where(col(BatteryHealthSnapshot.recorded_at) >= thirty_days_ago)
+            .group_by(BatteryHealthSnapshot.battery_id)
+            .subquery()
+        )
+
+        s1 = aliased(BatteryHealthSnapshot)
+        s2 = aliased(BatteryHealthSnapshot)
+
+        # Get the drop between first and last reading, filtered for top 5 drops
+        degraders_query = (
+            select(
+                Battery.id,
+                Battery.serial_number,
+                Battery.health_percentage,
+                (s1.health_percentage - s2.health_percentage).label("drop_amount")
+            )
+            .select_from(Battery)
+            .join(first_readings, Battery.id == first_readings.c.battery_id)
+            .join(s1, and_(s1.battery_id == Battery.id, s1.recorded_at == first_readings.c.first_time))
+            .join(last_readings, Battery.id == last_readings.c.battery_id)
+            .join(s2, and_(s2.battery_id == Battery.id, s2.recorded_at == last_readings.c.last_time))
+            .where((s1.health_percentage - s2.health_percentage) > 0)
+            .order_by((s1.health_percentage - s2.health_percentage).desc())
+            .limit(5)
+        )
+        
+        worst_rows = db.exec(degraders_query).all()
+        top5 = [
+            WorstDegrader(
+                battery_id=str(r.id),
+                serial_number=r.serial_number,
+                degradation_rate=round(float(r.drop_amount), 2),
+                current_health=r.health_percentage
+            ) for r in worst_rows
+        ]
 
         # 4. Maintenance compliance — 2 queries → 1 CASE
         maint_row = db.exec(

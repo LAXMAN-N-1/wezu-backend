@@ -94,7 +94,7 @@ def get_analytics_overview(
             "battery_swaps": {"total": swaps_current, "growth": get_percentage_change(swaps_current, swaps_prev)},
             "fleet_utilization": {"percentage": utilization, "growth": 0.0}
         }
-    return cached_call("analytics_overview", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)
+    return cached_call("admin-analytics", "overview", "30d", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)
 
 @router.get("/trends")
 def get_analytics_trends(
@@ -139,7 +139,7 @@ def get_analytics_trends(
             "revenue": revenue_data,
             "swaps": swaps_data
         }
-    return cached_call("analytics_trends", period, ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)
+    return cached_call("admin-analytics", "trends", period, ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)
 
 @router.get("/battery-health-distribution")
 def get_battery_health_distribution(
@@ -162,7 +162,7 @@ def get_battery_health_distribution(
             {"status": "Fair", "count": row.fair, "color": "#F59E0B"},
             {"status": "Critical", "count": row.critical, "color": "#EF4444"}
         ]
-    return cached_call("analytics_battery_health", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)
+    return cached_call("admin-analytics", "battery-health-distribution", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)
 
 @router.get("/revenue/by-region")
 def get_revenue_by_region(
@@ -184,7 +184,7 @@ def get_revenue_by_region(
             ]
             
         return [{"region": r.city or "Unknown", "value": r.swaps_count * 50} for r in results]
-    return cached_call("analytics_rev_region", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)
+    return cached_call("admin-analytics", "revenue-by-region", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)
 
 @router.get("/revenue/by-station")
 def get_revenue_by_station(
@@ -203,7 +203,7 @@ def get_revenue_by_station(
             return [{"station": "No Data", "value": 0}]
             
         return [{"station": r.name, "value": r.swaps_count * 50} for r in results]
-    return cached_call("analytics_rev_station", period, ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)
+    return cached_call("admin-analytics", "revenue-by-station", period, ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)
 
 @router.get("/recent-activity")
 def get_recent_activity(
@@ -228,7 +228,8 @@ def get_recent_activity(
             })
         
         return activities
-    return cached_call("analytics_recent_activity", ttl_seconds=60, call=_fetch)
+    # Ensure "recent-activity" matches dashboard default of "all"
+    return cached_call("admin-analytics", "recent-activity", "all", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)
 
 @router.get("/top-stations")
 def get_top_stations(
@@ -254,7 +255,7 @@ def get_top_stations(
                 "status": st.status
             } for st, count in results
         ]
-    return cached_call("analytics_top_stations", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)
+    return cached_call("admin-analytics", "top-stations", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)
 
 @router.get("/conversion-funnel")
 def get_conversion_funnel(
@@ -280,7 +281,7 @@ def get_conversion_funnel(
             {"stage": "KYC Approved", "value": kyc_approved},
             {"stage": "First Swap", "value": active_swappers}
         ]
-    return cached_call("analytics_funnel", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)
+    return cached_call("admin-analytics", "conversion-funnel", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)
 
 @router.get("/demand-forecast")
 def get_demand_forecast(
@@ -300,7 +301,7 @@ def get_demand_forecast(
             "lower_bound": [avg_daily - 10 + (i * 5) for i in range(4)],
             "upper_bound": [avg_daily + 20 + (i * 5) for i in range(4)]
         }
-    return cached_call("analytics_demand_forecast", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)
+    return cached_call("admin-analytics", "demand-forecast", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)
 
 @router.get("/inventory-status")
 def get_inventory_status(
@@ -321,4 +322,4 @@ def get_inventory_status(
             "maintenance": row.maintenance,
             "dispatched": row.rented
         }
-    return cached_call("analytics_inventory", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)
+    return cached_call("admin-analytics", "inventory-status", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_fetch)
