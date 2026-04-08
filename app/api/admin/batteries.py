@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
-from fastapi.responses import ORJSONResponse
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select, func, or_, and_
 from typing import List, Optional
@@ -19,7 +18,7 @@ from app.api.deps import get_current_active_admin
 from app.models.user import User
 from app.utils.runtime_cache import cached_call
 
-router = APIRouter(default_response_class=ORJSONResponse)
+router = APIRouter()
 
 @router.get("", response_model=BatteryListResponse)
 def list_batteries(

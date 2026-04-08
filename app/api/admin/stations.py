@@ -1,6 +1,5 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import ORJSONResponse
 from sqlmodel import Session, select, func, case
 from typing import Any, List, Optional
 from datetime import datetime, UTC
@@ -17,7 +16,7 @@ from app.core.database import get_db
 from app.core.config import settings
 from app.utils.runtime_cache import cached_call
 
-router = APIRouter(default_response_class=ORJSONResponse)
+router = APIRouter()
 
 
 class StationCreateRequest(BaseModel):

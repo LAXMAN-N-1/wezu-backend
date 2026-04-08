@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import ORJSONResponse
 from sqlmodel import Session, select, func
 from sqlalchemy import case
 from sqlalchemy.orm import load_only
@@ -16,7 +15,7 @@ from app.models.rbac import Role
 from app.utils.runtime_cache import cached_call, invalidate_cache
 
 
-router = APIRouter(default_response_class=ORJSONResponse)
+router = APIRouter()
 
 
 def _invalidate_admin_user_cache() -> None:
