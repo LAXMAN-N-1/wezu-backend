@@ -247,7 +247,7 @@ def get_health_overview(db: Session = Depends(get_db)):
             ).model_dump()
 
         # Bulk degradation rates still need snapshots — keep existing logic but only fetch IDs
-        b_ids = [r[0] for r in db.exec(select(Battery.id)).all()]
+        b_ids = list(db.exec(select(Battery.id)).all())
         rates_90d = _compute_bulk_degradation_rates(b_ids, db, days=90)
         rates_30d = _compute_bulk_degradation_rates(b_ids, db, days=30)
 

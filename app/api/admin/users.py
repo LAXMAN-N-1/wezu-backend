@@ -196,7 +196,6 @@ def list_users(
                     User.user_type,
                     User.status,
                     User.kyc_status,
-                    User.is_active,
                     User.profile_picture,
                     User.role_id,
                     User.is_superuser,
