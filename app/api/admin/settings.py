@@ -26,18 +26,36 @@ def get_general_settings(
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_admin),
 ):
-    def _fetch():
+    if key:
+        def _fetch_one():
+            config = session.exec(
+                select(SystemConfig).where(SystemConfig.key == key)
+            ).first()
+            if not config:
+                return {}
+            return {
+                key: {
+                    "value": config.value,
+                    "description": config.description,
+                    "id": config.id,
+                }
+            }
+
+        return cached_call(
+            "admin_settings", "general", "key", key,
+            ttl_seconds=300,
+            call=_fetch_one,
+        )
+
+    def _fetch_all():
         configs = session.exec(select(SystemConfig)).all()
         return {c.key: {"value": c.value, "description": c.description, "id": c.id} for c in configs}
 
-    all_settings = cached_call(
-        "admin_settings", "general",
+    return cached_call(
+        "admin_settings", "general", "all",
         ttl_seconds=300,
-        call=_fetch,
+        call=_fetch_all,
     )
-    if key:
-        return {key: all_settings.get(key)} if key in all_settings else {}
-    return all_settings
 
 
 @router.patch("/general/{config_id}")
