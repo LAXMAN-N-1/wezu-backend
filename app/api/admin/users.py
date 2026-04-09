@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlmodel import Session, select, func
 from sqlalchemy import case
 from sqlalchemy.orm import load_only
@@ -160,6 +160,7 @@ def list_users(
     status: Optional[str] = None,
     user_type: Optional[str] = None,
     kyc_status: Optional[str] = None,
+    fields: Optional[str] = None,
     current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(get_db),
 ):
@@ -184,42 +185,76 @@ def list_users(
             filters.append(User.kyc_status == kyc_status)
 
         total_count = db.exec(select(func.count(User.id)).where(*filters)).one() or 0
-        users = db.exec(
-            select(User)
-            .where(*filters)
-            .options(
-                load_only(
-                    User.id,
-                    User.full_name,
-                    User.email,
-                    User.phone_number,
-                    User.user_type,
-                    User.status,
-                    User.kyc_status,
-                    User.profile_picture,
-                    User.role_id,
-                    User.is_superuser,
-                    User.created_at,
-                    User.last_login,
-                    User.deletion_reason,
-                    User.force_password_change,
-                )
-            )
-            .order_by(User.created_at.desc())
-            .offset(skip)
-            .limit(limit)
-        ).all()
-
-        role_ids = {u.role_id for u in users if u.role_id}
-        role_map = (
-            {r.id: r.name for r in db.exec(select(Role).where(Role.id.in_(role_ids))).all()}
-            if role_ids else {}
-        )
-
         user_list = []
-        for u in users:
-            role_name = role_map.get(u.role_id) if u.role_id else None
-            user_list.append(_serialize_user(u, role_name=role_name))
+        
+        if fields:
+            field_names = {"id"} | {f.strip() for f in fields.split(",")}
+            valid_cols = [getattr(User, fn) for fn in field_names if hasattr(User, fn)]
+            if valid_cols:
+                # Add role mapping injection if role is requested
+                fetch_roles = "role" in field_names or "role_name" in field_names
+                if fetch_roles and User.role_id not in valid_cols:
+                    valid_cols.append(User.role_id)
+                    
+                users = db.exec(select(*valid_cols).where(*filters).order_by(User.created_at.desc()).offset(skip).limit(limit)).all()
+                keys = [c.name for c in valid_cols]
+                
+                role_map = {}
+                if fetch_roles:
+                    # 'users' is a list of tuples, we must find the index of role_id
+                    rid_idx = keys.index("role_id")
+                    role_ids = {row[rid_idx] for row in users if row[rid_idx]}
+                    role_map = {r.id: r.name for r in db.exec(select(Role).where(Role.id.in_(role_ids))).all()} if role_ids else {}
+
+                for row in users:
+                    if len(valid_cols) == 1:
+                        row_dict = {keys[0]: row}
+                    else:
+                        row_dict = dict(zip(keys, row))
+                    
+                    if fetch_roles:
+                        row_dict["role"] = role_map.get(row_dict.get("role_id"))
+                        
+                    for k, v in row_dict.items():
+                        if hasattr(v, 'isoformat'): row_dict[k] = v.isoformat()
+                        elif hasattr(v, 'value'): row_dict[k] = v.value
+                    user_list.append(row_dict)
+        else:
+            users = db.exec(
+                select(User)
+                .where(*filters)
+                .options(
+                    load_only(
+                        User.id,
+                        User.full_name,
+                        User.email,
+                        User.phone_number,
+                        User.user_type,
+                        User.status,
+                        User.kyc_status,
+                        User.profile_picture,
+                        User.role_id,
+                        User.is_superuser,
+                        User.created_at,
+                        User.last_login,
+                        User.deletion_reason,
+                        User.force_password_change,
+                    )
+                )
+                .order_by(User.created_at.desc())
+                .offset(skip)
+                .limit(limit)
+            ).all()
+
+            role_ids = {u.role_id for u in users if u.role_id}
+            role_map = (
+                {r.id: r.name for r in db.exec(select(Role).where(Role.id.in_(role_ids))).all()}
+                if role_ids else {}
+            )
+
+            for u in users:
+                role_name = role_map.get(u.role_id) if u.role_id else None
+                user_list.append(_serialize_user(u, role_name=role_name))
 
         return {
             "items": user_list,
@@ -237,6 +272,7 @@ def list_users(
         status or "",
         user_type or "",
         kyc_status or "",
+        fields or "",
         ttl_seconds=max(settings.USER_ADMIN_CACHE_TTL_SECONDS, 120),
         call=_load_users,
     )
@@ -244,6 +280,7 @@ def list_users(
 
 @router.get("/summary")
 def get_user_summary(
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(get_db),
 ):
@@ -272,6 +309,8 @@ def get_user_summary(
         "summary",
         ttl_seconds=max(settings.USER_ADMIN_CACHE_TTL_SECONDS, 120),
         call=_load_summary,
+        stale_while_revalidate_seconds=3600,  # 1 hour stale tolerance
+        background_tasks=background_tasks,
     )
 
 

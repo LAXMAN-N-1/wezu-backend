@@ -4,6 +4,7 @@ import logging
 from threading import Event, Lock
 from time import monotonic, sleep
 from typing import Any, Callable, Hashable, Optional
+from fastapi import BackgroundTasks
 from urllib.parse import quote
 
 from app.core.config import settings
@@ -98,6 +99,8 @@ def cached_call(
     *cache_parts: Hashable,
     ttl_seconds: int,
     call: Callable[[], Any],
+    stale_while_revalidate_seconds: int = 0,
+    background_tasks: Optional[BackgroundTasks] = None,
 ) -> Any:
     if ttl_seconds <= 0:
         return call()
@@ -112,8 +115,35 @@ def cached_call(
 
     with _runtime_cache_lock:
         cached = _runtime_cache.get(cache_key)
-        if cached and cached[0] > now:
-            return cached[1]
+        if cached:
+            cached_expires_at, cached_result = cached
+            if cached_expires_at > now:
+                return cached_result
+            
+            # STALE-WHILE-REVALIDATE: Return instantly if within tolerance, shift generation to background
+            if stale_while_revalidate_seconds > 0 and now <= (cached_expires_at + stale_while_revalidate_seconds):
+                if background_tasks and _runtime_inflight.get(cache_key) is None:
+                    
+                    def _bg_revalidate():
+                        try:
+                            # Note: BackgroundTasks delay session teardown until finished
+                            new_res = call()
+                            _store_local_cache(cache_key, ttl_seconds, new_res)
+                            redis_client = _get_redis_client()
+                            if redis_client is not None:
+                                redis_client.setex(_redis_key(*cache_key), ttl_seconds, json.dumps(new_res, default=str))
+                        except Exception as e:
+                            logger.error(f"SWR background refresh failed: {e}")
+                        finally:
+                            with _runtime_cache_lock:
+                                _runtime_inflight.pop(cache_key, None)
+
+                    # Mark inflight to prevent multiple triggers
+                    inflight = _InFlightCall()
+                    _runtime_inflight[cache_key] = inflight
+                    background_tasks.add_task(_bg_revalidate)
+                    
+                return cached_result
 
         _prune_expired(now)
         inflight = _runtime_inflight.get(cache_key)

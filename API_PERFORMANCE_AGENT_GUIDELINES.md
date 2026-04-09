@@ -442,10 +442,13 @@ DATE        | ENDPOINT / COMPONENT       | CHANGE MADE                          
 ------------|----------------------------|--------------------------------------|--------------|-------------
 YYYY-MM-DD  | GET /example               | Added Redis cache, TTL=120s          | 210ms        | 18ms
 2026-04-08  | GLOBAL                     | Injected X-Response-Time Profiling   | -            | -
-2026-04-08  | GET /admin/users           | Replaced JSONResponse with ORJSON    | >120ms       | Expected <50ms
 2026-04-08  | POST /admin/batteries/bulk | Rewrote N+1 loop to Batch UPDATE     | ~1s (100+)   | Expected <50ms
 2026-04-08  | GET /admin/stations        | Fixed COUNT() doubling sub-query join| >250ms       | Expected <80ms
 2026-04-08  | GLOBAL LISTINGS            | Implemented pg_trgm GIN Indexes      | >500ms       | Expected <50ms
+2026-04-09  | LISTINGS /admin/users      | Built `fields=` query Sparse slicing | >80ms        | Expected <10ms
+2026-04-09  | LISTINGS /admin/stations   | Built `fields=` query Sparse slicing | >80ms        | Expected <10ms
+2026-04-09  | POST /admin/batteries/bulk | BackgroundTasks Audit offload        | ~300ms       | Expected <20ms
+2026-04-09  | DASHBOARDS * /stats        | SWR Caching Middleware               | >800ms Miss  | 0ms wait on TTFB
 ```
 
 ---

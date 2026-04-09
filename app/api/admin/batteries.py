@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select, func, or_, and_
 from typing import List, Optional
@@ -15,8 +15,17 @@ from app.schemas.battery import (
     BatteryBulkUpdateRequest, BatteryHealthHistoryResponse
 )
 from app.api.deps import get_current_active_admin
+from app.models.battery import Battery, BatteryAuditLog, BatteryHealthHistory, BatteryStatus
 from app.models.user import User
 from app.utils.runtime_cache import cached_call
+from app.core.database import engine
+
+def _insert_audit_logs_bg(audit_data_list: List[dict]) -> None:
+    """Fire and forget processor to insert audit logs out-of-band."""
+    with Session(engine) as bg_session:
+        logs = [BatteryAuditLog(**data) for data in audit_data_list]
+        bg_session.add_all(logs)
+        bg_session.commit()
 
 router = APIRouter()
 
@@ -174,10 +183,11 @@ def export_batteries(
 @router.post("/bulk-update")
 def bulk_update_batteries(
     req: BatteryBulkUpdateRequest,
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_admin)
 ):
-    """Bulk update battery status using optimized batch operations."""
+    """Bulk update battery status using optimistic background queueing operations for logging."""
     if not req.battery_ids:
         return {"updated_count": 0, "total_requested": 0}
 
@@ -194,9 +204,11 @@ def bulk_update_batteries(
         updated_at=datetime.now(UTC)
     )
     session.exec(stmt)
+    session.commit()
 
-    audit_logs = [
-        BatteryAuditLog(
+    # Pre-build native python payloads for the background thread without binding them to this closed session
+    audit_data = [
+        dict(
             battery_id=bid,
             changed_by=current_user.id,
             field_changed="status",
@@ -205,10 +217,9 @@ def bulk_update_batteries(
             reason="Bulk update by admin"
         ) for bid, old_status in battery_map.items()
     ]
-    if audit_logs:
-        session.add_all(audit_logs)
+    if audit_data:
+        background_tasks.add_task(_insert_audit_logs_bg, audit_data)
 
-    session.commit()
     return {"updated_count": len(battery_map), "total_requested": len(req.battery_ids)}
 
 @router.get("/{battery_id}", response_model=BatteryDetailResponse)

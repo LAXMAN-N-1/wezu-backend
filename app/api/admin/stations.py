@@ -1,5 +1,5 @@
 import json
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlmodel import Session, select, func, case
 from typing import Any, List, Optional
 from datetime import datetime, UTC
@@ -161,6 +161,7 @@ def list_stations(
     status: Optional[str] = None,
     city: Optional[str] = None,
     station_type: Optional[str] = None,
+    fields: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: Any = Depends(deps.get_current_active_admin),
 ):
@@ -182,33 +183,54 @@ def list_stations(
 
         total_count = db.exec(select(func.count(Station.id)).where(*filters)).one() or 0
 
-        statement = select(Station).where(*filters).order_by(Station.created_at.desc()).offset(skip).limit(limit)
-        stations = db.exec(statement).all()
-
         result = []
-        for s in stations:
-            result.append({
-                "id": s.id,
-                "name": s.name,
-                "address": s.address,
-                "city": s.city,
-                "latitude": s.latitude,
-                "longitude": s.longitude,
-                "status": s.status.value if hasattr(s.status, 'value') else str(s.status),
-                "station_type": s.station_type,
-                "total_slots": s.total_slots,
-                "available_batteries": s.available_batteries,
-                "available_slots": s.available_slots,
-                "power_rating_kw": s.power_rating_kw,
-                "rating": s.rating,
-                "total_reviews": s.total_reviews,
-                "contact_phone": s.contact_phone,
-                "operating_hours": s.operating_hours,
-                "is_24x7": s.is_24x7,
-                "image_url": s.image_url,
-                "last_heartbeat": s.last_heartbeat.isoformat() if s.last_heartbeat else None,
-                "created_at": s.created_at.isoformat() if s.created_at else None,
-            })
+        if fields:
+            field_names = {"id"} | {f.strip() for f in fields.split(",")}
+            valid_cols = [getattr(Station, fn) for fn in field_names if hasattr(Station, fn)]
+            statement = select(*valid_cols).where(*filters).order_by(Station.created_at.desc()).offset(skip).limit(limit)
+            rows = db.exec(statement).all()
+            keys = [c.name for c in valid_cols]
+            
+            for row in rows:
+                # SQLAlchemy 2.0 returns tuples for multi-column selects
+                if len(valid_cols) == 1:
+                    row_dict = {keys[0]: row}
+                else:
+                    row_dict = dict(zip(keys, row))
+                
+                # Format specific types for fast JSON
+                for k, v in row_dict.items():
+                    if hasattr(v, 'isoformat'):
+                        row_dict[k] = v.isoformat()
+                    elif hasattr(v, 'value'):
+                        row_dict[k] = v.value
+                result.append(row_dict)
+        else:
+            statement = select(Station).where(*filters).order_by(Station.created_at.desc()).offset(skip).limit(limit)
+            stations = db.exec(statement).all()
+            for s in stations:
+                result.append({
+                    "id": s.id,
+                    "name": s.name,
+                    "address": s.address,
+                    "city": s.city,
+                    "latitude": s.latitude,
+                    "longitude": s.longitude,
+                    "status": s.status.value if hasattr(s.status, 'value') else str(s.status),
+                    "station_type": s.station_type,
+                    "total_slots": s.total_slots,
+                    "available_batteries": s.available_batteries,
+                    "available_slots": s.available_slots,
+                    "power_rating_kw": s.power_rating_kw,
+                    "rating": s.rating,
+                    "total_reviews": s.total_reviews,
+                    "contact_phone": s.contact_phone,
+                    "operating_hours": s.operating_hours,
+                    "is_24x7": s.is_24x7,
+                    "image_url": s.image_url,
+                    "last_heartbeat": s.last_heartbeat.isoformat() if s.last_heartbeat else None,
+                    "created_at": s.created_at.isoformat() if s.created_at else None,
+                })
 
         return {
             "stations": result,
@@ -219,7 +241,7 @@ def list_stations(
 
     return cached_call(
         "admin-stations", "list",
-        skip, limit, search or "", status or "", city or "", station_type or "",
+        skip, limit, search or "", status or "", city or "", station_type or "", fields or "",
         ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS,
         call=_load,
     )
@@ -227,6 +249,7 @@ def list_stations(
 
 @router.get("/stats")
 def get_station_stats(
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: Any = Depends(deps.get_current_active_admin),
 ):
@@ -257,7 +280,13 @@ def get_station_stats(
             "avg_rating": round(float(row[8]), 2),
         }
 
-    return cached_call("admin-stations", "stats", ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS, call=_load)
+    return cached_call(
+        "admin-stations", "stats",
+        ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS,
+        call=_load,
+        stale_while_revalidate_seconds=3600,
+        background_tasks=background_tasks,
+    )
 
 
 @router.post("/")
