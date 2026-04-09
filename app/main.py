@@ -43,7 +43,8 @@ from app.api.v1 import (
     dealer_portal_auth, dealer_portal_dashboard, dealer_portal_tickets, 
     dealer_portal_customers, dealer_portal_settings, dealer_onboarding, 
     dealer_documents, dealer_portal_roles, dealer_portal_users, 
-    dealer_analytics, dealer_campaigns, dealer_stations, drivers, catalog,
+    dealer_analytics, dealer_campaigns, dealer_stations, dealer_portal_inventory,
+    drivers, catalog,
     admin_invoices, admin_financial_reports, admin_audit, admin_rbac, admin_users,
     admin_dealers
 )
@@ -333,6 +334,7 @@ app.include_router(dealer_portal_customers.router, prefix=f"{dealer_api}/analyti
 app.include_router(dealer_analytics.router, prefix=f"{dealer_api}/analytics", tags=["Dealer: Analytics"], dependencies=dealer_deps)
 app.include_router(dealer_campaigns.router, prefix=f"{dealer_api}/campaigns", tags=["Dealer: Campaigns"], dependencies=dealer_deps)
 app.include_router(dealer_onboarding.router, prefix=f"{dealer_api}/onboarding", tags=["Dealer: Onboarding"], dependencies=dealer_deps)
+app.include_router(dealer_portal_inventory.router, prefix=f"{dealer_api}/portal", tags=["Dealer: Inventory"], dependencies=dealer_deps)
 
 # ----------------------------
 # API V1 - Logistics & System

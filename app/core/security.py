@@ -5,7 +5,7 @@ from jose import jwt
 from passlib.context import CryptContext
 from app.core.config import settings
 
-pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+pwd_context = CryptContext(schemes=["pbkdf2_sha256", "bcrypt"], deprecated=["bcrypt"])
 
 def create_access_token(subject: Union[str, Any], expires_delta: timedelta = None, extra_claims: dict = None) -> str:
     if expires_delta:
@@ -41,7 +41,18 @@ def create_refresh_token(subject: Union[str, Any], jti: str = None) -> str:
     return encoded_jwt
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    if not hashed_password:
+        return False
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        # Corrupted or unrecognizable hash in DB — treat as invalid credentials
+        import structlog
+        structlog.get_logger().warning(
+            "verify_password: hash could not be identified, treating as invalid",
+            hash_prefix=hashed_password[:20] if hashed_password else "EMPTY",
+        )
+        return False
 
 def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)

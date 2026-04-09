@@ -94,6 +94,7 @@ from app.models.membership import UserMembership
 from app.models.oauth import BlacklistedToken
 from app.models.dealer_kyc import DealerKYCApplication, KYCStateTransition
 from app.models.dealer_inventory import DealerInventory, InventoryTransaction
+from app.models.dealer_stock_request import DealerStockRequest
 from app.models.stock import Stock
 from app.models.stock_movement import StockMovement
 from app.models.dealer_promotion import DealerPromotion, PromotionUsage
