@@ -88,7 +88,6 @@ class Battery(SQLModel, table=True):
     
     # Current Location Context
     # Polymorphic-like tracking: location_type enum ('warehouse', 'station', 'customer', 'transit')
-    location_type: Optional[str] = None 
     location_id: Optional[int] = None 
 
     
@@ -158,3 +157,12 @@ class BatteryHealthHistory(SQLModel, table=True):
     
     health_percentage: float
     recorded_at: datetime = Field(default_factory=datetime.utcnow)
+
+class RFIDMapping(SQLModel, table=True):
+    __tablename__ = "rfid_mappings"
+    __table_args__ = {"schema": "inventory"}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    rfid_tag: str = Field(index=True, unique=True)
+    battery_serial: str = Field(foreign_key="inventory.batteries.serial_number", index=True)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_by: Optional[int] = Field(default=None, foreign_key="core.users.id")

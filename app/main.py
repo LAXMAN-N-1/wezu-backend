@@ -25,7 +25,7 @@ from app.api.v1 import (
     settlements, telemetry, vehicles, locations, system, roles, 
     menus, role_rights, admin_kyc, audit, ml, inventory,
     admin_stations, station_monitoring, user_analytics,
-    indents, grn, station_camera, maintenance
+    indents, grn, station_camera, maintenance, dealer_support
 )
 from app.api.v1.admin import (
     support as admin_support, 
@@ -187,6 +187,7 @@ dealer_deps = [Depends(deps.get_current_user)] # Granular checks inside routers 
 app.include_router(dealers.router, prefix=f"{dealer_api}/profile", tags=["Dealer: Profile"], dependencies=dealer_deps)
 app.include_router(stock.router, prefix=f"{dealer_api}/stock", tags=["Dealer: Stock"], dependencies=dealer_deps)
 app.include_router(settlements.router, prefix=f"{dealer_api}/settlements", tags=["Dealer: Settlements"], dependencies=dealer_deps)
+app.include_router(dealer_support.router, prefix=f"{settings.API_V1_STR}/dealer-portal/tickets", tags=["Dealer Portal: Support"], dependencies=dealer_deps)
 
 # 4. Logistics Application Endpoints
 logistics_api = f"{settings.API_V1_STR}/logistics"
@@ -204,6 +205,12 @@ app.include_router(locations.router, prefix=f"{infra_api}/locations", tags=["Inf
 app.include_router(inventory.router, prefix=f"{settings.API_V1_STR}/inventory", tags=["Logistics: Inventory"])
 app.include_router(indents.router, prefix=f"{settings.API_V1_STR}/indents", tags=["Inventory: Indents"])
 app.include_router(grn.router, prefix=f"{settings.API_V1_STR}/grn", tags=["Inventory: GRN"])
+
+# RBAC Management Endpoints
+app.include_router(roles.router, prefix=f"{settings.API_V1_STR}/roles", tags=["RBAC: Roles"])
+app.include_router(menus.router, prefix=f"{settings.API_V1_STR}/menus", tags=["RBAC: Menus"])
+app.include_router(role_rights.router, prefix=f"{settings.API_V1_STR}/role-rights", tags=["RBAC: Role Rights"])
+
 
 
 

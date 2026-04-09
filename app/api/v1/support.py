@@ -13,6 +13,7 @@ from app.schemas.support import (
 )
 from app.schemas.feedback import FeedbackCreate, FeedbackResponse
 from app.schemas.faq import FAQResponse
+from app.services.support_service import SupportService
 from datetime import datetime
 import os
 import shutil
@@ -46,18 +47,20 @@ def create_ticket(
         user_id=current_user.id,
         subject=ticket_in.subject,
         category=ticket_in.category,
-        priority=ticket_in.priority
+        priority=ticket_in.priority,
+        description=ticket_in.description,
+        attachment_urls=ticket_in.attachment_urls or []
     )
     session.add(ticket)
     session.commit()
     session.refresh(ticket)
     
-    from app.services.support_service import SupportService
     SupportService.handle_new_ticket_message(
         db=session,
         ticket_id=ticket.id,
         sender_id=current_user.id,
-        message_text=ticket_in.description
+        message_text=ticket_in.description,
+        attachment_urls=ticket_in.attachment_urls
     )
     return ticket
 
@@ -99,13 +102,16 @@ def reply_ticket(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
     
-    from app.services.support_service import SupportService
-    SupportService.handle_new_ticket_message(
+    msg, created = SupportService.handle_new_ticket_message(
         db=session,
         ticket_id=ticket.id,
         sender_id=current_user.id,
-        message_text=reply_in.message
+        message_text=reply_in.message,
+        attachment_urls=reply_in.attachment_urls
     )
+    
+    if not created:
+        raise HTTPException(status_code=400, detail="Duplicate message: This message has already been sent to this ticket.")
     
     if ticket.status == "closed":
         ticket.status = "open"

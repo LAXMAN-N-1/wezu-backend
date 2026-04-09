@@ -71,7 +71,7 @@ class BatteryResponse(BatteryBase):
     # Tracking Info
     manufacturer: Optional[str] = None
     battery_type: Optional[str] = None
-    location_type: str
+    location_type: Optional[str] = None
     manufacture_date: Optional[datetime] = None
     purchase_date: Optional[datetime] = None
     warranty_expiry: Optional[datetime] = None
@@ -137,3 +137,24 @@ class BatteryListResponse(BaseModel):
 class BatteryBulkUpdateRequest(BaseModel):
     battery_ids: List[uuid.UUID]
     status: str
+
+# --- RFID Mapping Schemas ---
+class RFIDMappingCreate(BaseModel):
+    rfid_tag: str
+    battery_serial: str
+
+class RFIDMappingUpdate(BaseModel):
+    battery_serial: Optional[str] = None
+
+class RFIDMappingResponse(BaseModel):
+    id: int
+    rfid_tag: str
+    battery_serial: str
+    created_at: datetime
+    created_by: Optional[int] = None
+    
+    model_config = ConfigDict(from_attributes=True)
+
+class RFIDMappingListResponse(BaseModel):
+    items: List[RFIDMappingResponse]
+    total_count: int

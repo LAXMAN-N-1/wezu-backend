@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional, TYPE_CHECKING, List
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
+from sqlalchemy import Column, JSON
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -24,7 +25,9 @@ class SupportTicket(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     
     user_id: int = Field(foreign_key="core.users.id", index=True)
-    assigned_to: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    assigned_to_id: Optional[int] = Field(default=None, foreign_key="core.users.id")
+    station_id: Optional[int] = Field(default=None, foreign_key="stations.stations.id")
+    related_to_id: Optional[int] = Field(default=None, foreign_key="core.support_tickets.id")
     
     subject: str
     description: str
@@ -34,24 +37,35 @@ class SupportTicket(SQLModel, table=True):
     
     category: str = Field(default="general") # billing, technical, hardware, other
     
+    attachment_urls: List[str] = Field(default=[], sa_column=Column(JSON))
+    
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     resolved_at: Optional[datetime] = None
+    
+    # Feedback & CSAT
+    rating: Optional[int] = Field(default=None, ge=1, le=5)
+    rated_at: Optional[datetime] = None
 
     # Relationships
     user: "User" = Relationship(sa_relationship_kwargs={"foreign_keys": "[SupportTicket.user_id]"})
-    assignee: Optional["User"] = Relationship(sa_relationship_kwargs={"foreign_keys": "[SupportTicket.assigned_to]"})
+    assignee: Optional["User"] = Relationship(sa_relationship_kwargs={"foreign_keys": "[SupportTicket.assigned_to_id]"})
     messages: List["TicketMessage"] = Relationship(back_populates="ticket")
+    
+    related_to: Optional["SupportTicket"] = Relationship(
+        sa_relationship_kwargs={"remote_side": "SupportTicket.id", "foreign_keys": "[SupportTicket.related_to_id]"}
+    )
 
 class TicketMessage(SQLModel, table=True):
     __tablename__ = "ticket_messages"
     __table_args__ = {"schema": "core"}
     id: Optional[int] = Field(default=None, primary_key=True)
     ticket_id: int = Field(foreign_key="core.support_tickets.id", index=True)
-    sender_id: int = Field(foreign_key="core.users.id")
+    sender_id: Optional[int] = Field(default=None, foreign_key="core.users.id", nullable=True)
     
     message: str
     is_internal_note: bool = Field(default=False)
+    attachment_urls: List[str] = Field(default=[], sa_column=Column(JSON))
     
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
@@ -86,7 +100,7 @@ class ChatMessage(SQLModel, table=True):
     __table_args__ = {"schema": "core"}
     id: Optional[int] = Field(default=None, primary_key=True)
     session_id: int = Field(foreign_key="core.chat_sessions.id", index=True)
-    sender_id: int = Field(default=0) # 0 for system/bot
+    sender_id: Optional[int] = Field(default=None) # None for system/bot
     
     message: str
     created_at: datetime = Field(default_factory=datetime.utcnow)

@@ -8,14 +8,16 @@ import csv
 import io
 
 from app.core.database import get_db
-from app.models.battery import Battery, BatteryStatus, BatteryAuditLog, BatteryHealthHistory, LocationType, BatteryLifecycleEvent
+from app.models.battery import Battery, BatteryStatus, BatteryAuditLog, BatteryHealthHistory, LocationType, BatteryLifecycleEvent, RFIDMapping
 from app.schemas.battery import (
     BatteryResponse, BatteryCreate, BatteryUpdate, BatteryDetailResponse,
     BatteryUtilizationResponse, BatteryAuditLogResponse, BatteryListResponse,
-    BatteryBulkUpdateRequest, BatteryHealthHistoryResponse
+    BatteryBulkUpdateRequest, BatteryHealthHistoryResponse, RFIDMappingCreate,
+    RFIDMappingResponse, RFIDMappingListResponse, RFIDMappingUpdate
 )
 from app.api.deps import get_current_active_admin
 from app.models.user import User
+from app.services.qr_service import QRCodeService
 
 router = APIRouter()
 
@@ -326,3 +328,143 @@ async def import_batteries(
         "error_count": len(errors),
         "errors": errors if dry_run else []
     }
+
+@router.post("/rfid-map", response_model=BatteryResponse)
+def map_rfid_tag(
+    mapping_in: RFIDMappingCreate,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_admin)
+):
+    """
+    Map physical RFID tags to digital battery serial records.
+    """
+    # 1. Validate battery existence
+    battery = session.exec(select(Battery).where(Battery.serial_number == mapping_in.battery_serial)).first()
+    if not battery:
+        raise HTTPException(status_code=404, detail=f"Battery with serial {mapping_in.battery_serial} not found")
+
+    # 2. Check for duplicate RFID tag
+    existing_mapping = session.exec(select(RFIDMapping).where(RFIDMapping.rfid_tag == mapping_in.rfid_tag)).first()
+    if existing_mapping:
+        raise HTTPException(
+            status_code=409, 
+            detail=f"RFID tag {mapping_in.rfid_tag} is already mapped to battery {existing_mapping.battery_serial}"
+        )
+
+    # 3. Create mapping
+    new_mapping = RFIDMapping(
+        rfid_tag=mapping_in.rfid_tag,
+        battery_serial=mapping_in.battery_serial,
+        created_by=current_user.id
+    )
+    session.add(new_mapping)
+
+    # 4. Audit Log
+    audit_log = BatteryAuditLog(
+        battery_id=battery.id,
+        changed_by=current_user.id,
+        field_changed="rfid_mapping",
+        new_value=mapping_in.rfid_tag,
+        reason="RFID tag hardware mapping"
+    )
+    session.add(audit_log)
+
+    session.commit()
+    session.refresh(battery)
+    return battery
+
+@router.get("/rfid-map/list", response_model=RFIDMappingListResponse)
+def list_rfid_mappings(
+    session: Session = Depends(get_db),
+    battery_serial: Optional[str] = None,
+    rfid_tag: Optional[str] = None,
+    offset: int = 0,
+    limit: int = 20,
+    current_user: User = Depends(get_current_active_admin)
+):
+    """List all RFID tag mappings."""
+    query = select(RFIDMapping)
+    if battery_serial:
+        query = query.where(RFIDMapping.battery_serial == battery_serial)
+    if rfid_tag:
+        query = query.where(RFIDMapping.rfid_tag == rfid_tag)
+    
+    total = session.exec(select(func.count(RFIDMapping.id))).one()
+    items = session.exec(query.offset(offset).limit(limit)).all()
+    return {"items": items, "total_count": total}
+
+@router.get("/rfid-map/{rfid_tag}", response_model=RFIDMappingResponse)
+def get_rfid_mapping(
+    rfid_tag: str,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_admin)
+):
+    """Get details of a specific RFID tag mapping."""
+    mapping = session.exec(select(RFIDMapping).where(RFIDMapping.rfid_tag == rfid_tag)).first()
+    if not mapping:
+        raise HTTPException(status_code=404, detail=f"RFID tag {rfid_tag} not found")
+    return mapping
+
+@router.patch("/rfid-map/{rfid_tag}", response_model=RFIDMappingResponse)
+def update_rfid_mapping(
+    rfid_tag: str,
+    mapping_in: RFIDMappingUpdate,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_admin)
+):
+    """Update an existing RFID tag mapping."""
+    mapping = session.exec(select(RFIDMapping).where(RFIDMapping.rfid_tag == rfid_tag)).first()
+    if not mapping:
+        raise HTTPException(status_code=404, detail=f"RFID tag {rfid_tag} not found")
+    
+    if mapping_in.battery_serial:
+        # Validate battery existence
+        battery = session.exec(select(Battery).where(Battery.serial_number == mapping_in.battery_serial)).first()
+        if not battery:
+            raise HTTPException(status_code=404, detail=f"Battery with serial {mapping_in.battery_serial} not found")
+        mapping.battery_serial = mapping_in.battery_serial
+        
+    session.add(mapping)
+    session.commit()
+    session.refresh(mapping)
+    return mapping
+
+@router.delete("/rfid-map/{rfid_tag}")
+def delete_rfid_mapping(
+    rfid_tag: str,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_admin)
+):
+    """Delete an RFID tag mapping."""
+    mapping = session.exec(select(RFIDMapping).where(RFIDMapping.rfid_tag == rfid_tag)).first()
+    if not mapping:
+        raise HTTPException(status_code=404, detail=f"RFID tag {rfid_tag} not found")
+    
+    session.delete(mapping)
+    session.commit()
+    return {"status": "success", "message": f"Mapping for tag {rfid_tag} deleted"}
+
+@router.get("/{battery_id}/barcode")
+def get_battery_barcode(
+    battery_id: uuid.UUID,
+    session: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_admin)
+):
+    """
+    Generate and download a QR code for the battery serial number.
+    """
+    # 1. Fetch battery
+    battery = session.get(Battery, battery_id)
+    if not battery:
+        raise HTTPException(status_code=404, detail="Battery not found")
+
+    # 2. Generate QR code bytes (encoding the serial number)
+    qr_buf = QRCodeService.generate_qr_code_bytes(battery.serial_number)
+
+    # 3. Return as downloadable PNG
+    filename = f"battery_{battery_id}_barcode.png"
+    return StreamingResponse(
+        qr_buf,
+        media_type="image/png",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
