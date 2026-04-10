@@ -5,12 +5,17 @@ inventory, update rules, and schedule maintenance.
 
 from typing import Any, List
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlmodel import Session, select, func
 from datetime import datetime, UTC
+import csv
+import io
 
 from app.db.session import get_session
 from app.api.deps import get_current_user
+from app.core.config import settings
+from jose import jwt
+from app.schemas.user import TokenPayload
 from app.models.user import User
 from app.models.dealer import DealerProfile
 from app.models.station import Station, StationSlot
@@ -1051,6 +1056,35 @@ def update_opening_hours(
     return DealerStationService.update_opening_hours(db, station_id, dealer_id, data.hours)
 
 
+@router.patch("/{station_id}/settings")
+def update_station_settings(
+    station_id: int,
+    data: StationUpdate,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Update primary details of a station."""
+    dealer_id = _get_dealer_id(db, current_user.id)
+    station = db.exec(
+        select(Station).where(Station.id == station_id, Station.dealer_id == dealer_id)
+    ).first()
+    if not station:
+        raise HTTPException(status_code=404, detail="Station not found")
+
+    update_data = data.dict(exclude_unset=True)
+    if not update_data:
+        return station
+
+    for key, val in update_data.items():
+        setattr(station, key, val)
+        
+    station.updated_at = datetime.now(UTC)
+    db.add(station)
+    db.commit()
+    db.refresh(station)
+    return station
+
+
 @router.post("/{station_id}/schedule-maintenance")
 def schedule_maintenance(
     station_id: int,
@@ -1072,4 +1106,117 @@ def fetch_inventory_alerts(
     """Fetch low-inventory alerts across all dealer stations based on custom thresholds."""
     dealer_id = _get_dealer_id(db, current_user.id)
     return DealerStationService.get_low_inventory_alerts(db, dealer_id)
+
+def get_user_from_qs(token: str = Query(...), db: Session = Depends(get_session)):
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        token_data = TokenPayload(**payload)
+        user = db.exec(select(User).where(User.id == int(token_data.sub))).first()
+        if not user or not user.is_active:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return user
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+@router.get("/{station_id}/export/swaps")
+def export_swaps_csv(
+    station_id: int,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_user_from_qs),
+):
+    dealer_id = _get_dealer_id(db, current_user.id)
+    station = db.exec(select(Station).where(Station.id == station_id, Station.dealer_id == dealer_id)).first()
+    if not station:
+        raise HTTPException(status_code=404, detail="Station not found")
+
+    swaps = db.exec(select(SwapSession).where(SwapSession.station_id == station_id).order_by(SwapSession.created_at.desc())).all()
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Swap ID", "Customer ID", "Old Battery ID", "Old SOC (%)", "New Battery ID", "New SOC (%)", "Amount", "Status", "Date"])
+    
+    for s in swaps:
+        writer.writerow([
+            s.id, s.user_id, s.old_battery_id or "", s.old_battery_soc or "", 
+            s.new_battery_id or "", s.new_battery_soc or "", s.swap_amount, s.status, s.created_at
+        ])
+    
+    return Response(content=output.getvalue(), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=station_{station_id}_swaps.csv"})
+
+
+@router.get("/{station_id}/export/rentals")
+def export_rentals_csv(
+    station_id: int,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_user_from_qs),
+):
+    dealer_id = _get_dealer_id(db, current_user.id)
+    station = db.exec(select(Station).where(Station.id == station_id, Station.dealer_id == dealer_id)).first()
+    if not station:
+        raise HTTPException(status_code=404, detail="Station not found")
+
+    rentals = db.exec(select(Rental).where(Rental.start_station_id == station_id).order_by(Rental.start_time.desc())).all()
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Rental ID", "Customer ID", "Battery ID", "Status", "Total Amount", "Start Time", "End Time"])
+    
+    for r in rentals:
+        writer.writerow([
+            r.id, r.user_id, r.battery_id, r.status, r.total_amount, r.start_time, r.end_time or ""
+        ])
+    
+    return Response(content=output.getvalue(), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=station_{station_id}_rentals.csv"})
+
+
+@router.get("/{station_id}/export/reviews")
+def export_reviews_csv(
+    station_id: int,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_user_from_qs),
+):
+    dealer_id = _get_dealer_id(db, current_user.id)
+    station = db.exec(select(Station).where(Station.id == station_id, Station.dealer_id == dealer_id)).first()
+    if not station:
+        raise HTTPException(status_code=404, detail="Station not found")
+
+    reviews = db.exec(select(Review).where(Review.station_id == station_id).order_by(Review.created_at.desc())).all()
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Review ID", "Customer ID", "Rating", "Comment", "Replied", "Date"])
+    
+    for r in reviews:
+        writer.writerow([
+            r.id, r.user_id, r.rating, r.comment or "", 
+            "Yes" if r.dealer_reply else "No", r.created_at
+        ])
+    
+    return Response(content=output.getvalue(), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=station_{station_id}_reviews.csv"})
+
+
+@router.get("/{station_id}/export/batteries")
+def export_batteries_csv(
+    station_id: int,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_user_from_qs),
+):
+    dealer_id = _get_dealer_id(db, current_user.id)
+    station = db.exec(select(Station).where(Station.id == station_id, Station.dealer_id == dealer_id)).first()
+    if not station:
+        raise HTTPException(status_code=404, detail="Station not found")
+
+    batteries = db.exec(select(Battery).where(Battery.current_station_id == station_id).order_by(Battery.battery_code)).all()
+    
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Battery ID", "Battery Code", "Status", "SOC (%)", "Health Status", "Cycles", "Last Seen"])
+    
+    for b in batteries:
+        writer.writerow([
+            b.id, b.battery_code, b.status, b.soc, b.health_status, b.cycles, b.last_seen_at
+        ])
+    
+    return Response(content=output.getvalue(), media_type="text/csv", headers={"Content-Disposition": f"attachment; filename=station_{station_id}_batteries.csv"})
 

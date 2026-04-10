@@ -483,3 +483,236 @@ def get_payout_schedule(
         })
         
     return {"data": data, "total": len(data)}
+
+
+# ── Payouts ──────────────────────────────────────────────────
+
+@router.get("/payouts")
+def get_dealer_payouts(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Lists payout schedule, next payout countdown, and payout tracking statuses."""
+    from app.services.settlement_service import SettlementService
+    dealer = _get_dealer(db, current_user.id)
+    return SettlementService.get_dealer_payouts(db, current_user.id)
+
+
+# ── Transaction Detail & Disputes ─────────────────────────────
+
+@router.get("/transactions/{transaction_id}")
+def get_transaction_detail(
+    transaction_id: int,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Detailed transaction view with lifecycle timeline and linked entities."""
+    from app.models.rental_event import RentalEvent
+    from app.models.swap import SwapSession
+
+    dealer = _get_dealer(db, current_user.id)
+    stations = db.exec(
+        select(Station).where(Station.dealer_id == dealer.id)
+    ).all()
+    station_ids = [s.id for s in stations]
+
+    if not station_ids:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    # Find the rental (transaction)
+    rental = db.exec(
+        select(Rental).where(
+            Rental.id == transaction_id,
+            Rental.start_station_id.in_(station_ids),
+        )
+    ).first()
+
+    if not rental:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    # Get customer info
+    customer = db.get(User, rental.user_id)
+    start_station = db.get(Station, rental.start_station_id) if rental.start_station_id else None
+    end_station = db.get(Station, rental.end_station_id) if rental.end_station_id else None
+
+    # Get lifecycle timeline from rental events
+    events = db.exec(
+        select(RentalEvent)
+        .where(RentalEvent.rental_id == rental.id)
+        .order_by(RentalEvent.created_at.asc())
+    ).all()
+
+    timeline = []
+    for event in events:
+        timeline.append({
+            "id": event.id,
+            "event_type": event.event_type,
+            "description": event.description,
+            "station_id": event.station_id,
+            "battery_id": event.battery_id,
+            "timestamp": event.created_at.isoformat(),
+        })
+
+    # If no events exist, synthesize a basic timeline from the rental itself
+    if not timeline:
+        timeline.append({
+            "id": None,
+            "event_type": "start",
+            "description": f"Rental started at {start_station.name if start_station else 'Unknown'}",
+            "station_id": rental.start_station_id,
+            "battery_id": rental.battery_id,
+            "timestamp": rental.start_time.isoformat(),
+        })
+        if rental.end_time:
+            timeline.append({
+                "id": None,
+                "event_type": "completed",
+                "description": f"Rental completed at {end_station.name if end_station else start_station.name if start_station else 'Unknown'}",
+                "station_id": rental.end_station_id or rental.start_station_id,
+                "battery_id": rental.battery_id,
+                "timestamp": rental.end_time.isoformat(),
+            })
+
+    # Get linked swap sessions
+    swaps = db.exec(
+        select(SwapSession).where(SwapSession.rental_id == rental.id)
+    ).all()
+
+    linked_swaps = []
+    for swap in swaps:
+        linked_swaps.append({
+            "id": swap.id,
+            "old_battery_id": swap.old_battery_id,
+            "new_battery_id": swap.new_battery_id,
+            "amount": float(swap.swap_amount),
+            "status": swap.status,
+            "created_at": swap.created_at.isoformat(),
+            "completed_at": swap.completed_at.isoformat() if swap.completed_at else None,
+        })
+
+    return {
+        "id": rental.id,
+        "customer": {
+            "id": customer.id if customer else None,
+            "name": customer.full_name if customer else "Unknown",
+            "email": customer.email if customer else None,
+            "phone": customer.phone_number if customer else None,
+        },
+        "start_station": {
+            "id": start_station.id if start_station else None,
+            "name": start_station.name if start_station else "Unknown",
+        },
+        "end_station": {
+            "id": end_station.id if end_station else None,
+            "name": end_station.name if end_station else None,
+        } if end_station else None,
+        "battery_id": rental.battery_id,
+        "status": rental.status.value if hasattr(rental.status, 'value') else str(rental.status),
+        "start_time": rental.start_time.isoformat(),
+        "expected_end_time": rental.expected_end_time.isoformat(),
+        "end_time": rental.end_time.isoformat() if rental.end_time else None,
+        "total_amount": float(rental.total_amount or 0),
+        "security_deposit": float(rental.security_deposit or 0),
+        "late_fee": float(rental.late_fee or 0),
+        "currency": rental.currency,
+        "distance_traveled_km": float(rental.distance_traveled_km or 0),
+        "timeline": timeline,
+        "linked_swaps": linked_swaps,
+        "created_at": rental.created_at.isoformat(),
+    }
+
+
+from pydantic import BaseModel as _BaseModel
+
+class _TransactionDisputeRequest(_BaseModel):
+    reason: str
+
+
+@router.post("/transactions/{transaction_id}/dispute")
+def create_transaction_dispute(
+    transaction_id: int,
+    request: _TransactionDisputeRequest,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Allows dealer to raise a dispute on a specific transaction (rental)."""
+    from app.models.settlement_dispute import SettlementDispute
+    from app.models.settlement import Settlement
+    from app.models.commission import CommissionLog
+
+    dealer = _get_dealer(db, current_user.id)
+    stations = db.exec(
+        select(Station).where(Station.dealer_id == dealer.id)
+    ).all()
+    station_ids = [s.id for s in stations]
+
+    if not station_ids:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    # Verify rental belongs to dealer's stations
+    rental = db.exec(
+        select(Rental).where(
+            Rental.id == transaction_id,
+            Rental.start_station_id.in_(station_ids),
+        )
+    ).first()
+
+    if not rental:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    # Find the settlement linked to this transaction through commission logs
+    commission_log = db.exec(
+        select(CommissionLog).where(
+            CommissionLog.transaction_id == transaction_id,
+            CommissionLog.dealer_id == current_user.id,
+        )
+    ).first()
+
+    settlement_id = None
+    if commission_log and commission_log.settlement_id:
+        settlement_id = commission_log.settlement_id
+    else:
+        # Fallback: find the most recent settlement for this dealer
+        latest_settlement = db.exec(
+            select(Settlement).where(
+                Settlement.dealer_id == dealer.id,
+            ).order_by(Settlement.created_at.desc())
+        ).first()
+        if latest_settlement:
+            settlement_id = latest_settlement.id
+
+    if not settlement_id:
+        raise HTTPException(
+            status_code=400,
+            detail="No settlement found for this transaction. Disputes can only be raised against settled transactions.",
+        )
+
+    # Check for existing open dispute
+    existing = db.exec(
+        select(SettlementDispute).where(
+            SettlementDispute.settlement_id == settlement_id,
+            SettlementDispute.dealer_id == current_user.id,
+            SettlementDispute.status.in_(["open", "under_review"]),
+        )
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="An open dispute already exists for this settlement")
+
+    dispute = SettlementDispute(
+        settlement_id=settlement_id,
+        dealer_id=current_user.id,
+        reason=f"[Txn #{transaction_id}] {request.reason}",
+        status="open",
+    )
+    db.add(dispute)
+    db.commit()
+    db.refresh(dispute)
+
+    return {
+        "id": dispute.id,
+        "transaction_id": transaction_id,
+        "settlement_id": settlement_id,
+        "reason": dispute.reason,
+        "status": dispute.status,
+        "created_at": dispute.created_at.isoformat(),
+    }
