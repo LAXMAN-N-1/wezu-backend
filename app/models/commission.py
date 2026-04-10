@@ -8,7 +8,7 @@ class CommissionConfig(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
     # Target entity
-    dealer_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id")
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id")
 
     # Type of transaction
@@ -52,7 +52,7 @@ class CommissionLog(SQLModel, table=True):
     transaction_id: int = Field(foreign_key="transactions.id")
 
     # Beneficiary
-    dealer_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id")
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id")
 
     # Earnings

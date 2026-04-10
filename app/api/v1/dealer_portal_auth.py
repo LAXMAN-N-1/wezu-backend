@@ -22,6 +22,8 @@ from app.core.security import (
     verify_password,
 )
 from app.repositories.user_repository import user_repository
+from app.utils.audit_context import generate_action_id, log_audit_action
+from app.models.audit_log import AuditActionType
 
 router = APIRouter()
 logger = logging.getLogger("wezu_dealer_auth")
@@ -195,7 +197,15 @@ async def dealer_login(
 
     # Generate tokens
     token_jti = str(uuid.uuid4())
-    access_token = create_access_token(subject=user.id, extra_claims={"sid": token_jti})
+    session_id = generate_action_id("DLR")
+    access_token = create_access_token(
+        subject=user.id, 
+        extra_claims={
+            "sid": token_jti,
+            "session_id": session_id,
+            "role_prefix": "DLR"
+        }
+    )
     refresh_token = create_refresh_token(subject=user.id, jti=token_jti)
 
     user.last_login = datetime.now(UTC)
@@ -228,6 +238,17 @@ async def dealer_login(
                     perms[mod] = []
                 perms[mod].append(p.action)
             user_dict["permissions"] = perms
+
+    # Audit login
+    log_audit_action(
+        db=db,
+        action=AuditActionType.AUTH_LOGIN,
+        level="INFO",
+        resource_type="DEALER_USER",
+        target_id=user.id,
+        details=f"Dealer login successful for {user.email}"
+    )
+    db.commit()
 
     return {
         "access_token": access_token,

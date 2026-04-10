@@ -7,6 +7,7 @@ from typing import Optional, Dict, Any
 from sqlmodel import Session, select
 from app.core.database import engine
 from app.models.audit_log import AuditLog, SecurityEvent
+from app.utils.audit_context import log_audit_action
 from datetime import datetime, UTC
 
 logger = logging.getLogger(__name__)
@@ -26,22 +27,25 @@ class AuditService:
         user_agent: str = None,
         old_value: Dict[str, Any] = None,
         new_value: Dict[str, Any] = None,
+        response_time_ms: Optional[float] = None,
+        module: Optional[str] = None,
+        status: str = "success"
     ):
-        """Create an audit log entry with full change tracking."""
+        """Create an audit log entry with full change tracking using standard context."""
         try:
-            log = AuditLog(
-                user_id=user_id,
+            # We use log_audit_action which pulls trace/session from ContextVars
+            log_audit_action(
+                db=db,
                 action=action,
+                module=module,
+                status=status,
                 resource_type=resource_type,
-                resource_id=resource_id,
                 target_id=target_id,
-                details=details,
-                ip_address=ip_address,
-                user_agent=user_agent,
                 old_value=old_value,
                 new_value=new_value,
+                details=details,
+                response_time_ms=response_time_ms
             )
-            db.add(log)
             db.commit()
         except Exception as e:
             try:
@@ -56,23 +60,25 @@ class AuditService:
         user_id: Optional[int],
         resource: str,
         action: str,
-        status: str,
-        metadata: Dict[str, Any],
-        ip_address: Optional[str] = None
+        status: str = "success",
+        metadata: Dict[str, Any] = None,
+        ip_address: Optional[str] = None,
+        response_time_ms: Optional[float] = None,
+        module: Optional[str] = None
     ):
-        """Async version for middleware and high-frequency logging."""
+        """Async version for middleware/events using context-aware logging."""
         with Session(engine) as db:
             try:
-                log = AuditLog(
-                    user_id=user_id,
+                log_audit_action(
+                    db=db,
                     action=action,
+                    module=module,
+                    status=status,
                     resource_type=event_type,
-                    resource_id=resource,
                     details=f"Status: {status}",
-                    ip_address=ip_address,
-                    meta_data=metadata
+                    meta_data=metadata,
+                    response_time_ms=response_time_ms
                 )
-                db.add(log)
                 db.commit()
             except Exception as e:
                 try:
@@ -124,18 +130,48 @@ class AuditService:
     async def get_logs(self, user_id: int = None, page: int = 1, limit: int = 20):
         """Fetch paginated logs."""
         with Session(engine) as db:
-            query = select(AuditLog)
-            if user_id:
-                query = query.where(AuditLog.user_id == user_id)
-            
-            total = len(db.exec(query).all())
-            query = query.order_by(AuditLog.timestamp.desc()).offset((page - 1) * limit).limit(limit)
-            logs = db.exec(query).all()
-            
-            return {
-                "logs": [log.to_dict() if hasattr(log, "to_dict") else log for log in logs],
-                "total_count": total
-            }
+            return await self.get_logs_advanced(db=db, user_id=user_id, page=page, limit=limit)
+
+    async def get_logs_advanced(
+        self,
+        db: Session,
+        date_from: datetime = None,
+        date_to: datetime = None,
+        page: int = 1,
+        limit: int = 50,
+        level: str = None,
+        is_suspicious: bool = None,
+        ip_address: str = None,
+    ):
+        """Standardized enterprise-grade paginated log retrieval."""
+        query = self._build_query(
+            db=db,
+            user_id=user_id,
+            action=action,
+            resource_type=resource_type,
+            target_id=target_id,
+            module=module,
+            status=status,
+            trace_id=trace_id,
+            date_from=date_from,
+            date_to=date_to,
+            level=level,
+            is_suspicious=is_suspicious,
+            ip_address=ip_address
+        )
+        
+        # Count total
+        count_query = select(func.count()).select_from(query.alias())
+        total_count = db.exec(count_query).one()
+        
+        # Paginated fetch
+        offset = (page - 1) * limit
+        logs = db.exec(query.offset(offset).limit(limit)).all()
+        
+        return {
+            "logs": logs,
+            "total_count": total_count
+        }
 
     @staticmethod
     def _build_query(
@@ -146,6 +182,11 @@ class AuditService:
         target_id: int = None,
         date_from: datetime = None,
         date_to: datetime = None,
+        status: str = None,
+        trace_id: str = None,
+        level: str = None,
+        is_suspicious: bool = None,
+        ip_address: str = None,
     ):
         """Build a filtered query for audit logs (shared by list/export)."""
         query = select(AuditLog)
@@ -161,7 +202,56 @@ class AuditService:
             query = query.where(AuditLog.timestamp >= date_from)
         if date_to is not None:
             query = query.where(AuditLog.timestamp <= date_to)
+        if module is not None:
+            query = query.where(AuditLog.module == module)
+        if status is not None:
+            query = query.where(AuditLog.status == status)
+        if trace_id is not None:
+            query = query.where(AuditLog.trace_id == trace_id)
+        if level is not None:
+            query = query.where(AuditLog.level == level)
+        if is_suspicious is not None:
+            query = query.where(AuditLog.is_suspicious == is_suspicious)
+        if ip_address is not None:
+            query = query.where(AuditLog.ip_address == ip_address)
+            
         return query.order_by(AuditLog.timestamp.desc())
+
+    @staticmethod
+    def get_dashboard_counts(db: Session) -> Dict[str, Any]:
+        """Aggregate counts for the Audit & Security Dashboard status cards."""
+        from sqlalchemy import func
+        today = datetime.now(UTC).date()
+        
+        total_today = db.exec(
+            select(func.count(AuditLog.id)).where(func.date(AuditLog.timestamp) == today)
+        ).one()
+        
+        admin_actions = db.exec(
+            select(func.count(AuditLog.id))
+            .where(func.date(AuditLog.timestamp) == today)
+            .where(AuditLog.role_prefix == "ADM")
+        ).one()
+        
+        failed_logins = db.exec(
+            select(func.count(AuditLog.id))
+            .where(func.date(AuditLog.timestamp) == today)
+            .where(AuditLog.action == "AUTH_LOGIN")
+            .where(AuditLog.status == "failure")
+        ).one()
+        
+        critical_events = db.exec(
+            select(func.count(AuditLog.id))
+            .where(func.date(AuditLog.timestamp) == today)
+            .where(AuditLog.level == "CRITICAL")
+        ).one()
+        
+        return {
+            "total_today": total_today,
+            "admin_actions": admin_actions,
+            "failed_logins": failed_logins,
+            "critical_events": critical_events
+        }
 
     @staticmethod
     def export_logs_csv(
@@ -175,7 +265,8 @@ class AuditService:
         writer = csv.writer(output)
         writer.writerow([
             "id", "user_id", "action", "resource_type", "target_id",
-            "old_value", "new_value", "ip_address", "user_agent", "timestamp",
+            "old_value", "new_value", "ip_address", "user_agent", 
+            "module", "status", "trace_id", "timestamp",
         ])
         for log in logs:
             writer.writerow([
@@ -183,6 +274,7 @@ class AuditService:
                 json.dumps(log.old_value) if log.old_value else "",
                 json.dumps(log.new_value) if log.new_value else "",
                 log.ip_address, log.user_agent,
+                log.module, log.status, log.trace_id,
                 log.timestamp.isoformat() if log.timestamp else "",
             ])
         return output.getvalue()
@@ -205,6 +297,9 @@ class AuditService:
                 "new_value": log.new_value,
                 "ip_address": log.ip_address,
                 "user_agent": log.user_agent,
+                "module": log.module,
+                "status": log.status,
+                "trace_id": log.trace_id,
                 "timestamp": log.timestamp.isoformat() if log.timestamp else None,
             }
             for log in logs

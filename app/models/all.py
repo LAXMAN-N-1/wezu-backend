@@ -1,7 +1,10 @@
-# Core Identity & Role
-from app.models.user import User, UserType, UserStatus
-from app.models.user_profile import UserProfile
+# 1. Base / Support Models first
+from app.models.enums import *
+from app.models.location import Zone, City, Region, Country, Continent
+from app.models.address import Address
+from app.models.kyc import KYCDocument, KYCRecord, KYCRequest, KYCDocumentType, KYCDocumentStatus
 from app.models.rbac import Role, Permission, RolePermission, UserRole, UserAccessPath, AdminUserRole
+from app.models.user_profile import UserProfile
 from app.models.token import SessionToken
 from app.models.two_factor_auth import TwoFactorAuth
 from app.models.session import UserSession
@@ -54,9 +57,8 @@ from app.models.late_fee import LateFee, LateFeeWaiver
 from app.models.promo_code import PromoCode
 from app.models.referral import Referral
 
-# Support, KYC & Feedback
+# Support & Content
 from app.models.support import SupportTicket, TicketStatus, TicketPriority
-from app.models.kyc import KYCDocument, KYCRecord, KYCRequest, KYCDocumentType, KYCDocumentStatus
 from app.models.video_kyc import VideoKYCSession
 from app.models.feedback import Feedback
 from app.models.review import Review
@@ -66,9 +68,7 @@ from app.models.banner import Banner
 from app.models.legal import LegalDocument
 from app.models.media import MediaAsset
 
-# Location & Org
-from app.models.location import Zone, City, Region, Country, Continent
-from app.models.address import Address
+# Organization & Infrastructure
 from app.models.branch import Branch
 from app.models.organization import Organization, OrganizationSocialLink
 from app.models.warehouse import Warehouse
@@ -80,15 +80,15 @@ from app.models.notification_preference import NotificationPreference
 from app.models.audit_log import AuditLog, SecurityEvent
 from app.models.admin_user import AdminUser
 from app.models.admin_group import AdminGroup
-from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
 from app.models.driver_profile import DriverProfile
-from app.models.staff import StaffProfile
 from app.models.vendor import Vendor, VendorDocument
 from app.models.role_right import RoleRight
 from app.models.menu import Menu
 from app.models.favorite import Favorite
 from app.models.i18n import Translation
 from app.models.fraud import RiskScore, FraudCheckLog, Blacklist
+from app.models.security_settings import SecuritySettings
+from app.models.fraud_alert import FraudAlert
 from app.models.batch_job import BatchJob, JobExecution
 from app.models.membership import UserMembership
 from app.models.oauth import BlacklistedToken
@@ -107,3 +107,7 @@ from app.models.notification_admin import PushCampaign, AutomatedTrigger, Notifi
 from app.models.api_key import ApiKeyConfig
 
 
+# 4. Core Identity (Moved to bottom to ensure dependencies are registered)
+from app.models.user import User, UserType, UserStatus
+from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
+from app.models.staff import StaffProfile

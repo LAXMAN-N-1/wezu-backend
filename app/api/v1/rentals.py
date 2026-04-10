@@ -14,6 +14,8 @@ from app.services.rental_service import RentalService
 from app.services.late_fee_service import LateFeeService
 from app.services.invoice_service import InvoiceService
 from fastapi.responses import StreamingResponse
+from app.utils.audit_context import log_audit_action
+from app.models.audit_log import AuditActionType
 
 class PriceCalculationRequest(BaseModel):
     battery_id: int
@@ -84,7 +86,17 @@ async def create_rental(
     if not is_operational:
          raise HTTPException(status_code=400, detail=msg)
          
-    return RentalService.create_rental(db, current_user.id, rental_in)
+    rental = RentalService.create_rental(db, current_user.id, rental_in)
+    log_audit_action(
+        db=db,
+        action=AuditActionType.DATA_MODIFICATION,
+        level="INFO",
+        resource_type="RENTAL",
+        target_id=rental.id,
+        details=f"New rental created by user {current_user.id}"
+    )
+    db.commit()
+    return rental
 
 @router.get("/active", response_model=List[RentalResponse])
 async def read_active_rentals(
@@ -123,6 +135,16 @@ async def return_rental_battery(
     rental = RentalService.return_battery(db, rental_id, station_id)
     if rental.user_id != current_user.id:
          raise HTTPException(status_code=403, detail="Not authorized")
+    
+    log_audit_action(
+        db=db,
+        action=AuditActionType.DATA_MODIFICATION,
+        level="INFO",
+        resource_type="RENTAL",
+        target_id=rental.id,
+        details=f"Rental return initiated by user {current_user.id}"
+    )
+    db.commit()
     return rental
 
 # Rental Modifications

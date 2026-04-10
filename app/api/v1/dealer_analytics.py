@@ -264,3 +264,56 @@ def email_report(
     """Email the performance report to the dealer."""
     dealer_id = _get_dealer_id(db, current_user.id)
     return DealerAnalyticsService.email_report(db, dealer_id)
+
+@router.get("/commission-summary")
+def get_commission_summary(
+    from_date: str = Query(None),
+    to_date: str = Query(None),
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Aggregates Commission and Settlements for the Settlement Command Center."""
+    from app.models.settlement import Settlement
+    from app.models.commission import CommissionLog
+    from sqlalchemy import func
+    from datetime import datetime
+    
+    dealer_id = _get_dealer_id(db, current_user.id)
+    
+    settlement_q = select(Settlement).where(Settlement.dealer_id == dealer_id)
+    
+    if from_date:
+        try:
+            fd = datetime.fromisoformat(from_date.replace("Z", "+00:00"))
+            settlement_q = settlement_q.where(Settlement.created_at >= fd)
+        except: pass
+    if to_date:
+        try:
+            td = datetime.fromisoformat(to_date.replace("Z", "+00:00"))
+            settlement_q = settlement_q.where(Settlement.created_at <= td)
+        except: pass
+        
+    settlements = db.exec(settlement_q).all()
+    
+    gross_revenue = sum(s.total_revenue for s in settlements)
+    platform_fees = sum(s.platform_fee for s in settlements)
+    net_payout = sum(s.net_payable for s in settlements)
+    commission_earned = sum(s.total_commission for s in settlements)
+    
+    # Determine commission rate from config if possible
+    from app.models.commission import CommissionConfig
+    config = db.exec(
+        select(CommissionConfig)
+        .where(CommissionConfig.dealer_id == current_user.id)
+        .order_by(CommissionConfig.created_at.desc())
+    ).first()
+    
+    current_rate = config.percentage if config else 15.0
+    
+    return {
+        "gross_revenue": gross_revenue,
+        "platform_fees_deducted": platform_fees,
+        "commission_earned": commission_earned,
+        "net_payout": net_payout,
+        "current_commission_rate": current_rate
+    }

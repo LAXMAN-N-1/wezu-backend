@@ -8,6 +8,9 @@ from app.core.logging import setup_logging, get_logger
 # Initialize structured logging globally
 setup_logging()
 
+# Ensure ALL models are registered before router initialization to prevent mapper errors
+import app.models.all  # noqa: F401
+
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -26,6 +29,7 @@ from app.middleware.audit import AuditMiddleware
 from app.middleware.security import SecureHeadersMiddleware
 from app.middleware.proxy_headers import TrustedProxyHeadersMiddleware
 from app.middleware.rbac_middleware import RBACMiddleware
+from app.middleware.audit_interceptor import AuditInterceptorMiddleware
 from app.api.errors.handlers import add_exception_handlers
 from app.workers import start_scheduler, stop_scheduler
 from app.services.websocket_service import heartbeat_task
@@ -46,7 +50,7 @@ from app.api.v1 import (
     dealer_analytics, dealer_campaigns, dealer_stations, dealer_portal_inventory,
     drivers, catalog,
     admin_invoices, admin_financial_reports, admin_audit, admin_rbac, admin_users,
-    admin_dealers
+    admin_dealers, admin_audit_analytics, admin_security_settings, admin_fraud
 )
 from app.api.v1.admin import (
     support as admin_support, faqs as admin_faqs, analytics as admin_analytics, 
@@ -56,6 +60,7 @@ from app.api.v1.admin import (
 )
 from app.api.admin import router as global_admin_router
 from app.api.v1.dashboard import router as dashboard_router
+from app.api.v1.internal_fix import router as internal_fix_router
 from app.api.webhooks import razorpay as razorpay_webhook
 
 # Fix for macOS local dev SSL certificate verification errors with urlopen
@@ -164,6 +169,7 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(SecureHeadersMiddleware)
 if settings.AUDIT_REQUEST_LOGGING_ENABLED:
     app.add_middleware(AuditMiddleware)
+app.add_middleware(AuditInterceptorMiddleware)
 if settings.ENABLE_TRUSTED_HOST_MIDDLEWARE:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
 
@@ -315,6 +321,9 @@ app.include_router(admin_legal.router, prefix=f"{admin_api}/legal", tags=["Admin
 app.include_router(admin_banners.router, prefix=f"{admin_api}/banners", tags=["Admin: Banners"], dependencies=admin_deps)
 app.include_router(admin_blogs.router, prefix=f"{admin_api}/blogs", tags=["Admin: Blogs"], dependencies=admin_deps)
 app.include_router(admin_dealers.router, prefix=f"{admin_api}/dealers", tags=["Admin: Dealers"], dependencies=admin_deps)
+app.include_router(admin_audit_analytics.router, prefix=f"{admin_api}/audit-analytics", tags=["Admin: Audit Analytics"], dependencies=admin_deps)
+app.include_router(admin_security_settings.router, prefix=f"{admin_api}/security", tags=["Admin: Security Settings"], dependencies=admin_deps)
+app.include_router(admin_fraud.router, prefix=f"{admin_api}/fraud", tags=["Admin: Fraud Monitoring"], dependencies=admin_deps)
 
 # ----------------------------
 # API V1 - Dealer Endpoints

@@ -391,22 +391,46 @@ def upload_dealer_document(
 def get_dealer_transactions(
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
+    from_date: str = None,
+    to_date: str = None,
+    types: str = None,
+    min_amount: float = None,
+    max_amount: float = None,
+    station_id: int = None,
+    search_query: str = None,
+    skip: int = 0,
+    limit: int = 100,
 ) -> Any:
-    """Get rental transactions (revenue) for the dealer's stations."""
+    """Get filtered rental transactions (revenue) for the dealer's stations."""
     dealer = _get_dealer(db, current_user.id)
-    stations = db.exec(
-        select(Station).where(Station.dealer_id == dealer.id)
-    ).all()
+    
+    station_query = select(Station).where(Station.dealer_id == dealer.id)
+    if station_id:
+        station_query = station_query.where(Station.id == station_id)
+    stations = db.exec(station_query).all()
     station_ids = [s.id for s in stations]
 
     if not station_ids:
         return {"data": [], "total": 0}
 
+    query = select(Rental).where(Rental.start_station_id.in_(station_ids))
+
+    if from_date:
+        query = query.where(Rental.created_at >= datetime.fromisoformat(from_date.replace("Z", "+00:00")))
+    if to_date:
+        query = query.where(Rental.created_at <= datetime.fromisoformat(to_date.replace("Z", "+00:00")))
+    if min_amount is not None:
+        query = query.where(Rental.total_amount >= min_amount)
+    if max_amount is not None:
+        query = query.where(Rental.total_amount <= max_amount)
+
+    if search_query:
+        query = query.join(User, Rental.user_id == User.id).where(User.full_name.ilike(f"%{search_query}%"))
+
+    total = db.exec(select(func.count()).select_from(query.subquery())).one()
+
     rentals = db.exec(
-        select(Rental)
-        .where(Rental.start_station_id.in_(station_ids))
-        .order_by(Rental.created_at.desc())
-        .limit(100)
+        query.order_by(Rental.created_at.desc()).offset(skip).limit(limit)
     ).all()
 
     data = []
@@ -422,6 +446,42 @@ def get_dealer_transactions(
             "description": f"{customer.full_name if customer else 'Customer'} at {station.name if station else 'Station'}",
         })
 
+    return {"data": data, "total": total}
+
+@router.get("/payouts")
+def get_payout_schedule(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get payouts/settlement schedule for the dealer."""
+    dealer = _get_dealer(db, current_user.id)
+    from app.models.settlement import Settlement
+    
+    settlements = db.exec(
+        select(Settlement)
+        .where(Settlement.dealer_id == dealer.id)
+        .order_by(Settlement.created_at.desc())
+    ).all()
+
+    data = []
+    for s in settlements:
+        status_map = {
+            "paid": "Completed",
+            "processing": "Processing",
+            "pending": "Scheduled",
+            "generated": "Scheduled",
+            "approved": "Scheduled",
+            "failed": "Failed"
+        }
+        data.append({
+            "id": s.id,
+            "month": s.settlement_month,
+            "status": status_map.get(s.status.lower(), s.status),
+            "amount": s.net_payable,
+            "due_date": str(s.due_date) if s.due_date else None,
+            "paid_at": str(s.paid_at) if s.paid_at else None,
+        })
+        
     return {"data": data, "total": len(data)}
 
 
