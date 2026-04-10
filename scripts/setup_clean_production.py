@@ -9,6 +9,7 @@ sys.path.append(parent_dir)
 from sqlmodel import Session, select, delete
 from sqlalchemy import text
 from app.db.session import engine
+import app.models.all  # Crucial to initialize SQLAlchemy mappers completely
 from app.models.user import User, UserStatus, UserType
 from app.models.dealer import DealerProfile
 from app.models.rbac import Role, UserRole, AdminUserRole

@@ -14,6 +14,7 @@ sys.path.append(parent_dir)
 
 from sqlmodel import Session, select, func
 from app.db.session import engine
+import app.models.all  # Fix mapper init issues in standalone scripts
 import app.models.all
 from app.models.user import User, UserStatus, UserType
 from app.models.dealer import DealerProfile, DealerDocument
@@ -247,6 +248,36 @@ def seed_all():
         _safe_commit(db)
         print(f"  ✓ {rental_count} rentals seeded")
 
+        # ── 5.5. Seed swap sessions ──────────────────────────────
+        print("\n[5.5/10] Seeding swap sessions...")
+        from app.models.swap import SwapSession
+        swap_count = 0
+        for i in range(150):
+            if not all_batteries:
+                break
+            user = random.choice(customers)
+            st = random.choice(stations)
+            created = NOW - timedelta(days=random.randint(0, 30), hours=random.randint(0, 23))
+            
+            swap = SwapSession(
+                user_id=user.id,
+                station_id=st.id,
+                old_battery_id=random.choice(all_batteries).id,
+                new_battery_id=random.choice(all_batteries).id,
+                old_battery_soc=random.uniform(5.0, 30.0),
+                new_battery_soc=random.uniform(90.0, 100.0),
+                swap_amount=random.uniform(20.0, 150.0),
+                currency="INR",
+                status="completed",
+                payment_status="paid",
+                created_at=created,
+                completed_at=created + timedelta(minutes=random.randint(1, 5)),
+            )
+            db.add(swap)
+            swap_count += 1
+        _safe_commit(db)
+        print(f"  ✓ {swap_count} swap sessions seeded")
+
         # ── 6. Seed commission logs (revenue data) ────────────────
         print("\n[6/10] Seeding commission logs...")
         # Create transactions first for FK references
@@ -261,7 +292,7 @@ def seed_all():
                     existing = db.exec(select(func.count(CommissionLog.id)).where(
                         CommissionLog.dealer_id == dealer_user.id,
                     )).one()
-                    if existing and existing > 200:
+                    if existing and existing > 500:
                         break
                     db.add(CommissionLog(
                         transaction_id=txn_id,
@@ -274,6 +305,34 @@ def seed_all():
             print(f"  ✓ Commission logs seeded")
         else:
             print("  ⚠ No transactions found — skipping commission logs")
+
+        # ── 6.5. Seed settlements (platform fees, payouts) ──────────────
+        print("\n[6.5/10] Seeding settlements...")
+        from app.models.settlement import Settlement
+        for m in range(3):
+            s_date = (NOW - timedelta(days=30*m)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            # Find last day by adding 31 days and replacing day=1, then back 1 day
+            next_m = s_date.month % 12 + 1
+            next_y = s_date.year + (s_date.month // 12)
+            temp = s_date.replace(year=next_y, month=next_m, day=1)
+            e_date = (temp - timedelta(days=1)).replace(hour=23, minute=59, second=59)
+            
+            existing = db.exec(select(Settlement).where(Settlement.dealer_id == dealer.id, Settlement.settlement_month == s_date.strftime("%Y-%m"))).first()
+            if not existing:
+                db.add(Settlement(
+                    dealer_id=dealer.id,
+                    settlement_month=s_date.strftime("%Y-%m"),
+                    start_date=s_date,
+                    end_date=e_date,
+                    total_revenue=random.uniform(5000, 15000),
+                    total_commission=random.uniform(500, 1500),
+                    platform_fee=random.uniform(100, 500),
+                    net_payable=random.uniform(400, 1000),
+                    status="paid",
+                    created_at=e_date + timedelta(days=1)
+                ))
+        _safe_commit(db)
+        print("  ✓ Settlements seeded")
 
         # ── 7. Seed support tickets ───────────────────────────────
         print("\n[7/10] Seeding support tickets...")

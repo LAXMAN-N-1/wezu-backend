@@ -2,6 +2,7 @@ from sqlmodel import SQLModel, Field, Relationship
 from typing import List, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from app.models.user import User
+    from app.models.admin_user import AdminUser
     from app.models.role_right import RoleRight
 from datetime import datetime, UTC
 

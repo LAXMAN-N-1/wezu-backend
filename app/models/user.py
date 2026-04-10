@@ -3,6 +3,8 @@ from app.models.kyc import KYCRecord
 from app.models.rbac import UserRole
 from app.models.two_factor_auth import TwoFactorAuth
 from app.models.device import Device  # Ensure SQLAlchemy registry has Device for User.devices relationship.
+from app.models.staff import StaffProfile  # Ensure SQLAlchemy registry has StaffProfile for User.staff_profile
+from app.models.token import SessionToken  # Ensure SQLAlchemy registry has SessionToken for User.session_tokens
 from app.models.staff import StaffProfile
 from app.models.dealer import DealerProfile
 from app.models.kyc import KYCDocument
