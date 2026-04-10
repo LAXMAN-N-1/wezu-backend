@@ -19,6 +19,7 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 
 from app.core.config import settings
 from app.db.session import engine
+import app.models.all  # Force register all models so relationships map successfully
 from app.api import deps
 from app.middleware.rate_limit import limiter
 from app.middleware.audit import AuditMiddleware
@@ -42,7 +43,8 @@ from app.api.v1 import (
     dealer_portal_auth, dealer_portal_dashboard, dealer_portal_tickets, 
     dealer_portal_customers, dealer_portal_settings, dealer_onboarding, 
     dealer_documents, dealer_portal_roles, dealer_portal_users, 
-    dealer_analytics, dealer_campaigns, dealer_stations, drivers, catalog,
+    dealer_analytics, dealer_campaigns, dealer_stations, dealer_portal_inventory,
+    drivers, catalog,
     admin_invoices, admin_financial_reports, admin_audit, admin_rbac, admin_users,
     admin_dealers
 )
@@ -78,15 +80,7 @@ logger = get_logger(__name__)
 from app.utils.cors import cors_headers_for_origin
 
 CORS_ALLOWED_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
-CORS_ALLOWED_HEADERS = [
-    "Authorization",
-    "Content-Type",
-    "Accept",
-    "Origin",
-    "X-Requested-With",
-    "X-Request-ID",
-    "X-Correlation-ID",
-]
+CORS_ALLOWED_HEADERS = ["*"]
 
 
 class CORSErrorMiddleware(BaseHTTPMiddleware):
@@ -340,6 +334,7 @@ app.include_router(dealer_analytics.router, prefix=f"{dealer_api}/analytics", ta
 app.include_router(dealer_portal_customers.router, prefix=f"{dealer_api}/analytics", tags=["Dealer: Customers"], dependencies=dealer_deps)
 app.include_router(dealer_campaigns.router, prefix=f"{dealer_api}/campaigns", tags=["Dealer: Campaigns"], dependencies=dealer_deps)
 app.include_router(dealer_onboarding.router, prefix=f"{dealer_api}/onboarding", tags=["Dealer: Onboarding"], dependencies=dealer_deps)
+app.include_router(dealer_portal_inventory.router, prefix=f"{dealer_api}/portal", tags=["Dealer: Inventory"], dependencies=dealer_deps)
 
 # ----------------------------
 # API V1 - Logistics & System

@@ -15,6 +15,7 @@ sys.path.append(parent_dir)
 from sqlmodel import Session, select, func
 from app.db.session import engine
 import app.models.all  # Fix mapper init issues in standalone scripts
+import app.models.all
 from app.models.user import User, UserStatus, UserType
 from app.models.dealer import DealerProfile, DealerDocument
 from app.models.station import Station, StationStatus, StationSlot
@@ -54,7 +55,7 @@ def seed_all():
                 email="dealer@wezu.com",
                 phone_number="8888888888",
                 full_name="Laxman Kumar",
-                hashed_password=get_password_hash(_SEED_PASSWORD),
+                hashed_password=get_password_hash("laxman123"),
                 user_type=UserType.DEALER,
                 status=UserStatus.ACTIVE,
             )
@@ -63,7 +64,10 @@ def seed_all():
             db.refresh(dealer_user)
             print(f"  ✓ Created dealer user id={dealer_user.id}")
         else:
-            print(f"  ✓ Dealer user exists id={dealer_user.id}")
+            dealer_user.hashed_password = get_password_hash("laxman123")
+            db.add(dealer_user)
+            db.commit()
+            print(f"  ✓ Updated dealer user password id={dealer_user.id}")
 
         dealer = db.exec(select(DealerProfile).where(DealerProfile.user_id == dealer_user.id)).first()
         if not dealer:

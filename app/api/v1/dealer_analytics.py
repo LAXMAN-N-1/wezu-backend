@@ -4,7 +4,8 @@ customer insights, peak hours, and export.
 All endpoints require dealer role.
 """
 
-from typing import Any
+from typing import Any, Optional, List
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import PlainTextResponse, JSONResponse
@@ -31,15 +32,28 @@ def _get_dealer_id(db: Session, user_id: int) -> int:
 
 @router.get("/overview")
 def get_overview(
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    station_id: Optional[int] = None,
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """
-    Performance overview: swap counts (today/month), revenue,
-    avg rating, active batteries, station count.
+    Performance overview: swap counts, revenue, avg rating.
     """
     dealer_id = _get_dealer_id(db, current_user.id)
-    return DealerAnalyticsService.get_overview(db, dealer_id)
+    return DealerAnalyticsService.get_overview(
+        db, dealer_id, start_date=start_date, end_date=end_date, station_id=station_id
+    )
+
+@router.get("/kpis")
+def get_kpis(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get the 4 standard financial KPI cards."""
+    dealer_id = _get_dealer_id(db, current_user.id)
+    return DealerAnalyticsService.get_sales_kpis(db, dealer_id)
 
 
 @router.get("/trends")
@@ -49,22 +63,31 @@ def get_trends(
     current_user: User = Depends(get_current_user),
     period: str = Query("daily", description="daily, weekly, or monthly"),
     periods: int = Query(7, ge=1, le=30),
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    station_id: Optional[int] = None,
 ) -> Any:
-    """Revenue + swap volume trends for the last N periods."""
+    """Revenue + swap volume trends for the last N periods or range."""
     if period not in ("daily", "weekly", "monthly"):
         raise HTTPException(status_code=400, detail="period must be daily, weekly, or monthly")
     dealer_id = _get_dealer_id(db, current_user.id)
-    return DealerAnalyticsService.get_trends(db, dealer_id, period, periods)
+    return DealerAnalyticsService.get_trends(
+        db, dealer_id, period, periods, start_date=start_date, end_date=end_date, station_id=station_id
+    )
 
 
 @router.get("/stations")
 def get_station_metrics(
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    """Per-station: swaps, revenue, utilization %, rating."""
+    """Per-station metrics within a range."""
     dealer_id = _get_dealer_id(db, current_user.id)
-    return DealerAnalyticsService.get_station_metrics(db, dealer_id)
+    return DealerAnalyticsService.get_station_metrics(
+        db, dealer_id, start_date=start_date, end_date=end_date
+    )
 
 @router.get("/comparison")
 def get_comparison(
@@ -79,13 +102,17 @@ def get_comparison(
 
 @router.get("/revenue-breakdown")
 def get_revenue_breakdown(
-    period: str = "month",
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    station_id: Optional[int] = None,
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """Breakdown of revenue for Stacked Bar Charts."""
     dealer_id = _get_dealer_id(db, current_user.id)
-    return DealerAnalyticsService.get_revenue_breakdown(db, dealer_id, period)
+    return DealerAnalyticsService.get_revenue_breakdown(
+        db, dealer_id, start_date=start_date, end_date=end_date, station_id=station_id
+    )
 
 
 @router.get("/revenue-chart")
@@ -178,12 +205,17 @@ def get_margin_by_battery(
 
 @router.get("/export/csv")
 def export_csv(
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    station_id: Optional[int] = None,
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Download performance overview as CSV."""
     dealer_id = _get_dealer_id(db, current_user.id)
-    data = DealerAnalyticsService.get_overview(db, dealer_id)
+    data = DealerAnalyticsService.get_overview(
+        db, dealer_id, start_date=start_date, end_date=end_date, station_id=station_id
+    )
     csv_content = DealerAnalyticsService.export_csv(data)
     return PlainTextResponse(
         content=csv_content,
