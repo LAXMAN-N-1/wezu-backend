@@ -1,0 +1,108 @@
+name: Backend v2 Go CI
+
+on:
+  pull_request:
+    paths:
+      - 'v2/**'
+      - '.github/workflows/backend-v2-go.yml'
+  push:
+    branches: [ main, develop, mohith ]
+    paths:
+      - 'v2/**'
+      - '.github/workflows/backend-v2-go.yml'
+
+jobs:
+  go-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: v2/go.sum
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run unit tests
+        run: go test ./...
+
+  perf-gate:
+    runs-on: ubuntu-latest
+    needs: go-test
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: wezu
+          POSTGRES_PASSWORD: wezu
+          POSTGRES_DB: wezu
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U wezu -d wezu"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: v2
+    env:
+      DATABASE_URL: postgresql://wezu:wezu@127.0.0.1:5432/wezu
+      REDIS_URL: redis://127.0.0.1:6379/0
+      HTTP_ADDR: :8081
+      JWT_ACCESS_SECRET: ci-access-secret
+      JWT_REFRESH_SECRET: ci-refresh-secret
+      OTEL_ENABLED: 'false'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: v2/go.sum
+
+      - name: Setup k6
+        uses: grafana/setup-k6-action@v1
+
+      - name: Start API
+        run: |
+          go run ./cmd/api > /tmp/v2-api.log 2>&1 &
+          echo $! > /tmp/v2-api.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8081/live >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "API failed to start"
+          cat /tmp/v2-api.log
+          exit 1
+
+      - name: Run perf smoke gate
+        run: BASE_URL=http://127.0.0.1:8081 k6 run perf/k6/smoke.js
+
+      - name: Stop API
+        if: always()
+        run: |
+          if [ -f /tmp/v2-api.pid ]; then
+            kill $(cat /tmp/v2-api.pid) || true
+          fi
+          cat /tmp/v2-api.log || true

@@ -1,13 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, BackgroundTasks
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, ORJSONResponse
 from sqlmodel import Session, select, func, or_, and_
 from typing import List, Optional
 from datetime import datetime, UTC, timedelta
 import csv
 import io
 
-from app.core.database import get_db
+from app.core.database import get_db, get_async_db
 from app.core.config import settings
+from sqlmodel.ext.asyncio.session import AsyncSession
+from app.utils.runtime_cache_async import cached_call_async
 from app.models.battery import Battery, BatteryStatus, BatteryAuditLog, BatteryHealthHistory, LocationType, BatteryLifecycleEvent
 from app.schemas.battery import (
     BatteryResponse, BatteryCreate, BatteryUpdate, BatteryDetailResponse,
@@ -29,9 +31,9 @@ def _insert_audit_logs_bg(audit_data_list: List[dict]) -> None:
 
 router = APIRouter()
 
-@router.get("", response_model=BatteryListResponse)
-def list_batteries(
-    session: Session = Depends(get_db),
+@router.get("", response_class=ORJSONResponse)
+async def list_batteries(
+    session: AsyncSession = Depends(get_async_db),
     status: Optional[str] = None,
     location_type: Optional[str] = None,
     battery_type: Optional[str] = None,
@@ -41,10 +43,11 @@ def list_batteries(
     sort_by: Optional[str] = Query("created_at", description="Sort column"),
     sort_order: Optional[str] = Query("desc", description="asc or desc"),
     offset: int = 0,
+    cursor: Optional[int] = Query(None, description="Keyset pagination cursor passing the last Battery ID falling back to offset"),
     limit: int = 20,
     current_user: User = Depends(get_current_active_admin)
 ):
-    def _load():
+    async def _load():
         from sqlalchemy.orm import selectinload
         query = select(Battery).options(
             selectinload(Battery.sku),
@@ -54,23 +57,30 @@ def list_batteries(
 
         nonlocal status, location_type, battery_type, min_health, max_health, search
 
+        has_filters = False
         # Apply filters to both queries
         if status:
+            has_filters = True
             query = query.where(Battery.status == status)
             count_query = count_query.where(Battery.status == status)
         if location_type:
+            has_filters = True
             query = query.where(Battery.location_type == location_type)
             count_query = count_query.where(Battery.location_type == location_type)
         if battery_type:
+            has_filters = True
             query = query.where(Battery.battery_type == battery_type)
             count_query = count_query.where(Battery.battery_type == battery_type)
         if min_health is not None:
+            has_filters = True
             query = query.where(Battery.health_percentage >= min_health)
             count_query = count_query.where(Battery.health_percentage >= min_health)
         if max_health is not None:
+            has_filters = True
             query = query.where(Battery.health_percentage <= max_health)
             count_query = count_query.where(Battery.health_percentage <= max_health)
         if search:
+            has_filters = True
             search_filter = or_(
                 Battery.serial_number.ilike(f"%{search}%"),
                 Battery.manufacturer.ilike(f"%{search}%"),
@@ -79,6 +89,10 @@ def list_batteries(
             query = query.where(search_filter)
             count_query = count_query.where(search_filter)
 
+        if cursor is not None:
+            has_filters = True
+            query = query.where(Battery.id < cursor)
+
         # Sorting
         sort_column = getattr(Battery, sort_by, Battery.created_at)
         if sort_order == "asc":
@@ -86,13 +100,23 @@ def list_batteries(
         else:
             query = query.order_by(sort_column.desc())
 
-        total_count = session.exec(count_query).one()
-        items = session.exec(query.offset(offset).limit(limit)).all()
+        if has_filters:
+            total_count = (await session.exec(count_query)).one()
+        else:
+            async def _get_base_count():
+                return (await session.exec(select(func.count(Battery.id)))).one()
+            total_count = await cached_call_async("batteries-base-count", "table-count", ttl_seconds=300, call=_get_base_count)
+
+        if cursor is not None:
+            items = (await session.exec(query.limit(limit))).all()
+        else:
+            items = (await session.exec(query.offset(offset).limit(limit))).all()
 
         return {"items": [item.model_dump() for item in items], "total_count": total_count}
 
-    return cached_call(
+    return await cached_call_async(
         "admin-batteries", "list",
+        str(cursor or ""),
         status or "", location_type or "", battery_type or "",
         str(min_health or ""), str(max_health or ""),
         search or "", sort_by or "created_at", sort_order or "desc",

@@ -62,7 +62,12 @@ def add_exception_handlers(app: FastAPI):
             request=request,
             status_code=exc.status_code,
             extra_headers=headers,
-            content={"error": str(exc.detail), "code": "HTTP_ERROR", "details": None},
+            content={
+                "detail": str(exc.detail),
+                "error": str(exc.detail),
+                "code": "HTTP_ERROR",
+                "details": None,
+            },
         )
 
     @app.exception_handler(RequestValidationError)
@@ -80,7 +85,12 @@ def add_exception_handlers(app: FastAPI):
             request=request,
             status_code=422,
             extra_headers={"X-Request-ID": req_id},
-            content={"error": "Validation Error", "code": "VALIDATION_ERROR", "details": exc.errors()},
+            content={
+                "detail": "Validation Error",
+                "error": "Validation Error",
+                "code": "VALIDATION_ERROR",
+                "details": exc.errors(),
+            },
         )
 
     @app.exception_handler(RateLimitExceeded)
@@ -94,7 +104,12 @@ def add_exception_handlers(app: FastAPI):
             request=request,
             status_code=429,
             extra_headers={"X-Request-ID": req_id},
-            content={"error": "Too Many Requests", "code": "RATE_LIMIT_EXCEEDED", "details": str(exc.detail)},
+            content={
+                "detail": "Too Many Requests",
+                "error": "Too Many Requests",
+                "code": "RATE_LIMIT_EXCEEDED",
+                "details": str(exc.detail),
+            },
         )
 
     @app.exception_handler(SQLAlchemyError)
@@ -109,7 +124,12 @@ def add_exception_handlers(app: FastAPI):
             request=request,
             status_code=500,
             extra_headers={"X-Request-ID": req_id},
-            content={"error": "Internal Database Error", "code": "DATABASE_ERROR", "details": None},
+            content={
+                "detail": "Internal Database Error",
+                "error": "Internal Database Error",
+                "code": "DATABASE_ERROR",
+                "details": None,
+            },
         )
         
     @app.exception_handler(Exception)
@@ -124,5 +144,10 @@ def add_exception_handlers(app: FastAPI):
             request=request,
             status_code=500,
             extra_headers={"X-Request-ID": req_id},
-            content={"error": "Internal Server Error", "code": "INTERNAL_ERROR", "details": None},
+            content={
+                "detail": "Internal Server Error",
+                "error": "Internal Server Error",
+                "code": "INTERNAL_ERROR",
+                "details": None,
+            },
         )

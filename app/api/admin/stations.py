@@ -1,6 +1,8 @@
 import json
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi.responses import ORJSONResponse
 from sqlmodel import Session, select, func, case
+from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import Any, List, Optional
 from datetime import datetime, UTC
 from pydantic import BaseModel
@@ -12,9 +14,10 @@ from app.models.maintenance_checklist import (
     MaintenanceChecklistTemplate,
 )
 from app.models.user import User
-from app.core.database import get_db
+from app.core.database import get_db, get_async_db
 from app.core.config import settings
-from app.utils.runtime_cache import cached_call
+from app.utils.runtime_cache import cached_call, invalidate_cache
+from app.utils.runtime_cache_async import cached_call_async
 
 router = APIRouter()
 
@@ -152,43 +155,61 @@ def _serialize_submission(submission: MaintenanceChecklistSubmission) -> dict[st
 
 # ---- STATION LISTING & CRUD ----
 
-@router.get("", include_in_schema=False)
-@router.get("/")
-def list_stations(
+@router.get("", include_in_schema=False, response_class=ORJSONResponse)
+@router.get("/", response_class=ORJSONResponse)
+async def list_stations(
     skip: int = 0,
     limit: int = 100,
+    cursor: Optional[int] = Query(None, description="Keyset pagination cursor equivalent to the last seen Station ID falling back to skip if empty"),
     search: Optional[str] = None,
     status: Optional[str] = None,
     city: Optional[str] = None,
     station_type: Optional[str] = None,
     fields: Optional[str] = None,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """List all stations with pagination, search, and filters."""
-    def _load():
+    async def _load():
         filters = []
+        has_filters = False
         if search:
+            has_filters = True
             filters.append(
                 (Station.name.ilike(f"%{search}%")) |
                 (Station.address.ilike(f"%{search}%")) |
                 (Station.city.ilike(f"%{search}%"))
             )
         if status:
+            has_filters = True
             filters.append(Station.status == status)
         if city:
+            has_filters = True
             filters.append(Station.city.ilike(f"%{city}%"))
         if station_type:
+            has_filters = True
             filters.append(Station.station_type == station_type)
 
-        total_count = db.exec(select(func.count(Station.id)).where(*filters)).one() or 0
+        if cursor is not None:
+            has_filters = True
+            filters.append(Station.id < cursor)
+
+        if has_filters:
+            total_count = (await db.exec(select(func.count(Station.id)).where(*filters))).one() or 0
+        else:
+            async def _get_base_count():
+                return (await db.exec(select(func.count(Station.id)))).one() or 0
+            total_count = await cached_call_async("stations-base-count", "table-count", ttl_seconds=300, call=_get_base_count)
 
         result = []
         if fields:
             field_names = {"id"} | {f.strip() for f in fields.split(",")}
             valid_cols = [getattr(Station, fn) for fn in field_names if hasattr(Station, fn)]
-            statement = select(*valid_cols).where(*filters).order_by(Station.created_at.desc()).offset(skip).limit(limit)
-            rows = db.exec(statement).all()
+            if cursor is not None:
+                statement = select(*valid_cols).where(*filters).order_by(Station.id.desc()).limit(limit)
+            else:
+                statement = select(*valid_cols).where(*filters).order_by(Station.created_at.desc()).offset(skip).limit(limit)
+            rows = (await db.exec(statement)).all()
             keys = [c.name for c in valid_cols]
             
             for row in rows:
@@ -206,8 +227,11 @@ def list_stations(
                         row_dict[k] = v.value
                 result.append(row_dict)
         else:
-            statement = select(Station).where(*filters).order_by(Station.created_at.desc()).offset(skip).limit(limit)
-            stations = db.exec(statement).all()
+            if cursor is not None:
+                statement = select(Station).where(*filters).order_by(Station.id.desc()).limit(limit)
+            else:
+                statement = select(Station).where(*filters).order_by(Station.created_at.desc()).offset(skip).limit(limit)
+            stations = (await db.exec(statement)).all()
             for s in stations:
                 result.append({
                     "id": s.id,
@@ -239,9 +263,17 @@ def list_stations(
             "page_size": limit,
         }
 
-    return cached_call(
-        "admin-stations", "list",
-        skip, limit, search or "", status or "", city or "", station_type or "", fields or "",
+    return await cached_call_async(
+        "admin-stations",
+        "list",
+        str(cursor or ""),
+        skip,
+        limit,
+        search or "",
+        status or "",
+        city or "",
+        station_type or "",
+        fields or "",
         ttl_seconds=settings.ANALYTICS_CACHE_TTL_SECONDS,
         call=_load,
     )

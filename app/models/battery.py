@@ -58,17 +58,17 @@ class Battery(SQLModel, table=True):
     health_status: BatteryHealth = Field(default=BatteryHealth.GOOD)
     
     current_charge: float = Field(default=100.0)
-    health_percentage: float = Field(default=100.0)
+    health_percentage: float = Field(default=100.0, index=True)
     cycle_count: int = Field(default=0)
     total_cycles: int = Field(default=0)
     temperature_c: float = Field(default=25.0)
     
     # New Battery Management Fields
-    manufacturer: Optional[str] = Field(default=None)
-    battery_type: Optional[str] = Field(default="48V/30Ah")
+    manufacturer: Optional[str] = Field(default=None, index=True)
+    battery_type: Optional[str] = Field(default="48V/30Ah", index=True)
     purchase_cost: float = Field(default=0.0)
     notes: Optional[str] = Field(default=None)
-    location_type: LocationType = Field(default=LocationType.WAREHOUSE)
+    location_type: LocationType = Field(default=LocationType.WAREHOUSE, index=True)
     
     # Lifecycle
     manufacture_date: Optional[datetime] = None

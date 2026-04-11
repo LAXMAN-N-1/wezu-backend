@@ -30,6 +30,17 @@ High-performance FastAPI backend powering the WEZU battery swapping ecosystem, i
 3. **API Documentation**:
    Access interactive docs at `http://localhost:8000/docs`.
 
+## ⚡ Go Rewrite (v2)
+- New low-latency rewrite lives in `v2/` using Go + PostgreSQL + Redis.
+- Includes modular domain boundaries, keyset pagination, SWR caching, queue workers, and k6 performance gates.
+- Quick start:
+  ```bash
+  cd v2
+  cp .env.example .env
+  make tidy
+  make run
+  ```
+
 ## 🌐 Coolify + Traefik Deployment
 
 For ingress through Coolify/Traefik (no app host port publishing), follow:

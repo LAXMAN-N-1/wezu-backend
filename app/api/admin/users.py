@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from fastapi.responses import ORJSONResponse
 from sqlmodel import Session, select, func
 from sqlalchemy import case
 from sqlalchemy.orm import load_only
@@ -8,8 +9,10 @@ from pydantic import BaseModel
 from app.api import deps
 from app.models.user import User, UserStatus, UserType
 from app.schemas.user import UserResponse
-from app.core.database import get_db
+from app.core.database import get_db, get_async_db
 from app.core.config import settings
+from app.utils.runtime_cache_async import cached_call_async
+from app.utils.runtime_cache_async import cached_call_async
 from app.core.security import get_password_hash
 from app.models.rbac import Role
 from app.utils.runtime_cache import cached_call, invalidate_cache
@@ -151,24 +154,27 @@ def _serialize_user(user: User, role_name: Optional[str] = None) -> dict:
     }
 
 
-@router.get("", include_in_schema=False)
-@router.get("/")
-def list_users(
+@router.get("", include_in_schema=False, response_class=ORJSONResponse)
+@router.get("/", response_class=ORJSONResponse)
+async def list_users(
     skip: int = 0,
     limit: int = 100,
+    cursor: Optional[int] = Query(None, description="Keyset pagination cursor equivalent to the last seen User ID falling back to skip if empty"),
     search: Optional[str] = None,
     status: Optional[str] = None,
     user_type: Optional[str] = None,
     kyc_status: Optional[str] = None,
     fields: Optional[str] = None,
     current_user: User = Depends(deps.get_current_active_admin),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
 ):
     """List all users with pagination, search, and filters."""
-    def _load_users() -> dict:
+    async def _load_users() -> dict:
         filters = [User.is_deleted == False]
 
+        has_filters = False
         if search:
+            has_filters = True
             filters.append(
                 (User.full_name.ilike(f"%{search}%")) |
                 (User.email.ilike(f"%{search}%")) |
@@ -176,16 +182,32 @@ def list_users(
             )
 
         if status:
+            has_filters = True
             filters.append(User.status == status.lower())
 
         if user_type:
+            has_filters = True
             filters.append(User.user_type == user_type)
 
         if kyc_status:
+            has_filters = True
             filters.append(User.kyc_status == kyc_status)
 
-        total_count = db.exec(select(func.count(User.id)).where(*filters)).one() or 0
+        if cursor is not None:
+            has_filters = True # Treat cursor as a filter to bypass base-count SWR to avoid stale totals
+            filters.append(User.id < cursor)
+
+        if has_filters:
+            total_count = (await db.exec(select(func.count(User.id)).where(*filters))).one() or 0
+        else:
+            async def _get_base_count():
+                return (await db.exec(select(func.count(User.id)).where(User.is_deleted == False))).one() or 0
+            total_count = await cached_call_async("users-base-count", "table-count", ttl_seconds=300, call=_get_base_count)
+
         user_list = []
+        
+        async def _get_all_roles_map():
+            return {r.id: r.name for r in (await db.exec(select(Role))).all()}
         
         if fields:
             field_names = {"id"} | {f.strip() for f in fields.split(",")}
@@ -196,7 +218,10 @@ def list_users(
                 if fetch_roles and User.role_id not in valid_cols:
                     valid_cols.append(User.role_id)
                     
-                users = db.exec(select(*valid_cols).where(*filters).order_by(User.created_at.desc()).offset(skip).limit(limit)).all()
+                if cursor is not None:
+                    users = (await db.exec(select(*valid_cols).where(*filters).order_by(User.id.desc()).limit(limit))).all()
+                else:    
+                    users = (await db.exec(select(*valid_cols).where(*filters).order_by(User.created_at.desc()).offset(skip).limit(limit))).all()
                 keys = [c.name for c in valid_cols]
                 
                 role_map = {}
@@ -204,7 +229,7 @@ def list_users(
                     # 'users' is a list of tuples, we must find the index of role_id
                     rid_idx = keys.index("role_id")
                     role_ids = {row[rid_idx] for row in users if row[rid_idx]}
-                    role_map = {r.id: r.name for r in db.exec(select(Role).where(Role.id.in_(role_ids))).all()} if role_ids else {}
+                    role_map = await cached_call_async("rbac-roles", "role-map", ttl_seconds=3600, call=_get_all_roles_map)
 
                 for row in users:
                     if len(valid_cols) == 1:
@@ -220,37 +245,22 @@ def list_users(
                         elif hasattr(v, 'value'): row_dict[k] = v.value
                     user_list.append(row_dict)
         else:
-            users = db.exec(
-                select(User)
-                .where(*filters)
-                .options(
-                    load_only(
-                        User.id,
-                        User.full_name,
-                        User.email,
-                        User.phone_number,
-                        User.user_type,
-                        User.status,
-                        User.kyc_status,
-                        User.profile_picture,
-                        User.role_id,
-                        User.is_superuser,
-                        User.created_at,
-                        User.last_login,
-                        User.deletion_reason,
-                        User.force_password_change,
-                    )
+            query = select(User).where(*filters).options(
+                load_only(
+                    User.id, User.full_name, User.email, User.phone_number,
+                    User.user_type, User.status, User.kyc_status, User.profile_picture,
+                    User.role_id, User.is_superuser, User.created_at, User.last_login,
+                    User.deletion_reason, User.force_password_change,
                 )
-                .order_by(User.created_at.desc())
-                .offset(skip)
-                .limit(limit)
-            ).all()
+            )
+            if cursor is not None:
+                users = (await db.exec(query.order_by(User.id.desc()).limit(limit))).all()
+            else:
+                users = (await db.exec(query.order_by(User.created_at.desc()).offset(skip).limit(limit))).all()
+
 
             role_ids = {u.role_id for u in users if u.role_id}
-            role_map = (
-                {r.id: r.name for r in db.exec(select(Role).where(Role.id.in_(role_ids))).all()}
-                if role_ids else {}
-            )
+            role_map = await cached_call_async("rbac-roles", "role-map", ttl_seconds=3600, call=_get_all_roles_map) if role_ids else {}
 
             for u in users:
                 role_name = role_map.get(u.role_id) if u.role_id else None
@@ -263,9 +273,10 @@ def list_users(
             "page_size": limit,
         }
 
-    return cached_call(
+    return await cached_call_async(
         "admin-users",
         "list",
+        str(cursor or ""),
         skip,
         limit,
         search or "",

@@ -37,3 +37,5 @@ sqlmodel==0.0.14
 structlog==23.2.0
 twilio==9.4.1
 uvicorn==0.24.0
+asyncpg
+aiosqlite

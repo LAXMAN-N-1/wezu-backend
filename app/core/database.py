@@ -1,5 +1,7 @@
 from sqlalchemy import pool
 from sqlmodel import Session, create_engine
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlmodel.ext.asyncio.session import AsyncSession
 from app.core.config import settings
 
 # Determine the best pooling strategy for PostgreSQL
@@ -27,9 +29,19 @@ else:
 
 engine = create_engine(settings.DATABASE_URL, **engine_kwargs)
 
+if settings.DATABASE_URL.startswith("sqlite"):
+    async_db_url = settings.DATABASE_URL.replace("sqlite://", "sqlite+aiosqlite://")
+elif settings.DATABASE_URL.startswith("postgresql"):
+    async_db_url = settings.DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
+else:
+    async_db_url = settings.DATABASE_URL
+
+async_engine = create_async_engine(async_db_url, **engine_kwargs)
+
 from sqlalchemy import event
 
 @event.listens_for(engine, "connect")
+@event.listens_for(async_engine.sync_engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
     if settings.DATABASE_URL.startswith("sqlite"):
         cursor = dbapi_connection.cursor()
@@ -40,4 +52,9 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
 def get_db():
     """Dependency for FastAPI endpoints"""
     with Session(engine) as session:
+        yield session
+
+async def get_async_db():
+    """Async Dependency for FastAPI endpoints built for MNC load balancing"""
+    async with AsyncSession(async_engine) as session:
         yield session

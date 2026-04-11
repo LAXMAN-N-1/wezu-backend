@@ -38,7 +38,7 @@ class Station(SQLModel, table=True):
     dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id")
     
     # Hardware Specs
-    station_type: str = Field(default="automated") # automated, manual, hybrid
+    station_type: str = Field(default="automated", index=True) # automated, manual, hybrid
     total_slots: int = Field(default=0)
     power_rating_kw: Optional[float] = None
     max_capacity: Optional[int] = Field(default=None)
@@ -51,7 +51,7 @@ class Station(SQLModel, table=True):
     available_slots: int = Field(default=0)
     
     # Status
-    status: str = Field(default="active")
+    status: str = Field(default="active", index=True)
     approval_status: str = Field(default="approved") # pending, approved, rejected
     contact_phone: Optional[str] = None
     operating_hours: Optional[str] = None # JSON string: {"mon": "09:00-18:00", ...}

@@ -113,7 +113,7 @@ class User(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Soft Delete
-    is_deleted: bool = Field(default=False)
+    is_deleted: bool = Field(default=False, index=True)
     deletion_reason: Optional[str] = None
     deleted_at: Optional[datetime] = None
     

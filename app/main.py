@@ -365,6 +365,16 @@ async def root():
 # ----------------------------
 v1_str = settings.API_V1_STR
 
+
+@app.get(f"{v1_str}/customer/health", tags=["Customer"])
+def customer_health_check():
+    """Customer API smoke endpoint for quick mobile integration checks."""
+    return {
+        "status": "ok",
+        "service": "customer-api",
+        "version": settings.APP_VERSION,
+    }
+
 # Authentication
 app.include_router(auth.router, prefix=f"{v1_str}/auth", tags=["Auth"])
 app.include_router(customer_auth.router, prefix=f"{v1_str}/customer/auth", tags=["Customer Auth"])
@@ -372,6 +382,7 @@ app.include_router(sessions.router, prefix=f"{v1_str}/sessions", tags=["Sessions
 
 # Core Entities
 app.include_router(users.router, prefix=f"{v1_str}/users", tags=["Users"])
+app.include_router(users.router, prefix=f"{v1_str}/customer/users", tags=["Customer Users"])
 app.include_router(profile.router, prefix=f"{v1_str}/profile", tags=["Profile"])
 app.include_router(kyc.router, prefix=v1_str, tags=["KYC"])
 app.include_router(stations.router, prefix=f"{v1_str}/stations", tags=["Stations"])

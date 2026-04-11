@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wezu-backend-v2
+  labels:
+    app: wezu-backend-v2
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: wezu-backend-v2
+  template:
+    metadata:
+      labels:
+        app: wezu-backend-v2
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/your-org/wezu-backend-v2:latest
+          ports:
+            - containerPort: 8081
+          env:
+            - name: SERVICE_NAME
+              value: wezu-api-v2
+            - name: ENVIRONMENT
+              value: production
+            - name: HTTP_ADDR
+              value: ":8081"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: wezu-backend-v2-secrets
+                  key: database_url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: wezu-backend-v2-secrets
+                  key: redis_url
+            - name: JWT_ACCESS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: wezu-backend-v2-secrets
+                  key: jwt_access_secret
+            - name: JWT_REFRESH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: wezu-backend-v2-secrets
+                  key: jwt_refresh_secret
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: "300m"
+              memory: "512Mi"
+            limits:
+              cpu: "1500m"
+              memory: "1024Mi"

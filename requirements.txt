@@ -512,3 +512,5 @@ yt-dlp==2024.12.23
 zipp==3.21.0
 zope.event==5.0
 zope.interface==7.2
+asyncpg
+aiosqlite

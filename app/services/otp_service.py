@@ -1,5 +1,6 @@
 import random
 import string
+import logging
 from datetime import datetime, UTC, timedelta
 from typing import Optional
 from sqlmodel import Session, select
@@ -7,6 +8,9 @@ from app.models.otp import OTP
 from app.core.config import settings
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
+
+logger = logging.getLogger("wezu_auth")
+
 
 class OTPService:
     @staticmethod
