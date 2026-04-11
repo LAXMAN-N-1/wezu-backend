@@ -3,6 +3,7 @@ from fastapi.responses import ORJSONResponse
 from sqlmodel import Session, select, func
 from sqlalchemy import case
 from sqlalchemy.orm import load_only
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from datetime import datetime, UTC
 from pydantic import BaseModel
