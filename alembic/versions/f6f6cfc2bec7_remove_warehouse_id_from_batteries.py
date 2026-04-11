@@ -18,8 +18,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.drop_column('batteries', 'warehouse_id', schema='inventory')
+    op.drop_column('batteries', 'warehouse_id')
 
 
 def downgrade() -> None:
-    op.add_column('batteries', sa.Column('warehouse_id', sa.Integer(), nullable=True), schema='inventory')
+    op.add_column('batteries', sa.Column('warehouse_id', sa.Integer(), nullable=True))

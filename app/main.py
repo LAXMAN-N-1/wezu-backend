@@ -23,16 +23,18 @@ if settings.ENVIRONMENT != "production":
     else:
         ssl._create_default_https_context = _create_unverified_https_context
 
-import sentry_sdk
-from sentry_sdk.integrations.fastapi import FastApiIntegration
-
-if settings.SENTRY_DSN:
-    sentry_sdk.init(
-        dsn=settings.SENTRY_DSN,
-        environment=settings.ENVIRONMENT,
-        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
-        integrations=[FastApiIntegration()]
-    )
+try:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    if getattr(settings, "SENTRY_DSN", None):
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            environment=settings.ENVIRONMENT,
+            traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+            integrations=[FastApiIntegration()]
+        )
+except ImportError:
+    pass
 
 # Customer-facing endpoints
 from app.api.v1 import (
@@ -43,8 +45,9 @@ from app.api.v1 import (
     settlements, telemetry, vehicles, locations, system, roles, 
     menus, role_rights, admin_kyc, audit, ml, inventory,
     admin_stations, station_monitoring, battery_alerts,
-    admin_alerts, maintenance, vendors
+    admin_alerts, maintenance, vendors, dealer_portal_settings
 )
+
 from app.api.v1.admin import (
     support as admin_support, 
     faqs as admin_faqs, 
@@ -215,6 +218,7 @@ app.include_router(branches.router, prefix=f"{settings.API_V1_STR}/branches", ta
 app.include_router(organizations.router, prefix=f"{settings.API_V1_STR}/organizations", tags=["Organizations"])
 app.include_router(warehouses.router, prefix=f"{settings.API_V1_STR}/warehouses", tags=["Warehouses"])
 app.include_router(screens.router, prefix=f"{settings.API_V1_STR}/screens", tags=["UI Configuration"])
+app.include_router(dealer_portal_settings.router, prefix=f"{settings.API_V1_STR}/dealer-portal/settings", tags=["Dealer Portal Settings"])
 
 # 2. Admin Application Endpoints
 admin_api = f"{settings.API_V1_STR}/admin"
@@ -342,6 +346,10 @@ app.include_router(admin_users.router, prefix=f"{settings.API_V1_STR}/admin/user
 from app.api.v1 import audit
 app.include_router(audit.router, prefix=f"{settings.API_V1_STR}/audit", tags=["Audit Logs"])
 
+
+# Test Reports (CI / QA)
+from app.api.v1 import test_reports
+app.include_router(test_reports.router, prefix=f"{settings.API_V1_STR}/test-reports", tags=["Test Reports"])
 
 # Webhooks
 app.include_router(razorpay_webhook.router, prefix="/api/webhooks", tags=["Webhooks"])

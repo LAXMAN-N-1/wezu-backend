@@ -21,7 +21,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # 1. Create LocationType Enum in inventory schema
-    location_type = sa.Enum('station', 'warehouse', 'service_center', 'recycling', name='locationtype', schema='inventory')
+    location_type = sa.Enum('station', 'warehouse', 'service_center', 'recycling', name='locationtype')
     location_type.create(op.get_bind(), checkfirst=True)
 
     # 2. Add POOR to BatteryHealth Enum (Public schema or wherever it exists)
@@ -29,15 +29,15 @@ def upgrade() -> None:
     op.execute("ALTER TYPE batteryhealth ADD VALUE IF NOT EXISTS 'POOR'")
 
     # 3. Add columns to batteries table
-    op.add_column('batteries', sa.Column('manufacturer', sa.String(), nullable=True), schema='inventory')
-    op.add_column('batteries', sa.Column('notes', sa.String(), nullable=True), schema='inventory')
+    op.add_column('batteries', sa.Column('manufacturer', sa.String(), nullable=True))
+    op.add_column('batteries', sa.Column('notes', sa.String(), nullable=True))
     
     # We use a raw string for the enum back-reference in the Column
-    location_type_enum = postgresql.ENUM('station', 'warehouse', 'service_center', 'recycling', name='locationtype', schema='inventory')
-    op.add_column('batteries', sa.Column('location_type', location_type_enum, nullable=False, server_default='warehouse'), schema='inventory')
+    location_type_enum = postgresql.ENUM('station', 'warehouse', 'service_center', 'recycling', name='locationtype')
+    op.add_column('batteries', sa.Column('location_type', location_type_enum, nullable=False, server_default='warehouse'))
     
-    op.add_column('batteries', sa.Column('manufacture_date', sa.DateTime(), nullable=True), schema='inventory')
-    op.add_column('batteries', sa.Column('last_charged_at', sa.DateTime(), nullable=True), schema='inventory')
+    op.add_column('batteries', sa.Column('manufacture_date', sa.DateTime(), nullable=True))
+    op.add_column('batteries', sa.Column('last_charged_at', sa.DateTime(), nullable=True))
 
 
     # 4. Create BatteryAuditLog table
@@ -50,12 +50,11 @@ def upgrade() -> None:
         sa.Column('new_value', sa.String(), nullable=True),
         sa.Column('reason', sa.String(), nullable=True),
         sa.Column('timestamp', sa.DateTime(), nullable=False),
-        sa.ForeignKeyConstraint(['battery_id'], ['inventory.batteries.id'], ),
-        sa.ForeignKeyConstraint(['changed_by'], ['core.users.id'], ),
-        sa.PrimaryKeyConstraint('id'),
-        schema='inventory'
+        sa.ForeignKeyConstraint(['battery_id'], ['batteries.id'], ),
+        sa.ForeignKeyConstraint(['changed_by'], ['users.id'], ),
+        sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_inventory_battery_audit_logs_battery_id'), 'battery_audit_logs', ['battery_id'], unique=False, schema='inventory')
+    op.create_index(op.f('ix_inventory_battery_audit_logs_battery_id'), 'battery_audit_logs', ['battery_id'], unique=False)
 
     # 5. Create BatteryHealthHistory table
     op.create_table('battery_health_history',
@@ -63,24 +62,23 @@ def upgrade() -> None:
         sa.Column('battery_id', sa.Integer(), nullable=False),
         sa.Column('health_percentage', sa.Float(), nullable=False),
         sa.Column('recorded_at', sa.DateTime(), nullable=False),
-        sa.ForeignKeyConstraint(['battery_id'], ['inventory.batteries.id'], ),
-        sa.PrimaryKeyConstraint('id'),
-        schema='inventory'
+        sa.ForeignKeyConstraint(['battery_id'], ['batteries.id'], ),
+        sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_inventory_battery_health_history_battery_id'), 'battery_health_history', ['battery_id'], unique=False, schema='inventory')
+    op.create_index(op.f('ix_inventory_battery_health_history_battery_id'), 'battery_health_history', ['battery_id'], unique=False)
 
 
 def downgrade() -> None:
-    op.drop_index(op.f('ix_inventory_battery_health_history_battery_id'), table_name='battery_health_history', schema='inventory')
-    op.drop_table('battery_health_history', schema='inventory')
-    op.drop_index(op.f('ix_inventory_battery_audit_logs_battery_id'), table_name='battery_audit_logs', schema='inventory')
-    op.drop_table('battery_audit_logs', schema='inventory')
+    op.drop_index(op.f('ix_inventory_battery_health_history_battery_id'), table_name='battery_health_history')
+    op.drop_table('battery_health_history')
+    op.drop_index(op.f('ix_inventory_battery_audit_logs_battery_id'), table_name='battery_audit_logs')
+    op.drop_table('battery_audit_logs')
     
-    op.drop_column('batteries', 'last_charged_at', schema='inventory')
-    op.drop_column('batteries', 'manufacture_date', schema='inventory')
-    op.drop_column('batteries', 'location_type', schema='inventory')
-    op.drop_column('batteries', 'notes', schema='inventory')
-    op.drop_column('batteries', 'manufacturer', schema='inventory')
+    op.drop_column('batteries', 'last_charged_at')
+    op.drop_column('batteries', 'manufacture_date')
+    op.drop_column('batteries', 'location_type')
+    op.drop_column('batteries', 'notes')
+    op.drop_column('batteries', 'manufacturer')
     
     # Note: Removing a value from a PG Enum is hard, usually we leave it.
     # op.execute("DROP TYPE locationtype") # Only if you want to fully revert type creation

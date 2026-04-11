@@ -110,7 +110,7 @@ class AnalyticsCustomerService(BaseAnalyticsService):
         history = db.query(Rental).filter(Rental.user_id == c_id).order_by(desc(Rental.start_time)).limit(10).all()
         rental_history = [{
             "id": r.id,
-            "cost": float(r.total_price),
+            "cost": float(r.total_amount),
             "duration": "2h 30m", # Mocked formatting
             "timestamp": r.start_time.isoformat()
         } for r in history]

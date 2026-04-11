@@ -18,12 +18,11 @@ class ClaimStatus(str, Enum):
 
 class WarrantyClaim(SQLModel, table=True):
     __tablename__ = "warranty_claims"
-    __table_args__ = {"schema": "core"}
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id", index=True)
-    order_id: int = Field(foreign_key="core.orders.id", index=True)
-    product_id: uuid.UUID = Field(foreign_key="inventory.batteries.id", index=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    order_id: int = Field(foreign_key="orders.id", index=True)
+    product_id: uuid.UUID = Field(foreign_key="batteries.id", index=True)
 
     claim_type: ClaimType = Field(index=True)
     description: str

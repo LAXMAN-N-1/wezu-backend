@@ -20,8 +20,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     # Convert battery_id from integer to uuid, setting existing to NULL since they are incompatible
-    op.execute("ALTER TABLE inventory.iot_devices ALTER COLUMN battery_id TYPE uuid USING NULL;")
+    op.execute("ALTER TABLE iot_devices ALTER COLUMN battery_id TYPE uuid USING NULL;")
 
 
 def downgrade() -> None:
-    op.execute("ALTER TABLE inventory.iot_devices ALTER COLUMN battery_id TYPE integer USING NULL;")
+    op.execute("ALTER TABLE iot_devices ALTER COLUMN battery_id TYPE integer USING NULL;")

@@ -158,7 +158,7 @@ class DealerAnalyticsService:
             ).one() or 0
 
             revenue = db.exec(
-                select(func.coalesce(func.sum(SwapSession.amount), 0.0)).where(
+                select(func.coalesce(func.sum(SwapSession.swap_amount), 0.0)).where(
                     col(SwapSession.station_id).in_(station_ids),
                     SwapSession.status == "completed",
                     SwapSession.created_at >= start,
@@ -197,7 +197,7 @@ class DealerAnalyticsService:
             ).one() or 0
 
             revenue = db.exec(
-                select(func.coalesce(func.sum(SwapSession.amount), 0.0)).where(
+                select(func.coalesce(func.sum(SwapSession.swap_amount), 0.0)).where(
                     SwapSession.station_id == s.id,
                     SwapSession.status == "completed",
                     SwapSession.created_at >= month_start,
@@ -300,7 +300,7 @@ class DealerAnalyticsService:
 
         # Avg CLV (total revenue / unique customers)
         total_revenue = db.exec(
-            select(func.coalesce(func.sum(SwapSession.amount), 0.0)).where(
+            select(func.coalesce(func.sum(SwapSession.swap_amount), 0.0)).where(
                 col(SwapSession.station_id).in_(station_ids),
                 SwapSession.status == "completed",
             )

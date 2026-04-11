@@ -119,6 +119,7 @@ class User(SQLModel, table=True):
 
     # Relationship
     role: Optional["Role"] = Relationship(sa_relationship_kwargs={"viewonly": True}) # Legacy/Primary role. Viewonly to prevent conflict with roles list
+    roles: List["Role"] = Relationship(back_populates="users", link_model=UserRole)
     wallet: Optional["Wallet"] = Relationship(back_populates="user")
     user_profile: Optional["UserProfile"] = Relationship(back_populates="user")
     addresses: List["Address"] = Relationship(back_populates="user")

@@ -201,7 +201,7 @@ class InvoiceService:
                 ['End Date:', rental.end_time.strftime('%d-%m-%Y %H:%M') if rental.end_time else 'Active'],
                 ['Duration:', f"{int(((rental.end_time or rental.expected_end_time) - rental.start_time).total_seconds() / 3600)} hours" if rental.start_time else 'N/A'],
                 ['Daily Rate:', f"₹{rental.daily_rate:.2f}"],
-                ['Total Amount:', f"₹{rental.total_cost:.2f}"],
+                ['Total Amount:', f"₹{rental.total_amount:.2f}"],
                 ['Status:', rental.status]
             ]
             

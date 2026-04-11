@@ -19,8 +19,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TABLE core.users ADD COLUMN IF NOT EXISTS last_global_logout_at TIMESTAMP WITHOUT TIME ZONE;")
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_global_logout_at TIMESTAMP WITHOUT TIME ZONE;")
 
 
 def downgrade() -> None:
-    op.drop_column('users', 'last_global_logout_at', schema='core')
+    op.drop_column('users', 'last_global_logout_at')

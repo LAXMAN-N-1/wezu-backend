@@ -1,7 +1,6 @@
-# Core Identity & Role
+from app.models.rbac import Role, Permission, RolePermission, UserRole, UserAccessPath, AdminUserRole
 from app.models.user import User, UserType, UserStatus
 from app.models.user_profile import UserProfile
-from app.models.rbac import Role, Permission, RolePermission, UserRole, UserAccessPath, AdminUserRole
 from app.models.token import SessionToken
 from app.models.two_factor_auth import TwoFactorAuth
 from app.models.session import UserSession
@@ -72,6 +71,8 @@ from app.models.address import Address
 from app.models.branch import Branch
 from app.models.organization import Organization, OrganizationSocialLink
 from app.models.warehouse import Warehouse
+from app.models.stock import Stock
+from app.models.stock_movement import StockMovement
 
 # System & Other
 from app.models.otp import OTP
@@ -95,4 +96,4 @@ from app.models.dealer_kyc import DealerKYCApplication, KYCStateTransition
 from app.models.dealer_inventory import DealerInventory, InventoryTransaction
 from app.models.dealer_promotion import DealerPromotion, PromotionUsage
 from app.models.search_history import SearchHistory
-
+from app.models.test_report import TestReport

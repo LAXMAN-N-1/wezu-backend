@@ -19,16 +19,16 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TABLE core.users ADD COLUMN IF NOT EXISTS backup_codes JSON;")
-    op.execute("ALTER TABLE core.users ADD COLUMN IF NOT EXISTS is_email_verified BOOLEAN DEFAULT FALSE NOT NULL;")
-    op.execute("ALTER TABLE core.users ADD COLUMN IF NOT EXISTS email_verification_token VARCHAR;")
-    op.execute("ALTER TABLE core.users ADD COLUMN IF NOT EXISTS email_verification_sent_at TIMESTAMP WITHOUT TIME ZONE;")
-    op.execute("ALTER TABLE core.users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP WITHOUT TIME ZONE;")
-    op.execute("ALTER TABLE core.users ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE NOT NULL;")
-    op.execute("ALTER TABLE core.users ADD COLUMN IF NOT EXISTS deletion_reason VARCHAR;")
-    op.execute("ALTER TABLE core.users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITHOUT TIME ZONE;")
-    op.execute("ALTER TABLE core.users ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN DEFAULT FALSE NOT NULL;")
-    op.execute("ALTER TABLE core.users ADD COLUMN IF NOT EXISTS two_factor_secret VARCHAR;")
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS backup_codes JSON;")
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_email_verified BOOLEAN DEFAULT FALSE NOT NULL;")
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_token VARCHAR;")
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_sent_at TIMESTAMP WITHOUT TIME ZONE;")
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP WITHOUT TIME ZONE;")
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE NOT NULL;")
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS deletion_reason VARCHAR;")
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITHOUT TIME ZONE;")
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_enabled BOOLEAN DEFAULT FALSE NOT NULL;")
+    op.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_secret VARCHAR;")
 
 
 def downgrade() -> None:

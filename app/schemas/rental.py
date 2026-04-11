@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, AliasChoices
 from typing import Optional, List
 from datetime import datetime
 from app.schemas.battery import BatteryResponse
@@ -6,7 +6,7 @@ from app.schemas.station import StationResponse
 
 class RentalBase(BaseModel):
     battery_id: int
-    pickup_station_id: int
+    pickup_station_id: int = Field(validation_alias=AliasChoices("pickup_station_id", "start_station_id"))
     duration_days: int = 1
 
 class RentalCreate(RentalBase):
@@ -21,7 +21,7 @@ class RentalResponse(BaseModel):
     id: int
     user_id: int
     battery: BatteryResponse
-    pickup_station_id: int
+    pickup_station_id: int = Field(validation_alias=AliasChoices("pickup_station_id", "start_station_id"))
     status: str
     start_time: datetime
     end_time: Optional[datetime]
@@ -30,7 +30,7 @@ class RentalResponse(BaseModel):
     daily_rate: float = 0.0
     damage_deposit: float = 0.0
     discount_amount: float = 0.0
-    total_price: float
+    total_price: float = Field(validation_alias=AliasChoices("total_price", "total_amount"))
     
     late_fee_amount: float = 0.0
     is_overdue: bool = False
@@ -40,7 +40,7 @@ class RentalResponse(BaseModel):
     
     events: List[RentalEventResponse] = []
     
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 class ActiveRentalResponse(RentalResponse):
     pass

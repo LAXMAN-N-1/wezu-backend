@@ -68,9 +68,9 @@ class AnalyticsAdminService(BaseAnalyticsService):
         }
 
         # 3. Financial Overview
-        total_rev_today = db.query(func.sum(Rental.total_price)).filter(Rental.start_time >= datetime.utcnow().replace(hour=0, minute=0, second=0)).scalar() or 0
-        total_rev_month = db.query(func.sum(Rental.total_price)).filter(Rental.start_time >= datetime.utcnow().replace(day=1)).scalar() or 0
-        revenue_rentals = db.query(func.sum(Rental.total_price)).filter(Rental.start_time >= target_date).scalar() or 0
+        total_rev_today = db.query(func.sum(Rental.total_amount)).filter(Rental.start_time >= datetime.utcnow().replace(hour=0, minute=0, second=0)).scalar() or 0
+        total_rev_month = db.query(func.sum(Rental.total_amount)).filter(Rental.start_time >= datetime.utcnow().replace(day=1)).scalar() or 0
+        revenue_rentals = db.query(func.sum(Rental.total_amount)).filter(Rental.start_time >= target_date).scalar() or 0
         
         revenue_analytics = {
             "total_revenue_today": float(total_rev_today),
@@ -95,7 +95,7 @@ class AnalyticsAdminService(BaseAnalyticsService):
         }
 
         # 5. Station Analytics
-        top_stations = db.query(Station.name, func.count(Rental.id)).join(Rental, Station.id == Rental.pickup_station_id).group_by(Station.name).order_by(desc(func.count(Rental.id))).limit(5).all()
+        top_stations = db.query(Station.name, func.count(Rental.id)).join(Rental, Station.id == Rental.start_station_id).group_by(Station.name).order_by(desc(func.count(Rental.id))).limit(5).all()
         
         station_analytics = {
             "top_performing_stations": [{"name": row[0], "rentals": row[1]} for row in top_stations],

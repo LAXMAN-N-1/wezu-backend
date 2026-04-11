@@ -4,10 +4,9 @@ from datetime import datetime
 
 class UserAlertConfig(SQLModel, table=True):
     __tablename__ = "user_alert_config"
-    __table_args__ = {"schema": "core"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: int = Field(foreign_key="core.users.id", unique=True, index=True)
+    user_id: int = Field(foreign_key="users.id", unique=True, index=True)
     
     low_charge_percent: int = Field(default=10)
     low_health_percent: int = Field(default=80)

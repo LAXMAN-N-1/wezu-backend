@@ -20,15 +20,15 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column('batteries', sa.Column('last_maintenance_cycles', sa.Integer(), nullable=False, server_default='0'), schema='inventory')
-    op.add_column('batteries', sa.Column('state_of_health', sa.Float(), nullable=False, server_default='100.0'), schema='inventory')
-    op.add_column('batteries', sa.Column('temperature_history', postgresql.JSON(astext_type=sa.Text()), nullable=True), schema='inventory')
-    op.add_column('batteries', sa.Column('charge_cycles', sa.Integer(), nullable=False, server_default='0'), schema='inventory')
-    op.add_column('batteries', sa.Column('location_id', sa.Integer(), nullable=True), schema='inventory')
+    op.add_column('batteries', sa.Column('last_maintenance_cycles', sa.Integer(), nullable=False, server_default='0'))
+    op.add_column('batteries', sa.Column('state_of_health', sa.Float(), nullable=False, server_default='100.0'))
+    op.add_column('batteries', sa.Column('temperature_history', postgresql.JSON(astext_type=sa.Text()), nullable=True))
+    op.add_column('batteries', sa.Column('charge_cycles', sa.Integer(), nullable=False, server_default='0'))
+    op.add_column('batteries', sa.Column('location_id', sa.Integer(), nullable=True))
 
 def downgrade() -> None:
-    op.drop_column('batteries', 'location_id', schema='inventory')
-    op.drop_column('batteries', 'charge_cycles', schema='inventory')
-    op.drop_column('batteries', 'temperature_history', schema='inventory')
-    op.drop_column('batteries', 'state_of_health', schema='inventory')
-    op.drop_column('batteries', 'last_maintenance_cycles', schema='inventory')
+    op.drop_column('batteries', 'location_id')
+    op.drop_column('batteries', 'charge_cycles')
+    op.drop_column('batteries', 'temperature_history')
+    op.drop_column('batteries', 'state_of_health')
+    op.drop_column('batteries', 'last_maintenance_cycles')

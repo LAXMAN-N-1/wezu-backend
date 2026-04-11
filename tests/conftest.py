@@ -1,10 +1,13 @@
 import os
 import pytest
+import sys
+import time
 from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine, select
 from sqlmodel.pool import StaticPool
-import sys
 from unittest.mock import MagicMock
+from app.services.test_report_service import test_report_service
+from app.db.session import engine as prod_engine
 
 # --- MOCK FIREBASE BEFORE APP IMPORTS ---
 # Prevents "Firebase Init Error" from top-level module code
@@ -83,8 +86,12 @@ def session_fixture():
             
         yield session
         # Teardown: delete all data
+        session.rollback()
         for table in reversed(SQLModel.metadata.sorted_tables):
-            session.execute(table.delete())
+            try:
+                session.execute(table.delete())
+            except Exception:
+                session.rollback()
         session.commit()
 
 
@@ -95,41 +102,51 @@ def seed_basics(session: Session):
     Data is cleared after each test by session_fixture teardown.
     """
     # Role
-    admin_role = Role(name="admin", description="Super Admin", category="system", level=100)
-    session.add(admin_role)
-    session.commit()
-    session.refresh(admin_role)
+    admin_role = session.exec(select(Role).where(Role.name == "admin")).first()
+    if not admin_role:
+        admin_role = Role(name="admin", description="Super Admin", category="system", level=100)
+        session.add(admin_role)
+        session.commit()
+        session.refresh(admin_role)
 
     # Menu
-    menu = Menu(name="dashboard", display_name="Dashboard", route="/dashboard", icon="home")
-    session.add(menu)
-    session.commit()
-    session.refresh(menu)
+    menu = session.exec(select(Menu).where(Menu.name == "dashboard")).first()
+    if not menu:
+        menu = Menu(name="dashboard", display_name="Dashboard", route="/dashboard", icon="home")
+        session.add(menu)
+        session.commit()
+        session.refresh(menu)
 
     # Permission
-    perm = Permission(slug="dashboard:view", module="dashboard", action="view", scope="all")
-    session.add(perm)
-    session.commit()
-    session.refresh(perm)
+    perm = session.exec(select(Permission).where(Permission.slug == "dashboard:view")).first()
+    if not perm:
+        perm = Permission(slug="dashboard:view", module="dashboard", action="view", scope="all")
+        session.add(perm)
+        session.commit()
+        session.refresh(perm)
 
     # RoleRight and RolePermission association
-    rr = RoleRight(role_id=admin_role.id, menu_id=menu.id, can_view=True, can_create=True, can_edit=True, can_delete=True)
-    session.add(rr)
-    session.commit()
+    rr = session.exec(select(RoleRight).where(RoleRight.role_id == admin_role.id, RoleRight.menu_id == menu.id)).first()
+    if not rr:
+        rr = RoleRight(role_id=admin_role.id, menu_id=menu.id, can_view=True, can_create=True, can_edit=True, can_delete=True)
+        session.add(rr)
+        session.commit()
 
     # Superuser
-    admin_user = User(
-        phone_number="9999999999",
-        email="admin@test.com",
-        full_name="Admin",
-        hashed_password=get_password_hash("password"),
-        is_superuser=True,
-        status=UserStatus.ACTIVE,
-        user_type=UserType.ADMIN,
-        role_id=admin_role.id,
-    )
-    session.add(admin_user)
-    session.commit()
+    admin_user = session.exec(select(User).where(User.email == "admin@test.com")).first()
+    if not admin_user:
+        admin_user = User(
+            phone_number="9999999999",
+            email="admin@test.com",
+            full_name="Admin",
+            hashed_password=get_password_hash("password"),
+            is_superuser=True,
+            status=UserStatus.ACTIVE,
+            user_type=UserType.ADMIN,
+            role_id=admin_role.id,
+        )
+        session.add(admin_user)
+        session.commit()
 
 from app.db.session import get_session as db_get_session
 
@@ -187,4 +204,76 @@ def normal_user_fixture(session: Session):
     session.commit()
     session.refresh(user)
     return user
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    """
+    Hook to capture test results and save them to the production database,
+    grouping by the actual test file/module name.
+    """
+    stats = terminalreporter.stats
+    
+    # We will accumulate results grouped by file path (e.g., tests/test_login.py)
+    modules = {}
+
+    def get_module(nodeid):
+        return nodeid.split("::")[0] if "::" in nodeid else "unknown_module"
+
+    # Process all reports
+    for outcome in ["passed", "failed", "skipped", "error"]:
+        for report in stats.get(outcome, []):
+            if hasattr(report, "when") and report.when != "call" and outcome == "passed":
+                continue # Skip setup/teardown passes
+            mod = get_module(report.nodeid)
+            if mod not in modules:
+                modules[mod] = {"passed": 0, "failed": 0, "skipped": 0, "error": 0, "failures": [], "errors": []}
+            
+            modules[mod][outcome] += 1
+            
+            if outcome == "failed":
+                modules[mod]["failures"].append({
+                    "nodeid": report.nodeid,
+                    "message": str(report.longreprtext) if hasattr(report, 'longreprtext') else "No traceback"
+                })
+            elif outcome == "error":
+                modules[mod]["errors"].append({
+                    "nodeid": report.nodeid,
+                    "message": str(report.longreprtext) if hasattr(report, 'longreprtext') else "Error during setup/teardown"
+                })
+
+    duration = time.time() - getattr(terminalreporter, '_sessionstarttime', time.time())
+    
+    # If no modules found but total tests ran (maybe just nothing failed/passed?), fallback:
+    if not modules:
+        passed = len(stats.get('passed', []))
+        failed = len(stats.get('failed', []))
+        skipped = len(stats.get('skipped', []))
+        error = len(stats.get('error', []))
+        total = passed + failed + skipped + error
+        if total > 0:
+            modules["pytest_run"] = {"passed": passed, "failed": failed, "skipped": skipped, "error": error, "failures": [], "errors": []}
+
+    report_data = {}
+    for mod, data in modules.items():
+        total_mod = data["passed"] + data["failed"] + data["skipped"] + data["error"]
+        report_data[mod] = {
+            "total_tests": total_mod,
+            "passed": data["passed"],
+            "failed": data["failed"] + data["error"],
+            "failures": data["failures"],
+            "errors": data["errors"],
+            "execution_time": f"{round(duration, 2)}s",
+            "environment": os.getenv("ENVIRONMENT", "local_test"),
+            "created_by": os.getenv("USER", "dev")
+        }
+
+    print(f"\n[REPORT] Saving results for {len(report_data)} module(s) to production database...")
+    
+    try:
+        from sqlmodel import Session
+        with Session(prod_engine) as db:
+            test_report_service.save_from_dict(db, report_data)
+            print("[REPORT] Success: Test results stored in 'test_reports' table.")
+    except Exception as e:
+        print(f"[REPORT] Error saving results to DB: {e}")
 

@@ -41,7 +41,7 @@ class AnalyticsDealerService(BaseAnalyticsService):
             SwapSession.created_at >= datetime.utcnow().replace(hour=0, minute=0, second=0)
         ).scalar() or 0
         
-        avg_dur = db.query(func.avg(extract('epoch', Rental.end_time - Rental.start_time) / 3600)).join(Station, Rental.pickup_station_id == Station.id).filter(
+        avg_dur = db.query(func.avg(extract('epoch', Rental.end_time - Rental.start_time) / 3600)).join(Station, Rental.start_station_id == Station.id).filter(
             Station.dealer_id == d_id,
             Rental.status == RentalStatus.COMPLETED,
             Rental.start_time >= datetime.utcnow().replace(hour=0, minute=0, second=0)
@@ -49,7 +49,7 @@ class AnalyticsDealerService(BaseAnalyticsService):
         
         # 3. Operations Analytics
         peak_hours_query_results = db.query(extract('hour', Rental.start_time), func.count(Rental.id)) \
-            .join(Station, Rental.pickup_station_id == Station.id) \
+            .join(Station, Rental.start_station_id == Station.id) \
             .filter(Station.dealer_id == d_id, Rental.start_time >= target_date) \
             .group_by(extract('hour', Rental.start_time)).all()
 
@@ -74,7 +74,7 @@ class AnalyticsDealerService(BaseAnalyticsService):
         }
 
         # 4. Revenue Analytics
-        dealer_rev = db.query(func.sum(Rental.total_price)).join(Station, Rental.pickup_station_id == Station.id).filter(
+        dealer_rev = db.query(func.sum(Rental.total_amount)).join(Station, Rental.start_station_id == Station.id).filter(
             Station.dealer_id == d_id,
             Rental.start_time >= target_date
         ).scalar() or 0.0

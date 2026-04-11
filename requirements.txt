@@ -1,4 +1,4 @@
-﻿absl-py==2.1.0
+absl-py==2.1.0
 accelerate==1.2.1
 aio-pika==9.6.1
 aiofiles==23.2.1
@@ -90,7 +90,7 @@ easydict==1.13
 ecdsa==0.19.1
 email_validator==2.2.0
 emoji==2.14.1
-en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl#sha256=1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85
+# en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl#sha256=1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85
 enum34==1.1.10
 et_xmlfile==2.0.0
 eventlet==0.39.1
