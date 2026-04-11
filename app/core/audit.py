@@ -10,12 +10,13 @@ Provides:
 import asyncio
 import functools
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from typing import Any, Callable, Dict, Optional
 
 from fastapi import Request
-from sqlmodel import Session
+from sqlmodel import select, Session
 
+from app.core.proxy import get_client_ip
 from app.models.audit_log import AuditLog
 
 logger = logging.getLogger(__name__)
@@ -134,7 +135,7 @@ def _log_from_context(
         ip_address = None
         user_agent_str = None
         if request is not None:
-            ip_address = request.client.host if request.client else None
+            ip_address = get_client_ip(request)
             user_agent_str = request.headers.get("user-agent")
 
         # Extract current user
@@ -211,8 +212,8 @@ def cleanup_old_logs(db: Session, retention_days: int = 90) -> int:
     Intended to be called by APScheduler or a management command.
     """
     try:
-        cutoff = datetime.utcnow() - timedelta(days=retention_days)
-        result = db.query(AuditLog).filter(AuditLog.timestamp < cutoff).delete()
+        cutoff = datetime.now(UTC) - timedelta(days=retention_days)
+        result = db.execute(delete(AuditLog).where(AuditLog.timestamp < cutoff))
         db.commit()
         logger.info(f"Audit log cleanup: deleted {result} records older than {retention_days} days")
         return result

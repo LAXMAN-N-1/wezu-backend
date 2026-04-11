@@ -5,7 +5,7 @@ from app.models.kyc import KYCRecord
 from app.api import deps
 import shutil
 import os
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Optional, List
 from app.schemas.kyc import RejectionReasonResponse
 
@@ -65,7 +65,7 @@ async def submit_kyc_document(
     elif document_type == "utility_bill":
         record.utility_bill_url = file_path
         
-    record.updated_at = datetime.utcnow()
+    record.updated_at = datetime.now(UTC)
     # If all docs present, update status to submitted?
     # Logic simplified for now
     if current_user.kyc_status == "verified":
@@ -181,7 +181,7 @@ def request_video_kyc(
     Request a live video KYC session.
     """
     from app.services.video_kyc_service import VideoKYCService
-    session = VideoKYCService.schedule_session(current_user.id, datetime.utcnow(), db=db)
+    session = VideoKYCService.schedule_session(current_user.id, datetime.now(UTC), db=db)
     return session
 
 @router.post("/resubmit")
@@ -192,12 +192,19 @@ async def resubmit_kyc(
     """
     Resubmit KYC after rejection. Resets status and documents logic.
     """
+    from app.models.user import KYCStatus
+    if current_user.kyc_status == KYCStatus.APPROVED:
+         raise HTTPException(status_code=400, detail="Can only resubmit if KYC is rejected")
+         
     from app.services.kyc_service import kyc_service
     success = kyc_service.resubmit_kyc(db, current_user.id)
     if not success:
          raise HTTPException(status_code=404, detail="User not found")
     
-    return {"message": "KYC status reset. You can now re-upload documents."}
+    return {
+        "message": "KYC status reset. You can now re-upload documents.",
+        "kyc_status": current_user.kyc_status
+    }
 
 @router.get("/rejection-reasons", response_model=List[RejectionReasonResponse])
 async def get_kyc_rejection_reasons():

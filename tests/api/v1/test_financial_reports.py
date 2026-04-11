@@ -55,7 +55,7 @@ def admin_and_dealer(session: Session):
     session.commit()
     session.refresh(wallet)
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     txns = [
         Transaction(user_id=admin.id, wallet_id=wallet.id, amount=500.0,
                      transaction_type=TransactionType.WALLET_TOPUP, status=TransactionStatus.SUCCESS,

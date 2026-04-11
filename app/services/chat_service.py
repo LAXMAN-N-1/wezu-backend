@@ -5,7 +5,7 @@ Live chat and automated responses
 """
 from sqlmodel import Session, select
 from typing import List, Dict, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from app.models.support import ChatSession, ChatMessage, AutoResponse
 import logging
 
@@ -20,7 +20,7 @@ class ChatService:
         chat_session = ChatSession(
             user_id=user_id,
             status="ACTIVE",
-            started_at=datetime.utcnow()
+            started_at=datetime.now(UTC)
         )
         session.add(chat_session)
         session.commit()
@@ -49,14 +49,14 @@ class ChatService:
             sender_type=sender_type,
             sender_id=sender_id,
             message=message,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(UTC)
         )
         session.add(chat_message)
         
         # Update session last message time
         chat_session = session.get(ChatSession, session_id)
         if chat_session:
-            chat_session.last_message_at = datetime.utcnow()
+            chat_session.last_message_at = datetime.now(UTC)
             session.add(chat_session)
         
         session.commit()
@@ -121,12 +121,12 @@ class ChatService:
                 return False
             
             chat_session.status = "CLOSED"
-            chat_session.closed_at = datetime.utcnow()
+            chat_session.closed_at = datetime.now(UTC)
             chat_session.customer_satisfaction = satisfaction
             
             # Calculate resolution time
             if chat_session.started_at:
-                resolution_time = (datetime.utcnow() - chat_session.started_at).total_seconds() / 60
+                resolution_time = (datetime.now(UTC) - chat_session.started_at).total_seconds() / 60
                 chat_session.resolution_time_minutes = int(resolution_time)
             
             session.add(chat_session)

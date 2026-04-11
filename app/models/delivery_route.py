@@ -1,13 +1,12 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 import sqlalchemy as sa
 from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
 
 class DeliveryRoute(SQLModel, table=True):
     __tablename__ = "delivery_routes"
-    # __table_args__ = {"schema": "public"}
     """Optimized delivery routes for drivers"""
     id: Optional[int] = Field(default=None, primary_key=True)
     driver_id: int = Field(foreign_key="driver_profiles.id")
@@ -28,7 +27,7 @@ class DeliveryRoute(SQLModel, table=True):
     
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     driver: "DriverProfile" = Relationship()
@@ -36,7 +35,6 @@ class DeliveryRoute(SQLModel, table=True):
 
 class RouteStop(SQLModel, table=True):
     __tablename__ = "route_stops"
-    # __table_args__ = {"schema": "public"}
     """Individual stops in a delivery route"""
     id: Optional[int] = Field(default=None, primary_key=True)
     route_id: int = Field(foreign_key="delivery_routes.id")

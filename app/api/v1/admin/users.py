@@ -24,7 +24,7 @@ from app.schemas.admin_user import (
 )
 from app.schemas.user import UserSearchResponse, UserSearchItem
 from app.models.user import User
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 
 logger = logging.getLogger("wezu_admin")
 
@@ -171,7 +171,7 @@ async def admin_create_user(
         hashed_password=get_password_hash(raw_password),
         is_active=True,
         is_deleted=False,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(UTC),
     )
     if role:
         new_user.role_id = role.id
@@ -241,7 +241,7 @@ async def admin_invite_user(
         hashed_password=get_password_hash(temp_password),
         is_active=True,
         is_deleted=False,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(UTC),
     )
     new_user.role_id = role.id
 
@@ -368,7 +368,7 @@ async def admin_bulk_invite(
                 hashed_password=get_password_hash(temp_password),
                 is_active=True,
                 is_deleted=False,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(UTC),
             )
             new_user.role_id = role.id
 
@@ -411,7 +411,7 @@ async def admin_bulk_invite(
         total_rows=len(rows),
         results=results,
         emails_sent=emails_sent,
-        generated_at=datetime.utcnow(),
+        generated_at=datetime.now(UTC),
     )
 
 
@@ -442,7 +442,7 @@ async def suspend_user(
     """Suspend account with reason and optional duration"""
     expires_at = None
     if req.duration_days:
-        expires_at = datetime.utcnow() + timedelta(days=req.duration_days)
+        expires_at = datetime.now(UTC) + timedelta(days=req.duration_days)
         
     user = UserService.suspend_user(db, id, current_user.id, req.reason, expires_at)
     if not user:

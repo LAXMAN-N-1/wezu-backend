@@ -1,10 +1,9 @@
 from sqlmodel import SQLModel, Field
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class InventoryAuditLog(SQLModel, table=True):
     __tablename__ = "inventory_audit_logs"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     battery_id: int = Field(foreign_key="batteries.id", index=True)
@@ -20,4 +19,4 @@ class InventoryAuditLog(SQLModel, table=True):
     actor_id: Optional[int] = Field(default=None, foreign_key="users.id")
     notes: Optional[str] = None
     
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))

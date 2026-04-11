@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
@@ -32,7 +32,6 @@ class TransactionStatus(str, Enum):
 
 class Transaction(SQLModel, table=True):
     __tablename__ = "transactions"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     
     user_id: int = Field(foreign_key="users.id", index=True)
@@ -51,8 +50,8 @@ class Transaction(SQLModel, table=True):
     payment_gateway_ref: Optional[str] = Field(default=None, index=True) # Razorpay/Stripe ID
     
     description: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationships
     user: "User" = Relationship(back_populates="transactions")
@@ -63,7 +62,6 @@ class Transaction(SQLModel, table=True):
 
 class Wallet(SQLModel, table=True):
     __tablename__ = "wallets"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", unique=True, index=True)
     
@@ -73,7 +71,7 @@ class Wallet(SQLModel, table=True):
     
     is_frozen: bool = Field(default=False)
     
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationships
     user: "User" = Relationship(back_populates="wallet")
@@ -82,14 +80,13 @@ class Wallet(SQLModel, table=True):
 
 class WalletWithdrawalRequest(SQLModel, table=True):
     __tablename__ = "wallet_withdrawal_requests"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     wallet_id: int = Field(foreign_key="wallets.id")
     amount: float
     status: str = Field(default="requested") # requested, approved, rejected, processed
     bank_details: str 
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     processed_at: Optional[datetime] = None
     
     wallet: "Wallet" = Relationship(back_populates="withdrawal_requests")

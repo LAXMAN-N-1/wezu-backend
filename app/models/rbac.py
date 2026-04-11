@@ -2,43 +2,40 @@ from sqlmodel import SQLModel, Field, Relationship
 from typing import List, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from app.models.user import User
+    from app.models.admin_user import AdminUser
     from app.models.role_right import RoleRight
-from datetime import datetime
+from datetime import datetime, UTC
 
 # Link Table for Role <-> Permission
 class RolePermission(SQLModel, table=True):
     __tablename__ = "role_permissions"
-    # __table_args__ = {"schema": "public"}
     role_id: int = Field(foreign_key="roles.id", primary_key=True)
     permission_id: int = Field(foreign_key="permissions.id", primary_key=True)
 
 # Link Table for AdminUser <-> Role
 class AdminUserRole(SQLModel, table=True):
     __tablename__ = "admin_user_roles"
-    # __table_args__ = {"schema": "public"}
     admin_id: int = Field(foreign_key="admin_users.id", primary_key=True)
     role_id: int = Field(foreign_key="roles.id", primary_key=True)
     
     assigned_by: Optional[int] = Field(default=None, foreign_key="admin_users.id")
-    assigned_at: datetime = Field(default_factory=datetime.utcnow)
+    assigned_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 # Link Table for User <-> Role (Many-to-Many)
 class UserRole(SQLModel, table=True):
     __tablename__ = "user_roles"
-    # __table_args__ = {"schema": "public"}
     user_id: int = Field(foreign_key="users.id", primary_key=True)
     role_id: int = Field(foreign_key="roles.id", primary_key=True)
     
     assigned_by: Optional[int] = Field(default=None, foreign_key="admin_users.id")
     notes: Optional[str] = None
-    effective_from: datetime = Field(default_factory=datetime.utcnow)
+    effective_from: datetime = Field(default_factory=lambda: datetime.now(UTC))
     expires_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class Permission(SQLModel, table=True):
     __tablename__ = "permissions"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     slug: str = Field(unique=True, index=True)  # e.g., "battery:view:all"
     module: str  # e.g., "battery", "station"
@@ -52,7 +49,6 @@ class Permission(SQLModel, table=True):
 
 class Role(SQLModel, table=True):
     __tablename__ = "roles"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(unique=True, index=True)
     description: Optional[str] = None
@@ -69,8 +65,8 @@ class Role(SQLModel, table=True):
     icon: Optional[str] = Field(default="shield") # Lucide icon name
     color: Optional[str] = Field(default="#4CAF50") # HEX color
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Hierarchy relationships
     parent: Optional["Role"] = Relationship(
@@ -117,7 +113,6 @@ class Role(SQLModel, table=True):
 # Data Scoping: Path Based Access
 class UserAccessPath(SQLModel, table=True):
     __tablename__ = "user_access_paths"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True)
@@ -128,7 +123,7 @@ class UserAccessPath(SQLModel, table=True):
     # Access Level
     access_level: str = Field(default="view") # view, manage, admin
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     created_by: Optional[int] = Field(default=None, foreign_key="admin_users.id")
     
     # Relationships

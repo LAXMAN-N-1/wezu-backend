@@ -102,3 +102,16 @@ def review_dealer(
             return DataResponse(data=app)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/my-status", response_model=DataResponse[Optional[DealerKYCApplication]])
+def get_my_kyc_status(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_session)
+):
+    """
+    Dealer checks their own KYC application status.
+    """
+    app = db.exec(
+        select(DealerKYCApplication).where(DealerKYCApplication.user_id == current_user.id)
+    ).first()
+    return DataResponse(data=app)

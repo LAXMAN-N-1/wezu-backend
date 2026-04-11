@@ -1,10 +1,9 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class ChargingQueue(SQLModel, table=True):
     __tablename__ = "charging_queue"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     station_id: int = Field(foreign_key="stations.id")
     battery_id: int = Field(foreign_key="batteries.id")
@@ -13,8 +12,8 @@ class ChargingQueue(SQLModel, table=True):
     queue_position: int
     estimated_completion_time: Optional[datetime] = None
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationships
     # battery: "Battery" = Relationship()

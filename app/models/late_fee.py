@@ -1,10 +1,9 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class LateFee(SQLModel, table=True):
     __tablename__ = "late_fees"
-    # __table_args__ = {"schema": "public"}
     """Late fee calculations for overdue rentals"""
     id: Optional[int] = Field(default=None, primary_key=True)
     rental_id: int = Field(foreign_key="rentals.id", unique=True)
@@ -37,8 +36,8 @@ class LateFee(SQLModel, table=True):
     # Waiver tracking
     waiver_request: Optional["LateFeeWaiver"] = Relationship(back_populates="late_fee")
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     rental: "Rental" = Relationship()
@@ -46,7 +45,6 @@ class LateFee(SQLModel, table=True):
 
 class LateFeeWaiver(SQLModel, table=True):
     __tablename__ = "late_fee_waivers"
-    # __table_args__ = {"schema": "public"}
     """Waiver requests for late fees"""
     id: Optional[int] = Field(default=None, primary_key=True)
     late_fee_id: int = Field(foreign_key="late_fees.id", unique=True)
@@ -68,7 +66,7 @@ class LateFeeWaiver(SQLModel, table=True):
     
     admin_notes: Optional[str] = None
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     late_fee: LateFee = Relationship(back_populates="waiver_request")

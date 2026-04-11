@@ -1,10 +1,9 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class Invoice(SQLModel, table=True):
     __tablename__ = "invoices"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id")
     transaction_id: int = Field(foreign_key="transactions.id")
@@ -18,7 +17,7 @@ class Invoice(SQLModel, table=True):
     is_late_fee: bool = Field(default=False)
     
     pdf_url: Optional[str] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationships
     user: "User" = Relationship()

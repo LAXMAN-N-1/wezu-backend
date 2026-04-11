@@ -45,7 +45,7 @@ def test_assign_permissions_overwrite(client: TestClient, session: Session):
     role, p1, p2, p3 = setup_data(session)
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Assign p1
     session.add(RolePermission(role_id=role.id, permission_id=p1.id))
@@ -83,7 +83,7 @@ def test_assign_permissions_append(client: TestClient, session: Session):
     session.commit()
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Append B
     payload = {
@@ -106,7 +106,7 @@ def test_assign_invalid_slug(client: TestClient, session: Session):
     session.commit()
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     payload = {
         "permissions": ["fake:slug"],
@@ -115,7 +115,7 @@ def test_assign_invalid_slug(client: TestClient, session: Session):
     
     resp = client.post(f"/api/v1/admin/rbac/roles/{role.id}/permissions", json=payload)
     assert resp.status_code == 400
-    assert "Invalid permission slugs" in resp.json()["detail"]
+    assert "Invalid permission slugs" in resp.json()["error"]
 
 def test_assign_permissions_invalidates_sessions(client: TestClient, session: Session):
     admin = create_superuser(session)
@@ -136,7 +136,7 @@ def test_assign_permissions_invalidates_sessions(client: TestClient, session: Se
     session.commit()
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Assign Perms -> Should trigger invalidation
     p = Permission(slug="p:sess", module="x", action="x")

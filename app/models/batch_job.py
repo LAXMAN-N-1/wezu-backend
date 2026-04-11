@@ -1,13 +1,12 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 import sqlalchemy as sa
 from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
 
 class BatchJob(SQLModel, table=True):
     __tablename__ = "batch_jobs"
-    # __table_args__ = {"schema": "public"}
     """Background job definitions and tracking"""
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -32,15 +31,14 @@ class BatchJob(SQLModel, table=True):
     
     description: Optional[str] = None
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     executions: list["JobExecution"] = Relationship(back_populates="job")
 
 class JobExecution(SQLModel, table=True):
     __tablename__ = "job_executions"
-    # __table_args__ = {"schema": "public"}
     """Individual job run history"""
     id: Optional[int] = Field(default=None, primary_key=True)
     job_id: int = Field(foreign_key="batch_jobs.id", index=True)
@@ -79,7 +77,7 @@ class JobExecution(SQLModel, table=True):
     memory_usage_mb: Optional[float] = None
     cpu_usage_percent: Optional[float] = None
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     job: BatchJob = Relationship(back_populates="executions")

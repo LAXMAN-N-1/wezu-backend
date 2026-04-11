@@ -4,12 +4,11 @@ Stores location history for active rentals
 """
 from sqlmodel import SQLModel, Field
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class GPSTrackingLog(SQLModel, table=True):
     """GPS location tracking for rentals"""
     __tablename__ = "gps_tracking_log"
-    # __table_args__ = {"schema": "public", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     rental_id: int = Field(foreign_key="rentals.id", index=True)
@@ -24,7 +23,7 @@ class GPSTrackingLog(SQLModel, table=True):
     heading: Optional[float] = None  # Direction in degrees
     
     # Timestamp
-    timestamp: datetime = Field(default_factory=datetime.utcnow, index=True)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), index=True)
     
     # Metadata
     provider: Optional[str] = None  # GPS, NETWORK, FUSED

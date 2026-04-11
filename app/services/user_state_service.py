@@ -20,11 +20,13 @@ from app.core.audit import AuditLogger
 
 logger = logging.getLogger(__name__)
 
+from app.models.user import User, UserStatus
+
 VALID_TRANSITIONS = {
-    "pending": ["verified"],
-    "verified": ["active"],
-    "active": ["suspended", "deleted"],
-    "suspended": ["active", "deleted"],
+    UserStatus.PENDING: [UserStatus.VERIFIED],
+    UserStatus.VERIFIED: [UserStatus.ACTIVE],
+    UserStatus.ACTIVE: [UserStatus.SUSPENDED, UserStatus.DELETED],
+    UserStatus.SUSPENDED: [UserStatus.ACTIVE, UserStatus.DELETED],
 }
 
 
@@ -47,23 +49,26 @@ class UserStateService:
         if not user:
             raise ValueError("User not found")
 
-        current_status = user.status.lower()
-        new_status = new_status.lower()
+        current_status = user.status
+        try:
+            new_status_enum = UserStatus(new_status.lower())
+        except ValueError:
+            raise ValueError(f"Invalid status: {new_status}")
 
         allowed = VALID_TRANSITIONS.get(current_status, [])
-        if new_status not in allowed:
+        if new_status_enum not in allowed:
             raise ValueError(
-                f"Invalid transition: {current_status} → {new_status}. "
+                f"Invalid transition: {current_status} → {new_status_enum}. "
                 f"Allowed: {allowed}"
             )
 
         old_status = user.status
-        user.status = new_status
+        user.status = new_status_enum
 
         # Sync is_active flag
-        if new_status in ("active", "verified"):
+        if new_status_enum in (UserStatus.ACTIVE, UserStatus.VERIFIED):
             user.is_active = True
-        elif new_status in ("suspended", "deleted"):
+        elif new_status_enum in (UserStatus.SUSPENDED, UserStatus.DELETED):
             user.is_active = False
 
         # If deleted, anonymize

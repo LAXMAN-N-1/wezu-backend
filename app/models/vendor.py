@@ -1,11 +1,10 @@
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 from sqlmodel import SQLModel, Field, Relationship
 from app.models.location import Zone
 
 class Vendor(SQLModel, table=True):
     __tablename__ = "vendors"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -28,8 +27,8 @@ class Vendor(SQLModel, table=True):
     address: Optional[str] = None
     gps_coordinates: Optional[str] = None # "lat,long"
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     documents: List["VendorDocument"] = Relationship(back_populates="vendor")
@@ -38,13 +37,12 @@ class Vendor(SQLModel, table=True):
 
 class VendorDocument(SQLModel, table=True):
     __tablename__ = "vendor_documents"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     vendor_id: int = Field(foreign_key="vendors.id")
     document_type: str = Field(index=True) # license, gst, agreement, other
     file_path: str
-    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+    uploaded_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     is_verified: bool = Field(default=False)
     
     vendor: Vendor = Relationship(back_populates="documents")

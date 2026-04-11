@@ -1,6 +1,6 @@
 from sqlmodel import Session, select
 from typing import List, Optional, Dict
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from app.models.station import Station, StationStatus
 from app.models.battery import Battery, BatteryStatus
 from app.models.battery_reservation import BatteryReservation
@@ -81,7 +81,7 @@ class BookingService:
             raise ValueError("User already has an active reservation")
 
         # 3. Create Reservation
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         expiry = now + timedelta(minutes=30)
         
         reservation = BatteryReservation(
@@ -105,7 +105,7 @@ class BookingService:
 
         # 5. Schedule reminder (10 mins before expiry)
         reminder_time = reservation.end_time - timedelta(minutes=10)
-        if reminder_time > datetime.utcnow():
+        if reminder_time > datetime.now(UTC):
             NotificationService.schedule_notification(
                 db=db,
                 user_id=user_id,
@@ -119,7 +119,7 @@ class BookingService:
     @staticmethod
     def release_expired_reservations(db: Session):
         """Release reservations older than 30 minutes"""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         statement = select(BatteryReservation).where(
             BatteryReservation.status == "PENDING",
             BatteryReservation.end_time < now

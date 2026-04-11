@@ -86,7 +86,7 @@ test@test.com,Test User
         headers=headers
     )
     assert resp.status_code == 400
-    assert "must have columns" in resp.json()["detail"]
+    assert "must have columns" in resp.json()["error"]
 
 
 def test_bulk_import_handles_errors(client, session: Session):

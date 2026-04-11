@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session, select, func
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 
 from app.api import deps
 from app.models.user import User
@@ -17,11 +17,11 @@ def calc_change(current: float, previous: float) -> float:
 
 @router.get("/summary")
 async def get_dashboard_summary(
-    period: str = Query("30d", regex="^(today|7d|30d|90d)$"),
+    period: str = Query("30d", pattern="^(today|7d|30d|90d)$"),
     current_user: User = Depends(deps.get_current_active_superuser),
     db: Session = Depends(deps.get_db),
 ):
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     
     if period == "today":
         current_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -149,7 +149,7 @@ async def get_dashboard_trend(
     db: Session = Depends(deps.get_db),
 ):
     # Dummy implementation for trend: generate 30 days of data ending today
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     points = []
 
     # Simple linear mock data or random sine wave for realism
@@ -240,7 +240,7 @@ async def get_dashboard_activity_feed(
     # This should be a unified query across rentals, users, payments, and alerts
     # For now, generate a realistic static mix representing "live" feed
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     def t(m_ago):
         return (now - timedelta(minutes=m_ago)).strftime("%I:%M %p")
 

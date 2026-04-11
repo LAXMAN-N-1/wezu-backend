@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict
-from datetime import datetime
+from datetime import datetime, UTC
 from app.api import deps
 from app.core.audit import audit_log
 from app.db.session import get_session
@@ -26,6 +26,7 @@ from app.schemas.dashboard import DashboardConfigResponse
 from app.services.audit_service import audit_service
 from app.services.analytics_service import AnalyticsService
 from app.services.membership_service import MembershipService
+from app.core.proxy import get_client_ip
 import os
 import shutil
 import json
@@ -196,7 +197,7 @@ async def update_user_me(
     Update authenticated user's profile.
     Safely separates User table updates from UserProfile table updates.
     """
-    from datetime import datetime
+    from datetime import datetime, UTC
     
     # Get fresh user with profile
     user = db.exec(select(User).where(User.id == current_user.id).options(selectinload(User.user_profile))).first()
@@ -224,11 +225,11 @@ async def update_user_me(
             if field in update_data:
                 setattr(user.user_profile, field, update_data[field])
                 
-        user.user_profile.updated_at = datetime.utcnow()
+        user.user_profile.updated_at = datetime.now(UTC)
         db.add(user.user_profile)
     
     # Update timestamp
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(UTC)
     
     db.add(user)
     db.commit()
@@ -265,7 +266,7 @@ async def upload_profile_picture(
     Upload profile picture for authenticated user.
     """
     from app.services.storage_service import StorageService
-    from datetime import datetime
+    from datetime import datetime, UTC
     import uuid
     
     # Validate file type
@@ -302,7 +303,7 @@ async def upload_profile_picture(
         raise HTTPException(status_code=404, detail="User not found")
     
     user.profile_picture = file_url
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(UTC)
     db.add(user)
     db.commit()
     
@@ -685,27 +686,54 @@ def _get_default_notification_preferences() -> dict:
 @router.get("/me/notification-preferences", response_model=NotificationPreferencesResponse)
 def get_notification_preferences(
     current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Get current user's notification preferences.
     """
-    prefs = _get_default_notification_preferences()
+    from app.models.notification_preference import NotificationPreference
+    from sqlmodel import select
     
-    if current_user.notification_preferences:
-        try:
-            stored = json.loads(current_user.notification_preferences)
-            # Merge stored prefs with defaults (in case new fields were added)
-            for key in ["email", "sms", "push", "quiet_hours"]:
-                if key in stored:
-                    prefs[key].update(stored[key])
-        except json.JSONDecodeError:
-            pass  # Fallback to defaults
+    pref = db.exec(
+        select(NotificationPreference).where(NotificationPreference.user_id == current_user.id)
+    ).first()
     
+    if not pref:
+        # Return defaults if no settings found
+        prefs = _get_default_notification_preferences()
+        return NotificationPreferencesResponse(
+            email=EmailPreferences(**prefs["email"]),
+            sms=SMSPreferences(**prefs["sms"]),
+            push=PushPreferences(**prefs["push"]),
+            quiet_hours=QuietHours(**prefs["quiet_hours"]),
+        )
+
     return NotificationPreferencesResponse(
-        email=EmailPreferences(**prefs["email"]),
-        sms=SMSPreferences(**prefs["sms"]),
-        push=PushPreferences(**prefs["push"]),
-        quiet_hours=QuietHours(**prefs["quiet_hours"]),
+        email=EmailPreferences(
+            enabled=pref.email_enabled,
+            rental_confirmations=pref.transactional_email,
+            payment_receipts=pref.payment_email,
+            promotional=pref.promotional_email,
+            security_alerts=True
+        ),
+        sms=SMSPreferences(
+            enabled=pref.sms_enabled,
+            rental_confirmations=pref.transactional_sms,
+            payment_receipts=pref.payment_sms,
+            otp=True
+        ),
+        push=PushPreferences(
+            enabled=pref.push_enabled,
+            battery_available=pref.battery_alerts_push,
+            payment_reminders=pref.payment_push,
+            promotional=pref.promotional_push
+        ),
+        quiet_hours=QuietHours(
+            enabled=pref.quiet_hours_enabled,
+            start_time=pref.quiet_hours_start.strftime("%H:%M") if pref.quiet_hours_start else "22:00",
+            end_time=pref.quiet_hours_end.strftime("%H:%M") if pref.quiet_hours_end else "07:00",
+            timezone="UTC"
+        )
     )
 
 
@@ -718,39 +746,70 @@ def update_notification_preferences(
     """
     Update current user's notification preferences.
     """
-    # Load existing or defaults
-    current_prefs = _get_default_notification_preferences()
+    from app.models.notification_preference import NotificationPreference
+    from sqlmodel import select
+    from datetime import datetime
     
-    if current_user.notification_preferences:
-        try:
-            stored = json.loads(current_user.notification_preferences)
-            for key in ["email", "sms", "push", "quiet_hours"]:
-                if key in stored:
-                    current_prefs[key].update(stored[key])
-        except json.JSONDecodeError:
-            pass
+    pref = db.exec(
+        select(NotificationPreference).where(NotificationPreference.user_id == current_user.id)
+    ).first()
     
-    # Merge updates
+    if not pref:
+        pref = NotificationPreference(user_id=current_user.id)
+        db.add(pref)
+    
+    # Map updates
     if prefs_in.email:
-        current_prefs["email"].update(prefs_in.email.model_dump())
+        pref.email_enabled = prefs_in.email.enabled
+        pref.transactional_email = prefs_in.email.rental_confirmations
+        pref.payment_email = prefs_in.email.payment_receipts
+        pref.promotional_email = prefs_in.email.promotional
     if prefs_in.sms:
-        current_prefs["sms"].update(prefs_in.sms.model_dump())
+        pref.sms_enabled = prefs_in.sms.enabled
+        pref.transactional_sms = prefs_in.sms.rental_confirmations
+        pref.payment_sms = prefs_in.sms.payment_receipts
     if prefs_in.push:
-        current_prefs["push"].update(prefs_in.push.model_dump())
+        pref.push_enabled = prefs_in.push.enabled
+        pref.battery_alerts_push = prefs_in.push.battery_available
+        pref.payment_push = prefs_in.push.payment_reminders
+        pref.promotional_push = prefs_in.push.promotional
     if prefs_in.quiet_hours:
-        current_prefs["quiet_hours"].update(prefs_in.quiet_hours.model_dump())
-    
-    # Persist
-    current_user.notification_preferences = json.dumps(current_prefs)
-    db.add(current_user)
+        pref.quiet_hours_enabled = prefs_in.quiet_hours.enabled
+        try:
+            pref.quiet_hours_start = datetime.strptime(prefs_in.quiet_hours.start_time, "%H:%M").time()
+            pref.quiet_hours_end = datetime.strptime(prefs_in.quiet_hours.end_time, "%H:%M").time()
+        except Exception:
+            pass
+            
     db.commit()
-    db.refresh(current_user)
+    db.refresh(pref)
     
     return NotificationPreferencesResponse(
-        email=EmailPreferences(**current_prefs["email"]),
-        sms=SMSPreferences(**current_prefs["sms"]),
-        push=PushPreferences(**current_prefs["push"]),
-        quiet_hours=QuietHours(**current_prefs["quiet_hours"]),
+        email=EmailPreferences(
+            enabled=pref.email_enabled,
+            rental_confirmations=pref.transactional_email,
+            payment_receipts=pref.payment_email,
+            promotional=pref.promotional_email,
+            security_alerts=True
+        ),
+        sms=SMSPreferences(
+            enabled=pref.sms_enabled,
+            rental_confirmations=pref.transactional_sms,
+            payment_receipts=pref.payment_sms,
+            otp=True
+        ),
+        push=PushPreferences(
+            enabled=pref.push_enabled,
+            battery_available=pref.battery_alerts_push,
+            payment_reminders=pref.payment_push,
+            promotional=pref.promotional_push
+        ),
+        quiet_hours=QuietHours(
+            enabled=pref.quiet_hours_enabled,
+            start_time=pref.quiet_hours_start.strftime("%H:%M") if pref.quiet_hours_start else "22:00",
+            end_time=pref.quiet_hours_end.strftime("%H:%M") if pref.quiet_hours_end else "07:00",
+            timezone="UTC"
+        )
     )
 
 
@@ -909,7 +968,7 @@ async def search_users(
     # Role filter requires join
     if role:
         from app.models.rbac import Role
-        query = query.join(User.roles).where(Role.name == role)
+        query = query.join(User.role).where(Role.name == role)
         
     # Join addresses if needed
     if join_addresses:
@@ -1036,8 +1095,7 @@ class KYCDocumentInfo(BaseModel):
     status: str
     uploaded_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 
@@ -1049,8 +1107,7 @@ class LoginHistoryEntry(BaseModel):
     timestamp: datetime
     details: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AdminUserProfileResponse(BaseModel):
@@ -1089,11 +1146,10 @@ class AdminUserProfileResponse(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
-from datetime import datetime
+from datetime import datetime, UTC
 from app.models.audit_log import AuditLog
 from app.models.kyc import KYCDocument
 from app.models.session import UserSession
@@ -1132,7 +1188,7 @@ async def get_user_by_id(
     
     # Fetch target user with relationships
     statement = select(User).where(User.id == user_id).options(
-        selectinload(User.roles),
+        selectinload(User.role),
         selectinload(User.wallet),
         selectinload(User.staff_profile),
         selectinload(User.kyc_documents),
@@ -1332,7 +1388,7 @@ async def update_user_status(
     else:
         user.is_active = False
         # Invalidate sessions
-        user.last_global_logout_at = datetime.utcnow()
+        user.last_global_logout_at = datetime.now(UTC)
         
     db.add(user)
     
@@ -1343,8 +1399,8 @@ async def update_user_status(
         resource_type="user",
         resource_id=str(user.id),
         details=f"Changed status from {old_status} to {new_status}. Reason: {status_update.reason}",
-        ip_address="0.0.0.0", # TODO: Extract from request
-        timestamp=datetime.utcnow()
+        ip_address=get_client_ip(request),
+        timestamp=datetime.now(UTC)
     )
     db.add(audit_log)
     db.commit()
@@ -1492,7 +1548,7 @@ async def delete_user(
     
     original_email = user.email
     user.is_deleted = True
-    user.deleted_at = datetime.utcnow()
+    user.deleted_at = datetime.now(UTC)
     user.is_active = False
     user.status = "deleted"
     
@@ -1510,7 +1566,7 @@ async def delete_user(
     user.apple_id = None
     
     # Invalidate sessions
-    user.last_global_logout_at = datetime.utcnow()
+    user.last_global_logout_at = datetime.now(UTC)
     
     db.add(user)
     
@@ -1521,8 +1577,8 @@ async def delete_user(
         resource_type="user",
         resource_id=str(user.id),
         details=f"Soft deleted user. Original Email: {original_email}",
-        ip_address="0.0.0.0",
-        timestamp=datetime.utcnow()
+        ip_address=get_client_ip(request),
+        timestamp=datetime.now(UTC)
     )
     db.add(audit_log)
     
@@ -1551,7 +1607,7 @@ async def get_my_sessions(
     
     # Identify current session roughly by IP/UA if possible, or JTI if we had it in request state
     # Ideally we'd compare JTI, but basic matching:
-    current_ip = request.client.host if request.client else None
+    current_ip = get_client_ip(request)
     current_ua = request.headers.get("user-agent")
     
     response = []

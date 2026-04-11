@@ -1,5 +1,5 @@
 from sqlmodel import Session, select, func, and_, or_
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from typing import Dict, Any, List
 from app.models.rental import Rental
 from app.models.user import User
@@ -13,7 +13,7 @@ class AdminAnalyticsService:
 
     @staticmethod
     def get_overview(db: Session) -> Dict[str, Any]:
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         month_ago = now - timedelta(days=30)
         two_months_ago = now - timedelta(days=60)
 
@@ -80,7 +80,7 @@ class AdminAnalyticsService:
     @staticmethod
     def get_trends(db: Session, period: str = 'daily') -> Dict[str, Any]:
         days = 30 if period == 'daily' else 90
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         start_date = (now - timedelta(days=days)).replace(hour=0, minute=0, second=0, microsecond=0)
         
         from sqlalchemy import cast, Date
@@ -146,7 +146,7 @@ class AdminAnalyticsService:
     def get_revenue_by_region(db: Session, period: str = '30d') -> Dict[str, Any]:
         """Revenue aggregated per station city from real rentals."""
         days = 90 if period == '90d' else 30
-        since = datetime.utcnow() - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
 
         # select returns Result of tuples
         rows = db.execute(
@@ -173,7 +173,7 @@ class AdminAnalyticsService:
     def get_revenue_by_station(db: Session, period: str = '30d') -> Dict[str, Any]:
         """Revenue aggregated per station from real rentals."""
         days = 90 if period == '90d' else 30
-        since = datetime.utcnow() - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
 
         rows = db.execute(
             select(
@@ -211,7 +211,7 @@ class AdminAnalyticsService:
     def get_revenue_by_battery_type(db: Session, period: str = '30d') -> Dict[str, Any]:
         """Revenue aggregated by battery model from real rentals."""
         days = 90 if period == '90d' else 30
-        since = datetime.utcnow() - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
 
         rows = db.execute(
             select(Battery.model_number, func.sum(Rental.total_amount), func.count(Rental.id))
@@ -260,7 +260,7 @@ class AdminAnalyticsService:
     @staticmethod
     def get_recent_activity(db: Session) -> Dict[str, Any]:
         """Latest events from the database (new users + rentals)."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         activities = []
 
         new_users = db.exec(select(User).order_by(User.created_at.desc()).limit(3)).all()
@@ -301,7 +301,7 @@ class AdminAnalyticsService:
     @staticmethod
     def get_top_stations(db: Session) -> Dict[str, Any]:
         """Top performing stations by total rental revenue (last 30 days)."""
-        since = datetime.utcnow() - timedelta(days=30)
+        since = datetime.now(UTC) - timedelta(days=30)
         rows = db.execute(
             select(
                 Station.id, Station.name, Station.address,
@@ -376,7 +376,7 @@ class AdminAnalyticsService:
 
     @staticmethod
     def get_user_growth(db: Session, period: str = 'monthly') -> Dict[str, Any]:
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         growth = []
         from sqlalchemy import cast, Date
         
@@ -434,7 +434,7 @@ class AdminAnalyticsService:
     @staticmethod
     def get_demand_forecast(db: Session) -> Dict[str, Any]:
         """7-day demand forecast using historical weekday averages."""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         weekday_avgs: Dict[int, float] = {}
         for wd in range(7):
             counts = []

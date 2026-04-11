@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List, Dict
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from app.models.station import Station
@@ -14,7 +14,6 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 class DealerProfile(SQLModel, table=True):
     __tablename__ = "dealer_profiles"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", unique=True)
     
@@ -22,9 +21,18 @@ class DealerProfile(SQLModel, table=True):
     gst_number: Optional[str] = None
     pan_number: Optional[str] = None
     
+    # Extra Business Info
+    year_established: Optional[str] = None
+    website_url: Optional[str] = None
+    business_description: Optional[str] = None
+    
     contact_person: str
     contact_email: str
     contact_phone: str
+    alternate_phone: Optional[str] = None
+    whatsapp_number: Optional[str] = None
+    support_email: Optional[str] = None
+    support_phone: Optional[str] = None
     
     address_line1: str
     city: str
@@ -32,18 +40,34 @@ class DealerProfile(SQLModel, table=True):
     pincode: str
     
     # Financial Details
+    bank_name: Optional[str] = None
+    bank_account_number: Optional[str] = None
+    bank_ifsc_code: Optional[str] = None
+    
     bank_details: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
+    payout_interval: Optional[str] = Field(default="Weekly") # Daily, Weekly, Bi-Weekly, Monthly
+    min_payout_amount: Optional[float] = Field(default=0.0)
+    
+    # Global Settings Defaults
+    global_station_defaults: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
+    global_inventory_rules: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
+    global_rental_settings: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
+    holiday_calendar: Optional[List[Dict]] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
     # Portal Settings (Preferences, Localization, Formatting, Rental)
     settings: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
     is_active: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
-    user: "User" = Relationship(
-        back_populates="dealer_profile",
-        sa_relationship_kwargs={"foreign_keys": "[DealerProfile.user_id]"}
+    owner: "User" = Relationship(
+        back_populates="owned_dealer_profile",
+        sa_relationship_kwargs={
+            "primaryjoin": "DealerProfile.user_id == User.id",
+            "foreign_keys": "[DealerProfile.user_id]",
+            "overlaps": "dealer_profile,user,owner,owned_dealer_profile,staff_members"
+        }
     )
     stations: List["Station"] = Relationship(back_populates="dealer")
     application: Optional["DealerApplication"] = Relationship(back_populates="dealer")
@@ -54,7 +78,6 @@ class DealerProfile(SQLModel, table=True):
 
 class DealerDocument(SQLModel, table=True):
     __tablename__ = "dealer_documents"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     dealer_id: int = Field(foreign_key="dealer_profiles.id")
     document_type: str = Field(index=True) # gst, pan, registration, cancelled_cheque
@@ -65,14 +88,13 @@ class DealerDocument(SQLModel, table=True):
     status: str = Field(default="PENDING") # PENDING, VERIFIED, REJECTED, EXPIRED, ARCHIVED
     
     valid_until: Optional[datetime] = None
-    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+    uploaded_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     is_verified: bool = Field(default=False)
     
     dealer: "DealerProfile" = Relationship(back_populates="documents")
 
 class DealerApplication(SQLModel, table=True):
     __tablename__ = "dealer_applications"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     dealer_id: int = Field(foreign_key="dealer_profiles.id", unique=True)
     
@@ -85,15 +107,15 @@ class DealerApplication(SQLModel, table=True):
     # Using JSON for history log: [{"stage": "SUBMITTED", "timestamp": "...", "notes": ""}]
     status_history: List[Dict] = Field(default_factory=list, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     dealer: "DealerProfile" = Relationship(back_populates="application")
     field_visits: List["FieldVisit"] = Relationship(back_populates="application")
     
     def log_stage(self, new_stage: str, notes: str = ""):
         self.current_stage = new_stage
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
         # Create a new list if it's None or empty, then append the new entry
         history = list(self.status_history) if self.status_history else []
         history.append({
@@ -105,7 +127,6 @@ class DealerApplication(SQLModel, table=True):
 
 class FieldVisit(SQLModel, table=True):
     __tablename__ = "field_visits"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     application_id: int = Field(foreign_key="dealer_applications.id")
     officer_id: int = Field(foreign_key="users.id") # Field Officer
@@ -118,6 +139,6 @@ class FieldVisit(SQLModel, table=True):
     report_data: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     images: Optional[List[str]] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     application: DealerApplication = Relationship(back_populates="field_visits")

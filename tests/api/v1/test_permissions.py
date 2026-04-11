@@ -39,7 +39,7 @@ def test_list_permissions_grouped(client: TestClient, session: Session):
     setup_permissions(session)
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     resp = client.get("/api/v1/admin/rbac/permissions")
     assert resp.status_code == 200

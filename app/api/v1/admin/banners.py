@@ -6,7 +6,7 @@ from app.models.user import User
 from app.models.banner import Banner
 from app.schemas.banner import BannerCreate, BannerUpdate, BannerRead
 from app.api.deps import get_current_active_admin
-from datetime import datetime
+from datetime import datetime, UTC
 
 router = APIRouter()
 
@@ -48,7 +48,7 @@ def update_banner(
     for key, value in banner_data.items():
         setattr(db_banner, key, value)
     
-    db_banner.updated_at = datetime.utcnow()
+    db_banner.updated_at = datetime.now(UTC)
     session.add(db_banner)
     session.commit()
     session.refresh(db_banner)

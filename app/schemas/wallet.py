@@ -34,3 +34,23 @@ class TransactionResponse(BaseModel):
 class RechargeRequest(BaseModel):
     amount: float
     payment_method: str = "upi"
+
+class DealerTransactionResponse(TransactionResponse):
+    customer_name: str
+    customer_phone: Optional[str] = None
+    station_name: str
+    terminal_id: Optional[int] = None
+    battery_serial: Optional[str] = None
+    duration_minutes: Optional[int] = None
+    net_amount: float
+    commission_amount: float
+    settlement_status: str
+
+class TransactionLifecycleEvent(BaseModel):
+    event_type: str
+    timestamp: datetime
+    is_completed: bool
+
+class TransactionLifecycleResponse(BaseModel):
+    transaction_id: int
+    events: List[TransactionLifecycleEvent]

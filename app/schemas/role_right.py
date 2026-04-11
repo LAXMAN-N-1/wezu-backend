@@ -1,3 +1,4 @@
+from pydantic import ConfigDict
 from typing import Optional
 from sqlmodel import SQLModel
 from datetime import datetime
@@ -24,5 +25,4 @@ class RoleRightRead(RoleRightBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

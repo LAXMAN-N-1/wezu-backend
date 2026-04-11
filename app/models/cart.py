@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 
 class CartItem(SQLModel, table=True):
     """Items in a user's shopping cart"""
@@ -12,8 +12,8 @@ class CartItem(SQLModel, table=True):
     variant_id: Optional[int] = Field(default=None, foreign_key="product_variants.id")
     
     quantity: int = Field(default=1, gt=0)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationships (Optional, but good for joins)
     # product: "CatalogProduct" = Relationship()

@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, Any, TYPE_CHECKING
-from datetime import datetime
+from datetime import datetime, UTC
 from enum import Enum
 import uuid
 
@@ -20,7 +20,6 @@ class KYCDocumentStatus(str, Enum):
 
 class KYCRecord(SQLModel, table=True):
     __tablename__ = "kyc_records"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True)
@@ -44,16 +43,15 @@ class KYCRecord(SQLModel, table=True):
     
     # Audit
     verified_by: Optional[int] = Field(default=None, foreign_key="users.id") # Admin User ID
-    submitted_at: datetime = Field(default_factory=datetime.utcnow)
+    submitted_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     verified_at: Optional[datetime] = None
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationship
     user: "User" = Relationship(back_populates="kyc_records", sa_relationship_kwargs={"foreign_keys": "[KYCRecord.user_id]"})
 
 class KYCDocument(SQLModel, table=True):
     __tablename__ = "kyc_documents"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True)
@@ -68,7 +66,7 @@ class KYCDocument(SQLModel, table=True):
     rejection_reason: Optional[str] = None
     
     verified_by: Optional[int] = Field(default=None, foreign_key="users.id")
-    uploaded_at: datetime = Field(default_factory=datetime.utcnow)
+    uploaded_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     verified_at: Optional[datetime] = None
     
     # Relationships
@@ -79,11 +77,10 @@ class KYCDocument(SQLModel, table=True):
 
 class KYCRequest(SQLModel, table=True):
     __tablename__ = "kyc_requests"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id")
     status: str = Field(default="pending")
     request_data: Optional[str] = None # JSON string
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

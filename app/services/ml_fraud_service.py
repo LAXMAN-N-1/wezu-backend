@@ -4,7 +4,7 @@ Machine learning-based fraud detection and risk scoring
 """
 from sqlmodel import Session, select
 from typing import Dict, List
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from app.models.user import User
 from app.models.rental import Rental
 from app.models.device_fingerprint import DeviceFingerprint
@@ -83,7 +83,7 @@ class MLFraudDetectionService:
         recent_rentals = session.exec(
             select(Rental)
             .where(Rental.user_id == user_id)
-            .where(Rental.created_at >= datetime.utcnow() - timedelta(days=30))
+            .where(Rental.created_at >= datetime.now(UTC) - timedelta(days=30))
             .order_by(Rental.created_at.desc())
         ).all()
         

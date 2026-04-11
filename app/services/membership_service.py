@@ -1,6 +1,6 @@
 from sqlmodel import Session, select
 from app.models.membership import UserMembership, MembershipTier
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from typing import Dict, List, Any
 
 class MembershipService:
@@ -81,7 +81,7 @@ class MembershipService:
         # 1 point for every ₹10 spent
         points_earned = amount / 10.0
         membership.points_balance += points_earned
-        membership.updated_at = datetime.utcnow()
+        membership.updated_at = datetime.now(UTC)
         
         # 2. Check for tier promotion
         MembershipService._process_tier_promotion(membership)
@@ -105,5 +105,5 @@ class MembershipService:
                 if membership.tier != tier:
                     membership.tier = tier
                     # Reset or extend expiry if logic exists
-                    membership.tier_expiry = datetime.utcnow() + timedelta(days=365)
+                    membership.tier_expiry = datetime.now(UTC) + timedelta(days=365)
                 break

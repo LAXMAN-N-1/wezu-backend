@@ -16,7 +16,8 @@ from typing import Optional
 from fastapi import Request
 from sqlmodel import Session
 
-from app.models.audit_log import AuditLog
+from app.utils.audit_context import log_audit_action
+from app.core.proxy import get_client_ip
 
 logger = logging.getLogger("wezu_audit")
 
@@ -67,9 +68,9 @@ def _write_log(
     target_id_param: Optional[str],
 ):
     """Write the audit log entry, swallowing errors to never break the endpoint."""
+    db: Optional[Session] = None
+    own_session = False
     try:
-        from app.core.database import get_db
-
         # Extract user info
         user_id = None
         current_user = kwargs.get("current_user")
@@ -80,7 +81,7 @@ def _write_log(
         ip_address = None
         user_agent = None
         if request:
-            ip_address = request.client.host if request.client else None
+            ip_address = get_client_ip(request)
             user_agent = request.headers.get("user-agent", "")
 
         # Extract target ID
@@ -92,32 +93,32 @@ def _write_log(
                 pass
 
         # Get DB session
-        db: Optional[Session] = kwargs.get("db") or kwargs.get("session")
+        db = kwargs.get("db") or kwargs.get("session")
         if db is None:
             # Fallback: create a new session
             from app.core.database import engine
 
             db = Session(engine)
             own_session = True
-        else:
-            own_session = False
 
-        log = AuditLog(
-            user_id=user_id,
+        log_audit_action(
+            db=db,
             action=action_type,
             resource_type=resource_type,
             target_id=target_id,
-            ip_address=ip_address,
-            user_agent=user_agent,
         )
-        db.add(log)
         db.commit()
-
-        if own_session:
-            db.close()
 
         logger.info(
             f"Audit: {action_type} on {resource_type} by user {user_id} from {ip_address}"
         )
     except Exception as e:
+        if db is not None:
+            try:
+                db.rollback()
+            except Exception:
+                pass
         logger.error(f"Failed to write audit log: {e}")
+    finally:
+        if own_session and db is not None:
+            db.close()

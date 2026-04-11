@@ -221,8 +221,8 @@ class TestMaintenanceEnforcement:
     def test_schedule_maintenance(self, client, session, station_test_env):
         """#6: Creates StationDowntime."""
         headers = get_token(station_test_env["dealer_user"])
-        start = (datetime.utcnow() + timedelta(days=1)).isoformat()
-        end = (datetime.utcnow() + timedelta(days=1, hours=2)).isoformat()
+        start = (datetime.now(UTC) + timedelta(days=1)).isoformat()
+        end = (datetime.now(UTC) + timedelta(days=1, hours=2)).isoformat()
         
         payload = {
             "start_time": start,
@@ -236,7 +236,7 @@ class TestMaintenanceEnforcement:
         # Test Double booking prevent (#12)
         resp2 = client.post(f"/api/v1/dealer-stations/{self.m_station_id}/maintenance", headers=headers, json=payload)
         assert resp2.status_code == 400
-        assert "overlaps" in resp2.json()["detail"]
+        assert "overlaps" in resp2.json()["error"]
 
     def test_maintenance_enforced(self, client, session, station_test_env):
         """#9: Swap fails if under maintenance."""
@@ -248,8 +248,8 @@ class TestMaintenanceEnforcement:
         client.put(f"/api/v1/dealer-stations/{self.m_station_id}/hours", headers=dealer_headers, json={"hours": f"{open_str}-{close_str}"})
 
         # 1. Schedule downtime NOW
-        start = (datetime.utcnow() - timedelta(minutes=10)).isoformat()
-        end = (datetime.utcnow() + timedelta(hours=2)).isoformat()
+        start = (datetime.now(UTC) - timedelta(minutes=10)).isoformat()
+        end = (datetime.now(UTC) + timedelta(hours=2)).isoformat()
         client.post(f"/api/v1/dealer-stations/{self.m_station_id}/maintenance", headers=dealer_headers, json={
             "start_time": start, "end_time": end, "reason": "Emergency Fix"
         })
@@ -260,13 +260,13 @@ class TestMaintenanceEnforcement:
             "station_id": self.m_station_id, "returned_battery_id": 999
         })
         assert resp.status_code == 400
-        assert "maintenance" in resp.json()["detail"].lower()
+        assert "maintenance" in resp.json()["error"].lower()
 
     def test_hours_enforced(self, client, session, station_test_env):
         """#8: Swap fails if outside hours."""
         # Setup hours to definitely be closed right now.
         # If current UTC hour is H, set open to H+2 to H+3
-        current_hour = datetime.utcnow().hour
+        current_hour = datetime.now(UTC).hour
         open_h = (current_hour + 2) % 24
         close_h = (current_hour + 3) % 24
         
@@ -283,7 +283,7 @@ class TestMaintenanceEnforcement:
             "station_id": self.m_station_id, "returned_battery_id": 999
         })
         assert resp.status_code == 400
-        assert "operating hours" in resp.json()["detail"].lower()
+        assert "operating hours" in resp.json()["error"].lower()
 
 # ─── Tests: Edge Cases & Authorization ───
 
@@ -353,7 +353,7 @@ class TestEdgeCases:
             "duration_days": 2
         })
         assert resp.status_code == 400
-        assert "operating hours" in resp.json()["detail"].lower()
+        assert "operating hours" in resp.json()["error"].lower()
 
     def test_invalid_hours_format_handled(self, client, session, station_test_env):
         """#15: Invalid hours format gracefully fallback to open."""

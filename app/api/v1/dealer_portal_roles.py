@@ -2,7 +2,7 @@ from typing import Any, List, Dict
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select, func
 import sqlalchemy as sa
-from datetime import datetime
+from datetime import datetime, UTC
 
 from app.db.session import get_session
 from app.api import deps
@@ -190,7 +190,7 @@ def update_role(
     for key, value in role_data.items():
         setattr(role, key, value)
     
-    role.updated_at = datetime.utcnow()
+    role.updated_at = datetime.now(UTC)
     db.add(role)
     
     if permissions is not None:

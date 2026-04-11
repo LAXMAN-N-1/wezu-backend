@@ -102,7 +102,6 @@ class DealerProfileResponse(BaseModel):
     pan_number: Optional[str]
     is_active: bool
     created_at: datetime
-    updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -110,13 +109,11 @@ class DealerApplicationResponse(BaseModel):
     """Dealer application response"""
     id: int
     dealer_id: int
-    stage: str
-    submitted_at: datetime
-    reviewed_at: Optional[datetime]
-    approved_at: Optional[datetime]
-    rejected_at: Optional[datetime]
-    rejection_reason: Optional[str]
-    notes: Optional[str]
+    current_stage: str
+    risk_score: float = 0.0
+    status_history: Optional[List[Dict]] = None
+    created_at: datetime
+    updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -126,10 +123,11 @@ class FieldVisitResponse(BaseModel):
     application_id: int
     officer_id: int
     scheduled_date: datetime
-    completed_date: Optional[datetime]
+    completed_date: Optional[datetime] = None
     status: str
-    findings: Optional[str]
-    recommendation: Optional[str]
+    report_data: Optional[Dict] = None
+    images: Optional[List[str]] = None
+    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -1,8 +1,9 @@
 from google.oauth2 import id_token
 from google.auth.transport import requests
 from app.core.config import settings
+from app.core.proxy import get_client_ip
 from fastapi import HTTPException, status, Request
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 class AuthService:
     @staticmethod
@@ -55,17 +56,11 @@ class AuthService:
             )
             return payload
         except Exception as e:
-            # In development, if APPLE_CLIENT_ID is not set, allow unverified for testing (CAUTION)
-            if settings.ENVIRONMENT != "production" and not settings.APPLE_CLIENT_ID:
-                from jose import jwt as jose_jwt
-                return jose_jwt.get_unverified_claims(token)
-                
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=f"Invalid Apple token: {str(e)}",
             )
 
-    @staticmethod
     @staticmethod
     async def verify_facebook_token(token: str):
         try:
@@ -89,31 +84,83 @@ class AuthService:
             )
 
     @staticmethod
-    def get_menu_for_role(role_name: str) -> list[dict]:
-        # Avoiding circular import by returning dicts or importing locally if needed
-        # But returning dicts is safer for service layer decoupling if schema isn't strictly needed here 
-        # However, for type safety let's use the schema if possible, but for now dicts are fine as they serialize to JSON
-        if role_name == "customer":
-            return [
-                {"id": "dashboard", "label": "Dashboard", "path": "/dashboard", "route": "/dashboard", "icon": "home"},
-                {"id": "vehicle", "label": "My Vehicle", "path": "/vehicle", "route": "/vehicle", "icon": "car"},
-                {"id": "stations", "label": "Find Stations", "path": "/stations", "route": "/stations", "icon": "map"},
-            ]
-        elif role_name in ["vendor_owner", "dealer"]:
-            return [
-                {"id": "dashboard", "label": "Dashboard", "path": "/dashboard", "route": "/dashboard", "icon": "home"},
-                {"id": "stations", "label": "Stations", "path": "/stations", "route": "/stations", "icon": "fuel"},
-                {"id": "staff", "label": "Staff", "path": "/staff", "route": "/staff", "icon": "users"},
-                {"id": "finance", "label": "Finance", "path": "/finance", "route": "/finance", "icon": "dollar-sign"},
-            ]
-        elif role_name in ["admin", "super_admin"]:
-            return [
-                {"id": "admin_dashboard", "label": "Dashboard", "path": "/admin/dashboard", "route": "/admin/dashboard", "icon": "activity"},
-                {"id": "admin_users", "label": "Users", "path": "/admin/users", "route": "/admin/users", "icon": "users"},
-                {"id": "admin_dealers", "label": "Dealers", "path": "/admin/users", "route": "/admin/users", "icon": "briefcase"},
-                {"id": "admin_settings", "label": "Settings", "path": "/admin/settings", "route": "/admin/settings", "icon": "settings"},
-            ]
-        return []
+    def get_permissions_for_role(db: Session, role_identifier: int | str) -> list[str]:
+        """
+        Fetch permissions for a given role from the database.
+        role_identifier can be role ID (int) or role name (str).
+        """
+        from app.models.rbac import Role, RolePermission, Permission
+        from sqlmodel import select
+        
+        if isinstance(role_identifier, int):
+            statement = select(Permission.slug).join(RolePermission).where(RolePermission.role_id == role_identifier)
+        else:
+            statement = select(Permission.slug).join(RolePermission).join(Role).where(Role.name == role_identifier)
+            
+        perms = db.exec(statement).all()
+        
+        # Fallbacks for empty DB states just to ensure login works while seeding
+        if not perms and isinstance(role_identifier, str):
+            fallback = {
+                "customer": ["profile:read:own", "stations:view:all", "rentals:create:own", "rentals:view:own", "wallet:view:own"],
+                "vendor_owner": ["dashboard:view:own", "stations:manage:own", "staff:manage:own", "finance:view:own"],
+                "dealer": ["dashboard:view:own", "stations:manage:own", "staff:manage:own", "finance:view:own"],
+                "admin": ["dashboard:view:all", "users:manage:all", "dealers:manage:all", "settings:manage:all", "audit:read:all"],
+                "super_admin": ["dashboard:view:all", "users:manage:all", "dealers:manage:all", "settings:manage:all", "audit:read:all", "rbac:manage:all"],
+            }
+            return fallback.get(role_identifier, [])
+            
+        return list(perms)
+
+    @staticmethod
+    def get_menu_for_role(db: Session, role_identifier: int | str) -> list[dict]:
+        from app.models.rbac import Role
+        from app.models.role_right import RoleRight
+        from app.models.menu import Menu
+        from sqlmodel import select
+        
+        if isinstance(role_identifier, int):
+            statement = select(Menu).join(RoleRight, RoleRight.menu_id == Menu.id).where(RoleRight.role_id == role_identifier).order_by(Menu.menu_order)
+        else:
+            statement = select(Menu).join(RoleRight, RoleRight.menu_id == Menu.id).join(Role).where(Role.name == role_identifier).order_by(Menu.menu_order)
+            
+        menus = db.exec(statement).all()
+        
+        if not menus and isinstance(role_identifier, str):
+            # Fallback
+            if role_identifier == "customer":
+                return [
+                    {"id": "dashboard", "label": "Dashboard", "path": "/dashboard", "route": "/dashboard", "icon": "home"},
+                    {"id": "vehicle", "label": "My Vehicle", "path": "/vehicle", "route": "/vehicle", "icon": "car"},
+                    {"id": "stations", "label": "Find Stations", "path": "/stations", "route": "/stations", "icon": "map"},
+                ]
+            elif role_identifier in ["vendor_owner", "dealer"]:
+                return [
+                    {"id": "dashboard", "label": "Dashboard", "path": "/dashboard", "route": "/dashboard", "icon": "home"},
+                    {"id": "stations", "label": "Stations", "path": "/stations", "route": "/stations", "icon": "fuel"},
+                    {"id": "staff", "label": "Staff", "path": "/staff", "route": "/staff", "icon": "users"},
+                    {"id": "finance", "label": "Finance", "path": "/finance", "route": "/finance", "icon": "dollar-sign"},
+                ]
+            elif role_identifier in ["admin", "super_admin"]:
+                return [
+                    {"id": "admin_dashboard", "label": "Dashboard", "path": "/admin/dashboard", "route": "/admin/dashboard", "icon": "activity"},
+                    {"id": "admin_users", "label": "Users", "path": "/admin/users", "route": "/admin/users", "icon": "users"},
+                    {"id": "admin_dealers", "label": "Dealers", "path": "/admin/users", "route": "/admin/users", "icon": "briefcase"},
+                    {"id": "admin_settings", "label": "Settings", "path": "/admin/settings", "route": "/admin/settings", "icon": "settings"},
+                ]
+            return []
+            
+        # Format response
+        result = []
+        for m in menus:
+            result.append({
+                "id": m.name,
+                "label": m.display_name,
+                "path": m.route or "",
+                "route": m.route or "",
+                "icon": m.icon or "circle"
+            })
+        return result
 
     @staticmethod
     def create_user_session(
@@ -131,6 +178,11 @@ class AuthService:
         """
         from app.models.session import UserSession
         from datetime import datetime, timedelta
+        try:
+            from datetime import UTC
+        except ImportError:
+            import datetime as dt
+            UTC = dt.timezone.utc
         from app.core.config import settings
         import hashlib
 
@@ -139,10 +191,7 @@ class AuthService:
             if not user_agent:
                 user_agent = request.headers.get("user-agent", "unknown")
             if not ip_address:
-                ip_address = request.client.host if request.client else "unknown"
-                forwarded = request.headers.get("x-forwarded-for")
-                if forwarded:
-                    ip_address = forwarded.split(",")[0]
+                ip_address = get_client_ip(request)
         
         # Default fallbacks
         if not user_agent: user_agent = "unknown"
@@ -218,7 +267,7 @@ class AuthService:
             device_type=device_type,
             device_id=device_id,
             device_name=device_name,
-            expires_at=datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+            expires_at=datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
         )
         db.add(session)
         db.commit()
@@ -238,6 +287,11 @@ class AuthService:
         from app.models.session import UserSession
         from sqlmodel import select
         from datetime import datetime, timedelta
+        try:
+            from datetime import UTC
+        except ImportError:
+            import datetime as dt
+            UTC = dt.timezone.utc
         from app.core.config import settings
         import hashlib
         from jose import jwt
@@ -260,15 +314,15 @@ class AuthService:
             # Update existing session
             session.token_id = new_token_jti or "unknown"
             session.refresh_token_hash = new_hash
-            session.last_active_at = datetime.utcnow()
-            session.expires_at = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+            session.last_active_at = datetime.now(UTC)
+            session.expires_at = datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
             
             # Update IP/UA if provided
             if request:
                  user_agent = request.headers.get("user-agent")
                  if user_agent: session.user_agent = user_agent
                  
-                 ip_address = request.client.host if request.client else None
+                 ip_address = get_client_ip(request)
                  if ip_address: session.ip_address = ip_address
             
             db.add(session)
@@ -281,6 +335,94 @@ class AuthService:
             )
 
     @staticmethod
+    def validate_session(db: Session, token: str, is_refresh: bool = False):
+        """
+        Validate a token against active UserSession records.
+        For refresh tokens, also verifies refresh token hash matches stored value.
+        """
+        from datetime import datetime, UTC
+        from jose import jwt, JWTError
+        import hashlib
+        from app.models.session import UserSession
+
+        if not token:
+            return None
+
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        except JWTError:
+            return None
+
+        token_type = payload.get("type")
+        if is_refresh and token_type != "refresh":
+            return None
+
+        token_id = payload.get("jti") if is_refresh else payload.get("sid")
+        if not token_id:
+            return None
+
+        session = db.exec(
+            select(UserSession)
+            .where(UserSession.token_id == token_id)
+            .where(UserSession.is_active == True)
+        ).first()
+        if not session:
+            return None
+
+        if getattr(session, "is_revoked", False):
+            return None
+
+        if session.expires_at and session.expires_at < datetime.now(UTC):
+            session.is_active = False
+            session.is_revoked = True
+            session.revoked_at = datetime.now(UTC)
+            db.add(session)
+            db.commit()
+            return None
+
+        if is_refresh and session.refresh_token_hash:
+            token_hash = hashlib.sha256(token.encode()).hexdigest()
+            if token_hash != session.refresh_token_hash:
+                return None
+
+        return session
+
+    @staticmethod
+    def revoke_session(db: Session, token: str) -> bool:
+        """
+        Revoke a session identified by token jti/sid.
+        Returns True if a session was found and revoked.
+        """
+        from datetime import datetime, UTC
+        from jose import jwt, JWTError
+        from app.models.session import UserSession
+
+        if not token:
+            return False
+
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        except JWTError:
+            return False
+
+        token_id = payload.get("jti") or payload.get("sid")
+        if not token_id:
+            return False
+
+        session = db.exec(
+            select(UserSession).where(UserSession.token_id == token_id)
+        ).first()
+        if not session:
+            return False
+
+        session.is_active = False
+        session.is_revoked = True
+        session.revoked_at = datetime.now(UTC)
+        db.add(session)
+        db.commit()
+        return True
+
+    @staticmethod
     def revoke_all_user_sessions(db: Session, user_id: int):
         """
         Revoke all active sessions for a user.
@@ -290,11 +432,16 @@ class AuthService:
         from app.models.session import UserSession
         from sqlmodel import select
         from datetime import datetime
+        try:
+            from datetime import UTC
+        except ImportError:
+            import datetime as dt
+            UTC = dt.timezone.utc
         
         # 1. Update Global Logout Timestamp
         user = db.get(User, user_id)
         if user:
-            user.last_global_logout_at = datetime.utcnow()
+            user.last_global_logout_at = datetime.now(UTC)
             db.add(user)
         
         # 2. Mark all sessions inactive

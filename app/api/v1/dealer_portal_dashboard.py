@@ -4,7 +4,7 @@ Dealer Portal Dashboard — Aggregated KPIs, alerts, and activity feed.
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, func
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 
 from app.db.session import get_session
 from app.api.deps import get_current_user
@@ -64,7 +64,7 @@ def get_dashboard_summary(
     revenue_this_month = 0.0
     try:
         from app.models.commission import CommissionLog
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         revenue_this_month = db.exec(
             select(func.coalesce(func.sum(CommissionLog.amount), 0.0)).where(
@@ -241,59 +241,6 @@ def get_customers_list(
     return {"data": data, "total": len(data)}
 
 
-@router.get("/tickets")
-def get_dealer_tickets(
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-) -> Any:
-    """Get support tickets relevant to the dealer (their own and from customers of their stations)."""
-    dealer = _get_dealer(db, current_user.id)
-    
-    # 1. Dealer's own tickets
-    dealer_tickets = db.exec(
-        select(SupportTicket).where(SupportTicket.user_id == current_user.id)
-    ).all()
-    
-    # 2. Customers tickets
-    user_ids_statement = (
-        select(User.id)
-        .join(Rental, Rental.user_id == User.id)
-        .join(Station, Rental.start_station_id == Station.id)
-        .where(Station.dealer_id == dealer.id)
-        .distinct()
-    )
-    customer_ids = db.exec(user_ids_statement).all()
-    
-    customer_tickets = []
-    if customer_ids:
-        customer_tickets = db.exec(
-            select(SupportTicket).where(SupportTicket.user_id.in_(customer_ids))
-        ).all()
-        
-    # Merge and deduplicate
-    all_tickets = {t.id: t for t in dealer_tickets + customer_tickets}.values()
-    
-    # Sort by recent first
-    sorted_tickets = sorted(all_tickets, key=lambda tx: tx.created_at, reverse=True)
-    
-    data = []
-    for t in sorted_tickets:
-        user = db.get(User, t.user_id)
-        customer_name = user.full_name if user and user.full_name else (user.email.split('@')[0] if user and user.email else "Unknown")
-        
-        data.append({
-            "id": f"TKT-{t.id:03d}",
-            "subject": t.subject,
-            "customer": customer_name,
-            "priority": t.priority.value.capitalize(),
-            "status": t.status.value.capitalize(),
-            "created_at": str(t.created_at),
-            "is_critical": t.priority.value == "critical",
-            "is_resolved": t.status.value in ("resolved", "closed")
-        })
-        
-    return {"data": data, "total": len(data)}
-
 @router.get("/campaigns")
 def get_dealer_campaigns(
     db: Session = Depends(get_session),
@@ -351,41 +298,421 @@ def get_dealer_profile_details(
     dealer = _get_dealer(db, current_user.id)
     return {"data": dealer.dict(), "success": True}
 
-@router.get("/users")
-def get_dealer_users(
+# ── Documents ────────────────────────────────────────────────
+
+@router.get("/documents")
+def list_dealer_documents(
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    """Mock endpoint for Dealer Staff Users."""
+    """List all documents for the dealer."""
+    dealer = _get_dealer(db, current_user.id)
+    from app.models.dealer import DealerDocument
+    docs = db.exec(
+        select(DealerDocument).where(
+            DealerDocument.dealer_id == dealer.id,
+            DealerDocument.status != "ARCHIVED",
+        )
+    ).all()
+
+    data = []
+    for d in docs:
+        data.append({
+            "id": d.id,
+            "document_type": d.document_type,
+            "category": d.category or "verification",
+            "file_url": d.file_url,
+            "status": d.status,
+            "version": d.version,
+            "valid_until": str(d.valid_until) if d.valid_until else None,
+            "created_at": str(d.uploaded_at) if d.uploaded_at else None,
+        })
+    return {"data": data, "total": len(data)}
+
+
+@router.post("/documents/upload")
+def upload_dealer_document(
+    data: dict,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Upload a new document or a newer version of an existing document."""
+    dealer = _get_dealer(db, current_user.id)
+    from app.models.dealer import DealerDocument
+
+    document_type = data.get("document_type", "other")
+    category = data.get("category", "verification")
+    file_url = data.get("file_url", "")
+    valid_until_str = data.get("valid_until")
+
+    # Find existing and determine next version
+    existing_docs = db.exec(
+        select(DealerDocument).where(
+            DealerDocument.dealer_id == dealer.id,
+            DealerDocument.document_type == document_type,
+        )
+    ).all()
+
+    next_version = 1
+    if existing_docs:
+        for doc in existing_docs:
+            if doc.status != "ARCHIVED":
+                doc.status = "ARCHIVED"
+        highest = max(d.version for d in existing_docs)
+        next_version = highest + 1
+
+    valid_until = None
+    if valid_until_str:
+        try:
+            valid_until = datetime.fromisoformat(valid_until_str)
+        except Exception:
+            pass
+
+    new_doc = DealerDocument(
+        dealer_id=dealer.id,
+        document_type=document_type,
+        category=category,
+        file_url=file_url,
+        version=next_version,
+        status="PENDING",
+        valid_until=valid_until,
+        is_verified=False,
+    )
+    db.add(new_doc)
+    db.commit()
+    db.refresh(new_doc)
+
+    return {"message": "Document uploaded successfully", "id": new_doc.id, "version": next_version}
+
+
+# ── Transactions / Revenue ───────────────────────────────────
+
+@router.get("/transactions")
+def get_dealer_transactions(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    from_date: str = None,
+    to_date: str = None,
+    types: str = None,
+    min_amount: float = None,
+    max_amount: float = None,
+    station_id: int = None,
+    search_query: str = None,
+    skip: int = 0,
+    limit: int = 100,
+) -> Any:
+    """Get filtered rental transactions (revenue) for the dealer's stations."""
     dealer = _get_dealer(db, current_user.id)
     
-    mock_users = [
-        {
-            "id": "USR-101",
-            "name": current_user.full_name or "Dealer Admin",
-            "email": current_user.email,
-            "role": "Owner",
-            "status": "Active",
-            "last_active": "Just now",
-            "avatar": None
-        },
-        {
-            "id": "USR-102",
-            "name": "Station Manager A",
-            "email": "manager_a@wezu.com",
-            "role": "Manager",
-            "status": "Active",
-            "last_active": "2 hours ago",
-            "avatar": None
-        },
-        {
-            "id": "USR-103",
-            "name": "Support Agent",
-            "email": "support1@wezu.com",
-            "role": "Staff",
-            "status": "Inactive",
-            "last_active": "5 days ago",
-            "avatar": None
+    station_query = select(Station).where(Station.dealer_id == dealer.id)
+    if station_id:
+        station_query = station_query.where(Station.id == station_id)
+    stations = db.exec(station_query).all()
+    station_ids = [s.id for s in stations]
+
+    if not station_ids:
+        return {"data": [], "total": 0}
+
+    query = select(Rental).where(Rental.start_station_id.in_(station_ids))
+
+    if from_date:
+        query = query.where(Rental.created_at >= datetime.fromisoformat(from_date.replace("Z", "+00:00")))
+    if to_date:
+        query = query.where(Rental.created_at <= datetime.fromisoformat(to_date.replace("Z", "+00:00")))
+    if min_amount is not None:
+        query = query.where(Rental.total_amount >= min_amount)
+    if max_amount is not None:
+        query = query.where(Rental.total_amount <= max_amount)
+
+    if search_query:
+        query = query.join(User, Rental.user_id == User.id).where(User.full_name.ilike(f"%{search_query}%"))
+
+    total = db.exec(select(func.count()).select_from(query.subquery())).one()
+
+    rentals = db.exec(
+        query.order_by(Rental.created_at.desc()).offset(skip).limit(limit)
+    ).all()
+
+    data = []
+    for r in rentals:
+        customer = db.get(User, r.user_id)
+        station = db.get(Station, r.start_station_id) if r.start_station_id else None
+        data.append({
+            "id": r.id,
+            "transaction_type": "Rental",
+            "amount": float(r.total_amount or 0),
+            "status": r.status.value if hasattr(r.status, 'value') else str(r.status),
+            "created_at": str(r.created_at),
+            "description": f"{customer.full_name if customer else 'Customer'} at {station.name if station else 'Station'}",
+        })
+
+    return {"data": data, "total": total}
+
+@router.get("/payouts")
+def get_payout_schedule(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Get payouts/settlement schedule for the dealer."""
+    dealer = _get_dealer(db, current_user.id)
+    from app.models.settlement import Settlement
+    
+    settlements = db.exec(
+        select(Settlement)
+        .where(Settlement.dealer_id == dealer.id)
+        .order_by(Settlement.created_at.desc())
+    ).all()
+
+    data = []
+    for s in settlements:
+        status_map = {
+            "paid": "Completed",
+            "processing": "Processing",
+            "pending": "Scheduled",
+            "generated": "Scheduled",
+            "approved": "Scheduled",
+            "failed": "Failed"
         }
-    ]
-    return {"data": mock_users, "total": len(mock_users)}
+        data.append({
+            "id": s.id,
+            "month": s.settlement_month,
+            "status": status_map.get(s.status.lower(), s.status),
+            "amount": s.net_payable,
+            "due_date": str(s.due_date) if s.due_date else None,
+            "paid_at": str(s.paid_at) if s.paid_at else None,
+        })
+        
+    return {"data": data, "total": len(data)}
+
+
+# ── Payouts ──────────────────────────────────────────────────
+
+@router.get("/payouts")
+def get_dealer_payouts(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Lists payout schedule, next payout countdown, and payout tracking statuses."""
+    from app.services.settlement_service import SettlementService
+    dealer = _get_dealer(db, current_user.id)
+    return SettlementService.get_dealer_payouts(db, current_user.id)
+
+
+# ── Transaction Detail & Disputes ─────────────────────────────
+
+@router.get("/transactions/{transaction_id}")
+def get_transaction_detail(
+    transaction_id: int,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Detailed transaction view with lifecycle timeline and linked entities."""
+    from app.models.rental_event import RentalEvent
+    from app.models.swap import SwapSession
+
+    dealer = _get_dealer(db, current_user.id)
+    stations = db.exec(
+        select(Station).where(Station.dealer_id == dealer.id)
+    ).all()
+    station_ids = [s.id for s in stations]
+
+    if not station_ids:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    # Find the rental (transaction)
+    rental = db.exec(
+        select(Rental).where(
+            Rental.id == transaction_id,
+            Rental.start_station_id.in_(station_ids),
+        )
+    ).first()
+
+    if not rental:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    # Get customer info
+    customer = db.get(User, rental.user_id)
+    start_station = db.get(Station, rental.start_station_id) if rental.start_station_id else None
+    end_station = db.get(Station, rental.end_station_id) if rental.end_station_id else None
+
+    # Get lifecycle timeline from rental events
+    events = db.exec(
+        select(RentalEvent)
+        .where(RentalEvent.rental_id == rental.id)
+        .order_by(RentalEvent.created_at.asc())
+    ).all()
+
+    timeline = []
+    for event in events:
+        timeline.append({
+            "id": event.id,
+            "event_type": event.event_type,
+            "description": event.description,
+            "station_id": event.station_id,
+            "battery_id": event.battery_id,
+            "timestamp": event.created_at.isoformat(),
+        })
+
+    # If no events exist, synthesize a basic timeline from the rental itself
+    if not timeline:
+        timeline.append({
+            "id": None,
+            "event_type": "start",
+            "description": f"Rental started at {start_station.name if start_station else 'Unknown'}",
+            "station_id": rental.start_station_id,
+            "battery_id": rental.battery_id,
+            "timestamp": rental.start_time.isoformat(),
+        })
+        if rental.end_time:
+            timeline.append({
+                "id": None,
+                "event_type": "completed",
+                "description": f"Rental completed at {end_station.name if end_station else start_station.name if start_station else 'Unknown'}",
+                "station_id": rental.end_station_id or rental.start_station_id,
+                "battery_id": rental.battery_id,
+                "timestamp": rental.end_time.isoformat(),
+            })
+
+    # Get linked swap sessions
+    swaps = db.exec(
+        select(SwapSession).where(SwapSession.rental_id == rental.id)
+    ).all()
+
+    linked_swaps = []
+    for swap in swaps:
+        linked_swaps.append({
+            "id": swap.id,
+            "old_battery_id": swap.old_battery_id,
+            "new_battery_id": swap.new_battery_id,
+            "amount": float(swap.swap_amount),
+            "status": swap.status,
+            "created_at": swap.created_at.isoformat(),
+            "completed_at": swap.completed_at.isoformat() if swap.completed_at else None,
+        })
+
+    return {
+        "id": rental.id,
+        "customer": {
+            "id": customer.id if customer else None,
+            "name": customer.full_name if customer else "Unknown",
+            "email": customer.email if customer else None,
+            "phone": customer.phone_number if customer else None,
+        },
+        "start_station": {
+            "id": start_station.id if start_station else None,
+            "name": start_station.name if start_station else "Unknown",
+        },
+        "end_station": {
+            "id": end_station.id if end_station else None,
+            "name": end_station.name if end_station else None,
+        } if end_station else None,
+        "battery_id": rental.battery_id,
+        "status": rental.status.value if hasattr(rental.status, 'value') else str(rental.status),
+        "start_time": rental.start_time.isoformat(),
+        "expected_end_time": rental.expected_end_time.isoformat(),
+        "end_time": rental.end_time.isoformat() if rental.end_time else None,
+        "total_amount": float(rental.total_amount or 0),
+        "security_deposit": float(rental.security_deposit or 0),
+        "late_fee": float(rental.late_fee or 0),
+        "currency": rental.currency,
+        "distance_traveled_km": float(rental.distance_traveled_km or 0),
+        "timeline": timeline,
+        "linked_swaps": linked_swaps,
+        "created_at": rental.created_at.isoformat(),
+    }
+
+
+from pydantic import BaseModel as _BaseModel
+
+class _TransactionDisputeRequest(_BaseModel):
+    reason: str
+
+
+@router.post("/transactions/{transaction_id}/dispute")
+def create_transaction_dispute(
+    transaction_id: int,
+    request: _TransactionDisputeRequest,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Allows dealer to raise a dispute on a specific transaction (rental)."""
+    from app.models.settlement_dispute import SettlementDispute
+    from app.models.settlement import Settlement
+    from app.models.commission import CommissionLog
+
+    dealer = _get_dealer(db, current_user.id)
+    stations = db.exec(
+        select(Station).where(Station.dealer_id == dealer.id)
+    ).all()
+    station_ids = [s.id for s in stations]
+
+    if not station_ids:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    # Verify rental belongs to dealer's stations
+    rental = db.exec(
+        select(Rental).where(
+            Rental.id == transaction_id,
+            Rental.start_station_id.in_(station_ids),
+        )
+    ).first()
+
+    if not rental:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    # Find the settlement linked to this transaction through commission logs
+    commission_log = db.exec(
+        select(CommissionLog).where(
+            CommissionLog.transaction_id == transaction_id,
+            CommissionLog.dealer_id == current_user.id,
+        )
+    ).first()
+
+    settlement_id = None
+    if commission_log and commission_log.settlement_id:
+        settlement_id = commission_log.settlement_id
+    else:
+        # Fallback: find the most recent settlement for this dealer
+        latest_settlement = db.exec(
+            select(Settlement).where(
+                Settlement.dealer_id == dealer.id,
+            ).order_by(Settlement.created_at.desc())
+        ).first()
+        if latest_settlement:
+            settlement_id = latest_settlement.id
+
+    if not settlement_id:
+        raise HTTPException(
+            status_code=400,
+            detail="No settlement found for this transaction. Disputes can only be raised against settled transactions.",
+        )
+
+    # Check for existing open dispute
+    existing = db.exec(
+        select(SettlementDispute).where(
+            SettlementDispute.settlement_id == settlement_id,
+            SettlementDispute.dealer_id == current_user.id,
+            SettlementDispute.status.in_(["open", "under_review"]),
+        )
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="An open dispute already exists for this settlement")
+
+    dispute = SettlementDispute(
+        settlement_id=settlement_id,
+        dealer_id=current_user.id,
+        reason=f"[Txn #{transaction_id}] {request.reason}",
+        status="open",
+    )
+    db.add(dispute)
+    db.commit()
+    db.refresh(dispute)
+
+    return {
+        "id": dispute.id,
+        "transaction_id": transaction_id,
+        "settlement_id": settlement_id,
+        "reason": dispute.reason,
+        "status": dispute.status,
+        "created_at": dispute.created_at.isoformat(),
+    }

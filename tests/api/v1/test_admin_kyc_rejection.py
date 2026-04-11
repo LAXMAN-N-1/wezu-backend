@@ -48,18 +48,19 @@ def test_kyc_rejection_and_resubmission_flow(
     client: TestClient, session: Session
 ) -> None:
     # 1. Setup: User with pending KYC
-    email = "rejected_user@test.com"
+    email = random_email()
     user_headers = get_auth_headers(client, email=email)
     
     user = session.exec(select(User).where(User.email == email)).first()
-    user.kyc_status = "pending_verification"
+    user.kyc_status = "pending"
     session.add(user)
     session.commit()
     session.refresh(user)
 
     # 2. Setup: Admin User
-    admin_headers = get_auth_headers(client, email="admin_rejector@test.com")
-    admin_user = session.exec(select(User).where(User.email == "admin_rejector@test.com")).first()
+    admin_email = random_email()
+    admin_headers = get_auth_headers(client, email=admin_email)
+    admin_user = session.exec(select(User).where(User.email == admin_email)).first()
     admin_user.is_superuser = True
     session.add(admin_user)
     session.commit()
@@ -88,7 +89,7 @@ def test_kyc_rejection_and_resubmission_flow(
     
     # 4. User Checks Status
     status_response = client.get(
-        f"{settings.API_V1_STR}/me/kyc",
+        f"{settings.API_V1_STR}/status",
         headers=user_headers
     )
     assert status_response.status_code == 200
@@ -97,36 +98,36 @@ def test_kyc_rejection_and_resubmission_flow(
     
     # 5. User Resubmits
     resubmit_response = client.post(
-        f"{settings.API_V1_STR}/me/kyc/resubmit",
+        f"{settings.API_V1_STR}/resubmit",
         headers=user_headers
     )
     
     assert resubmit_response.status_code == 200
     res_data = resubmit_response.json()
-    assert res_data["kyc_status"] == "pending_verification"
+    assert res_data["kyc_status"] == "pending"
     
     # Verify DB State
     session.refresh(user)
-    assert user.kyc_status == "pending_verification"
+    assert user.kyc_status == "pending"
     assert user.kyc_rejection_reason is None
 
 def test_invalid_resubmission_when_verified(
     client: TestClient, session: Session
 ) -> None:
     # Setup: Verified User
-    email = "verified_user@test.com"
+    email = random_email()
     user_headers = get_auth_headers(client, email=email)
     
     user = session.exec(select(User).where(User.email == email)).first()
-    user.kyc_status = "verified"
+    user.kyc_status = "approved"
     session.add(user)
     session.commit()
     
     # Try to resubmit
     response = client.post(
-        f"{settings.API_V1_STR}/me/kyc/resubmit",
+        f"{settings.API_V1_STR}/resubmit",
         headers=user_headers
     )
     
     assert response.status_code == 400
-    assert "Can only resubmit" in response.json()["detail"]
+    assert "Can only resubmit" in response.json()["error"]

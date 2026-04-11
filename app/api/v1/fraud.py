@@ -169,7 +169,7 @@ def submit_device_fingerprint(
     session: Session = Depends(deps.get_db)
 ):
     """Submit device fingerprint for tracking"""
-    from datetime import datetime
+    from datetime import datetime, UTC
     
     # Check if device already exists
     existing = session.exec(
@@ -180,7 +180,7 @@ def submit_device_fingerprint(
     
     if existing:
         # Update last seen
-        existing.last_seen = datetime.utcnow()
+        existing.last_seen = datetime.now(UTC)
         existing.ip_address = req.ip_address
         session.add(existing)
         session.commit()

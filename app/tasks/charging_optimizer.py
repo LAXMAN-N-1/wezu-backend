@@ -52,7 +52,7 @@ def optimize_charging_queues():
                 logger.debug(f"Optimized queue for station {station.id}: {len(queue_items)} batteries.")
                 
             except Exception as e:
-                logger.error(f"Failed to optimize queue for station {station.id}: {str(e)}")
+                logger.error(f"Failed to optimize queue for station {station.id}: {str(e)}", exc_info=True)
                 session.rollback()
         
         logger.info("Charging queue optimization completed.")

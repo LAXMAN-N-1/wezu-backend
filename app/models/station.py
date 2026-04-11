@@ -1,5 +1,5 @@
 from typing import Optional, List, TYPE_CHECKING
-from datetime import datetime
+from datetime import datetime, UTC
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
 
@@ -21,7 +21,6 @@ class StationStatus(str, Enum):
 
 class Station(SQLModel, table=True):
     __tablename__ = "stations"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
     tenant_id: Optional[str] = Field(default="default", index=True)
@@ -71,8 +70,8 @@ class Station(SQLModel, table=True):
     
     # Timestamps
     last_heartbeat: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationships
     slots: List["StationSlot"] = Relationship(back_populates="station")
@@ -89,7 +88,6 @@ class Station(SQLModel, table=True):
 
 class StationImage(SQLModel, table=True):
     __tablename__ = "station_images"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     station_id: int = Field(foreign_key="stations.id")
     url: str
@@ -99,7 +97,6 @@ class StationImage(SQLModel, table=True):
 
 class StationSlot(SQLModel, table=True):
     __tablename__ = "station_slots"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     station_id: int = Field(foreign_key="stations.id")
     

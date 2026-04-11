@@ -4,11 +4,11 @@ Dedicated auth endpoints for the dealer portal frontend.
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session, select
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
 from typing import Optional
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 
 from app.api import deps
 from app.db.session import get_session
@@ -22,6 +22,8 @@ from app.core.security import (
     verify_password,
 )
 from app.repositories.user_repository import user_repository
+from app.utils.audit_context import generate_action_id, log_audit_action
+from app.models.audit_log import AuditActionType
 
 router = APIRouter()
 logger = logging.getLogger("wezu_dealer_auth")
@@ -75,8 +77,7 @@ class DealerAuthUser(BaseModel):
     is_approved: bool = False
     application_stage: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DealerAuthResponse(BaseModel):
@@ -162,8 +163,8 @@ async def dealer_login(
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     # Brute-force protection
-    if user.locked_until and user.locked_until > datetime.utcnow():
-        remaining = int((user.locked_until - datetime.utcnow()).total_seconds() / 60) + 1
+    if user.locked_until and user.locked_until > datetime.now(UTC):
+        remaining = int((user.locked_until - datetime.now(UTC)).total_seconds() / 60) + 1
         raise HTTPException(
             status_code=423,
             detail=f"Account locked due to too many failed attempts. Try again in {remaining} minutes."
@@ -173,7 +174,7 @@ async def dealer_login(
         # Increment failed attempts
         user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
         if user.failed_login_attempts >= MAX_LOGIN_ATTEMPTS:
-            user.locked_until = datetime.utcnow() + timedelta(minutes=LOCKOUT_MINUTES)
+            user.locked_until = datetime.now(UTC) + timedelta(minutes=LOCKOUT_MINUTES)
             user.failed_login_attempts = 0
             db.add(user)
             db.commit()
@@ -196,10 +197,18 @@ async def dealer_login(
 
     # Generate tokens
     token_jti = str(uuid.uuid4())
-    access_token = create_access_token(subject=user.id, extra_claims={"sid": token_jti})
+    session_id = generate_action_id("DLR")
+    access_token = create_access_token(
+        subject=user.id, 
+        extra_claims={
+            "sid": token_jti,
+            "session_id": session_id,
+            "role_prefix": "DLR"
+        }
+    )
     refresh_token = create_refresh_token(subject=user.id, jti=token_jti)
 
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(UTC)
     db.add(user)
     db.commit()
 
@@ -229,6 +238,17 @@ async def dealer_login(
                     perms[mod] = []
                 perms[mod].append(p.action)
             user_dict["permissions"] = perms
+
+    # Audit login
+    log_audit_action(
+        db=db,
+        action=AuditActionType.AUTH_LOGIN,
+        level="INFO",
+        resource_type="DEALER_USER",
+        target_id=user.id,
+        details=f"Dealer login successful for {user.email}"
+    )
+    db.commit()
 
     return {
         "access_token": access_token,
@@ -301,7 +321,7 @@ async def dealer_register(
         current_stage="SUBMITTED",
         status_history=[{
             "stage": "SUBMITTED",
-            "timestamp": str(datetime.utcnow()),
+            "timestamp": str(datetime.now(UTC)),
             "note": "Digital application submitted",
         }],
     )
@@ -366,7 +386,7 @@ def change_password(
         raise HTTPException(status_code=400, detail="Current password is incorrect")
 
     current_user.hashed_password = get_password_hash(data.new_password)
-    current_user.password_changed_at = datetime.utcnow()
+    current_user.password_changed_at = datetime.now(UTC)
     db.add(current_user)
     db.commit()
 
@@ -428,7 +448,7 @@ def validate_invite_token(
     if not user:
         return {"valid": False, "expired": False, "message": "Invalid invitation link"}
 
-    if user.invite_token_expires and user.invite_token_expires < datetime.utcnow():
+    if user.invite_token_expires and user.invite_token_expires < datetime.now(UTC):
         return {
             "valid": False, "expired": True,
             "email": user.email, "full_name": user.full_name,
@@ -471,7 +491,7 @@ def activate_account(
     if not user:
         raise HTTPException(status_code=404, detail="Invalid activation link")
 
-    if user.invite_token_expires and user.invite_token_expires < datetime.utcnow():
+    if user.invite_token_expires and user.invite_token_expires < datetime.now(UTC):
         raise HTTPException(status_code=410, detail="Invitation has expired. Please request a new one.")
 
     # Set password, activate
@@ -480,8 +500,8 @@ def activate_account(
     user.invite_token = None
     user.invite_token_expires = None
     user.force_password_change = False
-    user.last_login = datetime.utcnow()
-    user.updated_at = datetime.utcnow()
+    user.last_login = datetime.now(UTC)
+    user.updated_at = datetime.now(UTC)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -545,8 +565,8 @@ def force_change_password(
 
     current_user.hashed_password = get_password_hash(data.new_password)
     current_user.force_password_change = False
-    current_user.password_changed_at = datetime.utcnow()
-    current_user.updated_at = datetime.utcnow()
+    current_user.password_changed_at = datetime.now(UTC)
+    current_user.updated_at = datetime.now(UTC)
     db.add(current_user)
     db.commit()
 

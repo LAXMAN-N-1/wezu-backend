@@ -1,5 +1,5 @@
 from sqlmodel import Session, select, func, and_
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from typing import Dict, List, Any, Optional
 from collections import defaultdict, Counter
 from app.models.financial import Transaction, TransactionType, TransactionStatus
@@ -24,7 +24,7 @@ class AnalyticsService:
             # default 30d
             days = 30
 
-        end = datetime.utcnow()
+        end = datetime.now(UTC)
         start = end - timedelta(days=days)
         prev_end = start
         prev_start = start - timedelta(days=days)
@@ -89,7 +89,7 @@ class AnalyticsService:
     def calculate_revenue_forecast(db: Session, days: int = 30) -> List[Dict[str, Any]]:
         """Projected revenue for next N days using simple moving average"""
         # Get last 30 days daily revenue
-        end_date = datetime.utcnow()
+        end_date = datetime.now(UTC)
         start_date = end_date - timedelta(days=30)
         
         stmt = select(
@@ -189,7 +189,7 @@ class AnalyticsService:
             proj_profit = projected_rev - proj_cost
             
             forecast.append({
-                "month": (datetime.utcnow() + timedelta(days=(i+1)*30)).strftime("%Y-%m"),
+                "month": (datetime.now(UTC) + timedelta(days=(i+1)*30)).strftime("%Y-%m"),
                 "projected_revenue": round(projected_rev, 2),
                 "projected_cost": round(proj_cost, 2),
                 "projected_profit": round(proj_profit, 2),
@@ -317,22 +317,18 @@ class AnalyticsService:
         )
 
         # Session / rental efficiency
-        completed = db.exec(
-            select(Rental)
-            .where(
-                Rental.status == RentalStatus.COMPLETED,
-                Rental.end_time.is_not(None),
-                Rental.start_time >= start,
-            )
-        ).all()
-        durations = [
-            (r.end_time - r.start_time).total_seconds() / 60
-            for r in completed
-            if r.end_time and r.start_time
-        ]
-        avg_session_minutes = round(sum(durations) / len(durations), 2) if durations else 0.0
+        # Optimization: Use SQL aggregation instead of fetching all records
+        avg_duration_stmt = select(func.avg(
+            (func.extract('epoch', Rental.end_time) - func.extract('epoch', Rental.start_time)) / 60
+        )).where(
+            Rental.status == RentalStatus.COMPLETED,
+            Rental.end_time.is_not(None),
+            Rental.start_time >= start,
+        )
+        avg_session_minutes = db.exec(avg_duration_stmt).one() or 0.0
+        
         revenue_per_rental = (
-            round(revenue_current / rentals_current, 2) if rentals_current else 0.0
+            round(float(revenue_current) / rentals_current, 2) if rentals_current else 0.0
         )
 
         # Revenue sparkline (last 7 days)
@@ -406,7 +402,7 @@ class AnalyticsService:
         }
 
     @staticmethod
-    def get_trends(db: Session, period: str = "daily") -> List[Dict[str, Any]]:
+    def get_trends(db: Session, period: str = "daily") -> Dict[str, Any]:
         """Time-series trend data for revenue, rentals, active users, and battery health."""
         from app.models.battery_health import BatteryHealthSnapshot
         from app.models.user import User
@@ -530,16 +526,15 @@ class AnalyticsService:
         """Aggregated user behavior: session duration, rentals/user, peak hours, heatmap."""
         from app.models.user import User, UserType
 
-        lookback = datetime.utcnow() - timedelta(days=60)
+        lookback = datetime.now(UTC) - timedelta(days=60)
         rentals = db.exec(
             select(Rental).where(Rental.created_at >= lookback)
         ).all()
 
-        completed = [r for r in rentals if r.status == RentalStatus.COMPLETED and r.end_time]
         durations = [
             (r.end_time - r.start_time).total_seconds() / 60
-            for r in completed
-            if r.end_time and r.start_time
+            for r in rentals
+            if r.start_time and r.end_time
         ]
         avg_session = round(sum(durations) / len(durations), 2) if durations else 0.0
 
@@ -565,7 +560,7 @@ class AnalyticsService:
             histogram.append({"range": label, "count": count})
 
         # Cohort breakdown: users created in last 30d vs older that were active in rentals
-        cutoff = datetime.utcnow() - timedelta(days=30)
+        cutoff = datetime.now(UTC) - timedelta(days=30)
         new_users = db.exec(
             select(func.count(User.id)).where(
                 User.user_type == UserType.CUSTOMER,
@@ -594,15 +589,23 @@ class AnalyticsService:
         """Recent activity across rentals, payments, and support events."""
         from app.models.support import SupportTicket
 
+        def _enum_text(value: Any, fallback: str = "unknown") -> str:
+            if value is None:
+                return fallback
+            if hasattr(value, "value"):
+                return str(value.value)
+            return str(value)
+
         activities: List[Dict[str, Any]] = []
 
         rentals = db.exec(
             select(Rental).order_by(Rental.created_at.desc()).limit(limit * 2)
         ).all()
         for r in rentals:
+            rental_status = _enum_text(r.status)
             activities.append(
                 {
-                    "title": "Rental Started" if r.status == RentalStatus.ACTIVE else f"Rental {r.status.value}",
+                    "title": "Rental Started" if r.status == RentalStatus.ACTIVE else f"Rental {rental_status}",
                     "description": f"User {r.user_id} at station {r.start_station_id}",
                     "time": r.created_at.strftime("%b %d, %H:%M"),
                     "type": "rental",
@@ -639,15 +642,17 @@ class AnalyticsService:
             select(SupportTicket).order_by(SupportTicket.created_at.desc()).limit(limit)
         ).all()
         for ticket in tickets:
+            priority = _enum_text(ticket.priority)
+            severity = "critical" if priority in {"high", "critical"} else "medium"
             activities.append(
                 {
                     "title": f"Support: {ticket.subject}",
-                    "description": f"Priority {ticket.priority.value}",
+                    "description": f"Priority {priority}",
                     "time": ticket.created_at.strftime("%b %d, %H:%M"),
                     "type": "alert",
-                    "severity": "critical" if ticket.priority.value in ["high", "critical"] else "medium",
+                    "severity": severity,
                     "timestamp": ticket.created_at,
-                    "details": {"ticket_id": ticket.id, "status": ticket.status.value},
+                    "details": {"ticket_id": ticket.id, "status": _enum_text(ticket.status)},
                 }
             )
 
@@ -700,9 +705,10 @@ class AnalyticsService:
                 select(func.count(Rental.id))
                 .where(
                     Rental.start_station_id == station.id,
-                    Rental.created_at >= datetime.utcnow() - timedelta(days=7),
+                    Rental.created_at >= datetime.now(UTC) - timedelta(days=7),
                 )
                 .group_by(func.date(Rental.created_at))
+                .order_by(func.date(Rental.created_at))
             )
             spark = [int(row) for row in db.exec(spark_stmt).all()]
 
@@ -747,7 +753,7 @@ class AnalyticsService:
             name = bucket_name(b.health_percentage or 100.0)
             buckets[name] += 1
 
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         prev_start = now - timedelta(days=60)
         prev_end = now - timedelta(days=30)
         snapshots = db.exec(
@@ -782,7 +788,7 @@ class AnalyticsService:
     @staticmethod
     def get_demand_forecast_per_station(db: Session) -> Dict[str, Any]:
         """7-day demand forecast (platform-wide), with actuals from the last week."""
-        today = datetime.utcnow().date()
+        today = datetime.now(UTC).date()
         lookback_start = today - timedelta(days=14)
 
         rentals = db.exec(
@@ -886,7 +892,7 @@ class AnalyticsService:
         """New users per period"""
         from app.models.user import User
         
-        start_date = datetime.utcnow() - timedelta(days=180)
+        start_date = datetime.now(UTC) - timedelta(days=180)
         group_func = (
             func.date_trunc("month", User.created_at)
             if period == "monthly"

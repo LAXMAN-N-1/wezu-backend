@@ -1,6 +1,6 @@
 from app.models.station import Station, StationImage, StationSlot, StationStatus
 from sqlmodel import Session, select, func
-from datetime import datetime
+from datetime import datetime, UTC
 from math import radians, cos, sin, asin, sqrt
 from app.models.alert import Alert
 from app.models.station_heartbeat import StationHeartbeat
@@ -9,7 +9,7 @@ from app.models.battery import Battery
 from app.models.rental import Rental
 from app.schemas.station import StationCreate, StationUpdate
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from sqlmodel import Session, select, func
 
 class StationService:
@@ -191,7 +191,7 @@ class StationService:
         for key, value in update_data.items():
             setattr(station, key, value)
             
-        station.updated_at = datetime.utcnow()
+        station.updated_at = datetime.now(UTC)
         db.add(station)
         db.commit()
         db.refresh(station)
@@ -204,7 +204,7 @@ class StationService:
             return False
         
         station.status = StationStatus.CLOSED
-        station.updated_at = datetime.utcnow()
+        station.updated_at = datetime.now(UTC)
         db.add(station)
         db.commit()
         return True
@@ -212,7 +212,7 @@ class StationService:
     @staticmethod
     def get_performance_metrics(db: Session, station_id: int) -> Dict[str, Any]:
         # Last 24 hours stats
-        day_ago = datetime.utcnow() - timedelta(days=1)
+        day_ago = datetime.now(UTC) - timedelta(days=1)
         rentals_stmt = select(Rental).where(Rental.start_station_id == station_id, Rental.start_time >= day_ago)
         rentals = db.exec(rentals_stmt).all()
         
@@ -260,7 +260,7 @@ class StationService:
             temperature=metrics.get("temperature"),
             power_consumption=metrics.get("power_consumption"),
             network_latency_ms=metrics.get("network_latency"),
-            recorded_at=datetime.utcnow()
+            recorded_at=datetime.now(UTC)
         )
         db.add(hb)
 
@@ -271,7 +271,7 @@ class StationService:
                 alert_type="HARDWARE",
                 severity="CRITICAL",
                 message=f"High temperature detected: {metrics.get('temperature')}",
-                created_at=datetime.utcnow()
+                created_at=datetime.now(UTC)
             )
             db.add(alert)
         db.commit()
@@ -279,7 +279,7 @@ class StationService:
     @staticmethod
     def get_heatmap_data(db: Session) -> List[Dict[str, Any]]:
         # Aggregate demand by recent rentals per station
-        week_ago = datetime.utcnow() - timedelta(days=7)
+        week_ago = datetime.now(UTC) - timedelta(days=7)
         demand_stmt = (
             select(Station.latitude, Station.longitude, func.count(Rental.id))
             .join(Rental, Rental.start_station_id == Station.id)

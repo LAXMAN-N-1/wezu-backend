@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Optional, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
@@ -51,7 +51,6 @@ class AlertSeverity(str, Enum):
 
 class BatteryHealthSnapshot(SQLModel, table=True):
     __tablename__ = "battery_health_snapshots"
-    # __table_args__ = {"schema": "public"}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     battery_id: int = Field(foreign_key="batteries.id", index=True)
@@ -64,12 +63,11 @@ class BatteryHealthSnapshot(SQLModel, table=True):
 
     snapshot_type: SnapshotType = Field(default=SnapshotType.MANUAL)
     recorded_by: Optional[int] = Field(default=None, foreign_key="users.id")
-    recorded_at: datetime = Field(default_factory=datetime.utcnow)
+    recorded_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class BatteryMaintenanceSchedule(SQLModel, table=True):
     __tablename__ = "battery_maintenance_schedules"
-    # __table_args__ = {"schema": "public"}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     battery_id: int = Field(foreign_key="batteries.id", index=True)
@@ -87,12 +85,11 @@ class BatteryMaintenanceSchedule(SQLModel, table=True):
 
     completed_at: Optional[datetime] = None
     created_by: Optional[int] = Field(default=None, foreign_key="users.id")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class BatteryHealthAlert(SQLModel, table=True):
     __tablename__ = "battery_health_alerts"
-    # __table_args__ = {"schema": "public"}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     battery_id: int = Field(foreign_key="batteries.id", index=True)
@@ -106,4 +103,4 @@ class BatteryHealthAlert(SQLModel, table=True):
     resolved_at: Optional[datetime] = None
     resolution_reason: Optional[str] = None
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

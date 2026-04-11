@@ -3,7 +3,7 @@ from app.models.battery import Battery
 from app.models.battery_reservation import BatteryReservation
 from app.schemas.station_monitoring import OptimizedQueueItem, OptimizationBattery
 from app.services.demand_predictor import MockDemandPredictor
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from typing import List, Optional
 
 class ChargingService:
@@ -15,7 +15,7 @@ class ChargingService:
         Peak (6 PM - 10 PM): 1.5
         Standard: 1.0
         """
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         hour = now.hour
         if 23 <= hour or hour <= 6:
             return 0.5
@@ -30,7 +30,7 @@ class ChargingService:
         Factor in Demand, Health, Cycles, and Energy Costs.
         """
         predictor = MockDemandPredictor()
-        demand_score = predictor.predict_demand(db, station_id, datetime.utcnow(), datetime.utcnow() + timedelta(hours=2))
+        demand_score = predictor.predict_demand(db, station_id, datetime.now(UTC), datetime.now(UTC) + timedelta(hours=2))
         energy_multiplier = ChargingService.get_energy_cost_multiplier()
         
         items = []
@@ -46,7 +46,7 @@ class ChargingService:
             stmt = select(BatteryReservation).where(
                 BatteryReservation.battery_id == b.battery_id,
                 BatteryReservation.status == "PENDING",
-                BatteryReservation.start_time <= datetime.utcnow() + timedelta(hours=2)
+                BatteryReservation.start_time <= datetime.now(UTC) + timedelta(hours=2)
             )
             reservation = db.exec(stmt).first()
             reservation_boost = 1000 if reservation else 0
@@ -63,15 +63,22 @@ class ChargingService:
                 "score": final_score
             })
         
+        # Build battery mapping for SOC lookups
+        battery_map = {b.battery_id: b for b in batteries}
+        
         # Sort by score descending
         sorted_items = sorted(items, key=lambda x: x['score'], reverse=True)
         
         result = []
         for i, item in enumerate(sorted_items):
-            # Estimate completion: 1.5 mins per 1% needed, factored by position
-            # (In reality, slot power would be used)
-            est_minutes = 45 # mock
-            est_time = datetime.utcnow() + timedelta(minutes=est_minutes * (i + 1))
+            battery = battery_map[item['battery_id']]
+            needed_charge = max(0, 100 - battery.current_charge)
+            
+            # Dynamic calculation: 1.5 minutes per 1% charge needed
+            # Plus 5 minutes base wait time per slot queuing
+            est_minutes = (needed_charge * 1.5) + (5 * i)
+            
+            est_time = datetime.now(UTC) + timedelta(minutes=est_minutes)
             
             result.append(OptimizedQueueItem(
                 battery_id=item['battery_id'],
@@ -91,12 +98,14 @@ class ChargingService:
         
         opt_batteries = []
         for slot in slots:
-            if slot.battery:
-                opt_batteries.append(OptimizationBattery(
-                    battery_id=str(slot.battery.id),
-                    current_charge=slot.battery.current_charge,
-                    state_of_health=slot.battery.health_percentage
-                ))
+            if slot.battery_id:
+                battery = db.get(Battery, slot.battery_id)
+                if battery:
+                    opt_batteries.append(OptimizationBattery(
+                        battery_id=str(battery.id),
+                        current_charge=battery.current_charge or 0.0,
+                        state_of_health=battery.health_percentage or 100.0,
+                    ))
         
         if not opt_batteries:
             return []

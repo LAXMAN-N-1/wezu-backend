@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 from sqlmodel import Session, select
 from pydantic import BaseModel
 from sqlalchemy.orm import selectinload
-from datetime import datetime
+from datetime import datetime, UTC
 import csv
 import io
 
@@ -179,7 +179,7 @@ def transfer_battery(
     
     from_station_id = battery.station_id
     battery.station_id = to_station_id
-    battery.updated_at = datetime.utcnow()
+    battery.updated_at = datetime.now(UTC)
     
     BatteryService.log_lifecycle_event(
         session, battery_id, "transfer", 
@@ -311,7 +311,7 @@ def update_battery(
                 reason=description, user_id=current_user.id
             )
     
-    battery.updated_at = datetime.utcnow()
+    battery.updated_at = datetime.now(UTC)
     session.add(battery)
     session.commit()
     session.refresh(battery)
@@ -358,7 +358,7 @@ def export_batteries_csv(
     return Response(
         content=csv_str,
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=batteries_export_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"}
+        headers={"Content-Disposition": f"attachment; filename=batteries_export_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}.csv"}
     )
 
 @router.put("/batch/update", response_model=DataResponse[dict])
@@ -397,7 +397,7 @@ def get_battery_telemetry(
             temperature=telemetry.get('temperature'),
             soc=telemetry.get('soc'),
             health=telemetry.get('health'),
-            timestamp=telemetry.get('timestamp', datetime.utcnow().isoformat()),
+            timestamp=telemetry.get('timestamp', datetime.now(UTC).isoformat()),
             is_realtime=True
         )
     )
@@ -416,7 +416,7 @@ def get_battery_alerts(
                 type=alert['type'],
                 severity=alert['severity'],
                 message=alert['message'],
-                timestamp=datetime.utcnow().isoformat()
+                timestamp=datetime.now(UTC).isoformat()
             )
             for alert in alerts
         ]

@@ -11,17 +11,18 @@ from app.services.otp_service import OTPService
 from app.services.fraud_service import FraudService
 from app.services.token_service import TokenService
 from app.core.security import create_access_token, create_refresh_token, get_password_hash, verify_password
+from app.core.proxy import get_client_ip
 from app.schemas.user import TokenPayload
 from app.core.config import settings
 from app.api import deps
 from app.core.audit import AuditLogger, audit_log
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 from fastapi.security import OAuth2PasswordRequestForm
 import logging
 import re
 from typing import Any, List, Optional
-from datetime import datetime, timedelta
-from jose import jwt, JWTError
+from datetime import datetime, UTC, timedelta
+from jose import jwt, JWTError, ExpiredSignatureError
 import uuid
 from app.middleware.rate_limit import limiter
 from app.repositories.user_repository import user_repository
@@ -104,15 +105,18 @@ async def register(
         status=UserStatus.ACTIVE
     )
     
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
     # Assign default role
     from app.models.rbac import Role
     from sqlalchemy.orm import selectinload
     customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
     if customer_role:
-        if customer_role not in user.roles:
-            user.roles.append(customer_role)
-            db.add(user)
-            db.commit()
+        user.role_id = customer_role.id
+        db.add(user)
+        db.commit()
         db.refresh(user)
 
     # Audit log
@@ -170,7 +174,7 @@ async def _process_login(username: str, password: str, db: Session, request: Req
 
     if not user or not verify_password(password, user.hashed_password):
         # Extract IP and User-Agent
-        ip_address = request.client.host if request.client else None
+        ip_address = get_client_ip(request)
         user_agent = request.headers.get("user-agent")
         AuditLogger.log_event(
             db, 
@@ -192,7 +196,7 @@ async def _process_login(username: str, password: str, db: Session, request: Req
     refresh_token = create_refresh_token(subject=user.id, jti=token_jti)
     
     # Audit log success
-    ip_address = request.client.host if request.client else None
+    ip_address = get_client_ip(request)
     user_agent = request.headers.get("user-agent")
     AuditLogger.log_event(db, user.id, "LOGIN", "AUTH", ip_address=ip_address, user_agent=user_agent)
     
@@ -207,7 +211,7 @@ async def _process_login(username: str, password: str, db: Session, request: Req
         from app.models.login_history import LoginHistory
         login_record = LoginHistory(
             user_id=user.id,
-            ip_address=request.client.host,
+            ip_address=get_client_ip(request),
             user_agent=request.headers.get("user-agent", "Unknown"),
             device_type="web" if "Mozilla" in request.headers.get("user-agent", "") else "mobile",
             status="success"
@@ -353,7 +357,7 @@ async def verify_registration_otp(
             logger.info(f"User {user.id} activated after OTP verification")
 
     # Update Last Login
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = datetime.now(UTC)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -370,10 +374,7 @@ async def verify_registration_otp(
         # (Already generated above)
             
         user_agent = request.headers.get("user-agent", "unknown")
-        ip_address = request.client.host if request.client else "unknown"
-        forwarded = request.headers.get("x-forwarded-for")
-        if forwarded:
-            ip_address = forwarded.split(",")[0]
+        ip_address = get_client_ip(request)
             
         device_type = "mobile" if "mobile" in user_agent.lower() else "web"
         
@@ -513,7 +514,7 @@ async def social_login(
         db.refresh(user)
 
     # Update Last Login
-    user.last_login_at = datetime.utcnow()
+    user.last_login_at = datetime.now(UTC)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -612,47 +613,7 @@ async def register_with_password(
     refresh_token = create_refresh_token(subject=new_user.id)
     return Token(access_token=access_token, refresh_token=refresh_token, user=new_user)
 
-@router.post("/login", response_model=Token)
-async def login_with_password(
-    request: Request,
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_session)
-):
-    # Check if user exists by email or phone
-    if "@" in form_data.username:
-        statement = select(User).where(User.email == form_data.username)
-    else:
-        statement = select(User).where(User.phone_number == form_data.username)
-    
-    user = db.exec(statement).first()
-    if not user or not user.hashed_password:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-        )
-    
-    # Verify password
-    from app.core.security import verify_password
-    if not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-        )
-    
-    if user.status != UserStatus.ACTIVE:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Inactive user"
-        )
-    
-    # Create Dual Tokens
-    access_token = create_access_token(subject=user.id)
-    refresh_token = create_refresh_token(subject=user.id)
-    
-    # Create Session
-    AuthService.create_user_session(db, user.id, refresh_token, request)
-    
-    return Token(access_token=access_token, refresh_token=refresh_token, user=user)
+
 
 class RefreshRequest(BaseModel):
     refresh_token: str
@@ -663,54 +624,67 @@ async def refresh_token(
     request: Request,
     db: Session = Depends(get_session)
 ):
+    auth_headers = {"WWW-Authenticate": "Bearer"}
     try:
         # Validate Session first
         session = AuthService.validate_session(db, refresh_data.refresh_token, is_refresh=True)
         if not session:
-             raise HTTPException(status_code=401, detail="Session expired or invalid")
-             
-        payload = jwt.decode(
-            refresh_data.refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-        )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="token_invalid",
+                headers=auth_headers,
+            )
+        payload = jwt.decode(refresh_data.refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         if payload.get("type") != "refresh":
-            raise HTTPException(status_code=401, detail="Invalid token type")
-        
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="token_invalid",
+                headers=auth_headers,
+            )
+
         user_id = payload.get("sub")
-        user = db.get(User, user_id)
+        user = db.get(User, int(user_id)) if user_id else None
         if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        
-        access_token = create_access_token(subject=user.id, extra_claims={"sid": old_jti}) # Access token tied to SAME session?
-        # WAIT: refresh rotates the token. New refresh token = NEW JTI.
-        # But session ID (db primary key) stays same?
-        # UserSession.token_id is updated to new JTI.
-        # So we should use NEW JTI.
-        
-        new_jti = str(uuid.uuid4())
-        refresh_token = create_refresh_token(subject=user.id, jti=new_jti)
-        access_token = create_access_token(subject=user.id, extra_claims={"sid": new_jti})
-        
-        # Revoke old session and create new one (Session Rotation)
-        AuthService.revoke_session(db, refresh_data.refresh_token)
-        AuthService.create_user_session(
-            db, 
-            user.id, 
-            new_refresh_token, 
-            ip_address=session.ip_address,
-            user_agent=session.user_agent
-        )
-        
-        # Update Session (Rotation)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="token_invalid",
+                headers=auth_headers,
+            )
+
         old_jti = payload.get("jti")
-        # Update session with new token info
-        AuthService.update_user_session(db, old_jti, refresh_token, request)
-        
-        return Token(access_token=access_token, refresh_token=refresh_token)
+        new_jti = str(uuid.uuid4())
+        new_refresh_token = create_refresh_token(subject=user.id, jti=new_jti)
+        access_token = create_access_token(subject=user.id, extra_claims={"sid": new_jti})
+
+        # Rotate session token where possible; fallback to create a new session.
+        if old_jti:
+            AuthService.update_user_session(db, old_jti, new_refresh_token, request)
+        else:
+            AuthService.revoke_session(db, refresh_data.refresh_token)
+            AuthService.create_user_session(db, user.id, new_refresh_token, request, token_jti=new_jti)
+
+        return Token(access_token=access_token, refresh_token=new_refresh_token, user=user)
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="token_expired",
+            headers=auth_headers,
+        )
     except JWTError:
-        raise HTTPException(status_code=401, detail="Could not validate credentials")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="token_invalid",
+            headers=auth_headers,
+        )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"AUTHENTICATION_ERROR: Unexpected refresh failure: {str(e)}")
-        raise HTTPException(status_code=401, detail="Could not validate credentials")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="token_invalid",
+            headers=auth_headers,
+        )
 
 @router.post("/logout")
 async def logout(
@@ -742,17 +716,25 @@ async def login(
     """
     from app.core.security import verify_password
     
-    # 1. Find User (by email or phone)
-    if "@" in login_data.username:
-        statement = select(User).where(User.email == login_data.username).options(selectinload(User.roles))
+    # 1. Find User (by email or phone) using normalized credential
+    credential = login_data.credential.strip()
+    if "@" in credential:
+        from sqlalchemy import func
+        statement = select(User).where(func.lower(User.email) == credential.lower()).options(selectinload(User.role))
     else:
-        statement = select(User).where(User.phone_number == login_data.username).options(selectinload(User.roles))
+        statement = select(User).where(User.phone_number == credential).options(selectinload(User.role))
     
     user = db.exec(statement).first()
     
     if not user:
         # Audit: failed login (unknown user)
-        AuditLogger.log_event(db, None, "FAILED_LOGIN", "AUTH", metadata={"username": login_data.username, "reason": "user_not_found"})
+        AuditLogger.log_event(
+            db,
+            None,
+            "FAILED_LOGIN",
+            "AUTH",
+            metadata={"credential": credential, "reason": "user_not_found"},
+        )
         raise HTTPException(status_code=401, detail="Invalid credentials")
         
     if not verify_password(login_data.password, user.hashed_password):
@@ -763,33 +745,20 @@ async def login(
          AuditLogger.log_event(db, user.id, "FAILED_LOGIN", "AUTH", metadata={"reason": "inactive_account"})
          raise HTTPException(status_code=403, detail="Account is inactive")
 
-    # 2. Determine Role
-    user_roles = [r.name for r in user.roles]
-    selected_role_name = None
+    # 2. Determine Role (single-role model)
+    selected_role_name = user.role.name if user.role else None
+    user_roles = [selected_role_name] if selected_role_name else []
     
     if not user_roles:
          raise HTTPException(status_code=403, detail="No roles assigned to user")
 
     if login_data.role:
-        if login_data.role not in user_roles:
+        if login_data.role != selected_role_name:
             raise HTTPException(status_code=403, detail=f"User does not have role: {login_data.role}")
         selected_role_name = login_data.role
-    else:
-        # Auto-select if only 1 role
-        if len(user_roles) == 1:
-            selected_role_name = user_roles[0]
-        else:
-            # Require selection
-            return LoginResponse(
-                success=False,
-                message="Please select a role to continue",
-                requires_role_selection=True,
-                available_roles=user_roles,
-                user=user.model_dump(exclude={"hashed_password"})
-            )
             
     # Update Last Login
-    user.last_login = datetime.utcnow()
+    user.last_login_at = datetime.now(UTC)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -802,14 +771,9 @@ async def login(
     # Create Session
     AuthService.create_user_session(db, user.id, refresh_token, request, token_jti=token_jti)
     
-    # Create Session
-    # login endpoint DOES NOT have Request in signature!
-    # I need to add Request to login signature.
-    # Skipping login in this replace.
-    
     # Get Permissions & Menu from AuthService
-    permissions = AuthService.get_permissions_for_role(selected_role_name)
-    menu_data = AuthService.get_menu_for_role(selected_role_name)
+    permissions = AuthService.get_permissions_for_role(db, selected_role_name)
+    menu_data = AuthService.get_menu_for_role(db, selected_role_name)
     
     # Audit: successful login
     AuditLogger.log_event(db, user.id, "LOGIN", "AUTH", metadata={"role": selected_role_name})
@@ -872,21 +836,6 @@ async def select_role(
         permissions=permissions,
         menu=menu_data
     )
-# ===== NEW MISSING ENDPOINTS =====
-
-@router.post("/logout")
-async def logout(
-    current_user: User = Depends(deps.get_current_user),
-    token: str = Depends(deps.oauth2_scheme),
-    db: Session = Depends(get_session)
-):
-    """Logout user - invalidate tokens"""
-    TokenService.blacklist_token(db, token)
-    logger.info(f"User {current_user.id} logged out and token blacklisted")
-    AuditLogger.log_event(db, current_user.id, "LOGOUT", "AUTH")
-    return {"message": "Logged out successfully"}
-
-
 @router.post("/logout-all")
 async def logout_all(
     current_user: User = Depends(deps.get_current_user),
@@ -896,7 +845,7 @@ async def logout_all(
     Invalidate ALL sessions for the current user.
     Updates 'last_global_logout_at' timestamp. Any token issued before this time will be rejected.
     """
-    current_user.last_global_logout_at = datetime.utcnow()
+    current_user.last_global_logout_at = datetime.now(UTC)
     # Merge into current session to avoid "already attached to session" error
     # if current_user came from a different dependency session context
     updated_user = db.merge(current_user)
@@ -1013,7 +962,7 @@ async def send_email_verification(
     
     # Rate limit: only allow one email every 2 minutes
     last_sent = getattr(current_user, 'email_verification_sent_at', None)
-    if last_sent and (datetime.utcnow() - last_sent).total_seconds() < 120:
+    if last_sent and (datetime.now(UTC) - last_sent).total_seconds() < 120:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Please wait 2 minutes before requesting another verification email"
@@ -1023,7 +972,7 @@ async def send_email_verification(
     token = secrets.token_urlsafe(32)
     
     current_user.email_verification_token = token
-    current_user.email_verification_sent_at = datetime.utcnow()
+    current_user.email_verification_sent_at = datetime.now(UTC)
     
     db.add(current_user)
     db.commit()
@@ -1224,8 +1173,29 @@ class AdminLoginRequest(BaseModel):
     username: str  # email
     password: str
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_username_aliases(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+        username = values.get("username") or values.get("email") or values.get("credential")
+        if isinstance(username, str):
+            username = username.strip()
+        if username:
+            values["username"] = username
+        return values
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str) -> str:
+        username = value.strip()
+        if not username:
+            raise ValueError("Username is required")
+        return username
+
 @router.post("/admin/login")
 async def admin_login(
+    request: Request,
     login_data: AdminLoginRequest,
     db: Session = Depends(get_session)
 ):
@@ -1243,7 +1213,6 @@ async def admin_login(
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
     password_clean = login_data.password.strip()
-    logger.warning(f"Admin login debug - Password received length: {len(login_data.password)}, Exact match to 'Admin@123': {login_data.password == 'Admin@123'}")
     
     if not verify_password(password_clean, user.hashed_password):
         logger.warning(f"Admin login - invalid password for: {login_data.username}")
@@ -1284,7 +1253,8 @@ async def admin_login(
     AuthService.create_user_session(
         db, 
         user.id, 
-        refresh_tok, 
+        refresh_tok,
+        request=request,
         user_agent="Admin Web"
     )
 

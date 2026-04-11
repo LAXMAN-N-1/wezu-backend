@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 from enum import Enum
 
 class SocialPlatform(str, Enum):
@@ -22,7 +22,6 @@ class SocialPlatform(str, Enum):
 
 class OrganizationSocialLink(SQLModel, table=True):
     __tablename__ = "organization_social_links"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     organization_id: int = Field(foreign_key="organizations.id")
@@ -34,7 +33,6 @@ class OrganizationSocialLink(SQLModel, table=True):
 
 class Organization(SQLModel, table=True):
     __tablename__ = "organizations"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     name: str = Field(index=True)
@@ -47,8 +45,8 @@ class Organization(SQLModel, table=True):
     logo_height: Optional[int] = None
     
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     social_links: List[OrganizationSocialLink] = Relationship(

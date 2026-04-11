@@ -2,12 +2,41 @@ from pydantic import BaseModel, EmailStr, Field, field_validator, model_validato
 from typing import Optional, List, Any, Dict
 
 class LoginRequest(BaseModel):
-    email: str = Field(..., description="Email address or phone number")
+    credential: str = Field(..., description="Login credential (email address or phone number)")
     password: str
     totp_code: Optional[str] = None # For 2FA
     role: Optional[str] = None
     device_fingerprint: Optional[str] = None
     remember_me: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_credential_aliases(cls, values: Any) -> Any:
+        if not isinstance(values, dict):
+            return values
+        credential = values.get("credential") or values.get("username") or values.get("email")
+        if isinstance(credential, str):
+            credential = credential.strip()
+        values["credential"] = credential
+        return values
+
+    @field_validator("credential")
+    @classmethod
+    def validate_credential(cls, value: str) -> str:
+        credential = value.strip()
+        if not credential:
+            raise ValueError("Credential is required")
+        return credential
+
+    @property
+    def username(self) -> str:
+        # Backward compatibility for existing code/tests that still read login_data.username
+        return self.credential
+
+    @property
+    def email(self) -> str:
+        # Backward compatibility for payloads that still send login_data.email
+        return self.credential
 
 class RoleSelectRequest(BaseModel):
     role: str

@@ -50,7 +50,7 @@ def reset_users():
         new_user = User(
             email="laxmanlaxman1629@gmail.com",
             phone_number="9154345918",
-            hashed_password=get_password_hash("laxman123"),
+            hashed_password=get_password_hash(os.environ.get("SEED_ADMIN_PASSWORD", "ChangeMe!Seed2026")),
             full_name="Laxman Laxman",
             user_type=UserType.CUSTOMER,
             status=UserStatus.ACTIVE,

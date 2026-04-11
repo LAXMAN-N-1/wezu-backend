@@ -3,7 +3,7 @@ Monthly Scheduled Jobs
 Run on 1st of each month
 """
 from sqlmodel import Session, select, func
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from app.core.database import engine
 from app.workers.daily_jobs import create_job_execution, complete_job_execution
 import logging
@@ -21,7 +21,7 @@ def commission_settlement():
         
         with Session(engine) as session:
             # Get previous month
-            today = datetime.utcnow()
+            today = datetime.now(UTC)
             first_of_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             last_month_end = first_of_month - timedelta(days=1)
             month_str = last_month_end.strftime("%Y-%m")
@@ -68,7 +68,7 @@ def batch_payment_processing():
         
         with Session(engine) as session:
             # Pay last month's settlements
-            today = datetime.utcnow()
+            today = datetime.now(UTC)
             first_of_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             last_month_end = first_of_month - timedelta(days=1)
             month_str = last_month_end.strftime("%Y-%m")
@@ -109,7 +109,7 @@ def financial_reconciliation():
         
         with Session(engine) as session:
             # Get previous month transactions
-            today = datetime.utcnow()
+            today = datetime.now(UTC)
             first_of_month = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
             last_month_end = first_of_month - timedelta(days=1)
             last_month_start = last_month_end.replace(day=1)
@@ -172,7 +172,7 @@ def data_archival():
         
         with Session(engine) as session:
             # Archive data older than 1 year
-            archive_date = datetime.utcnow() - timedelta(days=365)
+            archive_date = datetime.now(UTC) - timedelta(days=365)
             
             archived_counts = {}
             
@@ -198,7 +198,7 @@ def data_archival():
             archived_counts['battery_health_logs'] = len(old_health)
             
             # Keep audit logs for 7 years (compliance)
-            audit_archive_date = datetime.utcnow() - timedelta(days=365*7)
+            audit_archive_date = datetime.now(UTC) - timedelta(days=365*7)
             old_audits = session.exec(
                 select(AuditLog).where(AuditLog.timestamp < audit_archive_date)
             ).all()

@@ -3,7 +3,7 @@ GPS Tracking Service
 Continuous location tracking and history management
 """
 from sqlmodel import Session, select
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from typing import Optional, List, Dict
 from app.models.gps_log import GPSTrackingLog
 from app.models.rental import Rental
@@ -51,7 +51,7 @@ class GPSTrackingService:
             latitude=latitude,
             longitude=longitude,
             accuracy=accuracy,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(UTC)
         )
         session.add(gps_log)
         session.commit()

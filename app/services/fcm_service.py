@@ -3,13 +3,7 @@ from firebase_admin import credentials, messaging
 from app.core.config import settings
 from typing import List, Optional
 
-# Initialize Firebase
-try:
-    if settings.FIREBASE_CREDENTIALS_PATH:
-        cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
-        firebase_admin.initialize_app(cred)
-except Exception as e:
-    print(f"Firebase Init Error: {e}")
+from app.core.firebase import firebase_app
 
 class FCMService:
     @staticmethod

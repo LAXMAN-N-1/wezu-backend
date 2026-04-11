@@ -141,4 +141,4 @@ def test_submit_kyc_invalid_type(client: TestClient):
         files=files
     )
     assert response.status_code == 400
-    assert "Invalid document type" in response.json()["detail"]
+    assert "Invalid document type" in response.json()["error"]

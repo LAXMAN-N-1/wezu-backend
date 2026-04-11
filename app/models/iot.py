@@ -1,11 +1,10 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 import uuid
 
 class IoTDevice(SQLModel, table=True):
     __tablename__ = "iot_devices"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     device_id: str = Field(unique=True, index=True) # Hardware Serial / MAC / UUID
     device_type: str = Field(default="tracker_v1")
@@ -21,8 +20,8 @@ class IoTDevice(SQLModel, table=True):
     last_heartbeat: Optional[datetime] = None
     last_ip_address: Optional[str] = None
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationships
     battery: Optional["Battery"] = Relationship(back_populates="iot_device")
@@ -31,7 +30,6 @@ class IoTDevice(SQLModel, table=True):
 
 class DeviceCommand(SQLModel, table=True):
     __tablename__ = "device_commands"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     device_id: int = Field(foreign_key="iot_devices.id")
     
@@ -40,7 +38,7 @@ class DeviceCommand(SQLModel, table=True):
     
     status: str = Field(default="queued") # queued, sent, acknowledged, executed, failed
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     sent_at: Optional[datetime] = None
     executed_at: Optional[datetime] = None
     response_data: Optional[str] = None # JSON string
@@ -51,7 +49,6 @@ class DeviceCommand(SQLModel, table=True):
 
 class FirmwareUpdate(SQLModel, table=True):
     __tablename__ = "firmware_updates"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     version: str
     file_url: str
@@ -59,4 +56,4 @@ class FirmwareUpdate(SQLModel, table=True):
     device_type: str
     
     is_critical: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

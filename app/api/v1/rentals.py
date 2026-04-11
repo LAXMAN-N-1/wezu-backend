@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session
 from typing import List, Optional, Any
-from datetime import datetime, date, timedelta
+from datetime import datetime, UTC, date, timedelta
 from pydantic import BaseModel
 from app.api import deps
 from app.models.user import User
@@ -14,6 +14,8 @@ from app.services.rental_service import RentalService
 from app.services.late_fee_service import LateFeeService
 from app.services.invoice_service import InvoiceService
 from fastapi.responses import StreamingResponse
+from app.utils.audit_context import log_audit_action
+from app.models.audit_log import AuditActionType
 
 class PriceCalculationRequest(BaseModel):
     battery_id: int
@@ -80,11 +82,21 @@ async def create_rental(
     # Service doesn't check, let's assume multiple rentals allowed or enforced globally.
     # Enforce station operational hours and maintenance schedules
     from app.services.dealer_station_service import DealerStationService
-    is_operational, msg = DealerStationService.is_station_operational(db, rental_in.pickup_station_id)
+    is_operational, msg = DealerStationService.is_station_operational(db, rental_in.start_station_id)
     if not is_operational:
          raise HTTPException(status_code=400, detail=msg)
          
-    return RentalService.create_rental(db, current_user.id, rental_in)
+    rental = RentalService.create_rental(db, current_user.id, rental_in)
+    log_audit_action(
+        db=db,
+        action=AuditActionType.DATA_MODIFICATION,
+        level="INFO",
+        resource_type="RENTAL",
+        target_id=rental.id,
+        details=f"New rental created by user {current_user.id}"
+    )
+    db.commit()
+    return rental
 
 @router.get("/active", response_model=List[RentalResponse])
 async def read_active_rentals(
@@ -123,6 +135,16 @@ async def return_rental_battery(
     rental = RentalService.return_battery(db, rental_id, station_id)
     if rental.user_id != current_user.id:
          raise HTTPException(status_code=403, detail="Not authorized")
+    
+    log_audit_action(
+        db=db,
+        action=AuditActionType.DATA_MODIFICATION,
+        level="INFO",
+        resource_type="RENTAL",
+        target_id=rental.id,
+        details=f"Rental return initiated by user {current_user.id}"
+    )
+    db.commit()
     return rental
 
 # Rental Modifications
@@ -248,7 +270,7 @@ async def resume_rental(
         raise HTTPException(status_code=403, detail="Not authorized")
     
     pause.status = "COMPLETED"
-    pause.battery_reclaimed_at = datetime.utcnow()
+    pause.battery_reclaimed_at = datetime.now(UTC)
     db.add(pause)
     db.commit()
     
@@ -383,7 +405,7 @@ async def request_battery_swap(
          raise HTTPException(status_code=400, detail="Rental is not active")
     
     rental.swap_station_id = req.station_id
-    rental.swap_requested_at = datetime.utcnow()
+    rental.swap_requested_at = datetime.now(UTC)
     db.add(rental)
     db.commit()
     db.refresh(rental)

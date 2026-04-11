@@ -3,7 +3,7 @@ from app.models.logistics import BatteryTransfer
 from app.models.inventory_audit import InventoryAuditLog
 from app.models.battery import Battery, BatteryStatus, LocationType
 from app.schemas.inventory import TransferCreate
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List, Optional
 
 class InventoryService:
@@ -80,7 +80,7 @@ class InventoryService:
             
         # Update transfer status
         transfer.status = "received"
-        transfer.updated_at = datetime.utcnow()
+        transfer.updated_at = datetime.now(UTC)
         
         # Update battery location
         if transfer.to_location_type == "station":
@@ -93,7 +93,7 @@ class InventoryService:
             battery.location_id = transfer.to_location_id
             
         battery.status = BatteryStatus.AVAILABLE
-        battery.updated_at = datetime.utcnow()
+        battery.updated_at = datetime.now(UTC)
         
         db.add(transfer)
         db.add(battery)

@@ -2,7 +2,7 @@ from sqlmodel import Session, select
 from app.core.database import engine
 from app.models.battery import Battery
 from app.services.battery_service import BatteryService
-from datetime import datetime
+from datetime import datetime, UTC
 import logging
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ def monitor_battery_health():
                 # 2. Update status and log alerts if necessary
                 BatteryService.update_health_status(session, battery)
                 
-                battery.updated_at = datetime.utcnow()
+                battery.updated_at = datetime.now(UTC)
                 session.add(battery)
                 updated_count += 1
                 

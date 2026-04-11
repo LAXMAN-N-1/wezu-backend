@@ -4,16 +4,20 @@ from datetime import datetime
 
 # --- Battery Spec Schemas ---
 class BatterySpecBase(BaseModel):
+    name: Optional[str] = None
+    brand: Optional[str] = None
+    voltage: Optional[float] = None
+    capacity_mah: Optional[float] = None
+    weight_kg: Optional[float] = None
+    dimensions: Optional[str] = None
+    cycle_life_expectancy: Optional[int] = 1500
+
+class BatterySpecCreate(BatterySpecBase):
     name: str
     brand: str
     voltage: float
     capacity_mah: float
-    weight_kg: Optional[float] = None
-    dimensions: Optional[str] = None
     cycle_life_expectancy: int = 1500
-
-class BatterySpecCreate(BatterySpecBase):
-    pass
 
 class BatterySpecResponse(BatterySpecBase):
     id: int

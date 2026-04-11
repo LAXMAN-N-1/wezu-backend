@@ -2,7 +2,7 @@ from sqlmodel import Session, select
 from app.models.commission import CommissionConfig, CommissionLog, CommissionTier
 from app.models.financial import Transaction
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 import logging
 
 logger = logging.getLogger("wezu_commissions")
@@ -24,7 +24,7 @@ class CommissionService:
         3. Volume-based tiers
         Returns {"percentage": float, "flat_fee": float}
         """
-        now = as_of_date or datetime.utcnow()
+        now = as_of_date or datetime.now(UTC)
 
         statement = select(CommissionConfig).where(
             CommissionConfig.transaction_type == transaction_type,

@@ -1,5 +1,5 @@
 from sqlmodel import Session, select
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from typing import Optional, List
 from app.models.settlement import Settlement
 from app.models.commission import CommissionLog
@@ -158,7 +158,7 @@ class SettlementService:
                 settlement.status = "paid"
                 settlement.transaction_reference = txn_ref
                 settlement.payment_proof_url = proof_url
-                settlement.paid_at = datetime.utcnow()
+                settlement.paid_at = datetime.now(UTC)
                 db.add(settlement)
 
                 # Mark linked commissions as paid
@@ -207,7 +207,7 @@ class SettlementService:
             settlement.status = "paid"
             settlement.transaction_reference = txn_ref
             settlement.payment_proof_url = proof_url
-            settlement.paid_at = datetime.utcnow()
+            settlement.paid_at = datetime.now(UTC)
             settlement.failure_reason = None # Clear failure reason on success
             db.add(settlement)
 
@@ -241,7 +241,7 @@ class SettlementService:
         - pending_settlements count & amount
         - paid_settlements count & amount
         """
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         current_month = now.strftime("%Y-%m")
 
         # Current month pending commissions (not yet settled)
@@ -278,9 +278,13 @@ class SettlementService:
         pending = [s for s in settlements if s.status in ("pending", "generated")]
         paid = [s for s in settlements if s.status == "paid"]
 
+        # Calculate total platform fees deducted across history
+        total_platform_fees = round(sum(s.total_commission * 0.02 for s in settlements), 2)
+
         return {
             "current_month": current_month,
             "current_month_earnings": current_month_earnings,
+            "total_platform_fees": total_platform_fees,
             "history": history,
             "pending_settlements": {
                 "count": len(pending),
@@ -290,6 +294,10 @@ class SettlementService:
                 "count": len(paid),
                 "total_amount": round(sum(s.net_payable for s in paid), 2),
             },
+            "next_payout": {
+                "amount": round(sum(s.net_payable for s in pending), 2),
+                "date": (now.replace(day=28) + timedelta(days=5)).replace(day=10).isoformat(),
+            }
         }
 
     @staticmethod
@@ -394,3 +402,85 @@ class SettlementService:
         doc.output(path)
 
         return path
+
+    @staticmethod
+    def get_dealer_payouts(db: Session, dealer_id: int) -> dict:
+        """
+        Returns payout schedule, next payout countdown, and tracking statuses.
+        Uses dealer's payout_interval from DealerProfile.
+        """
+        now = datetime.now(UTC)
+
+        # Get dealer profile for payout interval settings
+        dealer_profile = db.exec(
+            select(DealerProfile).where(DealerProfile.user_id == dealer_id)
+        ).first()
+
+        payout_interval = "Weekly"
+        min_payout_amount = 0.0
+        if dealer_profile:
+            payout_interval = dealer_profile.payout_interval or "Weekly"
+            min_payout_amount = dealer_profile.min_payout_amount or 0.0
+
+        # Calculate next payout date based on interval
+        interval_days = {"Daily": 1, "Weekly": 7, "Bi-Weekly": 14, "Monthly": 30}
+        days_in_cycle = interval_days.get(payout_interval, 7)
+
+        # Assume payouts start on the 1st of the month
+        cycle_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        days_elapsed = (now - cycle_start).days
+        cycles_passed = days_elapsed // days_in_cycle
+        next_payout_date = cycle_start + timedelta(days=(cycles_passed + 1) * days_in_cycle)
+
+        countdown_seconds = max(0, (next_payout_date - now).total_seconds())
+        countdown_days = int(countdown_seconds // 86400)
+        countdown_hours = int((countdown_seconds % 86400) // 3600)
+
+        # Get all settlements for payout tracking
+        settlements = db.exec(
+            select(Settlement).where(
+                Settlement.dealer_id == dealer_id,
+            ).order_by(Settlement.created_at.desc())
+        ).all()
+
+        # Build payout list
+        payouts = []
+        for s in settlements:
+            payouts.append({
+                "id": s.id,
+                "month": s.settlement_month,
+                "amount": s.net_payable,
+                "status": s.status,
+                "due_date": s.due_date.isoformat() if s.due_date else None,
+                "paid_at": s.paid_at.isoformat() if s.paid_at else None,
+                "transaction_reference": s.transaction_reference,
+            })
+
+        # Summary by status
+        status_counts = {}
+        for s in settlements:
+            status_counts[s.status] = status_counts.get(s.status, 0) + 1
+
+        # Current cycle pending amount
+        current_month = now.strftime("%Y-%m")
+        pending_amount = sum(
+            s.net_payable for s in settlements
+            if s.status in ("pending", "generated") and s.settlement_month == current_month
+        )
+
+        return {
+            "payout_interval": payout_interval,
+            "min_payout_amount": min_payout_amount,
+            "next_payout": {
+                "date": next_payout_date.isoformat(),
+                "countdown": {
+                    "days": countdown_days,
+                    "hours": countdown_hours,
+                    "total_seconds": int(countdown_seconds),
+                },
+            },
+            "current_cycle_pending": round(pending_amount, 2),
+            "status_summary": status_counts,
+            "payouts": payouts,
+            "total": len(payouts),
+        }

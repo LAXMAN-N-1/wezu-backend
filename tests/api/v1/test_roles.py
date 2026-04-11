@@ -38,7 +38,7 @@ def test_create_role(client: TestClient, session: Session):
     seed_permissions(session)
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     payload = {
         "name": "Test Role",
@@ -63,7 +63,7 @@ def test_role_uniqueness(client: TestClient, session: Session):
     admin = create_superuser(session)
     
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     payload = {"name": "Unique Role", "category": "system", "permissions": []}
     # First creation - should succeed
@@ -78,7 +78,7 @@ def test_role_inheritance(client: TestClient, session: Session):
     admin = create_superuser(session)
     seed_permissions(session)
     app = client.app
-    app.dependency_overrides[deps.get_current_active_superuser] = lambda: admin
+    app.dependency_overrides[deps.get_current_user] = lambda: admin
     
     # Create Parent
     parent_payload = {

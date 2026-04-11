@@ -1,26 +1,33 @@
+import json
+import re
+from typing import Any, Optional
+from urllib.parse import urlparse
+
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "WEZU Energy"
     API_V1_STR: str = "/api/v1"
+    APP_VERSION: str = "1.0.0"
     
     # Database
-    DATABASE_URL: str = "postgresql://user:password@localhost:5432/wezy_db"
+    DATABASE_URL: str # No default allowed, must be provided in env
     SQLALCHEMY_ECHO: bool = False
-    DB_POOL_SIZE: int = 3
-    DB_MAX_OVERFLOW: int = 3
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 20
     DB_POOL_TIMEOUT: int = 30
     DB_POOL_RECYCLE: int = 1800
     DB_POOL_PRE_PING: bool = True
+    DB_POOL_USE_LIFO: bool = True
     
     # Redis (Sessions & Caching)
-    REDIS_URL: str = "redis://127.0.0.1:6379/0"
+    REDIS_URL: str # No default allowed, must be provided in env
     REDIS_SESSION_DB: int = 1
     REDIS_CACHE_DB: int = 2
     
     # MongoDB (Audit Logs & Unstructured Data)
-    MONGODB_URL: str = "mongodb://localhost:27017"
+    MONGODB_URL: str # No default allowed, must be provided in env
     MONGODB_DB: str = "wezu_audit"
     
     # Security
@@ -30,7 +37,7 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     
     # Customer Authentication
-    GOOGLE_OAUTH_CLIENT_ID: str = "14021620854-19a577mtevqnvelpijimv1n856f2llbq.apps.googleusercontent.com"
+    GOOGLE_OAUTH_CLIENT_ID: Optional[str] = None  # Must be provided via env var
     GOOGLE_OAUTH_CLIENT_SECRET: Optional[str] = None
     APPLE_CLIENT_ID: Optional[str] = None
     APPLE_TEAM_ID: Optional[str] = None
@@ -112,9 +119,10 @@ class Settings(BaseSettings):
     
     # Background Jobs
     RUN_BACKGROUND_TASKS: bool = True
-    DB_INIT_ON_STARTUP: bool = True
+    DB_INIT_ON_STARTUP: bool = False
     SCHEDULER_ENABLED: bool = True
     SCHEDULER_TIMEZONE: str = "Asia/Kolkata"
+    AUDIT_REQUEST_LOGGING_ENABLED: bool = False
     
     # Monitoring & Logging
     LOG_LEVEL: str = "INFO"
@@ -127,15 +135,101 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     ENVIRONMENT: str = "production"
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    CORS_ALLOW_LOCALHOST: bool = True
+    CORS_LOCALHOST_ORIGIN_REGEX: str = r"^https?://(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$"
+    ADMIN_FRONTEND_ORIGIN: Optional[str] = "https://admin.powerfrill.com"
+    ALLOWED_HOSTS: list[str] = ["localhost", "127.0.0.1", "[::1]", "testserver"]
+    ENABLE_TRUSTED_HOST_MIDDLEWARE: bool = False
+    TRUST_X_FORWARDED_HOST: bool = True
+    FORWARDED_ALLOW_IPS: list[str] = ["127.0.0.1/32", "::1/128", "172.16.0.0/12"]
+    API_PUBLIC_BASE_URL: Optional[str] = None
+    MEDIA_BASE_URL: Optional[str] = None
     
     # Customer Support
     SUPPORT_EMAIL: str = "support@wezu.com"
-    SUPPORT_PHONE: str = "+91-1234567890"
+    SUPPORT_PHONE: str = "+91-0000000000"  # Override via env
     
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",
         case_sensitive=False
     )
+
+    @field_validator("CORS_ORIGINS", "ALLOWED_HOSTS", "FORWARDED_ALLOW_IPS", mode="before")
+    @classmethod
+    def _parse_list_env(cls, value: Any) -> Any:
+        if not isinstance(value, str):
+            return value
+        text = value.strip()
+        if not text:
+            return []
+        if text.startswith("["):
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                pass
+        return [item.strip() for item in text.split(",") if item.strip()]
+
+    @model_validator(mode="after")
+    def _normalize_public_urls(self) -> "Settings":
+        if self.ADMIN_FRONTEND_ORIGIN:
+            frontend_origin = self.ADMIN_FRONTEND_ORIGIN.rstrip("/")
+            if frontend_origin and frontend_origin not in self.CORS_ORIGINS:
+                self.CORS_ORIGINS.append(frontend_origin)
+        self.CORS_ORIGINS = [origin.rstrip("/") for origin in self.CORS_ORIGINS if origin]
+        if "*" in self.CORS_ORIGINS:
+            raise ValueError(
+                "CORS_ORIGINS cannot contain '*' when allow_credentials=True. "
+                "Provide explicit frontend origins instead."
+            )
+
+        if self.API_PUBLIC_BASE_URL:
+            parsed = urlparse(self.API_PUBLIC_BASE_URL)
+            if parsed.hostname:
+                host = parsed.hostname.lower()
+                allowed_hosts = [entry.lower() for entry in self.ALLOWED_HOSTS]
+                if host not in allowed_hosts:
+                    self.ALLOWED_HOSTS.append(host)
+
+        if not self.MEDIA_BASE_URL and self.API_PUBLIC_BASE_URL:
+            self.MEDIA_BASE_URL = f"{self.API_PUBLIC_BASE_URL.rstrip('/')}/uploads"
+
+        return self
+
+    def is_origin_allowed(self, origin: str) -> bool:
+        if not origin:
+            return False
+        normalized_origin = origin.rstrip("/")
+        if not normalized_origin:
+            return False
+        if "*" in self.CORS_ORIGINS or normalized_origin in self.CORS_ORIGINS:
+            return True
+        if self.CORS_ALLOW_LOCALHOST:
+            try:
+                return re.match(self.CORS_LOCALHOST_ORIGIN_REGEX, normalized_origin) is not None
+            except re.error:
+                return False
+        return False
+
+    @property
+    def cors_allow_origin_regex(self) -> Optional[str]:
+        return self.CORS_LOCALHOST_ORIGIN_REGEX if self.CORS_ALLOW_LOCALHOST else None
+
+    @model_validator(mode="after")
+    def _validate_production_secrets(self) -> "Settings":
+        """Fail fast if critical secrets are placeholder values."""
+        _PLACEHOLDER_MARKERS = ["your-", "change-this", "CHANGEME", "xxxx", "placeholder"]
+
+        if any(marker in self.SECRET_KEY.lower() for marker in _PLACEHOLDER_MARKERS):
+            import warnings
+            msg = (
+                "SECRET_KEY contains a placeholder value! "
+                "Generate a proper key: python -c 'import secrets; print(secrets.token_urlsafe(64))'"
+            )
+            if self.ENVIRONMENT == "production":
+                raise ValueError(msg)
+            warnings.warn(msg, stacklevel=2)
+
+        return self
 
 settings = Settings()

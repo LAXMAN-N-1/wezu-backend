@@ -4,7 +4,7 @@ Calculate and manage late fees for overdue rentals
 """
 from sqlmodel import Session, select
 from typing import Optional, Dict, List
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from app.models.rental import Rental
 from app.models.financial import Transaction
 from app.core.config import settings
@@ -36,7 +36,7 @@ class LateFeeService:
         expected_end = rental.expected_end_time or (rental.start_time + timedelta(hours=24))
 
         if not rental.end_time:
-            now = datetime.utcnow()
+            now = datetime.now(UTC)
             if now <= expected_end:
                 return {'late_fee': 0, 'hours_late': 0, 'is_late': False}
             hours_late = (now - expected_end).total_seconds() / 3600
@@ -104,7 +104,7 @@ class LateFeeService:
                 existing_fee.days_overdue = int(fee_details['hours_late'] // 24)
                 existing_fee.total_late_fee = fee_details['late_fee']
                 existing_fee.amount_outstanding = existing_fee.total_late_fee - existing_fee.amount_paid - existing_fee.amount_waived
-                existing_fee.updated_at = datetime.utcnow()
+                existing_fee.updated_at = datetime.now(UTC)
                 db.add(existing_fee)
                 db.commit()
                 db.refresh(existing_fee)
@@ -151,7 +151,7 @@ class LateFeeService:
     @staticmethod
     def get_overdue_rentals(session: Session) -> List[dict]:
         """Get all overdue rentals"""
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         
         # Get active rentals
         active_rentals = session.exec(
@@ -162,6 +162,9 @@ class LateFeeService:
         for rental in active_rentals:
             expected_end = rental.expected_end_time or (rental.start_time + timedelta(hours=24))
             
+            if expected_end and expected_end.tzinfo is None:
+                expected_end = expected_end.replace(tzinfo=UTC)
+                
             if now > expected_end:
                 fee_details = LateFeeService.calculate_late_fee(rental.id, session)
                 overdue.append({
@@ -190,7 +193,7 @@ class LateFeeService:
         fee.amount_paid += fee.amount_outstanding
         fee.amount_outstanding = 0
         fee.payment_status = "PAID"
-        fee.updated_at = datetime.utcnow()
+        fee.updated_at = datetime.now(UTC)
         
         db.add(fee)
         db.commit()

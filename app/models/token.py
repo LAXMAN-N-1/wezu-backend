@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class SessionToken(SQLModel, table=True):
     __tablename__ = "session_tokens"
@@ -23,9 +23,9 @@ class SessionToken(SQLModel, table=True):
     revoked_at: Optional[datetime] = None
     
     # Timestamps
-    issued_at: datetime = Field(default_factory=datetime.utcnow)
+    issued_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     expires_at: datetime
-    last_activity_at: datetime = Field(default_factory=datetime.utcnow)
+    last_activity_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationship
     user: "User" = Relationship()

@@ -1,7 +1,7 @@
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlmodel import Session, select
-from datetime import datetime
+from datetime import datetime, UTC
 
 from app.models.telemetry import Telemetry
 from app.models.battery import Battery, BatteryLifecycleEvent
@@ -52,7 +52,7 @@ def ingest_telemetry(
         
     # 2. Save Time-Series Data
     if not data_in.timestamp:
-        data_in.timestamp = datetime.utcnow()
+        data_in.timestamp = datetime.now(UTC)
         
     telemetry_entry = Telemetry.model_validate(data_in)
     session.add(telemetry_entry)

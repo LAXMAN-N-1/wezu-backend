@@ -1,13 +1,12 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, TYPE_CHECKING
-from datetime import datetime
+from datetime import datetime, UTC
 
 if TYPE_CHECKING:
     from app.models.station import Station
 
 class Alert(SQLModel, table=True):
     __tablename__ = "alerts"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     station_id: Optional[int] = Field(default=None, foreign_key="stations.id", index=True)
@@ -18,7 +17,7 @@ class Alert(SQLModel, table=True):
     severity: str = Field(default="MEDIUM") 
     message: str
     
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), index=True)
     acknowledged_at: Optional[datetime] = None
     acknowledged_by: Optional[int] = Field(default=None, foreign_key="users.id")
     

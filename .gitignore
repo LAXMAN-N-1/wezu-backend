@@ -44,8 +44,12 @@ logs/
 # Database
 *.db
 *.sqlite
+*_dump.sql
+
+# Generated API Docs
+openapi.json
 
 # IDE
 .vscode/
 .idea/
-walkthrough.md
+walkthrough.mdrequirements.txt.bak

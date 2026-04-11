@@ -3,7 +3,7 @@ Payment Repository
 Data access layer for Transaction model
 """
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from sqlmodel import Session, select, func
 from app.models.financial import Transaction
 from app.repositories.base_repository import BaseRepository
@@ -85,7 +85,7 @@ class PaymentRepository(BaseRepository[Transaction, PaymentCreate, PaymentUpdate
         limit: int = 10
     ) -> List[Transaction]:
         """Get recent transactions"""
-        since = datetime.utcnow() - timedelta(days=days)
+        since = datetime.now(UTC) - timedelta(days=days)
         query = select(Transaction).where(
             (Transaction.user_id == user_id) &
             (Transaction.created_at >= since)

@@ -1,6 +1,6 @@
 from typing import List, Dict, Any
 from sqlmodel import Session, select
-from datetime import datetime
+from datetime import datetime, UTC
 from io import StringIO
 import csv
 
@@ -132,7 +132,7 @@ class BatteryBatchService:
                     if field in update_data and update_data[field] is not None:
                         setattr(battery, field, update_data[field])
                 
-                battery.updated_at = datetime.utcnow()
+                battery.updated_at = datetime.now(UTC)
                 success_count += 1
 
             except Exception as e:

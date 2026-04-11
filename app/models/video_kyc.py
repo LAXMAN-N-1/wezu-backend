@@ -1,10 +1,9 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class VideoKYCSession(SQLModel, table=True):
     __tablename__ = "video_kyc_sessions"
-    # __table_args__ = {"schema": "public", "extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id")
     session_id: str = Field(unique=True, index=True) # ID from 3rd party provider
@@ -17,7 +16,7 @@ class VideoKYCSession(SQLModel, table=True):
     video_url: Optional[str] = None
     snapshot_url: Optional[str] = None
     
-    started_at: datetime = Field(default_factory=datetime.utcnow)
+    started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     completed_at: Optional[datetime] = None
     
     # Scheduling

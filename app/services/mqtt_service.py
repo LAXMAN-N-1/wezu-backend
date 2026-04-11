@@ -5,7 +5,7 @@ Subscribes to IoT device telemetry and processes battery data
 import paho.mqtt.client as mqtt
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Optional, Callable
 from sqlmodel import Session
 from app.core.config import settings
@@ -40,7 +40,7 @@ class MQTTService:
                 port = 1883
             
             # Create client
-            client_id = f"{settings.MQTT_CLIENT_ID_PREFIX}_{datetime.utcnow().timestamp()}"
+            client_id = f"{settings.MQTT_CLIENT_ID_PREFIX}_{datetime.now(UTC).timestamp()}"
             self.client = mqtt.Client(client_id=client_id)
             
             # Set callbacks
@@ -108,7 +108,7 @@ class MQTTService:
         payload = {
             "command": command_type,
             "params": params or {},
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         }
         self.publish(topic, payload)
         logger.info(f"Command {command_type} sent to device {device_id}")

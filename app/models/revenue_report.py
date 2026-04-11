@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field
 from typing import Optional, Dict, Any
-from datetime import datetime, date
+from datetime import datetime, UTC, date
 from sqlalchemy import Column, JSON
 
 
@@ -37,4 +37,4 @@ class RevenueReport(SQLModel, table=True):
         default=None, sa_column=Column("breakdown_by_source", JSON, nullable=True)
     )
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

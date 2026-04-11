@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 
 class FeatureFlag(SQLModel, table=True):
     __tablename__ = "feature_flags"
@@ -13,7 +13,7 @@ class FeatureFlag(SQLModel, table=True):
     enabled_for_users: Optional[str] = None 
     enabled_for_tenants: Optional[str] = None
     
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class SystemConfig(SQLModel, table=True):
     __tablename__ = "system_configs"

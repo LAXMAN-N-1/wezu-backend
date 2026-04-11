@@ -6,6 +6,7 @@ from app.repositories.user_repository import user_repository
 from app.services.auth_service import AuthService
 from app.services.fraud_service import FraudService
 from app.core.security import create_access_token, create_refresh_token, verify_password
+from app.core.proxy import get_client_ip
 import logging
 
 logger = logging.getLogger(__name__)
@@ -37,7 +38,7 @@ class AuthController:
 
         # 3. Handle Fraud Analysis natively via Service
         if fraud_check:
-            client_ip = request.client.host if request.client else "unknown"
+            client_ip = get_client_ip(request)
             user_agent = request.headers.get("User-Agent", "unknown")
             fraud_score = await FraudService.analyze_login_attempt(
                 user_id=user.id,
@@ -66,7 +67,7 @@ class AuthController:
             access_token=access_token,
             refresh_token=refresh_token,
             device_info=request.headers.get("User-Agent", "unknown"),
-            ip_address=request.client.host if request.client else "unknown"
+            ip_address=get_client_ip(request)
         )
         
         return LoginResponse(

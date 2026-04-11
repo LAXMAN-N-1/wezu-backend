@@ -210,7 +210,7 @@ class TestRequirePermission:
         # GET /stations requires station:read — user only has battery:read
         resp = client.get("/api/v1/stations/")
         assert resp.status_code == 403
-        assert "station:read" in resp.json()["detail"]
+        assert "station:read" in resp.json()["error"]
 
     def test_200_with_permission(self, client: TestClient, session: Session):
         user = create_user(session, "hasaccess@test.com")
@@ -244,7 +244,7 @@ class TestRequirePermission:
 
         resp = client.get("/api/v1/batteries/")
         assert resp.status_code == 403
-        assert "battery:read" in resp.json()["detail"]
+        assert "battery:read" in resp.json()["error"]
 
 
 # ──────────────────────────────────────────────────

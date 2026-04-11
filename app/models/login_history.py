@@ -1,13 +1,12 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, TYPE_CHECKING
-from datetime import datetime
+from datetime import datetime, UTC
 
 if TYPE_CHECKING:
     from app.models.user import User
 
 class LoginHistory(SQLModel, table=True):
     __tablename__ = "login_history"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True)
@@ -20,7 +19,7 @@ class LoginHistory(SQLModel, table=True):
     status: str = "success" # success, failed
     details: Optional[str] = None # reason for failure if any
     
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationship
     user: Optional["User"] = Relationship()

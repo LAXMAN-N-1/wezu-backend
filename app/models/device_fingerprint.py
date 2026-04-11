@@ -1,13 +1,12 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 import sqlalchemy as sa
 from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
 
 class DeviceFingerprint(SQLModel, table=True):
     __tablename__ = "device_fingerprints"
-    # __table_args__ = {"schema": "public"}
     """Track unique device characteristics for fraud detection"""
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: Optional[int] = Field(default=None, foreign_key="users.id")
@@ -48,8 +47,8 @@ class DeviceFingerprint(SQLModel, table=True):
     is_suspicious: bool = Field(default=False)
     risk_score: float = Field(default=0.0)
     
-    first_seen: datetime = Field(default_factory=datetime.utcnow)
-    last_seen: datetime = Field(default_factory=datetime.utcnow)
+    first_seen: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    last_seen: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     user: Optional["User"] = Relationship()
@@ -57,7 +56,6 @@ class DeviceFingerprint(SQLModel, table=True):
 
 class DuplicateAccount(SQLModel, table=True):
     __tablename__ = "duplicate_accounts"
-    # __table_args__ = {"schema": "public"}
     """Link potentially duplicate accounts"""
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -86,7 +84,7 @@ class DuplicateAccount(SQLModel, table=True):
     action_taken: Optional[str] = None  # MERGED, BLOCKED, FLAGGED, CLEARED
     notes: Optional[str] = None
     
-    detected_at: datetime = Field(default_factory=datetime.utcnow)
+    detected_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     device: Optional[DeviceFingerprint] = Relationship(back_populates="duplicate_links")

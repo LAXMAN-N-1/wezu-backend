@@ -4,7 +4,7 @@ E-commerce product catalog for battery purchase
 """
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 from enum import Enum
 
 class ProductCategory(str, Enum):
@@ -22,7 +22,6 @@ class ProductStatus(str, Enum):
 class CatalogProduct(SQLModel, table=True):
     """Product catalog"""
     __tablename__ = "products"
-    # __table_args__ = {"schema": "public", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -66,8 +65,8 @@ class CatalogProduct(SQLModel, table=True):
     review_count: int = Field(default=0, ge=0)
     
     # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     images: List["CatalogProductImage"] = Relationship(back_populates="product")
@@ -76,7 +75,6 @@ class CatalogProduct(SQLModel, table=True):
 class CatalogProductImage(SQLModel, table=True):
     """Product images"""
     __tablename__ = "product_images"
-    # __table_args__ = {"schema": "public", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     product_id: int = Field(foreign_key="products.id", index=True)
@@ -84,7 +82,7 @@ class CatalogProductImage(SQLModel, table=True):
     alt_text: Optional[str] = None
     display_order: int = Field(default=0)
     is_primary: bool = Field(default=False)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationship
     product: Optional[CatalogProduct] = Relationship(back_populates="images")
@@ -92,7 +90,6 @@ class CatalogProductImage(SQLModel, table=True):
 class CatalogProductVariant(SQLModel, table=True):
     """Product variants (color, size, etc.)"""
     __tablename__ = "product_variants"
-    # __table_args__ = {"schema": "public", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     product_id: int = Field(foreign_key="products.id", index=True)
@@ -114,7 +111,7 @@ class CatalogProductVariant(SQLModel, table=True):
     
     # Status
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationship
     product: Optional[CatalogProduct] = Relationship(back_populates="variants")
@@ -122,7 +119,6 @@ class CatalogProductVariant(SQLModel, table=True):
 class CatalogOrder(SQLModel, table=True):
     """Customer orders"""
     __tablename__ = "orders"
-    # __table_args__ = {"schema": "public", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     order_number: str = Field(unique=True, index=True)
@@ -151,7 +147,7 @@ class CatalogOrder(SQLModel, table=True):
     status: str = Field(default="PENDING", index=True)  # PENDING, CONFIRMED, SHIPPED, DELIVERED, CANCELLED
     
     # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), index=True)
     confirmed_at: Optional[datetime] = None
     shipped_at: Optional[datetime] = None
     delivered_at: Optional[datetime] = None
@@ -167,7 +163,6 @@ class CatalogOrder(SQLModel, table=True):
 class CatalogOrderItem(SQLModel, table=True):
     """Order line items"""
     __tablename__ = "order_items"
-    # __table_args__ = {"schema": "public", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     order_id: int = Field(foreign_key="orders.id", index=True)
@@ -191,7 +186,6 @@ class CatalogOrderItem(SQLModel, table=True):
 class DeliveryTracking(SQLModel, table=True):
     """Delivery tracking for orders"""
     __tablename__ = "delivery_tracking"
-    # __table_args__ = {"schema": "public", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     order_id: int = Field(foreign_key="orders.id", index=True, unique=True)
@@ -215,13 +209,12 @@ class DeliveryTracking(SQLModel, table=True):
     recipient_signature: Optional[str] = None
     
     # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 class DeliveryEvent(SQLModel, table=True):
     """Delivery status history"""
     __tablename__ = "delivery_events"
-    # __table_args__ = {"schema": "public", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     tracking_id: int = Field(foreign_key="delivery_tracking.id", index=True)
@@ -230,7 +223,7 @@ class DeliveryEvent(SQLModel, table=True):
     status: str
     location: Optional[str] = None
     description: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow, index=True)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), index=True)
     
     # Additional info
     event_metadata: Optional[str] = None  # JSON string

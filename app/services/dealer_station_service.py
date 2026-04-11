@@ -4,7 +4,7 @@ Dealer Station Service — Handles dealer operations for stations, inventory, al
 
 from sqlmodel import Session, select, func
 from fastapi import HTTPException
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List, Dict, Any
 
 from app.models.station import Station, StationSlot
@@ -24,8 +24,8 @@ class DealerStationService:
             dealer_id=dealer_id,
             approval_status="pending",
             status="inactive",
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow()
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC)
         )
         db.add(station)
         db.commit()
@@ -77,10 +77,11 @@ class DealerStationService:
         
         from app.models.battery import Battery
         
+        # Use LEFT OUTER JOIN so we return batteries even if not assigned to a specific slot
         query = (
             select(Battery, StationSlot.slot_number)
-            .join(StationSlot, StationSlot.battery_id == Battery.id)
-            .where(StationSlot.station_id == station_id)
+            .join(StationSlot, StationSlot.battery_id == Battery.id, isouter=True)
+            .where(Battery.station_id == station_id)
         )
              
         results = db.exec(query).all()
@@ -100,7 +101,7 @@ class DealerStationService:
                  "health_status": health_stat,
                  "cycle_count": battery.cycle_count,
                  "slot_number": slot_num,
-                 "status": battery.status
+                 "status": battery.status.value if hasattr(battery.status, 'value') else str(battery.status)
              })
         return batteries
 
@@ -185,7 +186,7 @@ class DealerStationService:
         if not station:
             return False, "Station not found"
             
-        now = datetime.utcnow()
+        now = datetime.now(UTC)
         
         # 1. Check Maintenance
         downtime = db.exec(

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlmodel import Session, select, func, text, col
+from sqlmodel import Session, select, func, col
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 import uuid
 
 from app.api.deps import get_db, get_current_active_admin
@@ -27,7 +27,7 @@ from collections import defaultdict
 def _compute_bulk_degradation_rates(battery_ids: List[uuid.UUID], db: Session, days: int = 90) -> dict:
     if not battery_ids:
         return {}
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = datetime.now(UTC) - timedelta(days=days)
     snapshots = db.exec(
         select(BatteryHealthSnapshot)
         .where(BatteryHealthSnapshot.battery_id.in_(battery_ids))
@@ -46,7 +46,12 @@ def _compute_bulk_degradation_rates(battery_ids: List[uuid.UUID], db: Session, d
             rates[bid] = 0.0
             continue
         first, last = snaps[0], snaps[-1]
-        days_diff = (last.recorded_at - first.recorded_at).days
+        first_recorded_at = _coerce_datetime(first.recorded_at)
+        last_recorded_at = _coerce_datetime(last.recorded_at)
+        if not first_recorded_at or not last_recorded_at:
+            rates[bid] = 0.0
+            continue
+        days_diff = (last_recorded_at - first_recorded_at).days
         if days_diff <= 0:
             rates[bid] = 0.0
             continue
@@ -77,8 +82,28 @@ def _get_health_enum(health: float) -> BatteryHealth:
     else:
         return BatteryHealth.CRITICAL
 
+def _coerce_datetime(value: object) -> Optional[datetime]:
+    if value is None:
+        return None
+
+    if isinstance(value, datetime):
+        dt = value
+    elif isinstance(value, str):
+        try:
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    else:
+        return None
+
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
+
+
 def _serialize_dt(dt: Optional[datetime]) -> Optional[str]:
-    return dt.isoformat() if dt else None
+    normalized = _coerce_datetime(dt)
+    return normalized.isoformat() if normalized else None
 
 # ============================================================
 # GET /health/overview — Fleet-wide health summary
@@ -111,7 +136,7 @@ def get_health_overview(db: Session = Depends(get_db)):
     needing_service = sum(1 for bid, r in rates_30d.items() if r > 5)
 
     # Scheduled maintenance in next 7 days
-    next_week = datetime.utcnow() + timedelta(days=7)
+    next_week = datetime.now(UTC) + timedelta(days=7)
     upcoming = db.exec(
         select(func.count(BatteryMaintenanceSchedule.id))
         .where(BatteryMaintenanceSchedule.status == MaintenanceStatus.SCHEDULED)
@@ -157,28 +182,30 @@ def get_health_batteries(
 
     # Bulk latest snapshots
     latest_snaps = db.exec(
-        text('''
-        SELECT DISTINCT ON (battery_id) * FROM inventory.battery_health_snapshots 
-        WHERE battery_id = ANY(:bids)
-        ORDER BY battery_id, recorded_at DESC
-        '''),
-        params={'bids': [str(bid) for bid in b_ids]}
-    ).fetchall()
-    snaps_map = {row.battery_id: row for row in latest_snaps}
+        select(BatteryHealthSnapshot)
+        .where(BatteryHealthSnapshot.battery_id.in_(b_ids))
+        .order_by(BatteryHealthSnapshot.battery_id, col(BatteryHealthSnapshot.recorded_at).desc())
+    ).all()
+    snaps_map = {}
+    for snapshot in latest_snaps:
+        if snapshot.battery_id not in snaps_map:
+            snaps_map[snapshot.battery_id] = snapshot
 
     # Bulk latest maintenance
     latest_maint = db.exec(
-        text('''
-        SELECT DISTINCT ON (battery_id) * FROM inventory.battery_maintenance_schedules 
-        WHERE battery_id = ANY(:bids) AND status = 'completed'
-        ORDER BY battery_id, completed_at DESC
-        '''),
-        params={'bids': [str(bid) for bid in b_ids]}
-    ).fetchall()
-    maint_map = {row.battery_id: row for row in latest_maint}
+        select(BatteryMaintenanceSchedule)
+        .where(BatteryMaintenanceSchedule.battery_id.in_(b_ids))
+        .where(BatteryMaintenanceSchedule.status == MaintenanceStatus.COMPLETED)
+        .where(BatteryMaintenanceSchedule.completed_at.is_not(None))
+        .order_by(BatteryMaintenanceSchedule.battery_id, col(BatteryMaintenanceSchedule.completed_at).desc())
+    ).all()
+    maint_map = {}
+    for maintenance in latest_maint:
+        if maintenance.battery_id not in maint_map:
+            maint_map[maintenance.battery_id] = maintenance
 
     results = []
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
 
     for b in batteries:
         health = b.health_percentage
@@ -204,8 +231,9 @@ def get_health_batteries(
         last_maint = maint_map.get(b.id)
 
         days_since = None
-        if last_maint and last_maint.completed_at:
-            days_since = (now - last_maint.completed_at.replace(tzinfo=None)).days
+        completed_at = _coerce_datetime(last_maint.completed_at) if last_maint else None
+        if completed_at:
+            days_since = (now - completed_at).days
 
         results.append(HealthBatteryResponse(
             id=str(b.id),
@@ -269,9 +297,9 @@ def get_health_battery_detail(battery_id: str, db: Session = Depends(get_db)):
         months_to_eol = (health_now - 20) / deg_rate
         months_to_fair = (health_now - 50) / deg_rate if health_now > 50 else 0
         if months_to_eol > 0:
-            predicted_eol = _serialize_dt(datetime.utcnow() + timedelta(days=months_to_eol * 30))
+            predicted_eol = _serialize_dt(datetime.now(UTC) + timedelta(days=months_to_eol * 30))
         if months_to_fair > 0:
-            predicted_fair = _serialize_dt(datetime.utcnow() + timedelta(days=months_to_fair * 30))
+            predicted_fair = _serialize_dt(datetime.now(UTC) + timedelta(days=months_to_fair * 30))
 
     # Health breakdown factors
     voltage_health = min(100, max(0, (latest.voltage - 44) / 8 * 100)) if latest and latest.voltage else 90
@@ -384,7 +412,7 @@ def get_battery_snapshots(
     db: Session = Depends(get_db),
 ):
     bid = uuid.UUID(battery_id)
-    cutoff = datetime.utcnow() - timedelta(days=days)
+    cutoff = datetime.now(UTC) - timedelta(days=days)
     snapshots = db.exec(
         select(BatteryHealthSnapshot)
         .where(BatteryHealthSnapshot.battery_id == bid)
@@ -441,7 +469,7 @@ def record_health_snapshot(
     old_health = battery.health_percentage
     battery.health_percentage = data.health_percentage
     battery.health_status = _get_health_enum(data.health_percentage)
-    battery.last_inspected_at = datetime.utcnow()
+    battery.last_inspected_at = datetime.now(UTC)
     db.add(battery)
 
     # Auto-create alert if significant drop
@@ -500,12 +528,15 @@ def get_health_alerts(
     alerts = db.exec(query).all()
 
     # Enrich with battery serial
+    b_ids = {a.battery_id for a in alerts if a.battery_id}
+    b_map = {b.id: b.serial_number for b in db.exec(select(Battery).where(Battery.id.in_(b_ids))).all()} if b_ids else {}
+
     result = []
     for a in alerts:
-        battery = db.exec(select(Battery).where(Battery.id == a.battery_id)).first()
+        serial = b_map.get(a.battery_id)
         result.append(HealthAlertResponse(
             id=a.id, battery_id=str(a.battery_id),
-            battery_serial=battery.serial_number if battery else None,
+            battery_serial=serial,
             alert_type=a.alert_type.value, severity=a.severity.value,
             message=a.message, is_resolved=a.is_resolved,
             resolved_by=a.resolved_by, resolved_at=_serialize_dt(a.resolved_at),
@@ -532,7 +563,7 @@ def resolve_health_alert(
 
     alert.is_resolved = True
     alert.resolved_by = admin_user.id
-    alert.resolved_at = datetime.utcnow()
+    alert.resolved_at = datetime.now(UTC)
     alert.resolution_reason = data.reason
     db.add(alert)
     db.commit()
@@ -593,19 +624,22 @@ def get_maintenance_list(
     if status:
         query = query.where(BatteryMaintenanceSchedule.status == MaintenanceStatus(status))
     if upcoming_days:
-        cutoff = datetime.utcnow() + timedelta(days=upcoming_days)
+        cutoff = datetime.now(UTC) + timedelta(days=upcoming_days)
         query = query.where(BatteryMaintenanceSchedule.scheduled_date <= cutoff)
         query = query.where(BatteryMaintenanceSchedule.status == MaintenanceStatus.SCHEDULED)
 
     query = query.order_by(BatteryMaintenanceSchedule.scheduled_date.desc())
     items = db.exec(query).all()
 
+    b_ids = {m.battery_id for m in items if m.battery_id}
+    b_map = {b.id: b.serial_number for b in db.exec(select(Battery).where(Battery.id.in_(b_ids))).all()} if b_ids else {}
+
     result = []
     for m in items:
-        battery = db.exec(select(Battery).where(Battery.id == m.battery_id)).first()
+        serial = b_map.get(m.battery_id)
         result.append(MaintenanceScheduleResponse(
             id=m.id, battery_id=str(m.battery_id),
-            battery_serial=battery.serial_number if battery else None,
+            battery_serial=serial,
             scheduled_date=_serialize_dt(m.scheduled_date),
             maintenance_type=m.maintenance_type.value, priority=m.priority.value,
             assigned_to=m.assigned_to, status=m.status.value,
@@ -625,19 +659,30 @@ def get_health_analytics(db: Session = Depends(get_db)):
 
     # 1. Fleet trend — weekly average over 90 days
     trend = []
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
+    start_of_90d = now - timedelta(days=90)
+    
+    all_snaps = db.exec(
+        select(BatteryHealthSnapshot)
+        .where(col(BatteryHealthSnapshot.recorded_at) >= start_of_90d)
+    ).all()
+    normalized_snaps = []
+    for snapshot in all_snaps:
+        recorded_at = _coerce_datetime(snapshot.recorded_at)
+        if recorded_at:
+            normalized_snaps.append((snapshot, recorded_at))
+    
     for week_back in range(12, -1, -1):
         week_start = now - timedelta(weeks=week_back + 1)
         week_end = now - timedelta(weeks=week_back)
 
-        snapshots = db.exec(
-            select(BatteryHealthSnapshot)
-            .where(col(BatteryHealthSnapshot.recorded_at) >= week_start)
-            .where(col(BatteryHealthSnapshot.recorded_at) < week_end)
-        ).all()
+        week_snaps = [
+            snapshot for snapshot, recorded_at in normalized_snaps
+            if week_start <= recorded_at < week_end
+        ]
 
-        if snapshots:
-            avg = round(sum(s.health_percentage for s in snapshots) / len(snapshots), 1)
+        if week_snaps:
+            avg = round(sum(s.health_percentage for s in week_snaps) / len(week_snaps), 1)
         else:
             avg = 0
 

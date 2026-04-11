@@ -1,10 +1,23 @@
+"""
+Debug script to verify login works.
+
+Usage:
+    python scripts/debug/verify_login.py <email> <password>
+    python scripts/debug/verify_login.py                    # prompts interactively
+"""
 import requests
 import json
+import sys
+import getpass
 
 url = "http://127.0.0.1:8000/api/v1/auth/login"
+
+email = sys.argv[1] if len(sys.argv) > 1 else input("Email: ")
+password = sys.argv[2] if len(sys.argv) > 2 else getpass.getpass("Password: ")
+
 data = {
-    "username": "admin@wezu.com",
-    "password": "admin123"
+    "username": email,
+    "password": password
 }
 headers = {
     "Content-Type": "application/json"

@@ -2,7 +2,7 @@ from sqlmodel import Session, select
 from app.models.alert import Alert
 from app.models.station import Station
 from app.services.notification_service import NotificationService
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List, Optional
 
 class AlertService:
@@ -19,7 +19,7 @@ class AlertService:
             alert_type=alert_type,
             severity=severity,
             message=message,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(UTC)
         )
         db.add(alert)
         db.commit()
@@ -54,7 +54,7 @@ class AlertService:
     def acknowledge_alert(db: Session, alert_id: int, user_id: int) -> Optional[Alert]:
         alert = db.get(Alert, alert_id)
         if alert:
-            alert.acknowledged_at = datetime.utcnow()
+            alert.acknowledged_at = datetime.now(UTC)
             alert.acknowledged_by = user_id
             db.add(alert)
             db.commit()

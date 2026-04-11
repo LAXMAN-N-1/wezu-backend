@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from app.models.battery import Battery
     from app.models.station import Station
     from app.models.swap import SwapSession
-    from app.models.finance.transaction import Transaction
+    from app.models.financial import Transaction
     from app.models.rental_event import RentalEvent
 
 class RentalStatus(str, Enum):
@@ -22,7 +22,6 @@ class RentalStatus(str, Enum):
 
 class Rental(SQLModel, table=True):
     __tablename__ = "rentals"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     
     # Core References
@@ -34,7 +33,7 @@ class Rental(SQLModel, table=True):
     end_station_id: Optional[int] = Field(default=None, foreign_key="stations.id")
     
     # Timings
-    start_time: datetime = Field(default_factory=datetime.utcnow)
+    start_time: datetime = Field(default_factory=lambda: datetime.now(UTC))
     expected_end_time: datetime
     end_time: Optional[datetime] = None
     
@@ -53,8 +52,8 @@ class Rental(SQLModel, table=True):
     end_battery_level: float = Field(default=0.0)
     distance_traveled_km: float = Field(default=0.0)
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationships
     user: "User" = Relationship(back_populates="rentals")
@@ -68,10 +67,9 @@ class Rental(SQLModel, table=True):
 
 class Purchase(SQLModel, table=True):
     __tablename__ = "purchases"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", index=True)
     battery_id: int = Field(foreign_key="batteries.id", index=True)
     amount: float
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

@@ -16,6 +16,7 @@ import datetime
 from app.models.user import User, KYCStatus
 from app.schemas.kyc import KYCDocumentResponse, KYCQueueItem, KYCQueueResponse, KYCVerifyRequest, KYCDashboardResponse
 from app.schemas.kyc_admin import KYCRejectRequest
+from app.services.email_service import EmailService
 
 @router.get("/pending", response_model=KYCQueueResponse)
 def get_pending_kyc_queue(
@@ -124,9 +125,20 @@ def verify_kyc_submission(
     db.commit()
     db.refresh(user)
     
-    # TODO: Send Notification (Email/SMS/Push)
-    # NotificationService.send_kyc_update(user_id, status=user.kyc_status, notes=request.notes)
-    
+    # Send Notification (Email)
+    status_text = "Approved" if user.kyc_status == KYCStatus.APPROVED else "Rejected"
+    email_content = f"""
+        <h3>KYC Status Update</h3>
+        <p>Your Recent KYC submission has been <b>{status_text}</b>.</p>
+    """
+    if user.kyc_status == KYCStatus.REJECTED:
+        email_content += f"<p>Reason: Please check your portal for issues with your documents.</p>"
+        
+    EmailService.send_email(
+        to_email=user.email,
+        subject=f"Wezu Energy - KYC {status_text}",
+        content=email_content
+    )
     return {"status": "success", "user_status": user.kyc_status}
 
 @router.get("/documents", response_model=dict)
@@ -261,9 +273,18 @@ def reject_kyc_submission(
     db.commit()
     db.refresh(user)
     
-    # TODO: Send Notification (Email/SMS/Push)
-    # NotificationService.send_kyc_rejection(user_id, reason=request.reason)
-    
+    # Send Notification (Email)
+    email_content = f"""
+        <h3>KYC Application Rejected</h3>
+        <p>Unfortunately, your KYC application was rejected for the following reason:</p>
+        <p><b>{request.reason}</b></p>
+        <p>Please log in to the portal, update your documents, and submit again.</p>
+    """
+    EmailService.send_email(
+        to_email=user.email,
+        subject="Wezu Energy - KYC Rejected",
+        content=email_content
+    )
     
     return {"status": "success", "user_status": user.kyc_status, "reason": user.kyc_rejection_reason}
 
@@ -329,7 +350,7 @@ def approve_user_kyc(
         raise HTTPException(status_code=404, detail="User not found")
         
     user.kyc_status = KYCStatus.APPROVED
-    user.updated_at = datetime.datetime.utcnow()
+    user.updated_at = datetime.datetime.now(UTC)
     db.add(user)
     db.commit()
     return {"message": "User KYC approved successfully"}
@@ -348,7 +369,7 @@ def reject_user_kyc(
         
     user.kyc_status = KYCStatus.REJECTED
     user.kyc_rejection_reason = request.reason
-    user.updated_at = datetime.datetime.utcnow()
+    user.updated_at = datetime.datetime.now(UTC)
     db.add(user)
     db.commit()
     return {"message": "User KYC rejected successfully", "reason": request.reason}

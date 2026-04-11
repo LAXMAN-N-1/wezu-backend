@@ -13,26 +13,44 @@ from app.schemas.support import (
 )
 from app.schemas.feedback import FeedbackCreate, FeedbackResponse
 from app.schemas.faq import FAQResponse
-from datetime import datetime
+from datetime import datetime, UTC
 import os
 import shutil
 
 router = APIRouter()
 
-@router.get("/admin/tickets", response_model=List[SupportTicketResponse])
+from app.schemas.common import PaginatedResponse, PaginationParams
+
+@router.get("/admin/tickets", response_model=PaginatedResponse[SupportTicketResponse])
 def admin_read_tickets(
     status: Optional[str] = None,
     category: Optional[str] = None,
+    page: int = 1,
+    limit: int = 10,
     session: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_superuser),
 ) -> Any:
-    """Admin: list all support tickets with filters"""
+    """Admin: list all support tickets with pagination and filters"""
     statement = select(SupportTicket)
     if status:
         statement = statement.where(SupportTicket.status == status)
     if category:
         statement = statement.where(SupportTicket.category == category)
-    return session.exec(statement.order_by(SupportTicket.created_at.desc())).all()
+    
+    # Get total count
+    total = session.exec(select(func.count()).select_from(statement.subquery())).one()
+    
+    # Get paginated data
+    offset = (page - 1) * limit
+    tickets = session.exec(statement.order_by(SupportTicket.created_at.desc()).offset(offset).limit(limit)).all()
+    
+    return PaginatedResponse(
+        data=tickets,
+        total=total,
+        page=page,
+        limit=limit,
+        total_pages=(total + limit - 1) // limit
+    )
 
 @router.post("/tickets", response_model=SupportTicketResponse)
 def create_ticket(
@@ -46,7 +64,8 @@ def create_ticket(
         user_id=current_user.id,
         subject=ticket_in.subject,
         category=ticket_in.category,
-        priority=ticket_in.priority
+        priority=ticket_in.priority,
+        created_at=datetime.now(UTC)
     )
     session.add(ticket)
     session.commit()
@@ -61,13 +80,27 @@ def create_ticket(
     )
     return ticket
 
-@router.get("/tickets/my", response_model=List[SupportTicketResponse])
+@router.get("/tickets/my", response_model=PaginatedResponse[SupportTicketResponse])
 def read_my_tickets(
+    page: int = 1,
+    limit: int = 10,
     session: Session = Depends(deps.get_db),
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    """Customer: list their own tickets"""
-    return session.exec(select(SupportTicket).where(SupportTicket.user_id == current_user.id)).all()
+    """Customer: list their own tickets with pagination"""
+    statement = select(SupportTicket).where(SupportTicket.user_id == current_user.id)
+    total = session.exec(select(func.count()).select_from(statement.subquery())).one()
+    
+    offset = (page - 1) * limit
+    tickets = session.exec(statement.order_by(SupportTicket.created_at.desc()).offset(offset).limit(limit)).all()
+    
+    return PaginatedResponse(
+        data=tickets,
+        total=total,
+        page=page,
+        limit=limit,
+        total_pages=(total + limit - 1) // limit
+    )
 
 @router.get("/tickets/{ticket_id}", response_model=SupportTicketDetailResponse)
 def read_ticket_detail(
@@ -128,7 +161,7 @@ def close_ticket(
         raise HTTPException(status_code=404, detail="Ticket not found")
     
     ticket.status = TicketStatus.CLOSED
-    ticket.updated_at = datetime.utcnow()
+    ticket.updated_at = datetime.now(UTC)
     db.add(ticket)
     db.commit()
     db.refresh(ticket)
@@ -203,7 +236,28 @@ async def upload_ticket_attachment(
         "file_name": file.filename
     }
 
-# --- Feedback & FAQ ---
+# --- Admin Analytics ---
+from app.schemas.support import QueueStatsResponse, AgentPerformanceResponse
+
+@router.get("/admin/support/queue", response_model=QueueStatsResponse)
+def get_support_queue_stats(
+    session: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_superuser)
+):
+    """Admin: Overview of support ticket queue performance"""
+    from app.services.support_service import SupportService
+    return SupportService.get_queue_stats(session)
+
+@router.get("/admin/support/performance", response_model=List[AgentPerformanceResponse])
+def get_support_agent_performance(
+    session: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_superuser)
+):
+    """Admin: KPIs for all support agents"""
+    from app.services.support_service import SupportService
+    return SupportService.get_agent_performance(session)
+
+# --- Feedback & FAQ (Knowledge Base) ---
 @router.post("/feedback", response_model=FeedbackResponse)
 async def submit_feedback(
     feedback_in: FeedbackCreate,
@@ -237,7 +291,7 @@ async def list_faqs(
     category: Optional[str] = None,
     db: Session = Depends(deps.get_db)
 ):
-    """List FAQs with optional category filter"""
+    """Knowledge Base: List FAQs with optional category filter"""
     from app.api.v1.faqs import get_faqs
     return await get_faqs(category, db)
 
@@ -246,7 +300,7 @@ async def search_faq(
     q: str,
     db: Session = Depends(deps.get_db)
 ):
-    """Search FAQ by keyword"""
+    """Knowledge Base: Search FAQ by keyword"""
     statement = select(FAQ).where(
         (FAQ.question.contains(q)) |
         (FAQ.answer.contains(q))
@@ -263,7 +317,7 @@ async def get_faq_detail(
     faq_id: int,
     db: Session = Depends(deps.get_db)
 ):
-    """Get FAQ detail"""
+    """Knowledge Base: Get article detail"""
     faq = db.get(FAQ, faq_id)
     if not faq:
         raise HTTPException(status_code=404, detail="FAQ not found")

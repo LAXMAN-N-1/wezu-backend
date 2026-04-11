@@ -22,6 +22,9 @@ class AuditLogEntry(BaseModel):
     timestamp: datetime
     details: Optional[str]
     ip_address: Optional[str]
+    module: Optional[str]
+    status: Optional[str]
+    trace_id: Optional[str]
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -108,21 +111,18 @@ async def get_role_audit_log(
             detail="Only Admins can view role audit logs"
         )
         
-    # 2. Query Audit Logs
-    # We look for resource_type="role" and resource_id=str(role_id)
-    query = select(AuditLog).where(AuditLog.resource_type == "role").where(AuditLog.resource_id == str(role_id))
-    
-    # Count
-    count_query = select(func.count()).select_from(query.subquery())
-    total_count = db.exec(count_query).one()
-    
-    # Pagination & Sort
-    offset = (page - 1) * limit
-    logs = db.exec(query.order_by(AuditLog.timestamp.desc()).offset(offset).limit(limit)).all()
+    # 2. Standardized Query
+    result = await audit_service.get_logs_advanced(
+        db=db,
+        resource_type="role",
+        target_id=role_id, # target_id corresponds to resource_id for roles
+        page=page,
+        limit=limit
+    )
     
     return AuditLogResponse(
-        logs=logs,
-        total_count=total_count,
+        logs=result["logs"],
+        total_count=result["total_count"],
         page=page,
         limit=limit
     )
@@ -239,23 +239,18 @@ async def get_auth_failures(
             detail="Only Admins can view auth failures"
         )
         
-    # 2. Query Audit Logs
-    query = select(AuditLog).where(AuditLog.action == "login_failed")
-    
-    if user_id:
-        query = query.where(AuditLog.user_id == user_id)
-        
-    # Count
-    count_query = select(func.count()).select_from(query.subquery())
-    total_count = db.exec(count_query).one()
-    
-    # Pagination & Sort
-    offset = (page - 1) * limit
-    logs = db.exec(query.order_by(AuditLog.timestamp.desc()).offset(offset).limit(limit)).all()
+    # 2. Standardized Query
+    result = await audit_service.get_logs_advanced(
+        db=db,
+        action="login_failed",
+        user_id=user_id,
+        page=page,
+        limit=limit
+    )
     
     return AuditLogResponse(
-        logs=logs,
-        total_count=total_count,
+        logs=result["logs"],
+        total_count=result["total_count"],
         page=page,
         limit=limit
     )
@@ -295,31 +290,70 @@ async def get_data_access_log(
             detail="Only Admins can view data access logs"
         )
         
-    # 2. Query Audit Logs
-    query = select(AuditLog)
-    
-    if user_id:
-        query = query.where(AuditLog.user_id == user_id)
-    if resource_type:
-        query = query.where(AuditLog.resource_type == resource_type)
-    if resource_id:
-        query = query.where(AuditLog.resource_id == resource_id)
-    if start_date:
-        query = query.where(AuditLog.timestamp >= start_date)
-    if end_date:
-        query = query.where(AuditLog.timestamp <= end_date)
-        
-    # Count
-    count_query = select(func.count()).select_from(query.subquery())
-    total_count = db.exec(count_query).one()
-    
-    # Pagination & Sort
-    offset = (page - 1) * limit
-    logs = db.exec(query.order_by(AuditLog.timestamp.desc()).offset(offset).limit(limit)).all()
+    # 2. Standardized Query
+    result = await audit_service.get_logs_advanced(
+        db=db,
+        user_id=user_id,
+        resource_type=resource_type,
+        target_id=int(resource_id) if resource_id and resource_id.isdigit() else None,
+        date_from=start_date,
+        date_to=end_date,
+        page=page,
+        limit=limit
+    )
     
     return AuditLogResponse(
-        logs=logs,
-        total_count=total_count,
+        logs=result["logs"],
+        total_count=result["total_count"],
+        page=page,
+        limit=limit
+    )
+@router.get("/", response_model=AuditLogResponse)
+async def search_audit_logs(
+    user_id: Optional[int] = None,
+    action: Optional[str] = None,
+    resource_type: Optional[str] = None,
+    module: Optional[str] = None,
+    status: Optional[str] = None,
+    trace_id: Optional[str] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    page: int = 1,
+    limit: int = 50,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    """
+    Search audit logs with enterprise-grade filtering.
+    Leverages high-speed indexing for 'failure' status and module-based analysis.
+    """
+    # 1. Authorization
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only superusers can search audit logs"
+        )
+        
+    # 2. Build Query
+    # Use AuditService._build_query but with SQLModel instead of raw SQL
+    # Actually we can just use the Service's search logic
+    result = await audit_service.get_logs_advanced(
+        db=db,
+        user_id=user_id,
+        action=action,
+        resource_type=resource_type,
+        module=module,
+        status=status,
+        trace_id=trace_id,
+        date_from=start_date,
+        date_to=end_date,
+        page=page,
+        limit=limit
+    )
+    
+    return AuditLogResponse(
+        logs=result["logs"],
+        total_count=result["total_count"],
         page=page,
         limit=limit
     )

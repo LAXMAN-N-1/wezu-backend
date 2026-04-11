@@ -1,10 +1,9 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class SwapSuggestion(SQLModel, table=True):
     __tablename__ = "swap_suggestions"
-    # __table_args__ = {"schema": "public"}
     """ML-based swap station recommendations"""
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id")
@@ -40,7 +39,7 @@ class SwapSuggestion(SQLModel, table=True):
     was_accepted: Optional[bool] = None
     accepted_at: Optional[datetime] = None
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     user: "User" = Relationship()
@@ -49,7 +48,6 @@ class SwapSuggestion(SQLModel, table=True):
 
 class SwapPreference(SQLModel, table=True):
     __tablename__ = "swap_preferences"
-    # __table_args__ = {"schema": "public"}
     """User preferences for swap stations"""
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", unique=True)
@@ -76,7 +74,7 @@ class SwapPreference(SQLModel, table=True):
     notify_when_battery_below: int = Field(default=20)  # SOC percentage
     notify_suggestion_radius_km: float = Field(default=5.0)
     
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     user: "User" = Relationship()

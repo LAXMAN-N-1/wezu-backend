@@ -25,7 +25,7 @@ def test_create_user_as_superuser(client: TestClient, session: Session):
     
     from app.main import app
     app.dependency_overrides[deps.get_current_user] = get_superuser_override
-    app.dependency_overrides[deps.get_current_active_superuser] = get_superuser_override
+    app.dependency_overrides[deps.get_current_user] = get_superuser_override
 
     # 3. Try to create a new user
     response = client.post(
@@ -93,6 +93,6 @@ def test_create_user_as_normal_user_fails(client: TestClient, session: Session):
     # Actually deps.get_current_active_superuser calls get_current_user.
     
     assert response.status_code == 403
-    # assert response.json()["detail"] == "The user doesn't have enough privileges" # Detail might vary
+    # assert response.json()["error"] == "The user doesn't have enough privileges" # Detail might vary
     
     app.dependency_overrides.clear()

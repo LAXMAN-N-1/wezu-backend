@@ -1,7 +1,7 @@
 """
 Schemas for Dealer Portal User Management (Credentials & Login Flow).
 """
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
@@ -151,8 +151,7 @@ class DealerUserRead(BaseModel):
     created_at: Optional[datetime] = None
     created_by: Optional[str] = None  # Name of user who created
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SessionRead(BaseModel):

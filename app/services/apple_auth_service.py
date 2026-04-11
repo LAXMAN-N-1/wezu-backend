@@ -4,7 +4,7 @@ Handles Apple OAuth authentication for customer app
 """
 import jwt
 import httpx
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from typing import Optional, Dict
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
@@ -99,8 +99,8 @@ class AppleAuthService:
             
             payload = {
                 'iss': settings.APPLE_TEAM_ID,
-                'iat': datetime.utcnow(),
-                'exp': datetime.utcnow() + timedelta(days=180),  # Max 6 months
+                'iat': datetime.now(UTC),
+                'exp': datetime.now(UTC) + timedelta(days=180),  # Max 6 months
                 'aud': AppleAuthService.APPLE_ISSUER,
                 'sub': settings.APPLE_CLIENT_ID
             }

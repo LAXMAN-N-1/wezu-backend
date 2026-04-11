@@ -1,10 +1,9 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class RentalEvent(SQLModel, table=True):
     __tablename__ = "rental_events"
-    # __table_args__ = {"schema": "public", "extend_existing": True}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     rental_id: int = Field(foreign_key="rentals.id")
@@ -15,7 +14,7 @@ class RentalEvent(SQLModel, table=True):
     station_id: Optional[int] = Field(default=None, foreign_key="stations.id")
     battery_id: Optional[int] = Field(default=None, foreign_key="batteries.id")
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationship
     rental: "Rental" = Relationship(back_populates="events")

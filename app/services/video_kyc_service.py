@@ -2,7 +2,7 @@ from sqlmodel import Session, select
 from app.core.database import engine
 from app.models.video_kyc import VideoKYCSession
 from app.models.user import User
-from datetime import datetime
+from datetime import datetime, UTC
 import uuid
 
 class VideoKYCService:
@@ -74,7 +74,7 @@ class VideoKYCService:
         if vks:
                 vks.status = status
                 if status == "completed":
-                    vks.completed_at = datetime.utcnow()
+                    vks.completed_at = datetime.now(UTC)
                 if recording_url:
                     vks.video_url = recording_url
                 if notes:

@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, UTC
 import random
 import paho.mqtt.client as mqtt
 from sqlmodel import Session, select
@@ -47,7 +47,7 @@ class IoTService:
                     return
 
                 # Update Heartbeat
-                device.last_heartbeat = datetime.utcnow()
+                device.last_heartbeat = datetime.now(UTC)
                 device.status = "online"
                 device.last_ip_address = payload.get("ip", device.last_ip_address)
                 session.add(device)
@@ -73,7 +73,7 @@ class IoTService:
         from app.models.iot import Telemetry
         telemetry = Telemetry(
             battery_id=device.battery_id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
             soc=data.get("soc", 0.0),
             soh=data.get("soh", 100.0),
             voltage=data.get("voltage", 0.0),
@@ -128,7 +128,7 @@ class IoTService:
             cmd = session.get(DeviceCommand, command_id)
             if cmd:
                 cmd.status = data.get("status", "executed")
-                cmd.executed_at = datetime.utcnow()
+                cmd.executed_at = datetime.now(UTC)
                 cmd.response_data = json.dumps(data)
                 session.add(cmd)
                 session.commit()
@@ -157,12 +157,12 @@ class IoTService:
                 "command_id": cmd.id,
                 "type": command_type,
                 "params": payload,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(UTC).isoformat()
             }
             IoTService.client.publish(topic, json.dumps(msg_payload))
             
             cmd.status = "sent"
-            cmd.sent_at = datetime.utcnow()
+            cmd.sent_at = datetime.now(UTC)
             session.add(cmd)
             session.commit()
             return cmd

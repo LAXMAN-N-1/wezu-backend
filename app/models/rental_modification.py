@@ -1,10 +1,9 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, UTC
 
 class RentalExtension(SQLModel, table=True):
     __tablename__ = "rental_extensions"
-    # __table_args__ = {"schema": "public"}
     """Extension requests for active rentals"""
     id: Optional[int] = Field(default=None, primary_key=True)
     rental_id: int = Field(foreign_key="rentals.id")
@@ -26,8 +25,8 @@ class RentalExtension(SQLModel, table=True):
     approved_by: Optional[int] = Field(default=None, foreign_key="users.id")
     approved_at: Optional[datetime] = None
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     rental: "Rental" = Relationship()
@@ -36,7 +35,6 @@ class RentalExtension(SQLModel, table=True):
 
 class RentalPause(SQLModel, table=True):
     __tablename__ = "rental_pauses"
-    # __table_args__ = {"schema": "public"}
     """Temporary rental pausing (e.g., user traveling)"""
     id: Optional[int] = Field(default=None, primary_key=True)
     rental_id: int = Field(foreign_key="rentals.id")
@@ -63,8 +61,8 @@ class RentalPause(SQLModel, table=True):
     approved_by: Optional[int] = Field(default=None, foreign_key="users.id")
     approved_at: Optional[datetime] = None
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     rental: "Rental" = Relationship()

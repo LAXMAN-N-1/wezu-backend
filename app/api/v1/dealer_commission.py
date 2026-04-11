@@ -2,7 +2,7 @@ from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlmodel import Session, select
-from datetime import datetime
+from datetime import datetime, UTC
 from pydantic import BaseModel, ConfigDict
 
 from app.db.session import get_session
@@ -13,6 +13,8 @@ from app.models.settlement_dispute import SettlementDispute
 from app.models.user import User
 from app.services.settlement_service import SettlementService
 from app.services.dispute_service import DisputeService
+from app.utils.audit_context import log_audit_action
+from app.models.audit_log import AuditActionType
 
 router = APIRouter()
 
@@ -110,7 +112,7 @@ def create_commission_rate(
         transaction_type=request.transaction_type,
         percentage=request.percentage,
         flat_fee=request.flat_fee,
-        effective_from=request.effective_from or datetime.utcnow(),
+        effective_from=request.effective_from or datetime.now(UTC),
         effective_until=request.effective_until,
     )
     db.add(config)
@@ -313,9 +315,21 @@ def dealer_create_dispute(
 ) -> Any:
     """Dealer: Raise a dispute on a settlement."""
     try:
-        return DisputeService.create_dispute(
+        dispute = DisputeService.create_dispute(
             db, settlement_id, current_user.id, request.reason
         )
+        
+        log_audit_action(
+            db=db,
+            action=AuditActionType.DATA_MODIFICATION,
+            level="INFO",
+            resource_type="DISPUTE",
+            target_id=dispute.id if hasattr(dispute, 'id') else None,
+            details=f"Dealer {current_user.id} raised a dispute on settlement {settlement_id}"
+        )
+        db.commit()
+        
+        return dispute
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except PermissionError as e:

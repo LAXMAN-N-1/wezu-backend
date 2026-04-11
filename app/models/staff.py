@@ -1,10 +1,9 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 
 class StaffProfile(SQLModel, table=True):
     __tablename__ = "staff_profiles"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     user_id: int = Field(foreign_key="users.id", unique=True)
     
@@ -18,12 +17,20 @@ class StaffProfile(SQLModel, table=True):
     reporting_manager_id: Optional[int] = Field(default=None, foreign_key="users.id")
     
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     user: "User" = Relationship(
         back_populates="staff_profile",
-        sa_relationship_kwargs={"foreign_keys": "StaffProfile.user_id"}
+        sa_relationship_kwargs={
+            "foreign_keys": "StaffProfile.user_id",
+            "overlaps": "user,staff_profile,owner,owned_dealer_profile,staff_members"
+        }
     )
-    dealer: Optional["DealerProfile"] = Relationship(back_populates="staff_members")
+    dealer: Optional["DealerProfile"] = Relationship(
+        back_populates="staff_members",
+        sa_relationship_kwargs={
+            "overlaps": "dealer,staff_members,user,owner,owned_dealer_profile"
+        }
+    )
     # station: Optional["Station"] = Relationship()

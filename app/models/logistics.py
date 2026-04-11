@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, TYPE_CHECKING, List
-from datetime import datetime
+from datetime import datetime, UTC
 from enum import Enum
 import uuid
 
@@ -23,7 +23,6 @@ class DeliveryStatus(str, Enum):
 
 class BatteryTransfer(SQLModel, table=True):
     __tablename__ = "battery_transfers"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     battery_id: int = Field(foreign_key="batteries.id")
@@ -37,15 +36,14 @@ class BatteryTransfer(SQLModel, table=True):
     status: str = Field(default="pending") # pending, assigned, in_transit, received, cancelled
     manifest_id: Optional[int] = Field(default=None, foreign_key="manifests.id")
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationship
     manifest: Optional["Manifest"] = Relationship(back_populates="transfers")
 
 class Manifest(SQLModel, table=True):
     __tablename__ = "manifests"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     manifest_number: str = Field(default_factory=lambda: f"MAN-{uuid.uuid4().hex[:8].upper()}", index=True, unique=True)
@@ -57,8 +55,8 @@ class Manifest(SQLModel, table=True):
     
     transfers: List[BatteryTransfer] = Relationship(back_populates="manifest")
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 # Update Relationship for User
 if TYPE_CHECKING:
@@ -66,7 +64,6 @@ if TYPE_CHECKING:
     
 class DeliveryOrder(SQLModel, table=True):
     __tablename__ = "delivery_orders"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -104,8 +101,8 @@ class DeliveryOrder(SQLModel, table=True):
     # Reverse Logistics Link
     return_request_id: Optional[int] = Field(default=None, foreign_key="return_requests.id")
     
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     # Relationships
     driver: Optional["User"] = Relationship(back_populates="delivery_orders")

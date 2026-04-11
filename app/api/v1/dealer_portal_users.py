@@ -5,7 +5,7 @@ Full CRUD for dealer staff users, invite flow, sessions, password management.
 from typing import List, Optional, Dict
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session, select, func, or_
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 import secrets
 import logging
 
@@ -23,6 +23,8 @@ from app.schemas.dealer_user import (
     EmailCheckRequest, EmailCheckResponse, UserStats, SessionRead,
     LoginHistoryEntry, BulkActionRequest, BulkActionType, CredentialMode,
 )
+from app.services.email_service import EmailService
+from app.core.config import settings
 
 router = APIRouter()
 logger = logging.getLogger("dealer_portal_users")
@@ -198,13 +200,27 @@ def create_dealer_user(
         # Generate invite token
         token = _generate_invite_token()
         user.invite_token = token
-        user.invite_token_expires = datetime.utcnow() + timedelta(hours=INVITE_TOKEN_EXPIRY_HOURS)
-        user.invite_sent_at = datetime.utcnow()
+        user.invite_token_expires = datetime.now(UTC) + timedelta(hours=INVITE_TOKEN_EXPIRY_HOURS)
+        user.invite_sent_at = datetime.now(UTC)
         user.status = UserStatus.PENDING
 
-        # TODO: Send actual email with invite link containing token
-        logger.info(f"[INVITE] Token for {data.email}: {token}")
-        logger.info(f"[INVITE] Activation URL: /activate/{token}")
+        # Send actual email with invite link containing token
+        base_url = settings.ADMIN_FRONTEND_ORIGIN or "https://admin.powerfrill.com"
+        invite_link = f"{base_url}/activate/{token}"
+        
+        email_content = f"""
+            <h3>Welcome to Wezu Dealer Portal</h3>
+            <p>You have been invited to join the dealer team. Click the link below to activate your account and set your password:</p>
+            <p><a href="{invite_link}">{invite_link}</a></p>
+            <p>This link expires in {INVITE_TOKEN_EXPIRY_HOURS} hours.</p>
+        """
+        EmailService.send_email(
+            to_email=data.email,
+            subject="Invitation to join Wezu Dealer Portal",
+            content=email_content
+        )
+        
+        logger.info(f"[INVITE] Sent activation email to {data.email}")
 
     elif data.credential_mode == CredentialMode.MANUAL:
         if not data.password:
@@ -358,7 +374,7 @@ def update_dealer_user(
                 old_values[key] = getattr(user, key)
                 setattr(user, key, value)
 
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(UTC)
     db.add(user)
 
     _audit(db, current_user.id, dealer.id, AuditActionType.DATA_MODIFICATION,
@@ -387,7 +403,7 @@ def delete_dealer_user(
         raise HTTPException(status_code=400, detail="Cannot delete yourself")
 
     user.is_deleted = True
-    user.deleted_at = datetime.utcnow()
+    user.deleted_at = datetime.now(UTC)
     user.deletion_reason = "Deleted by admin"
     user.status = UserStatus.DELETED
     db.add(user)
@@ -399,7 +415,7 @@ def delete_dealer_user(
     for s in sessions:
         s.is_active = False
         s.is_revoked = True
-        s.revoked_at = datetime.utcnow()
+        s.revoked_at = datetime.now(UTC)
         db.add(s)
 
     _audit(db, current_user.id, dealer.id, AuditActionType.DATA_MODIFICATION,
@@ -428,7 +444,7 @@ def change_user_status(
 
     old_status = user.status
     user.status = data.status
-    user.updated_at = datetime.utcnow()
+    user.updated_at = datetime.now(UTC)
 
     # If deactivating, revoke all sessions
     if data.status in ["inactive", "suspended"]:
@@ -438,7 +454,7 @@ def change_user_status(
         for s in sessions:
             s.is_active = False
             s.is_revoked = True
-            s.revoked_at = datetime.utcnow()
+            s.revoked_at = datetime.now(UTC)
             db.add(s)
 
     db.add(user)
@@ -470,8 +486,8 @@ def reset_user_password(
             raise HTTPException(status_code=400, detail="Password required")
         user.hashed_password = get_password_hash(data.password)
         user.force_password_change = data.force_password_change
-        user.password_changed_at = datetime.utcnow()
-        user.updated_at = datetime.utcnow()
+        user.password_changed_at = datetime.now(UTC)
+        user.updated_at = datetime.now(UTC)
         db.add(user)
 
         # Revoke all sessions to force re-login
@@ -481,17 +497,31 @@ def reset_user_password(
         for s in sessions:
             s.is_active = False
             s.is_revoked = True
-            s.revoked_at = datetime.utcnow()
+            s.revoked_at = datetime.now(UTC)
             db.add(s)
 
     elif data.mode == "email":
         # Generate password reset token (reuse invite_token field)
         token = _generate_invite_token()
         user.invite_token = token
-        user.invite_token_expires = datetime.utcnow() + timedelta(hours=1)
+        user.invite_token_expires = datetime.now(UTC) + timedelta(hours=1)
         db.add(user)
-        # TODO: Send reset email
-        logger.info(f"[RESET] Password reset token for {user.email}: {token}")
+        # Send reset email
+        base_url = settings.ADMIN_FRONTEND_ORIGIN or "https://admin.powerfrill.com"
+        reset_link = f"{base_url}/reset-password/{token}"
+        
+        email_content = f"""
+            <h3>Password Reset Request</h3>
+            <p>You requested a password reset. Click the link below to set a new password:</p>
+            <p><a href="{reset_link}">{reset_link}</a></p>
+            <p>This link expires in 1 hour.</p>
+        """
+        EmailService.send_email(
+            to_email=user.email,
+            subject="Wezu Dealer Portal - Password Reset",
+            content=email_content
+        )
+        logger.info(f"[RESET] Sent password reset email to {user.email}")
 
     _audit(db, current_user.id, dealer.id, AuditActionType.PASSWORD_RESET,
            target_id=user.id, details=f"Password reset ({data.mode}) for {user.email}")
@@ -519,12 +549,27 @@ def resend_invite(
     # Generate new token
     token = _generate_invite_token()
     user.invite_token = token
-    user.invite_token_expires = datetime.utcnow() + timedelta(hours=INVITE_TOKEN_EXPIRY_HOURS)
-    user.invite_sent_at = datetime.utcnow()
+    user.invite_token_expires = datetime.now(UTC) + timedelta(hours=INVITE_TOKEN_EXPIRY_HOURS)
+    user.invite_sent_at = datetime.now(UTC)
     db.add(user)
 
-    # TODO: Send actual email
-    logger.info(f"[INVITE-RESEND] New token for {user.email}: {token}")
+    # Send actual email
+    base_url = settings.ADMIN_FRONTEND_ORIGIN or "https://admin.powerfrill.com"
+    invite_link = f"{base_url}/activate/{token}"
+    
+    email_content = f"""
+        <h3>Welcome to Wezu Dealer Portal (Reminder)</h3>
+        <p>You have been invited to join the dealer team. Click the link below to activate your account and set your password:</p>
+        <p><a href="{invite_link}">{invite_link}</a></p>
+        <p>This link expires in {INVITE_TOKEN_EXPIRY_HOURS} hours.</p>
+    """
+    EmailService.send_email(
+        to_email=user.email,
+        subject="Invitation to join Wezu Dealer Portal (Reminder)",
+        content=email_content
+    )
+    
+    logger.info(f"[INVITE-RESEND] Resent activation email to {user.email}")
 
     _audit(db, current_user.id, dealer.id, AuditActionType.USER_INVITE,
            target_id=user.id, details=f"Resent invitation to {user.email}")
@@ -582,7 +627,7 @@ def terminate_all_sessions(
     for s in sessions:
         s.is_active = False
         s.is_revoked = True
-        s.revoked_at = datetime.utcnow()
+        s.revoked_at = datetime.now(UTC)
         db.add(s)
         count += 1
 
@@ -611,7 +656,7 @@ def terminate_session(
 
     session.is_active = False
     session.is_revoked = True
-    session.revoked_at = datetime.utcnow()
+    session.revoked_at = datetime.now(UTC)
     db.add(session)
 
     _audit(db, current_user.id, dealer.id, AuditActionType.SESSION_TERMINATED,
@@ -662,10 +707,10 @@ def bulk_action(
 
             elif data.action == BulkActionType.DELETE:
                 user.is_deleted = True
-                user.deleted_at = datetime.utcnow()
+                user.deleted_at = datetime.now(UTC)
                 user.status = UserStatus.DELETED
 
-            user.updated_at = datetime.utcnow()
+            user.updated_at = datetime.now(UTC)
             db.add(user)
             results["success"] += 1
 

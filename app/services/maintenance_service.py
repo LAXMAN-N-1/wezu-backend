@@ -4,7 +4,7 @@ from app.core.database import engine
 from app.models.maintenance import MaintenanceSchedule, MaintenanceRecord, StationDowntime
 from app.models.battery import Battery
 from app.models.station import Station
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 import logging
 
 logger = logging.getLogger("wezu_maintenance")
@@ -37,7 +37,7 @@ class MaintenanceService:
                 # Check Time
                 elif schedule.interval_days:
                     last_date = battery.last_maintenance_date or battery.created_at
-                    if (datetime.utcnow() - last_date).days >= schedule.interval_days:
+                    if (datetime.now(UTC) - last_date).days >= schedule.interval_days:
                         is_due = True
                         reason = f"Time threshold reached (Last: {last_date.date()})"
                 
@@ -52,7 +52,7 @@ class MaintenanceService:
             stations = db.exec(select(Station).where(Station.status != "maintenance")).all()
             for station in stations:
                 last_date = station.last_maintenance_date or station.created_at
-                if schedule.interval_days and (datetime.utcnow() - last_date).days >= schedule.interval_days:
+                if schedule.interval_days and (datetime.now(UTC) - last_date).days >= schedule.interval_days:
                     station.status = "maintenance"
                     db.add(station)
                     logger.info(f"Station {station.name} flagged for maintenance")
@@ -69,7 +69,7 @@ class MaintenanceService:
             description=data.get("description"),
             cost=data.get("cost", 0.0),
             parts_replaced=data.get("parts_replaced"),
-            performed_at=datetime.utcnow()
+            performed_at=datetime.now(UTC)
         )
         db.add(record)
         
@@ -97,7 +97,7 @@ class MaintenanceService:
     def report_downtime(db: Session, station_id: int, reason: str):
         dt = StationDowntime(
             station_id=station_id,
-            start_time=datetime.utcnow(),
+            start_time=datetime.now(UTC),
             reason=reason
         )
         db.add(dt)

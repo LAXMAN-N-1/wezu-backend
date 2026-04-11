@@ -1,15 +1,14 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
 
 
 class CommissionConfig(SQLModel, table=True):
     __tablename__ = "commission_configs"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
 
     # Target entity
-    dealer_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id")
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id")
 
     # Type of transaction
@@ -20,11 +19,11 @@ class CommissionConfig(SQLModel, table=True):
     flat_fee: float = Field(default=0.0)
 
     # Effective date management
-    effective_from: datetime = Field(default_factory=datetime.utcnow)
+    effective_from: datetime = Field(default_factory=lambda: datetime.now(UTC))
     effective_until: Optional[datetime] = Field(default=None)
 
     is_active: bool = Field(default=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class CommissionTier(SQLModel, table=True):
@@ -42,19 +41,18 @@ class CommissionTier(SQLModel, table=True):
     percentage: float = Field(default=0.0)
     flat_fee: float = Field(default=0.0)
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class CommissionLog(SQLModel, table=True):
     __tablename__ = "commission_logs"
-    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
 
     # Reference to causing event
     transaction_id: int = Field(foreign_key="transactions.id")
 
     # Beneficiary
-    dealer_id: Optional[int] = Field(default=None, foreign_key="users.id")
+    dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id")
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id")
 
     # Earnings
@@ -64,7 +62,7 @@ class CommissionLog(SQLModel, table=True):
     # Settlement linkage
     settlement_id: Optional[int] = Field(default=None, foreign_key="settlements.id")
 
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
     settlement: Optional["Settlement"] = Relationship(back_populates="commission_logs")

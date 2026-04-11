@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from sqlmodel import Session, select
 from app.models.battery import Battery, BatteryLifecycleEvent
 from app.services.geofence_service import GeofenceService
@@ -46,7 +46,7 @@ class TelematicsService:
                 # so we can return the violation detail for MQTTService to broadcast
                 data["geofence_violation"] = message
             
-        battery.updated_at = datetime.utcnow()
+        battery.updated_at = datetime.now(UTC)
         db.add(battery)
         
         # Log update event if status changed or periodically
@@ -67,7 +67,7 @@ class TelematicsService:
             soh=data.get("soh") or data.get("health"),
             latitude=data.get("lat"),
             longitude=data.get("lon"),
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(UTC)
         )
         db.add(telemetry_log)
         db.commit()
