@@ -57,3 +57,65 @@ class DriverService:
             "avg_delivery_time_minutes": round(avg_time, 2),
             "satisfaction_score": round(satisfaction, 2)
         }
+
+    @staticmethod
+    def get_driver_dashboard_stats(db: Session, driver_id: int) -> dict:
+        """
+        Driver dashboard aggregate for today's load and overall execution stats.
+        """
+        from app.models.logistics import DeliveryOrder
+
+        driver = db.get(DriverProfile, driver_id)
+        if not driver:
+            return {
+                "driver_id": driver_id,
+                "total_jobs": 0,
+                "today_jobs": 0,
+                "active_jobs": 0,
+                "completed_jobs": 0,
+                "rating": 0.0,
+                "total_earnings": 0.0,
+                "on_time_rate": 0.0,
+                "avg_delivery_time_minutes": 0.0,
+                "satisfaction_score": 0.0,
+            }
+
+        orders = db.exec(
+            select(DeliveryOrder).where(DeliveryOrder.assigned_driver_id == driver.user_id)
+        ).all()
+        today = datetime.now(UTC).date()
+
+        def _status_value(order_status) -> str:
+            if hasattr(order_status, "value"):
+                return str(order_status.value).lower()
+            return str(order_status).lower()
+
+        total_jobs = len(orders)
+        completed_jobs = sum(1 for o in orders if _status_value(o.status) == "delivered")
+        active_jobs = sum(1 for o in orders if _status_value(o.status) in {"assigned", "in_transit"})
+        today_jobs = 0
+        for order in orders:
+            anchor = order.scheduled_at or order.created_at
+            if anchor and anchor.date() == today:
+                today_jobs += 1
+
+        perf = DriverService.get_driver_performance(db, driver_id)
+
+        # Earnings are deployment-specific; default to zero unless payout data is available.
+        earnings_per_delivery = float(getattr(driver, "payout_per_delivery", 0.0) or 0.0)
+        total_earnings = round(completed_jobs * earnings_per_delivery, 2)
+
+        return {
+            "driver_id": driver.id,
+            "user_id": driver.user_id,
+            "is_online": bool(driver.is_online),
+            "rating": round(float(driver.rating or 0.0), 2),
+            "total_jobs": total_jobs,
+            "today_jobs": today_jobs,
+            "active_jobs": active_jobs,
+            "completed_jobs": completed_jobs,
+            "total_earnings": total_earnings,
+            "on_time_rate": perf.get("on_time_rate", 0.0),
+            "avg_delivery_time_minutes": perf.get("avg_delivery_time_minutes", 0.0),
+            "satisfaction_score": perf.get("satisfaction_score", 0.0),
+        }

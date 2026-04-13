@@ -221,6 +221,67 @@ class MaintenanceService:
         return record
 
     @staticmethod
+    def get_maintenance_history(db: Session, battery_id: int) -> list[MaintenanceRecord]:
+        """
+        Return maintenance records for a battery in reverse chronological order.
+        """
+        return db.exec(
+            select(MaintenanceRecord)
+            .where(MaintenanceRecord.entity_type == "battery")
+            .where(MaintenanceRecord.entity_id == battery_id)
+            .order_by(MaintenanceRecord.performed_at.desc())
+        ).all()
+
+    @staticmethod
+    def get_maintenance_schedule(db: Session, station_id: int) -> dict[str, Any]:
+        """
+        Build station maintenance dashboard payload:
+        - active schedules (upcoming / overdue)
+        - recent station maintenance history
+        """
+        station = db.get(Station, station_id)
+        if not station or station.is_deleted:
+            raise ValueError("Station not found")
+
+        now = datetime.utcnow()
+        schedules = MaintenanceService.list_schedules(db, entity_type="station", active_only=True)
+        upcoming: list[dict[str, Any]] = []
+        overdue: list[dict[str, Any]] = []
+
+        for schedule in schedules:
+            due_date = MaintenanceService.calculate_due_date(schedule)
+            item = {
+                "schedule_id": schedule.id,
+                "entity_type": schedule.entity_type,
+                "schedule_name": getattr(schedule, "schedule_name", None),
+                "model_name": getattr(schedule, "model_name", None),
+                "interval_days": schedule.interval_days,
+                "interval_cycles": schedule.interval_cycles,
+                "due_date": due_date,
+                "template_id": getattr(schedule, "template_id", None),
+            }
+            if due_date and due_date < now:
+                overdue.append(item)
+            else:
+                upcoming.append(item)
+
+        history = db.exec(
+            select(MaintenanceRecord)
+            .where(MaintenanceRecord.entity_type == "station")
+            .where(MaintenanceRecord.entity_id == station_id)
+            .order_by(MaintenanceRecord.performed_at.desc())
+            .limit(50)
+        ).all()
+
+        return {
+            "station_id": station_id,
+            "station_status": station.status,
+            "upcoming": sorted(upcoming, key=lambda x: x["due_date"] or datetime.max),
+            "overdue": sorted(overdue, key=lambda x: x["due_date"] or datetime.max),
+            "history": history,
+        }
+
+    @staticmethod
     def report_downtime(db: Session, station_id: int, reason: str):
         station = db.get(Station, station_id)
         if not station or station.is_deleted:

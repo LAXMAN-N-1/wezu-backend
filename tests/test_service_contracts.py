@@ -46,12 +46,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # ── Known dynamic-dispatch allowlist ───────────────────────────────────────
 # Methods that are dispatched dynamically or via getattr, or are known
 # pre-existing gaps tracked separately (P2+ scope). Skip them.
-ALLOWLIST: Set[Tuple[str, str]] = {
-    ("MaintenanceService", "get_maintenance_history"),   # batteries.py — P2 scope
-    ("MaintenanceService", "get_maintenance_schedule"),  # stations.py — P2 scope
-    ("DriverService", "get_driver_dashboard_stats"),     # logistics.py — P2 scope
-    ("AuthService", "create_session"),                   # passkeys.py — alias for create_user_session
-}
+ALLOWLIST: Set[Tuple[str, str]] = set()
 
 
 # ── AST helpers ────────────────────────────────────────────────────────────

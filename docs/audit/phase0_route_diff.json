@@ -1,0 +1,94 @@
+{
+  "generated_at": "2026-04-10T11:14:14.782133+00:00",
+  "baseline_file": "docs/audit/route_manifest.json",
+  "new_file": "docs/audit/phase0_route_manifest.json",
+  "added_count": 1,
+  "removed_count": 9,
+  "changed_count": 0,
+  "added": [
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/users",
+      "router_file": "app/api/v1/admin_users.py",
+      "function_name": "list_users",
+      "module": "app.api.v1.admin_users",
+      "mounted": true,
+      "candidate_mount_path": "/api/v1/admin/users",
+      "has_auth": true,
+      "does_direct_db": false,
+      "calls_service": false,
+      "calls_repository": false,
+      "response_model": "",
+      "lineno": 25
+    }
+  ],
+  "removed": [
+    {
+      "method": "GET",
+      "path": "/",
+      "handler": "app.main:root",
+      "tags": [
+        "System"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/.well-known/assetlinks.json",
+      "handler": "app.main:android_assetlinks",
+      "tags": []
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "handler": "app.main:health_check",
+      "tags": [
+        "System"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/live",
+      "handler": "app.main:live_check",
+      "tags": [
+        "System"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ready",
+      "handler": "app.main:readiness_check",
+      "tags": [
+        "System"
+      ]
+    },
+    {
+      "method": "HEAD",
+      "path": "/.well-known/assetlinks.json",
+      "handler": "app.main:android_assetlinks",
+      "tags": []
+    },
+    {
+      "method": "OPTIONS",
+      "path": "/{full_path:path}",
+      "handler": "app.main:global_options_handler",
+      "tags": []
+    },
+    {
+      "method": "POST",
+      "path": "/api/internal/hotspots/telematics/ingest",
+      "handler": "app.api.internal.hotspots:ingest_telematics_internal",
+      "tags": [
+        "Internal"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/webhooks/razorpay",
+      "handler": "app.api.webhooks.razorpay:razorpay_webhook_event",
+      "tags": [
+        "Webhooks"
+      ]
+    }
+  ],
+  "changed": []
+}

@@ -1,0 +1,3024 @@
+{
+  "generated_at": "2026-04-10T11:14:16.988964+00:00",
+  "total_models": 193,
+  "unowned_models": 0,
+  "rows": [
+    {
+      "model": "Address",
+      "model_module": "app.models.address",
+      "owned_by": "platform_core",
+      "imported_outside_domain_by": [
+        "app.api.v1.admin_rbac",
+        "app.api.v1.audit",
+        "app.api.v1.profile",
+        "app.api.v1.users",
+        "app.services.user_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.v1.profile",
+        "app.services.user_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "AdminGroup",
+      "model_module": "app.models.admin_group",
+      "owned_by": "admin_platform_ops",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "AdminUser",
+      "model_module": "app.models.admin_user",
+      "owned_by": "admin_platform_ops",
+      "imported_outside_domain_by": [
+        "app.api.v1.locations",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Alert",
+      "model_module": "app.models.alert",
+      "owned_by": "admin_platform_ops",
+      "imported_outside_domain_by": [
+        "app.db.seeds.seed_phase2",
+        "app.models.all",
+        "app.services.alert_service",
+        "app.services.battery_service",
+        "app.services.station_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_phase2",
+        "app.services.alert_service",
+        "app.services.station_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "ChurnPrediction",
+      "model_module": "app.models.analytics",
+      "owned_by": "admin_platform_ops",
+      "imported_outside_domain_by": [
+        "app.db.seeds.seed_analytics_data"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_analytics_data"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "DemandForecast",
+      "model_module": "app.models.analytics",
+      "owned_by": "admin_platform_ops",
+      "imported_outside_domain_by": [
+        "app.db.seeds.seed_analytics_data",
+        "app.services.forecasting_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_analytics_data",
+        "app.services.forecasting_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "PricingRecommendation",
+      "model_module": "app.models.analytics",
+      "owned_by": "admin_platform_ops",
+      "imported_outside_domain_by": [
+        "app.db.seeds.seed_analytics_data"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_analytics_data"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "AnalyticsActivityEvent",
+      "model_module": "app.models.analytics_dashboard",
+      "owned_by": "admin_platform_ops",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "AnalyticsReportJob",
+      "model_module": "app.models.analytics_dashboard",
+      "owned_by": "admin_platform_ops",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "ApiKeyConfig",
+      "model_module": "app.models.api_key",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.api.admin.settings",
+        "app.db.seeds.seed_modules",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.settings",
+        "app.db.seeds.seed_modules"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "AuditLog",
+      "model_module": "app.models.audit_log",
+      "owned_by": "admin_platform_ops",
+      "imported_outside_domain_by": [
+        "app.api.v1.dealer_portal_auth",
+        "app.api.v1.dealer_portal_roles",
+        "app.api.v1.dealer_portal_users",
+        "app.api.v1.users",
+        "app.core.audit",
+        "app.db.seeds.seed_modules",
+        "app.models.all",
+        "app.services.request_audit_queue",
+        "app.utils.audit_decorator",
+        "app.workers.monthly_jobs"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.v1.dealer_portal_auth",
+        "app.api.v1.dealer_portal_roles",
+        "app.api.v1.dealer_portal_users",
+        "app.api.v1.users",
+        "app.core.audit",
+        "app.db.seeds.seed_modules",
+        "app.services.request_audit_queue",
+        "app.utils.audit_decorator"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "SecurityEvent",
+      "model_module": "app.models.audit_log",
+      "owned_by": "admin_platform_ops",
+      "imported_outside_domain_by": [
+        "app.db.seeds.seed_modules",
+        "app.models.all",
+        "app.services.security_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_modules",
+        "app.services.security_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "Banner",
+      "model_module": "app.models.banner",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.api.admin.cms",
+        "app.api.v1.admin.banners",
+        "app.db.seeds.seed_cms",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_cms"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "BatchJob",
+      "model_module": "app.models.batch_job",
+      "owned_by": "admin_platform_ops",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.workers.daily_jobs"
+      ],
+      "mutated_outside_domain_by": [
+        "app.workers.daily_jobs"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "JobExecution",
+      "model_module": "app.models.batch_job",
+      "owned_by": "admin_platform_ops",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.workers.daily_jobs"
+      ],
+      "mutated_outside_domain_by": [
+        "app.workers.daily_jobs"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "Battery",
+      "model_module": "app.models.battery",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.admin.analytics",
+        "app.api.admin.batteries",
+        "app.api.admin.health",
+        "app.api.admin.iot",
+        "app.api.admin.main",
+        "app.api.admin.monitoring",
+        "app.api.admin.settings",
+        "app.api.admin.stock",
+        "app.api.v1.dashboard",
+        "app.api.v1.dealer_portal_customers",
+        "app.api.v1.manifests",
+        "app.api.v1.orders",
+        "app.api.v1.rentals",
+        "app.api.v1.swaps",
+        "app.api.v1.warehouse_structure",
+        "app.db.seed_stations",
+        "app.db.seeds.fast_seed_financial",
+        "app.db.seeds.seed_admin_analytics",
+        "app.db.seeds.seed_all",
+        "app.db.seeds.seed_analytics",
+        "app.db.seeds.seed_analytics_data",
+        "app.db.seeds.seed_batteries",
+        "app.db.seeds.seed_batteries_advanced",
+        "app.db.seeds.seed_battery_health",
+        "app.db.seeds.seed_catalog",
+        "app.db.seeds.seed_data",
+        "app.db.seeds.seed_full_db",
+        "app.db.seeds.seed_phase2",
+        "app.db.seeds.seed_production_data",
+        "app.db.seeds.sync_and_seed",
+        "app.ml.feature_store",
+        "app.ml.pipeline",
+        "app.models.all",
+        "app.models.manifest",
+        "app.models.rental",
+        "app.models.swap",
+        "app.repositories.analytics_dashboard_repository",
+        "app.services.admin_analytics_service",
+        "app.services.analytics.admin_service",
+        "app.services.analytics.customer_service",
+        "app.services.analytics.dealer_service",
+        "app.services.analytics.logistics_service",
+        "app.services.analytics_service",
+        "app.services.booking_service",
+        "app.services.bootstrap_service",
+        "app.services.dealer_analytics_service",
+        "app.services.dealer_station_service",
+        "app.services.inventory_service",
+        "app.services.logistics_service",
+        "app.services.mqtt_service",
+        "app.services.qr_service",
+        "app.services.rental_service",
+        "app.services.stock",
+        "app.services.swap_service",
+        "app.tasks.battery_health_monitor",
+        "app.tasks.charging_optimizer",
+        "app.workers.daily_jobs",
+        "app.workers.hourly_jobs",
+        "app.workers.realtime_jobs"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.batteries",
+        "app.api.v1.manifests",
+        "app.db.seed_stations",
+        "app.db.seeds.fast_seed_financial",
+        "app.db.seeds.seed_all",
+        "app.db.seeds.seed_analytics",
+        "app.db.seeds.seed_batteries",
+        "app.db.seeds.seed_batteries_advanced",
+        "app.db.seeds.seed_catalog",
+        "app.db.seeds.seed_data",
+        "app.db.seeds.seed_full_db",
+        "app.db.seeds.seed_production_data",
+        "app.db.seeds.sync_and_seed"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "BatteryAuditLog",
+      "model_module": "app.models.battery",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.admin.batteries",
+        "app.db.seeds.seed_batteries_advanced",
+        "app.db.seeds.sync_and_seed",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.batteries",
+        "app.db.seeds.seed_batteries_advanced"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "BatteryHealthHistory",
+      "model_module": "app.models.battery",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.admin.batteries",
+        "app.api.v1.dashboard",
+        "app.db.seeds.seed_batteries_advanced",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_batteries_advanced"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "BatteryLifecycleEvent",
+      "model_module": "app.models.battery",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.admin.batteries",
+        "app.api.v1.manifests",
+        "app.api.v1.orders",
+        "app.api.v1.swaps",
+        "app.db.seeds.sync_and_seed",
+        "app.models.all",
+        "app.repositories.analytics_dashboard_repository",
+        "app.services.analytics_dashboard_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.v1.manifests",
+        "app.api.v1.orders"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "BatteryBatch",
+      "model_module": "app.models.battery_catalog",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "BatteryCatalog",
+      "model_module": "app.models.battery_catalog",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.v1.rentals",
+        "app.db.seeds.seed_all",
+        "app.db.seeds.seed_catalog",
+        "app.db.seeds.seed_full_db",
+        "app.db.seeds.sync_and_seed",
+        "app.models.all",
+        "app.models.stock",
+        "app.services.rental_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_all",
+        "app.db.seeds.seed_catalog",
+        "app.db.seeds.seed_full_db",
+        "app.db.seeds.sync_and_seed"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "BatteryHealthAlert",
+      "model_module": "app.models.battery_health",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.admin.health",
+        "app.db.seeds.seed_battery_health",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.health",
+        "app.db.seeds.seed_battery_health"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "BatteryHealthSnapshot",
+      "model_module": "app.models.battery_health",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.admin.health",
+        "app.db.seeds.populate_analytics_data",
+        "app.db.seeds.seed_admin_analytics",
+        "app.db.seeds.seed_all",
+        "app.db.seeds.seed_battery_health",
+        "app.db.seeds.seed_catalog",
+        "app.db.seeds.sync_and_seed",
+        "app.models.all",
+        "app.services.analytics_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.health",
+        "app.db.seeds.seed_admin_analytics",
+        "app.db.seeds.seed_all",
+        "app.db.seeds.seed_battery_health",
+        "app.db.seeds.seed_catalog",
+        "app.db.seeds.sync_and_seed"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "BatteryMaintenanceSchedule",
+      "model_module": "app.models.battery_health",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.admin.health",
+        "app.db.seeds.seed_battery_health",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.health",
+        "app.db.seeds.seed_battery_health"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "BatteryHealthLog",
+      "model_module": "app.models.battery_health_log",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.workers.hourly_jobs",
+        "app.workers.monthly_jobs",
+        "app.workers.realtime_jobs"
+      ],
+      "mutated_outside_domain_by": [
+        "app.workers.realtime_jobs"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "BatteryReservation",
+      "model_module": "app.models.battery_reservation",
+      "owned_by": "customer_rental_swap",
+      "imported_outside_domain_by": [
+        "app.services.charging_service",
+        "app.services.demand_predictor"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "BessEnergyLog",
+      "model_module": "app.models.bess",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.admin.bess",
+        "app.db.seeds.seed_modules",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_modules"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "BessGridEvent",
+      "model_module": "app.models.bess",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.admin.bess",
+        "app.db.seeds.seed_modules",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_modules"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "BessReport",
+      "model_module": "app.models.bess",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.admin.bess",
+        "app.db.seeds.seed_modules",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_modules"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "BessUnit",
+      "model_module": "app.models.bess",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.admin.bess",
+        "app.db.seeds.seed_modules",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_modules"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "BiometricCredential",
+      "model_module": "app.models.biometric",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Blog",
+      "model_module": "app.models.blog",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.api.admin.cms",
+        "app.api.v1.admin.blogs",
+        "app.db.seeds.seed_cms",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_cms"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "BlogBase",
+      "model_module": "app.models.blog",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Branch",
+      "model_module": "app.models.branch",
+      "owned_by": "dealer_portal",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.models.warehouse"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "CartItem",
+      "model_module": "app.models.cart",
+      "owned_by": "customer_rental_swap",
+      "imported_outside_domain_by": [],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "CatalogOrder",
+      "model_module": "app.models.catalog",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.api.v1.payments",
+        "app.api.v1.purchases_enhanced",
+        "app.models.all",
+        "app.services.invoice_service",
+        "app.services.order_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.services.order_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "CatalogOrderItem",
+      "model_module": "app.models.catalog",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.services.invoice_service",
+        "app.services.order_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.services.order_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "CatalogProduct",
+      "model_module": "app.models.catalog",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.db.seed_ecommerce",
+        "app.db.seeds.seed_products",
+        "app.models.all",
+        "app.services.cart_service",
+        "app.services.catalog_service",
+        "app.services.order_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seed_ecommerce",
+        "app.db.seeds.seed_products",
+        "app.services.catalog_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "CatalogProductImage",
+      "model_module": "app.models.catalog",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.db.seed_ecommerce",
+        "app.db.seeds.seed_products",
+        "app.models.all",
+        "app.services.catalog_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seed_ecommerce",
+        "app.db.seeds.seed_products",
+        "app.services.catalog_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "CatalogProductVariant",
+      "model_module": "app.models.catalog",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.db.seed_ecommerce",
+        "app.models.all",
+        "app.services.cart_service",
+        "app.services.catalog_service",
+        "app.services.order_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seed_ecommerce",
+        "app.services.catalog_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "DeliveryEvent",
+      "model_module": "app.models.catalog",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.services.order_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.services.order_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "DeliveryTracking",
+      "model_module": "app.models.catalog",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.services.order_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.services.order_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "Chargeback",
+      "model_module": "app.models.chargeback",
+      "owned_by": "finance_wallet_payments",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "ChargingQueue",
+      "model_module": "app.models.charging_queue",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.tasks.charging_optimizer"
+      ],
+      "mutated_outside_domain_by": [
+        "app.tasks.charging_optimizer"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "CommissionConfig",
+      "model_module": "app.models.commission",
+      "owned_by": "finance_wallet_payments",
+      "imported_outside_domain_by": [
+        "app.api.admin.dealers",
+        "app.api.v1.admin_dealers",
+        "app.api.v1.dealer_commission",
+        "app.db.seeds.fast_seed_financial",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.dealers",
+        "app.api.v1.admin_dealers",
+        "app.api.v1.dealer_commission",
+        "app.db.seeds.fast_seed_financial"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "CommissionLog",
+      "model_module": "app.models.commission",
+      "owned_by": "finance_wallet_payments",
+      "imported_outside_domain_by": [
+        "app.api.admin.dealers",
+        "app.api.v1.admin.dealers",
+        "app.api.v1.admin_dealers",
+        "app.api.v1.dealer_portal_dashboard",
+        "app.models.all",
+        "app.services.dealer_analytics_service",
+        "app.services.dealer_ledger_service",
+        "app.services.dealer_service",
+        "app.workers.daily_jobs"
+      ],
+      "mutated_outside_domain_by": [
+        "app.workers.daily_jobs"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "CommissionTier",
+      "model_module": "app.models.commission",
+      "owned_by": "finance_wallet_payments",
+      "imported_outside_domain_by": [
+        "app.api.v1.dealer_commission",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.v1.dealer_commission"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "DealerApplication",
+      "model_module": "app.models.dealer",
+      "owned_by": "dealer_portal",
+      "imported_outside_domain_by": [
+        "app.api.admin.dealers",
+        "app.api.v1.admin.dealers",
+        "app.api.v1.admin_dealers",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.dealers",
+        "app.api.v1.admin_dealers"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "DealerDocument",
+      "model_module": "app.models.dealer",
+      "owned_by": "dealer_portal",
+      "imported_outside_domain_by": [
+        "app.api.admin.dealers",
+        "app.api.v1.admin_dealers"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "DealerProfile",
+      "model_module": "app.models.dealer",
+      "owned_by": "dealer_portal",
+      "imported_outside_domain_by": [
+        "app.api.admin.dealers",
+        "app.api.admin.finance",
+        "app.api.v1.admin.dealers",
+        "app.api.v1.admin_dealers",
+        "app.db.seed_stations",
+        "app.db.seeds.fast_seed_financial",
+        "app.db.seeds.seed_analytics",
+        "app.db.seeds.seed_dealer_data",
+        "app.db.seeds.seed_full_db",
+        "app.db.seeds.seed_phase2",
+        "app.db.seeds.seed_test_dealer",
+        "app.models.all",
+        "app.models.station",
+        "app.models.user",
+        "app.services.admin_analytics_service",
+        "app.services.analytics.admin_service",
+        "app.services.analytics_service",
+        "app.services.settlement_service",
+        "app.workers.daily_jobs",
+        "app.workers.hourly_jobs",
+        "app.workers.monthly_jobs"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.dealers",
+        "app.api.v1.admin_dealers",
+        "app.db.seed_stations",
+        "app.db.seeds.fast_seed_financial",
+        "app.db.seeds.seed_analytics",
+        "app.db.seeds.seed_test_dealer"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "FieldVisit",
+      "model_module": "app.models.dealer",
+      "owned_by": "dealer_portal",
+      "imported_outside_domain_by": [
+        "app.api.admin.dealers",
+        "app.api.v1.admin.dealers",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "DealerInventory",
+      "model_module": "app.models.dealer_inventory",
+      "owned_by": "dealer_portal",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.workers.daily_jobs",
+        "app.workers.hourly_jobs"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "InventoryTransaction",
+      "model_module": "app.models.dealer_inventory",
+      "owned_by": "dealer_portal",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "DealerKYCApplication",
+      "model_module": "app.models.dealer_kyc",
+      "owned_by": "kyc_fraud_compliance",
+      "imported_outside_domain_by": [
+        "app.api.v1.dealer_kyc",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "KYCStateTransition",
+      "model_module": "app.models.dealer_kyc",
+      "owned_by": "kyc_fraud_compliance",
+      "imported_outside_domain_by": [
+        "app.api.v1.dealer_kyc",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "DealerPromotion",
+      "model_module": "app.models.dealer_promotion",
+      "owned_by": "dealer_portal",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.services.campaign_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.services.campaign_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "PromotionUsage",
+      "model_module": "app.models.dealer_promotion",
+      "owned_by": "dealer_portal",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.services.campaign_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.services.campaign_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "DeliveryAssignment",
+      "model_module": "app.models.delivery_assignment",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.db.seeds.seed_phase2",
+        "app.models.all",
+        "app.models.return_request"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_phase2"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "DeliveryRoute",
+      "model_module": "app.models.delivery_route",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.api.admin.logistics",
+        "app.db.seeds.seed_phase2",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_phase2"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "RouteStop",
+      "model_module": "app.models.delivery_route",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.api.admin.logistics",
+        "app.db.seeds.seed_phase2",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_phase2"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "Device",
+      "model_module": "app.models.device",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.api.v1.notifications_enhanced",
+        "app.db.seeds.seed_full_db",
+        "app.models.all",
+        "app.services.notification_service",
+        "app.workers.realtime_jobs"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.v1.notifications_enhanced"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "DeviceFingerprint",
+      "model_module": "app.models.device_fingerprint",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.api.admin.fraud",
+        "app.api.v1.fraud",
+        "app.models.all",
+        "app.services.fraud_service",
+        "app.services.ml_fraud_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.v1.fraud"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "DuplicateAccount",
+      "model_module": "app.models.device_fingerprint",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.api.admin.fraud",
+        "app.api.v1.fraud",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.v1.fraud"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "DriverProfile",
+      "model_module": "app.models.driver_profile",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.api.admin.logistics",
+        "app.api.v1.drivers",
+        "app.api.v1.logistics",
+        "app.api.v1.orders",
+        "app.db.seeds.seed_full_db",
+        "app.db.seeds.seed_phase2",
+        "app.models.all",
+        "app.models.delivery_assignment",
+        "app.models.order",
+        "app.services.bootstrap_service",
+        "app.services.driver_service",
+        "app.services.logistics_service",
+        "app.services.route_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_phase2",
+        "app.services.driver_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "EcommerceOrder",
+      "model_module": "app.models.ecommerce",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.db.seeds.seed_phase2",
+        "app.models.all",
+        "app.services.ecommerce_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_phase2",
+        "app.services.ecommerce_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "EcommerceOrderItem",
+      "model_module": "app.models.ecommerce",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.services.ecommerce_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.services.ecommerce_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "EcommerceProduct",
+      "model_module": "app.models.ecommerce",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.db.seeds.seed_data",
+        "app.db.seeds.seed_phase2",
+        "app.models.all",
+        "app.services.ecommerce_service"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "FAQ",
+      "model_module": "app.models.faq",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.api.admin.cms",
+        "app.api.admin.support",
+        "app.api.v1.admin.faqs",
+        "app.db.seeds.seed_cms",
+        "app.db.seeds.seed_support",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.support",
+        "app.db.seeds.seed_cms",
+        "app.db.seeds.seed_support"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "Favorite",
+      "model_module": "app.models.favorite",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.api.v1.stations",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.v1.stations"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "Feedback",
+      "model_module": "app.models.feedback",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Transaction",
+      "model_module": "app.models.financial",
+      "owned_by": "finance_wallet_payments",
+      "imported_outside_domain_by": [
+        "app.api.admin.analytics",
+        "app.api.admin.finance",
+        "app.api.admin.monitoring",
+        "app.api.v1.admin_invoices",
+        "app.api.v1.analytics",
+        "app.api.v1.analytics_enhanced",
+        "app.api.v1.bookings",
+        "app.api.v1.dashboard",
+        "app.api.v1.orders",
+        "app.api.v1.swaps",
+        "app.api.webhooks.razorpay",
+        "app.db.seeds.fast_seed_financial",
+        "app.db.seeds.populate_analytics_data",
+        "app.db.seeds.seed_admin_analytics",
+        "app.db.seeds.seed_full_db",
+        "app.db.seeds.seed_phase2",
+        "app.ml.feature_store",
+        "app.models.all",
+        "app.models.rental",
+        "app.services.analytics.customer_service",
+        "app.services.analytics_service",
+        "app.services.dealer_ledger_service",
+        "app.services.late_fee_service",
+        "app.workers.daily_jobs",
+        "app.workers.monthly_jobs"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.v1.bookings",
+        "app.api.v1.orders",
+        "app.api.v1.swaps",
+        "app.db.seeds.fast_seed_financial",
+        "app.db.seeds.seed_admin_analytics",
+        "app.db.seeds.seed_phase2",
+        "app.services.late_fee_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "Wallet",
+      "model_module": "app.models.financial",
+      "owned_by": "finance_wallet_payments",
+      "imported_outside_domain_by": [
+        "app.api.v1.bookings",
+        "app.api.v1.swaps",
+        "app.db.seeds.fast_seed_financial",
+        "app.db.seeds.seed_admin_analytics",
+        "app.db.seeds.seed_full_db",
+        "app.db.seeds.seed_production_data",
+        "app.models.all",
+        "app.models.user",
+        "app.services.analytics.customer_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.v1.bookings",
+        "app.db.seeds.fast_seed_financial",
+        "app.db.seeds.seed_admin_analytics",
+        "app.db.seeds.seed_full_db",
+        "app.db.seeds.seed_production_data"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "WalletWithdrawalRequest",
+      "model_module": "app.models.financial",
+      "owned_by": "finance_wallet_payments",
+      "imported_outside_domain_by": [
+        "app.api.admin.finance",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Blacklist",
+      "model_module": "app.models.fraud",
+      "owned_by": "kyc_fraud_compliance",
+      "imported_outside_domain_by": [
+        "app.api.admin.fraud",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.fraud"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "FraudCheckLog",
+      "model_module": "app.models.fraud",
+      "owned_by": "kyc_fraud_compliance",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.workers.daily_jobs"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "RiskScore",
+      "model_module": "app.models.fraud",
+      "owned_by": "kyc_fraud_compliance",
+      "imported_outside_domain_by": [
+        "app.api.admin.fraud",
+        "app.models.all",
+        "app.workers.daily_jobs"
+      ],
+      "mutated_outside_domain_by": [
+        "app.workers.daily_jobs"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "Geofence",
+      "model_module": "app.models.geofence",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.api.admin.iot",
+        "app.api.v1.telemetry",
+        "app.db.seeds.seed_phase2",
+        "app.models.all",
+        "app.workers.hourly_jobs"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_phase2"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "GPSTrackingLog",
+      "model_module": "app.models.gps_log",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.services.iot_service",
+        "app.workers.hourly_jobs",
+        "app.workers.monthly_jobs",
+        "app.workers.realtime_jobs"
+      ],
+      "mutated_outside_domain_by": [
+        "app.workers.realtime_jobs"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "Translation",
+      "model_module": "app.models.i18n",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "IdempotencyKey",
+      "model_module": "app.models.idempotency",
+      "owned_by": "platform_core",
+      "imported_outside_domain_by": [
+        "app.services.idempotency_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.services.idempotency_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "InventoryTransfer",
+      "model_module": "app.models.inventory",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.repositories.analytics_dashboard_repository",
+        "app.services.analytics_dashboard_service",
+        "app.services.battery_consistency",
+        "app.services.bootstrap_service"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "InventoryTransferItem",
+      "model_module": "app.models.inventory",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.repositories.analytics_dashboard_repository",
+        "app.services.battery_consistency"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "StockDiscrepancy",
+      "model_module": "app.models.inventory",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.repositories.analytics_dashboard_repository",
+        "app.services.analytics_dashboard_service"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "InventoryAuditLog",
+      "model_module": "app.models.inventory_audit",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.api.admin.audit_trails"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Invoice",
+      "model_module": "app.models.invoice",
+      "owned_by": "finance_wallet_payments",
+      "imported_outside_domain_by": [
+        "app.api.admin.finance",
+        "app.api.v1.admin_invoices",
+        "app.db.seeds.fast_seed_financial",
+        "app.db.seeds.seed_phase2",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.fast_seed_financial",
+        "app.db.seeds.seed_phase2"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "DeviceCommand",
+      "model_module": "app.models.iot",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.admin.iot",
+        "app.db.seeds.seed_phase2",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.iot",
+        "app.db.seeds.seed_phase2"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "FirmwareUpdate",
+      "model_module": "app.models.iot",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "IoTDevice",
+      "model_module": "app.models.iot",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.admin.iot",
+        "app.db.seeds.seed_phase2",
+        "app.models.all",
+        "app.workers.hourly_jobs",
+        "app.workers.realtime_jobs"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_phase2"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "KYCDocument",
+      "model_module": "app.models.kyc",
+      "owned_by": "kyc_fraud_compliance",
+      "imported_outside_domain_by": [
+        "app.api.admin.kyc_admin",
+        "app.api.admin.main",
+        "app.api.v1.admin_kyc",
+        "app.api.v1.users",
+        "app.models.all",
+        "app.models.user",
+        "app.services.analytics.dealer_service"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "KYCRecord",
+      "model_module": "app.models.kyc",
+      "owned_by": "kyc_fraud_compliance",
+      "imported_outside_domain_by": [
+        "app.db.seeds.seed_admin_analytics",
+        "app.models.all",
+        "app.models.user",
+        "app.services.analytics_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_admin_analytics"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "KYCRequest",
+      "model_module": "app.models.kyc",
+      "owned_by": "kyc_fraud_compliance",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "LateFee",
+      "model_module": "app.models.late_fee",
+      "owned_by": "customer_rental_swap",
+      "imported_outside_domain_by": [
+        "app.api.admin.rentals",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "LateFeeWaiver",
+      "model_module": "app.models.late_fee",
+      "owned_by": "customer_rental_swap",
+      "imported_outside_domain_by": [
+        "app.api.admin.rentals",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "LegalDocument",
+      "model_module": "app.models.legal",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.api.admin.cms",
+        "app.api.v1.admin.legal",
+        "app.db.seeds.seed_cms",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_cms"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "City",
+      "model_module": "app.models.location",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.db.seeds.seed_all",
+        "app.db.seeds.sync_and_seed",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_all",
+        "app.db.seeds.sync_and_seed"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "Continent",
+      "model_module": "app.models.location",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.db.seeds.seed_all",
+        "app.db.seeds.sync_and_seed",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_all",
+        "app.db.seeds.sync_and_seed"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "Country",
+      "model_module": "app.models.location",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.db.seeds.seed_all",
+        "app.db.seeds.sync_and_seed",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_all",
+        "app.db.seeds.sync_and_seed"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "Region",
+      "model_module": "app.models.location",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.db.seeds.seed_all",
+        "app.db.seeds.sync_and_seed",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_all",
+        "app.db.seeds.sync_and_seed"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "Zone",
+      "model_module": "app.models.location",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.db.seeds.seed_all",
+        "app.db.seeds.sync_and_seed",
+        "app.models.all",
+        "app.models.vendor"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_all",
+        "app.db.seeds.sync_and_seed"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "LoginHistory",
+      "model_module": "app.models.login_history",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "BatteryTransfer",
+      "model_module": "app.models.logistics",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.models.battery",
+        "app.services.analytics.admin_service"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "DeliveryOrder",
+      "model_module": "app.models.logistics",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.api.admin.logistics",
+        "app.db.seeds.seed_phase2",
+        "app.models.all",
+        "app.models.return_request"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.logistics",
+        "app.db.seeds.seed_phase2"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "LogisticsManifest",
+      "model_module": "app.models.logistics",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "MaintenanceRecord",
+      "model_module": "app.models.maintenance",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.admin.stations",
+        "app.api.v1.dealer_stations",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.stations"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "MaintenanceSchedule",
+      "model_module": "app.models.maintenance",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "StationDowntime",
+      "model_module": "app.models.maintenance",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.admin.stations",
+        "app.models.all",
+        "app.services.dealer_station_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.services.dealer_station_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "MaintenanceChecklistSubmission",
+      "model_module": "app.models.maintenance_checklist",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.admin.stations",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.stations"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "MaintenanceChecklistTemplate",
+      "model_module": "app.models.maintenance_checklist",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.admin.stations",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.stations"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "Manifest",
+      "model_module": "app.models.manifest",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "ManifestItem",
+      "model_module": "app.models.manifest",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "MediaAsset",
+      "model_module": "app.models.media",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.api.admin.cms",
+        "app.api.v1.admin.media",
+        "app.db.seeds.seed_cms",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.cms",
+        "app.api.v1.admin.media",
+        "app.db.seeds.seed_cms"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "UserMembership",
+      "model_module": "app.models.membership",
+      "owned_by": "customer_rental_swap",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Menu",
+      "model_module": "app.models.menu",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Notification",
+      "model_module": "app.models.notification",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.api.v1.dealer_portal_dashboard",
+        "app.api.v1.dealer_portal_settings",
+        "app.models.all",
+        "app.services.workflow_automation_service",
+        "app.workers.realtime_jobs"
+      ],
+      "mutated_outside_domain_by": [
+        "app.workers.realtime_jobs"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "AutomatedTrigger",
+      "model_module": "app.models.notification_admin",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.api.admin.notifications",
+        "app.db.seeds.seed_modules",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_modules"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "NotificationConfig",
+      "model_module": "app.models.notification_admin",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.api.admin.notifications",
+        "app.db.seeds.seed_modules",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_modules"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "NotificationLog",
+      "model_module": "app.models.notification_admin",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.api.admin.notifications",
+        "app.db.seeds.seed_modules",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_modules"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "PushCampaign",
+      "model_module": "app.models.notification_admin",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.api.admin.notifications",
+        "app.db.seeds.seed_modules",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_modules"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "NotificationOutbox",
+      "model_module": "app.models.notification_outbox",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "NotificationPreference",
+      "model_module": "app.models.notification_preference",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.api.v1.dealer_portal_settings",
+        "app.api.v1.profile",
+        "app.api.v1.users",
+        "app.models.all",
+        "app.models.user"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.v1.dealer_portal_settings",
+        "app.api.v1.profile",
+        "app.api.v1.users"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "BlacklistedToken",
+      "model_module": "app.models.oauth",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.api.deps",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Order",
+      "model_module": "app.models.order",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.repositories.analytics_dashboard_repository",
+        "app.services.analytics_dashboard_service",
+        "app.services.battery_consistency",
+        "app.services.bootstrap_service"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "OrderBattery",
+      "model_module": "app.models.order",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.services.battery_consistency"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "OrderRealtimeOutbox",
+      "model_module": "app.models.order_realtime_outbox",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Organization",
+      "model_module": "app.models.organization",
+      "owned_by": "dealer_portal",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "OrganizationSocialLink",
+      "model_module": "app.models.organization",
+      "owned_by": "dealer_portal",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "OTP",
+      "model_module": "app.models.otp",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.services.fraud_service"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "PasskeyChallenge",
+      "model_module": "app.models.passkey",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "PasskeyCredential",
+      "model_module": "app.models.passkey",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "PasswordHistory",
+      "model_module": "app.models.password_history",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "PaymentTransaction",
+      "model_module": "app.models.payment",
+      "owned_by": "finance_wallet_payments",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.services.rental_service",
+        "app.workers.monthly_jobs",
+        "app.workers.realtime_jobs"
+      ],
+      "mutated_outside_domain_by": [
+        "app.services.rental_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "PaymentMethod",
+      "model_module": "app.models.payment_method",
+      "owned_by": "finance_wallet_payments",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "PromoCode",
+      "model_module": "app.models.promo_code",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.api.v1.admin.promo",
+        "app.models.all",
+        "app.services.rental_service"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "AdminUserRole",
+      "model_module": "app.models.rbac",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.api.v1.admin_rbac",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Permission",
+      "model_module": "app.models.rbac",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.api.v1.admin_rbac",
+        "app.api.v1.admin_roles",
+        "app.api.v1.audit",
+        "app.api.v1.dealer_portal_roles",
+        "app.db.seeds.seed_full_db",
+        "app.db.seeds.seed_production_data",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Role",
+      "model_module": "app.models.rbac",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.api.admin.users",
+        "app.api.v1.admin.roles",
+        "app.api.v1.admin.users",
+        "app.api.v1.admin_rbac",
+        "app.api.v1.admin_roles",
+        "app.api.v1.admin_user_bulk",
+        "app.api.v1.dealer_portal_auth",
+        "app.api.v1.dealer_portal_roles",
+        "app.api.v1.dealer_portal_users",
+        "app.api.v1.drivers",
+        "app.controllers.auth_controller",
+        "app.db.initial_data",
+        "app.db.seeds.seed_full_db",
+        "app.db.seeds.seed_production_data",
+        "app.models.all",
+        "app.services.dealer_service",
+        "app.services.support_service",
+        "app.services.workflow_automation_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.v1.admin.roles",
+        "app.api.v1.admin_rbac",
+        "app.api.v1.admin_roles",
+        "app.api.v1.dealer_portal_roles",
+        "app.db.initial_data",
+        "app.db.seeds.seed_full_db"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "RolePermission",
+      "model_module": "app.models.rbac",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.api.v1.admin_rbac",
+        "app.api.v1.dealer_portal_roles",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.v1.admin_rbac",
+        "app.api.v1.dealer_portal_roles"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "UserAccessPath",
+      "model_module": "app.models.rbac",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.api.v1.admin_rbac",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.v1.admin_rbac"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "UserRole",
+      "model_module": "app.models.rbac",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.api.v1.admin_rbac",
+        "app.api.v1.admin_roles",
+        "app.api.v1.admin_user_bulk",
+        "app.api.v1.dealer_portal_roles",
+        "app.api.v1.drivers",
+        "app.db.seeds.seed_full_db",
+        "app.models.all",
+        "app.services.analytics.admin_service",
+        "app.services.dealer_service",
+        "app.services.support_service",
+        "app.services.workflow_automation_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.v1.admin_rbac",
+        "app.api.v1.admin_user_bulk",
+        "app.api.v1.drivers",
+        "app.services.dealer_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "Referral",
+      "model_module": "app.models.referral",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Refund",
+      "model_module": "app.models.refund",
+      "owned_by": "finance_wallet_payments",
+      "imported_outside_domain_by": [
+        "app.api.admin.finance",
+        "app.api.v1.orders",
+        "app.api.webhooks.razorpay",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.finance",
+        "app.api.v1.orders"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "Purchase",
+      "model_module": "app.models.rental",
+      "owned_by": "customer_rental_swap",
+      "imported_outside_domain_by": [
+        "app.api.admin.rentals",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Rental",
+      "model_module": "app.models.rental",
+      "owned_by": "customer_rental_swap",
+      "imported_outside_domain_by": [
+        "app.api.admin.main",
+        "app.api.admin.monitoring",
+        "app.api.admin.rentals",
+        "app.api.admin.settings",
+        "app.api.v1.analytics",
+        "app.api.v1.analytics_enhanced",
+        "app.api.v1.dashboard",
+        "app.api.v1.dealer_portal_customers",
+        "app.api.v1.dealer_portal_dashboard",
+        "app.api.v1.dealer_stations",
+        "app.api.v1.location",
+        "app.api.v1.payments",
+        "app.api.v1.telemetry",
+        "app.db.seeds.populate_analytics_data",
+        "app.db.seeds.seed_admin_analytics",
+        "app.db.seeds.seed_all",
+        "app.db.seeds.seed_analytics",
+        "app.db.seeds.sync_and_seed",
+        "app.ml.feature_store",
+        "app.models.all",
+        "app.models.battery",
+        "app.models.financial",
+        "app.services.admin_analytics_service",
+        "app.services.analytics.admin_service",
+        "app.services.analytics.customer_service",
+        "app.services.analytics.dealer_service",
+        "app.services.analytics_service",
+        "app.services.battery_service",
+        "app.services.dealer_analytics_service",
+        "app.services.dealer_ledger_service",
+        "app.services.dealer_service",
+        "app.services.gps_service",
+        "app.services.invoice_service",
+        "app.services.iot_service",
+        "app.services.ml_fraud_service",
+        "app.services.station_metrics_service",
+        "app.services.station_service",
+        "app.workers.daily_jobs",
+        "app.workers.hourly_jobs",
+        "app.workers.realtime_jobs",
+        "app.workers.rental_worker"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_admin_analytics",
+        "app.db.seeds.seed_all",
+        "app.db.seeds.seed_analytics",
+        "app.db.seeds.sync_and_seed"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "RentalEvent",
+      "model_module": "app.models.rental_event",
+      "owned_by": "customer_rental_swap",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.workers.monthly_jobs"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "RentalExtension",
+      "model_module": "app.models.rental_modification",
+      "owned_by": "customer_rental_swap",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "RentalPause",
+      "model_module": "app.models.rental_modification",
+      "owned_by": "customer_rental_swap",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "ReturnInspection",
+      "model_module": "app.models.return_request",
+      "owned_by": "customer_rental_swap",
+      "imported_outside_domain_by": [],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "ReturnRequest",
+      "model_module": "app.models.return_request",
+      "owned_by": "customer_rental_swap",
+      "imported_outside_domain_by": [
+        "app.api.admin.logistics",
+        "app.api.v1.logistics",
+        "app.db.seeds.seed_phase2",
+        "app.models.all",
+        "app.models.delivery_assignment",
+        "app.models.logistics",
+        "app.services.logistics_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_phase2",
+        "app.services.logistics_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "RevenueReport",
+      "model_module": "app.models.revenue_report",
+      "owned_by": "admin_platform_ops",
+      "imported_outside_domain_by": [
+        "app.db.seeds.fast_seed_financial",
+        "app.models.all",
+        "app.services.financial_report_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.fast_seed_financial",
+        "app.services.financial_report_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "Review",
+      "model_module": "app.models.review",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.models.all",
+        "app.models.station",
+        "app.services.analytics.dealer_service",
+        "app.services.dealer_analytics_service"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "RoleRight",
+      "model_module": "app.models.role_right",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.api.deps",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "SearchHistory",
+      "model_module": "app.models.search_history",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "SecurityQuestion",
+      "model_module": "app.models.security_question",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "UserSecurityQuestion",
+      "model_module": "app.models.security_question",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "UserSession",
+      "model_module": "app.models.session",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.api.deps",
+        "app.api.v1.admin_rbac",
+        "app.api.v1.admin_users",
+        "app.api.v1.dealer_portal_users",
+        "app.db.seed_ecommerce",
+        "app.db.seed_stations",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Settlement",
+      "model_module": "app.models.settlement",
+      "owned_by": "finance_wallet_payments",
+      "imported_outside_domain_by": [
+        "app.api.admin.finance",
+        "app.api.v1.dealer_commission",
+        "app.api.v1.dealers",
+        "app.db.seeds.fast_seed_financial",
+        "app.db.seeds.seed_phase2",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.fast_seed_financial",
+        "app.db.seeds.seed_phase2"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "SettlementDispute",
+      "model_module": "app.models.settlement_dispute",
+      "owned_by": "finance_wallet_payments",
+      "imported_outside_domain_by": [
+        "app.api.v1.dealer_commission",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "StaffProfile",
+      "model_module": "app.models.staff",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.db.seed_ecommerce",
+        "app.db.seed_stations",
+        "app.db.seeds.seed_data",
+        "app.db.seeds.seed_full_db",
+        "app.models.all",
+        "app.models.dealer"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Station",
+      "model_module": "app.models.station",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.admin.analytics",
+        "app.api.admin.iot",
+        "app.api.admin.main",
+        "app.api.admin.monitoring",
+        "app.api.admin.settings",
+        "app.api.admin.stations",
+        "app.api.admin.stock",
+        "app.api.v1.admin_dealers",
+        "app.api.v1.admin_stations",
+        "app.api.v1.bookings",
+        "app.api.v1.dashboard",
+        "app.api.v1.dealer_portal_customers",
+        "app.api.v1.dealer_portal_dashboard",
+        "app.api.v1.dealer_stations",
+        "app.api.v1.dealers",
+        "app.api.v1.favorites",
+        "app.api.v1.inventory",
+        "app.api.v1.settlements",
+        "app.api.v1.swaps",
+        "app.db.seed_stations",
+        "app.db.seeds.fast_seed_financial",
+        "app.db.seeds.seed_admin_analytics",
+        "app.db.seeds.seed_all",
+        "app.db.seeds.seed_analytics",
+        "app.db.seeds.seed_analytics_data",
+        "app.db.seeds.seed_batteries_advanced",
+        "app.db.seeds.seed_data",
+        "app.db.seeds.seed_full_db",
+        "app.db.seeds.seed_phase2",
+        "app.db.seeds.seed_production_data",
+        "app.db.seeds.sync_and_seed",
+        "app.models.alert",
+        "app.models.all",
+        "app.models.dealer",
+        "app.models.rental",
+        "app.models.swap",
+        "app.repositories.analytics_dashboard_repository",
+        "app.services.admin_analytics_service",
+        "app.services.alert_service",
+        "app.services.analytics.admin_service",
+        "app.services.analytics.dealer_service",
+        "app.services.analytics_service",
+        "app.services.booking_service",
+        "app.services.bootstrap_service",
+        "app.services.campaign_service",
+        "app.services.dealer_analytics_service",
+        "app.services.dealer_ledger_service",
+        "app.services.dealer_service",
+        "app.services.dealer_station_service",
+        "app.services.forecasting_service",
+        "app.services.logistics_service",
+        "app.services.ml_fraud_service",
+        "app.services.settlement_service",
+        "app.services.swap_service",
+        "app.tasks.charging_optimizer",
+        "app.tasks.station_monitor",
+        "app.workers.daily_jobs"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.stations",
+        "app.db.seed_stations",
+        "app.db.seeds.fast_seed_financial",
+        "app.db.seeds.seed_all",
+        "app.db.seeds.seed_analytics",
+        "app.db.seeds.seed_data",
+        "app.db.seeds.seed_full_db",
+        "app.db.seeds.seed_production_data",
+        "app.db.seeds.sync_and_seed",
+        "app.services.dealer_station_service"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "StationImage",
+      "model_module": "app.models.station",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.db.seed_stations",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seed_stations"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "StationSlot",
+      "model_module": "app.models.station",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.admin.stations",
+        "app.api.v1.dealer_stations",
+        "app.api.v1.favorites",
+        "app.api.v1.inventory",
+        "app.db.seed_stations",
+        "app.db.seeds.seed_all",
+        "app.db.seeds.seed_production_data",
+        "app.db.seeds.sync_and_seed",
+        "app.models.all",
+        "app.services.analytics_service",
+        "app.services.dealer_analytics_service",
+        "app.services.dealer_station_service",
+        "app.services.logistics_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seed_stations",
+        "app.db.seeds.seed_all",
+        "app.db.seeds.seed_production_data",
+        "app.db.seeds.sync_and_seed"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "StationHeartbeat",
+      "model_module": "app.models.station_heartbeat",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.v1.admin_stations",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "StationDailyMetric",
+      "model_module": "app.models.station_metrics",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "ReorderRequest",
+      "model_module": "app.models.station_stock",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.api.admin.stock",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.stock"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "StationStockConfig",
+      "model_module": "app.models.station_stock",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.api.admin.stock",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.stock"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "StockAlertDismissal",
+      "model_module": "app.models.station_stock",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.api.admin.stock",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.stock"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "Stock",
+      "model_module": "app.models.stock",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "StockMovement",
+      "model_module": "app.models.stock_movement",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "AutoResponse",
+      "model_module": "app.models.support",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "ChatMessage",
+      "model_module": "app.models.support",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "ChatSession",
+      "model_module": "app.models.support",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "SupportTicket",
+      "model_module": "app.models.support",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.api.admin.support",
+        "app.api.v1.admin.support",
+        "app.api.v1.dealer_portal_dashboard",
+        "app.api.v1.dealer_portal_tickets",
+        "app.api.v1.purchases_enhanced",
+        "app.api.v1.rentals_enhanced",
+        "app.db.seeds.populate_analytics_data",
+        "app.db.seeds.seed_admin_analytics",
+        "app.db.seeds.seed_analytics",
+        "app.db.seeds.seed_support",
+        "app.models.all",
+        "app.services.admin_analytics_service",
+        "app.services.analytics.admin_service",
+        "app.services.analytics_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.v1.dealer_portal_tickets",
+        "app.api.v1.purchases_enhanced",
+        "app.api.v1.rentals_enhanced",
+        "app.db.seeds.seed_admin_analytics",
+        "app.db.seeds.seed_analytics",
+        "app.db.seeds.seed_support"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "TicketMessage",
+      "model_module": "app.models.support",
+      "owned_by": "comms_content_engagement",
+      "imported_outside_domain_by": [
+        "app.api.admin.support",
+        "app.api.v1.dealer_portal_tickets",
+        "app.api.v1.purchases_enhanced",
+        "app.api.v1.rentals_enhanced",
+        "app.db.seeds.seed_support"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.support",
+        "app.api.v1.dealer_portal_tickets",
+        "app.api.v1.purchases_enhanced",
+        "app.api.v1.rentals_enhanced",
+        "app.db.seeds.seed_support"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "SwapSession",
+      "model_module": "app.models.swap",
+      "owned_by": "customer_rental_swap",
+      "imported_outside_domain_by": [
+        "app.api.admin.analytics",
+        "app.api.admin.rentals",
+        "app.api.v1.settlements",
+        "app.db.seeds.fast_seed_financial",
+        "app.db.seeds.seed_analytics_data",
+        "app.ml.feature_store",
+        "app.ml.pipeline",
+        "app.models.all",
+        "app.services.analytics.dealer_service",
+        "app.services.dealer_analytics_service",
+        "app.services.forecasting_service",
+        "app.services.ml_service",
+        "app.services.settlement_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.fast_seed_financial",
+        "app.db.seeds.seed_analytics_data"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "SwapPreference",
+      "model_module": "app.models.swap_suggestion",
+      "owned_by": "customer_rental_swap",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "SwapSuggestion",
+      "model_module": "app.models.swap_suggestion",
+      "owned_by": "customer_rental_swap",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "FeatureFlag",
+      "model_module": "app.models.system",
+      "owned_by": "admin_platform_ops",
+      "imported_outside_domain_by": [
+        "app.db.seeds.seed_modules",
+        "app.models.all",
+        "app.services.feature_flag_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_modules"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "SystemConfig",
+      "model_module": "app.models.system",
+      "owned_by": "admin_platform_ops",
+      "imported_outside_domain_by": [
+        "app.db.seeds.seed_modules",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_modules"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "TelemeticsData",
+      "model_module": "app.models.telematics",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Telemetry",
+      "model_module": "app.models.telemetry",
+      "owned_by": "iot_telematics_system",
+      "imported_outside_domain_by": [
+        "app.api.admin.iot",
+        "app.db.seeds.seed_analytics_data",
+        "app.db.seeds.seed_phase2",
+        "app.ml.feature_store",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_analytics_data",
+        "app.db.seeds.seed_phase2"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "SessionToken",
+      "model_module": "app.models.token",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "TwoFactorAuth",
+      "model_module": "app.models.two_factor_auth",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.api.v1.security",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.v1.security"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "User",
+      "model_module": "app.models.user",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.api.admin.analytics",
+        "app.api.admin.audit_trails",
+        "app.api.admin.batteries",
+        "app.api.admin.bess",
+        "app.api.admin.cms",
+        "app.api.admin.dealers",
+        "app.api.admin.finance",
+        "app.api.admin.fraud",
+        "app.api.admin.iot",
+        "app.api.admin.jobs",
+        "app.api.admin.kyc_admin",
+        "app.api.admin.logistics",
+        "app.api.admin.main",
+        "app.api.admin.monitoring",
+        "app.api.admin.notifications",
+        "app.api.admin.rentals",
+        "app.api.admin.security",
+        "app.api.admin.settings",
+        "app.api.admin.stations",
+        "app.api.admin.support",
+        "app.api.admin.users",
+        "app.api.deps",
+        "app.api.v1.admin.analytics",
+        "app.api.v1.admin.banners",
+        "app.api.v1.admin.blogs",
+        "app.api.v1.admin.dealers",
+        "app.api.v1.admin.faqs",
+        "app.api.v1.admin.legal",
+        "app.api.v1.admin.media",
+        "app.api.v1.admin.promo",
+        "app.api.v1.admin.reviews",
+        "app.api.v1.admin.roles",
+        "app.api.v1.admin.support",
+        "app.api.v1.admin.users",
+        "app.api.v1.admin_audit",
+        "app.api.v1.admin_dealers",
+        "app.api.v1.admin_financial_reports",
+        "app.api.v1.admin_invoices",
+        "app.api.v1.admin_kyc",
+        "app.api.v1.admin_rbac",
+        "app.api.v1.admin_roles",
+        "app.api.v1.admin_user_bulk",
+        "app.api.v1.admin_users",
+        "app.api.v1.analytics",
+        "app.api.v1.analytics.admin",
+        "app.api.v1.analytics.customer",
+        "app.api.v1.analytics.dealer",
+        "app.api.v1.analytics.logistics",
+        "app.api.v1.analytics_enhanced",
+        "app.api.v1.audit",
+        "app.api.v1.batteries",
+        "app.api.v1.battery_catalog",
+        "app.api.v1.bookings",
+        "app.api.v1.branches",
+        "app.api.v1.catalog",
+        "app.api.v1.dashboard",
+        "app.api.v1.dealer_analytics",
+        "app.api.v1.dealer_campaigns",
+        "app.api.v1.dealer_commission",
+        "app.api.v1.dealer_documents",
+        "app.api.v1.dealer_kyc",
+        "app.api.v1.dealer_onboarding",
+        "app.api.v1.dealer_portal_auth",
+        "app.api.v1.dealer_portal_customers",
+        "app.api.v1.dealer_portal_dashboard",
+        "app.api.v1.dealer_portal_roles",
+        "app.api.v1.dealer_portal_settings",
+        "app.api.v1.dealer_portal_tickets",
+        "app.api.v1.dealer_portal_users",
+        "app.api.v1.dealer_stations",
+        "app.api.v1.dealers",
+        "app.api.v1.drivers",
+        "app.api.v1.favorites",
+        "app.api.v1.fraud",
+        "app.api.v1.i18n",
+        "app.api.v1.inventory",
+        "app.api.v1.iot",
+        "app.api.v1.kyc",
+        "app.api.v1.location",
+        "app.api.v1.logistics",
+        "app.api.v1.maintenance",
+        "app.api.v1.manifests",
+        "app.api.v1.notifications",
+        "app.api.v1.notifications_enhanced",
+        "app.api.v1.orders",
+        "app.api.v1.organizations",
+        "app.api.v1.payments",
+        "app.api.v1.payments_enhanced",
+        "app.api.v1.promo",
+        "app.api.v1.purchases_enhanced",
+        "app.api.v1.rentals",
+        "app.api.v1.rentals_enhanced",
+        "app.api.v1.routes",
+        "app.api.v1.screens",
+        "app.api.v1.security",
+        "app.api.v1.stations",
+        "app.api.v1.stock",
+        "app.api.v1.support",
+        "app.api.v1.support_enhanced",
+        "app.api.v1.swaps",
+        "app.api.v1.telemetry",
+        "app.api.v1.transactions",
+        "app.api.v1.utils",
+        "app.api.v1.vehicles",
+        "app.api.v1.wallet",
+        "app.api.v1.wallet_enhanced",
+        "app.api.v1.warehouse_structure",
+        "app.api.v1.warehouses",
+        "app.controllers.auth_controller",
+        "app.db.seed_ecommerce",
+        "app.db.seed_stations",
+        "app.db.seeds.fast_seed_financial",
+        "app.db.seeds.populate_analytics_data",
+        "app.db.seeds.seed_admin_analytics",
+        "app.db.seeds.seed_all",
+        "app.db.seeds.seed_analytics",
+        "app.db.seeds.seed_analytics_data",
+        "app.db.seeds.seed_batteries_advanced",
+        "app.db.seeds.seed_battery_health",
+        "app.db.seeds.seed_data",
+        "app.db.seeds.seed_full_db",
+        "app.db.seeds.seed_modules",
+        "app.db.seeds.seed_phase2",
+        "app.db.seeds.seed_production_data",
+        "app.db.seeds.seed_support",
+        "app.db.seeds.seed_test_customer",
+        "app.db.seeds.seed_test_dealer",
+        "app.db.seeds.sync_and_seed",
+        "app.models.all",
+        "app.models.battery_health",
+        "app.models.branch",
+        "app.models.dealer_promotion",
+        "app.models.financial",
+        "app.models.kyc",
+        "app.models.logistics",
+        "app.models.membership",
+        "app.models.rental",
+        "app.models.support",
+        "app.models.swap",
+        "app.models.vehicle",
+        "app.models.warehouse",
+        "app.services.admin_analytics_service",
+        "app.services.analytics.admin_service",
+        "app.services.analytics.customer_service",
+        "app.services.analytics.logistics_service",
+        "app.services.analytics_service",
+        "app.services.dealer_ledger_service",
+        "app.services.dealer_service",
+        "app.services.ecommerce_service",
+        "app.services.fraud_service",
+        "app.services.invoice_service",
+        "app.services.kyc_service",
+        "app.services.ml_fraud_service",
+        "app.services.notification_outbox_service",
+        "app.services.notification_service",
+        "app.services.referral_service",
+        "app.services.security_service",
+        "app.services.support_service",
+        "app.services.video_kyc_service",
+        "app.services.wallet_service",
+        "app.services.workflow_automation_service",
+        "app.workers.daily_jobs"
+      ],
+      "mutated_outside_domain_by": [
+        "app.api.admin.users",
+        "app.api.v1.admin.users",
+        "app.api.v1.admin_dealers",
+        "app.api.v1.admin_user_bulk",
+        "app.api.v1.dealer_portal_auth",
+        "app.api.v1.dealer_portal_users",
+        "app.controllers.auth_controller",
+        "app.db.seeds.fast_seed_financial",
+        "app.db.seeds.seed_admin_analytics",
+        "app.db.seeds.seed_all",
+        "app.db.seeds.seed_analytics",
+        "app.db.seeds.seed_data",
+        "app.db.seeds.seed_full_db",
+        "app.db.seeds.seed_phase2",
+        "app.db.seeds.seed_production_data",
+        "app.db.seeds.seed_test_customer",
+        "app.db.seeds.seed_test_dealer",
+        "app.db.seeds.sync_and_seed"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "UserStatusLog",
+      "model_module": "app.models.user_history",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "UserProfile",
+      "model_module": "app.models.user_profile",
+      "owned_by": "identity_access",
+      "imported_outside_domain_by": [
+        "app.db.seeds.seed_full_db",
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Vehicle",
+      "model_module": "app.models.vehicle",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.db.seeds.seed_full_db",
+        "app.models.all",
+        "app.models.user"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Vendor",
+      "model_module": "app.models.vendor",
+      "owned_by": "dealer_portal",
+      "imported_outside_domain_by": [
+        "app.api.v1.settlements",
+        "app.db.seed_stations",
+        "app.models.all",
+        "app.models.station"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seed_stations"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "VendorDocument",
+      "model_module": "app.models.vendor",
+      "owned_by": "dealer_portal",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "VideoKYCSession",
+      "model_module": "app.models.video_kyc",
+      "owned_by": "kyc_fraud_compliance",
+      "imported_outside_domain_by": [
+        "app.models.all"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Rack",
+      "model_module": "app.models.warehouse",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.services.battery_consistency"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "Shelf",
+      "model_module": "app.models.warehouse",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.services.battery_consistency"
+      ],
+      "mutated_outside_domain_by": [],
+      "is_mutated_outside_domain": false
+    },
+    {
+      "model": "ShelfBattery",
+      "model_module": "app.models.warehouse",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.services.battery_consistency"
+      ],
+      "mutated_outside_domain_by": [
+        "app.services.battery_consistency"
+      ],
+      "is_mutated_outside_domain": true
+    },
+    {
+      "model": "Warehouse",
+      "model_module": "app.models.warehouse",
+      "owned_by": "logistics_supply",
+      "imported_outside_domain_by": [
+        "app.db.seeds.seed_production_data",
+        "app.models.all",
+        "app.models.branch",
+        "app.services.battery_consistency",
+        "app.services.bootstrap_service"
+      ],
+      "mutated_outside_domain_by": [
+        "app.db.seeds.seed_production_data"
+      ],
+      "is_mutated_outside_domain": true
+    }
+  ]
+}

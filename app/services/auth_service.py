@@ -301,6 +301,57 @@ class AuthService:
         return session
 
     @staticmethod
+    def create_session(
+        db: Session,
+        user_id: int,
+        access_token: str,
+        refresh_token: str,
+        device_info: str = None,
+        ip_address: str = None,
+        user_agent: str = None,
+        request: Request = None,
+    ):
+        """
+        Backward-compatible session creation contract used by passkey login.
+        Persists a UserSession keyed by access sid (preferred) or refresh jti.
+        """
+        token_id = None
+        try:
+            from jose import jwt
+
+            access_payload = jwt.decode(access_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            token_id = access_payload.get("sid")
+        except Exception:
+            token_id = None
+
+        if not token_id:
+            try:
+                from jose import jwt
+
+                refresh_payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+                token_id = refresh_payload.get("jti")
+            except Exception:
+                token_id = None
+
+        effective_user_agent = user_agent or device_info or "unknown"
+        session = AuthService.create_user_session(
+            db=db,
+            user_id=user_id,
+            refresh_token=refresh_token,
+            request=request,
+            token_jti=token_id,
+            ip_address=ip_address,
+            user_agent=effective_user_agent,
+        )
+
+        if device_info and session:
+            session.device_name = device_info
+            db.add(session)
+            db.commit()
+            db.refresh(session)
+        return session
+
+    @staticmethod
     def update_user_session(
         db: Session,
         old_token_jti: str,
