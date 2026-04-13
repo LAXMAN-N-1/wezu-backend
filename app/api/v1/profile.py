@@ -18,6 +18,7 @@ from app.schemas.user import (
     AddressUpdate,
     AddressResponse,
 )
+from app.schemas.input_contracts import PreferencesUpdate
 
 from app.api import deps
 from app.api.deps import invalidate_user_token_cache
@@ -214,14 +215,12 @@ def get_preferences(
 
 @router.put("/preferences")
 def update_preferences(
-    preferences: "PreferencesUpdate",
+    preferences: PreferencesUpdate,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ):
     """Update preferences"""
     from app.models.notification_preference import NotificationPreference
-    from app.schemas.input_contracts import PreferencesUpdate
-    from sqlmodel import select
     
     pref = db.exec(
         select(NotificationPreference).where(NotificationPreference.user_id == current_user.id)

@@ -16,6 +16,7 @@ from app.models.dealer import DealerProfile
 from app.models.notification import Notification
 from app.models.notification_preference import NotificationPreference
 from app.utils.runtime_cache import cached_call, invalidate_cache
+from app.schemas.input_contracts import NotificationPreferencesUpdate
 
 router = APIRouter()
 
@@ -257,12 +258,11 @@ def get_notification_preferences(
 
 @router.put("/notification-preferences")
 def update_notification_preferences(
-    data: "NotificationPreferencesUpdate",
+    data: NotificationPreferencesUpdate,
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Update notification preferences."""
-    from app.schemas.input_contracts import NotificationPreferencesUpdate
     prefs = db.exec(
         select(NotificationPreference).where(
             NotificationPreference.user_id == current_user.id
