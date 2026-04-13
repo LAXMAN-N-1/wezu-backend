@@ -60,7 +60,7 @@ class Station(SQLModel, table=True):
     image_url: Optional[str] = None
     
     # Ratings
-    rating: float = Field(default=0.0)
+    rating: float = Field(default=0.0, index=True)
     total_reviews: int = Field(default=0)
     last_maintenance_date: Optional[datetime] = None
     

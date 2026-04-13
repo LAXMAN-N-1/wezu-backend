@@ -37,19 +37,23 @@ def mock_users_and_roles(session: Session):
     }
     
     for r_name, user in users_data.items():
-        session.add(user)
-        session.commit()
-        session.refresh(user)
+        existing_user = session.exec(select(User).where(User.email == user.email)).first()
+        if existing_user:
+            user = existing_user
+        else:
+            session.add(user)
+            session.commit()
+            session.refresh(user)
         # Assign role
-        link = UserRole(user_id=user.id, role_id=roles[r_name].id)
-        session.add(link)
+        link = session.exec(select(UserRole).where(UserRole.user_id == user.id, UserRole.role_id == roles[r_name].id)).first()
+        if not link:
+            link = UserRole(user_id=user.id, role_id=roles[r_name].id)
+            session.add(link)
     session.commit()
     
     return users_data
 
-@pytest.fixture
-def client():
-    return TestClient(app)
+# Note: Using `client` fixture from conftest.py which properly overrides the DB session with SQLite
 
 def get_override_token(user: User):
     # This is a helper to mock token injection for tests without hitting real DB auth over and over

@@ -24,25 +24,29 @@ def mock_users_and_roles(session: Session):
         roles[r_name] = role
     session.commit()
 
-    admin = User(
-        email="admin_mgmt@test.com", hashed_password="pw",
-        is_active=True, is_superuser=True, status="active",
-    )
-    session.add(admin)
-    session.commit()
-    session.refresh(admin)
-    session.add(UserRole(user_id=admin.id, role_id=roles[RoleEnum.ADMIN.value].id))
+    admin = session.exec(select(User).where(User.email == "admin_mgmt@test.com")).first()
+    if not admin:
+        admin = User(
+            email="admin_mgmt@test.com", hashed_password="pw",
+            is_active=True, is_superuser=True, status="active",
+        )
+        session.add(admin)
+        session.commit()
+        session.refresh(admin)
+        session.add(UserRole(user_id=admin.id, role_id=roles[RoleEnum.ADMIN.value].id))
+        session.commit()
 
-    dealer = User(
-        email="dealer_mgmt@test.com", hashed_password="pw",
-        is_active=True, status="active",
-    )
-    session.add(dealer)
-    session.commit()
-    session.refresh(dealer)
-    session.add(UserRole(user_id=dealer.id, role_id=roles[RoleEnum.DEALER.value].id))
-
-    session.commit()
+    dealer = session.exec(select(User).where(User.email == "dealer_mgmt@test.com")).first()
+    if not dealer:
+        dealer = User(
+            email="dealer_mgmt@test.com", hashed_password="pw",
+            is_active=True, status="active",
+        )
+        session.add(dealer)
+        session.commit()
+        session.refresh(dealer)
+        session.add(UserRole(user_id=dealer.id, role_id=roles[RoleEnum.DEALER.value].id))
+        session.commit()
     return {"admin": admin, "dealer": dealer, "roles": roles}
 
 

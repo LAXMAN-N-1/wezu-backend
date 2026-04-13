@@ -1,5 +1,6 @@
-from sqlmodel import Session, select, func, and_, desc, extract
-from datetime import datetime, timedelta, UTC
+from sqlalchemy.orm import Session
+from sqlalchemy import func, and_, desc, extract
+from datetime import datetime, timedelta
 from typing import Dict, Any
 
 from app.schemas.analytics.admin import AdminOverviewResponse
@@ -20,8 +21,8 @@ class AnalyticsAdminService(BaseAnalyticsService):
     @staticmethod
     async def get_overview(db: Session, period: str = "30d") -> AdminOverviewResponse:
         days = BaseAnalyticsService.parse_period(period)
-        target_date = datetime.now(UTC) - timedelta(days=days)
-        prev_target_date = datetime.now(UTC) - timedelta(days=days * 2)
+        target_date = datetime.utcnow() - timedelta(days=days)
+        prev_target_date = datetime.utcnow() - timedelta(days=days * 2)
 
         # Helper for KPI cards
         def get_kpi(current_val, prev_val):
@@ -30,14 +31,20 @@ class AnalyticsAdminService(BaseAnalyticsService):
             return KpiCard(value=float(current_val), trend_percentage=round(trend, 2), status=status)
 
         # 1. Platform Overview
-        total_users = db.exec(select(func.count(User.id))).one() or 0
-        active_users_24h = db.exec(select(func.count(User.id)).where(User.last_login >= datetime.now(UTC) - timedelta(hours=24))).one() or 0
-        total_dealers = db.exec(select(func.count(DealerProfile.id))).one() or 0
+        # Assuming customers don't have a specific role_id or use UserRole.USER
+        from app.utils.constants import UserRole
+        from app.models.rbac import UserRole as UserRoleTable, Role
         
+        # Approximate: Users that are just regular users
+        total_users = db.query(func.count(User.id)).scalar() or 0
+        active_users_24h = db.query(func.count(User.id)).filter(User.last_login >= datetime.utcnow() - timedelta(hours=24)).scalar() or 0
+        total_dealers = db.query(func.count(DealerProfile.id)).scalar() or 0
+        
+        # Approximate: logistics users (if we don't have UserType, maybe count drivers or skip exact count)
         total_logistics = 0  # To be refined if Logistics has a specific role
         
-        total_stations = db.exec(select(func.count(Station.id))).one() or 0
-        total_batteries = db.exec(select(func.count(Battery.id))).one() or 0
+        total_stations = db.query(func.count(Station.id)).scalar() or 0
+        total_batteries = db.query(func.count(Battery.id)).scalar() or 0
 
         platform_overview = {
             "total_users": get_kpi(total_users, total_users), # Simple count for now
@@ -49,9 +56,9 @@ class AnalyticsAdminService(BaseAnalyticsService):
         }
 
         # 2. Rental Analytics
-        rentals_today = db.exec(select(func.count(Rental.id)).where(Rental.start_time >= datetime.now(UTC).replace(hour=0, minute=0, second=0))).one() or 0
-        rentals_week = db.exec(select(func.count(Rental.id)).where(Rental.start_time >= datetime.now(UTC) - timedelta(days=7))).one() or 0
-        avg_duration = db.exec(select(func.avg(extract('epoch', Rental.end_time - Rental.start_time) / 3600)).where(Rental.status == RentalStatus.COMPLETED)).one() or 0
+        rentals_today = db.query(func.count(Rental.id)).filter(Rental.start_time >= datetime.utcnow().replace(hour=0, minute=0, second=0)).scalar() or 0
+        rentals_week = db.query(func.count(Rental.id)).filter(Rental.start_time >= datetime.utcnow() - timedelta(days=7)).scalar() or 0
+        avg_duration = db.query(func.avg(extract('epoch', Rental.end_time - Rental.start_time) / 3600)).filter(Rental.status == RentalStatus.COMPLETED).scalar() or 0
         
         rental_analytics = {
             "rentals_today": rentals_today,
@@ -61,9 +68,9 @@ class AnalyticsAdminService(BaseAnalyticsService):
         }
 
         # 3. Financial Overview
-        total_rev_today = db.exec(select(func.sum(Rental.total_amount)).where(Rental.start_time >= datetime.now(UTC).replace(hour=0, minute=0, second=0))).one() or 0
-        total_rev_month = db.exec(select(func.sum(Rental.total_amount)).where(Rental.start_time >= datetime.now(UTC).replace(day=1))).one() or 0
-        revenue_rentals = db.exec(select(func.sum(Rental.total_amount)).where(Rental.start_time >= target_date)).one() or 0
+        total_rev_today = db.query(func.sum(Rental.total_amount)).filter(Rental.start_time >= datetime.utcnow().replace(hour=0, minute=0, second=0)).scalar() or 0
+        total_rev_month = db.query(func.sum(Rental.total_amount)).filter(Rental.start_time >= datetime.utcnow().replace(day=1)).scalar() or 0
+        revenue_rentals = db.query(func.sum(Rental.total_amount)).filter(Rental.start_time >= target_date).scalar() or 0
         
         revenue_analytics = {
             "total_revenue_today": float(total_rev_today),
@@ -73,13 +80,13 @@ class AnalyticsAdminService(BaseAnalyticsService):
         }
 
         # 4. Battery & Fleet
-        health_90_100 = db.exec(select(func.count(Battery.id)).where(Battery.health_percentage >= 90)).one() or 0
-        health_80_90 = db.exec(select(func.count(Battery.id)).where(and_(Battery.health_percentage >= 80, Battery.health_percentage < 90))).one() or 0
-        health_below_80 = db.exec(select(func.count(Battery.id)).where(Battery.health_percentage < 80)).one() or 0
+        health_90_100 = db.query(func.count(Battery.id)).filter(Battery.health_percentage >= 90).scalar() or 0
+        health_80_90 = db.query(func.count(Battery.id)).filter(and_(Battery.health_percentage >= 80, Battery.health_percentage < 90)).scalar() or 0
+        health_below_80 = db.query(func.count(Battery.id)).filter(Battery.health_percentage < 80).scalar() or 0
 
         battery_fleet_analytics = {
             "total_batteries": total_batteries,
-            "batteries_in_use": db.exec(select(func.count(Battery.id)).where(Battery.status == BatteryStatus.RENTED)).one() or 0,
+            "batteries_in_use": db.query(func.count(Battery.id)).filter(Battery.status == BatteryStatus.RENTED).scalar() or 0,
             "health_distribution": {
                 "90-100%": health_90_100,
                 "80-90%": health_80_90,
@@ -88,7 +95,7 @@ class AnalyticsAdminService(BaseAnalyticsService):
         }
 
         # 5. Station Analytics
-        top_stations = db.exec(select(Station.name, func.count(Rental.id)).join(Rental, Station.id == Rental.start_station_id).group_by(Station.name).order_by(desc(func.count(Rental.id))).limit(5)).all()
+        top_stations = db.query(Station.name, func.count(Rental.id)).join(Rental, Station.id == Rental.start_station_id).group_by(Station.name).order_by(desc(func.count(Rental.id))).limit(5).all()
         
         station_analytics = {
             "top_performing_stations": [{"name": row[0], "rentals": row[1]} for row in top_stations],
@@ -96,7 +103,7 @@ class AnalyticsAdminService(BaseAnalyticsService):
         }
 
         # 6. Financial & Operational
-        pending_tickets = db.exec(select(func.count(SupportTicket.id)).where(SupportTicket.status == "open")).one() or 0
+        pending_tickets = db.query(func.count(SupportTicket.id)).filter(SupportTicket.status == "open").scalar() or 0
         
         financial_analytics = {
             "daily_revenue": float(revenue_rentals / days if days > 0 else 0),
@@ -119,7 +126,7 @@ class AnalyticsAdminService(BaseAnalyticsService):
             financial_analytics=financial_analytics,
             operational_analytics=operational_analytics,
             charts={
-                "revenue_trend": [TrendPoint(x=(datetime.now(UTC) - timedelta(days=i)).strftime("%Y-%m-%d"), y=1000 + i*50) for i in range(days)],
+                "revenue_trend": [TrendPoint(x=(datetime.utcnow() - timedelta(days=i)).strftime("%Y-%m-%d"), y=1000 + i*50) for i in range(days)],
                 "battery_health": [
                     DistributionPoint(label="90-100%", value=health_90_100),
                     DistributionPoint(label="80-90%", value=health_80_90),

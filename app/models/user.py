@@ -2,31 +2,27 @@ from sqlmodel import SQLModel, Field, Relationship
 from app.models.kyc import KYCRecord
 from app.models.rbac import UserRole
 from app.models.two_factor_auth import TwoFactorAuth
-from app.models.device import Device  # Ensure SQLAlchemy registry has Device for User.devices relationship.
-from app.models.staff import StaffProfile  # Ensure SQLAlchemy registry has StaffProfile for User.staff_profile
-from app.models.token import SessionToken  # Ensure SQLAlchemy registry has SessionToken for User.session_tokens
-from app.models.staff import StaffProfile
-from app.models.dealer import DealerProfile
-from app.models.kyc import KYCDocument
 
 from typing import Optional, List, TYPE_CHECKING
-from datetime import datetime, UTC
+from datetime import datetime
 from enum import Enum
 import sqlalchemy as sa
+
+from app.models.two_factor_auth import TwoFactorAuth
 
 if TYPE_CHECKING:
     from app.models.session import UserSession
     from app.models.financial import Wallet
     from app.models.location import Address
     from app.models.kyc import KYCDocument, KYCRecord
-    from app.models.device import Device
+    from app.models.iot import Device
     from app.models.vehicle import Vehicle
     from app.models.dealer import DealerProfile
     from app.models.driver_profile import DriverProfile
     from app.models.staff import StaffProfile
     from app.models.rbac import Role, UserAccessPath
     from app.models.token import SessionToken
-    from app.models.notification_preference import NotificationPreference
+    from app.models.user_profile import UserProfile
 
 class UserType(str, Enum):
     CUSTOMER = "customer"
@@ -42,7 +38,6 @@ class UserStatus(str, Enum):
     PENDING_VERIFICATION = "pending_verification"
     PENDING = "pending"
     INACTIVE = "inactive"
-    VERIFIED = "verified"
     DELETED = "deleted"
 
 class KYCStatus(str, Enum):
@@ -54,6 +49,7 @@ class KYCStatus(str, Enum):
 class User(SQLModel, table=True):
 
     __tablename__ = "users"
+    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -112,8 +108,8 @@ class User(SQLModel, table=True):
     force_password_change: bool = Field(default=False)
 
     # Timestamps
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Soft Delete
     is_deleted: bool = Field(default=False)
@@ -122,10 +118,8 @@ class User(SQLModel, table=True):
     
 
     # Relationship
-    role: Optional["Role"] = Relationship(
-        back_populates="users",
-        sa_relationship_kwargs={"foreign_keys": "[User.role_id]"}
-    ) # Primary role relationship
+    role: Optional["Role"] = Relationship(sa_relationship_kwargs={"viewonly": True}) # Legacy/Primary role. Viewonly to prevent conflict with roles list
+    roles: List["Role"] = Relationship(back_populates="users", link_model=UserRole)
     wallet: Optional["Wallet"] = Relationship(back_populates="user")
     user_profile: Optional["UserProfile"] = Relationship(back_populates="user")
     addresses: List["Address"] = Relationship(back_populates="user")
@@ -141,13 +135,9 @@ class User(SQLModel, table=True):
     vehicles: List["Vehicle"] = Relationship(back_populates="user")
     
     # Fix for ambiguous foreign keys: explicitly specify which FK links a user to their OWN dealer profile
-    owned_dealer_profile: Optional["DealerProfile"] = Relationship(
-        back_populates="owner",
-        sa_relationship_kwargs={
-            "primaryjoin": "User.id == DealerProfile.user_id",
-            "foreign_keys": "[DealerProfile.user_id]",
-            "overlaps": "dealer_profile,user,owner,owned_dealer_profile,staff_profile"
-        }
+    dealer_profile: Optional["DealerProfile"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"foreign_keys": "[DealerProfile.user_id]"}
     )
     
     driver_profile: Optional["DriverProfile"] = Relationship(back_populates="user")
@@ -165,31 +155,12 @@ class User(SQLModel, table=True):
     sessions: List["UserSession"] = Relationship(back_populates="user")
     session_tokens: List["SessionToken"] = Relationship(back_populates="user")
     two_factor_auth: Optional["TwoFactorAuth"] = Relationship(back_populates="user")
-    notification_preference: Optional["NotificationPreference"] = Relationship(
-        back_populates="user",
-        sa_relationship_kwargs={"uselist": False}
-    )
+    user_profile: Optional["UserProfile"] = Relationship(back_populates="user")
 
     @property
     def is_active(self) -> bool:
         """Helper for schema compatibility."""
         return self.status == UserStatus.ACTIVE
-
-    @is_active.setter
-    def is_active(self, value: bool):
-        if value:
-            # Only change if currently inactive/suspended
-            if self.status in [UserStatus.INACTIVE, UserStatus.SUSPENDED]:
-                self.status = UserStatus.ACTIVE
-        else:
-            # Only change if currently active/verified
-            if self.status in [UserStatus.ACTIVE, UserStatus.VERIFIED]:
-                self.status = UserStatus.SUSPENDED
-
-    @property
-    def roles(self) -> List["Role"]:
-        """Backward compatibility for legacy Many-to-Many role checks."""
-        return [self.role] if self.role else []
 
     # --- Granular RBAC Helpers ---
     @property

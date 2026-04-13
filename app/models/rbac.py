@@ -94,8 +94,8 @@ class Role(SQLModel, table=True):
         }
     )
 
-    # Change to One-to-Many to match User model
-    users: List["User"] = Relationship(back_populates="role")
+    # Change to Many-to-Many to match User model
+    users: List["User"] = Relationship(back_populates="roles", link_model=UserRole)
     
     # Merged from app/models/role.py (Legacy/Chandu branch)
     role_rights: List["RoleRight"] = Relationship(back_populates="role", sa_relationship_kwargs={"cascade": "all, delete-orphan"})

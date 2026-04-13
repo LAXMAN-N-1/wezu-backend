@@ -1168,3 +1168,96 @@ class AnalyticsService:
             if total_batteries
             else 0,
         }
+
+    @staticmethod
+    def get_fraud_risk_summary(db: Session) -> Dict[str, Any]:
+        """Summary of user risk tiers and recent fraud check activities"""
+        from app.models.fraud import RiskScore, FraudCheckLog
+        
+        # Risk Tiers
+        risk_scores = db.exec(select(RiskScore)).all()
+        tiers = {"low": 0, "medium": 0, "high": 0}
+        
+        for score in risk_scores:
+            if score.total_score < 30:
+                tiers["low"] += 1
+            elif score.total_score <= 70:
+                tiers["medium"] += 1
+            else:
+                tiers["high"] += 1
+                
+        # Recent Fraud Checks
+        recent_checks = db.exec(
+            select(FraudCheckLog).order_by(FraudCheckLog.created_at.desc()).limit(10)
+        ).all()
+        
+        checks_data = []
+        for c in recent_checks:
+            checks_data.append({
+                "id": c.id,
+                "user_id": c.user_id,
+                "check_type": c.check_type,
+                "status": c.status,
+                "details": c.details,
+                "created_at": c.created_at.isoformat() if c.created_at else None
+            })
+            
+        return {
+            "risk_tiers": tiers,
+            "total_scored_users": len(risk_scores),
+            "recent_checks": checks_data
+        }
+
+    @staticmethod
+    def get_suspensions_history(db: Session) -> Dict[str, Any]:
+        """Global history of suspensions and current active suspensions"""
+        from app.models.user import User, UserStatus
+        from app.models.user_history import UserStatusLog
+        
+        active_suspensions = db.exec(select(func.count(User.id)).where(User.status == UserStatus.SUSPENDED)).one()
+        
+        # History of suspensions grouped by month (last 6 months)
+        start_date = datetime.utcnow() - timedelta(days=180)
+        group_func = func.date_trunc('month', UserStatusLog.created_at)
+        
+        stmt = select(group_func, func.count(UserStatusLog.id)).where(
+            UserStatusLog.created_at >= start_date,
+            UserStatusLog.action_type == "suspension"
+        ).group_by(group_func).order_by(group_func)
+        
+        history_results = db.execute(stmt).all()
+        history = [{"period": r[0].isoformat(), "suspensions": r[1]} for r in history_results]
+        
+        return {
+            "active_suspensions": active_suspensions,
+            "history": history
+        }
+
+    @staticmethod
+    def get_invite_link_metrics(db: Session) -> Dict[str, Any]:
+        """Metrics on referral link usage and conversions"""
+        from app.models.referral import Referral
+        
+        referrals = db.exec(select(Referral)).all()
+        
+        metrics = {
+            "total_referrals": len(referrals),
+            "pending": 0,
+            "completed": 0,
+            "expired": 0,
+            "total_rewards_distributed": 0.0
+        }
+        
+        for r in referrals:
+            if r.status == "pending":
+                metrics["pending"] += 1
+            elif r.status == "completed":
+                metrics["completed"] += 1
+                metrics["total_rewards_distributed"] += r.reward_amount
+            elif r.status == "expired":
+                metrics["expired"] += 1
+                
+        # Round the reward distributed
+        metrics["total_rewards_distributed"] = round(metrics["total_rewards_distributed"], 2)
+        
+        return metrics

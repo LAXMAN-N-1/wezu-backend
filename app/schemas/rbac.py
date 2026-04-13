@@ -151,7 +151,6 @@ class BulkAssignmentResult(BaseModel):
 class BulkRoleAssignRequest(BaseModel):
     role_id: int
     user_ids: List[int]
-
 class BulkRoleAssignResponse(BaseModel):
     total_requested: int
     total_success: int
@@ -159,7 +158,6 @@ class BulkRoleAssignResponse(BaseModel):
     results: List[BulkAssignmentResult]
 
 # ----- Role Transfer -----
-
 class RoleTransferRequest(BaseModel):
     new_user_id: int
     role_id: int
@@ -171,13 +169,11 @@ class RoleTransferResponse(BaseModel):
     old_assignment_id: Optional[int] = None
     new_assignment_id: Optional[int] = None
 
-
 # ----- Role Duplicate / Hierarchy -----
 
 class RoleDuplicate(BaseModel):
     new_name: str
     description: Optional[str] = None
-
 
 # ----- Permission Check -----
 
@@ -193,10 +189,8 @@ class AccessPathBase(BaseModel):
     path_pattern: str
     access_level: str
 
-
 class AccessPathCreate(AccessPathBase):
     pass
-
 
 class AccessPathUpdate(BaseModel):
     access_level: Optional[str] = None

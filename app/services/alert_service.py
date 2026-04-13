@@ -60,3 +60,82 @@ class AlertService:
             db.commit()
             db.refresh(alert)
         return alert
+
+    @staticmethod
+    def process_battery_telemetry(
+        db: Session,
+        battery_id: str,
+        charge_percent: float = None,
+        health_percent: float = None,
+        temp_celsius: float = None,
+        days_to_maintenance: int = None
+    ):
+        from app.models.rental import Rental
+        from app.models.user_alert_config import UserAlertConfig
+        from app.models.battery_health import BatteryHealthAlert, AlertType, AlertSeverity
+        
+        statement = select(Rental).where(
+            Rental.battery_id == battery_id, 
+            Rental.status == "active"
+        )
+        rental = db.exec(statement).first()
+        if not rental:
+            return 
+
+        config = db.exec(select(UserAlertConfig).where(UserAlertConfig.user_id == rental.user_id)).first()
+        if not config:
+            config = UserAlertConfig(user_id=rental.user_id)
+            
+        if not config.alerts_enabled:
+            return
+
+        alerts_to_create = []
+        
+        if charge_percent is not None and charge_percent < config.low_charge_percent:
+            alerts_to_create.append((
+                AlertType.CRITICAL_HEALTH,
+                AlertSeverity.WARNING,
+                f"Battery charge dropped to {charge_percent}% (Below {config.low_charge_percent}% threshold)."
+            ))
+            
+        if health_percent is not None and health_percent < config.low_health_percent:
+            alerts_to_create.append((
+                AlertType.RAPID_DEGRADATION,
+                AlertSeverity.CRITICAL,
+                f"Battery health degraded to {health_percent}% (Below {config.low_health_percent}% threshold)."
+            ))
+            
+        if temp_celsius is not None and temp_celsius > config.high_temp_celsius:
+            alerts_to_create.append((
+                AlertType.HIGH_TEMP,
+                AlertSeverity.CRITICAL,
+                f"Battery temperature is {temp_celsius}°C (Above {config.high_temp_celsius}°C threshold)."
+            ))
+            
+        if days_to_maintenance is not None and days_to_maintenance <= config.maintenance_reminder_days:
+            alerts_to_create.append((
+                AlertType.OVERDUE_SERVICE,
+                AlertSeverity.INFO,
+                f"Maintenance is due in {days_to_maintenance} days."
+            ))
+            
+        for a_type, severity, msg in alerts_to_create:
+            existing = db.exec(
+                select(BatteryHealthAlert).where(
+                    BatteryHealthAlert.battery_id == battery_id,
+                    BatteryHealthAlert.alert_type == a_type,
+                    BatteryHealthAlert.is_resolved == False
+                )
+            ).first()
+            
+            if not existing:
+                new_alert = BatteryHealthAlert(
+                    battery_id=battery_id,
+                    alert_type=a_type,
+                    severity=severity,
+                    message=msg,
+                    is_resolved=False
+                )
+                db.add(new_alert)
+        db.commit()
+

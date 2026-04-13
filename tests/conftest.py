@@ -1,10 +1,13 @@
 import os
 import pytest
-from fastapi.testclient import TestClient
-from sqlmodel import Session, SQLModel, create_engine, select, and_
-from sqlmodel.pool import StaticPool
 import sys
+import time
+from fastapi.testclient import TestClient
+from sqlmodel import Session, SQLModel, create_engine, select
+from sqlmodel.pool import StaticPool
 from unittest.mock import MagicMock
+from app.services.test_report_service import test_report_service
+from app.db.session import engine as prod_engine
 
 # --- MOCK FIREBASE BEFORE APP IMPORTS ---
 # Prevents "Firebase Init Error" from top-level module code
@@ -22,7 +25,7 @@ from app.models.rbac import Role, Permission
 from app.models.role_right import RoleRight
 from app.models.menu import Menu
 from app.models.user import User, UserStatus, UserType
-import app.models.all  # Force all models to load for SQLAlchemy mapping
+
 # --- PATCH FOR SQLITE JSONB COMPATIBILITY ---
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.sqlite.base import SQLiteTypeCompiler
@@ -33,27 +36,42 @@ def visit_JSONB(self, type_, **kw):
 SQLiteTypeCompiler.visit_JSONB = visit_JSONB
 # --------------------------------------------
 
-# Use PostgreSQL for tests (dedicated test database is required)
-# Read from environment variable if available, otherwise fallback to a default
-DATABASE_URL = os.getenv("TEST_DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/wezu_test")
+# Use in-memory SQLite for tests - ensure no database URL is passed
+DATABASE_URL = "sqlite://"  # Force in-memory database for tests
 
 # Create engine with proper configuration
-# Removed StaticPool as it is primarily for SQLite in-memory and causes TypeErrors with PostgreSQL
-engine = create_engine(DATABASE_URL)
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
+
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
+import sqlite3
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    if type(dbapi_connection) is sqlite3.Connection:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("ATTACH DATABASE ':memory:' AS core")
+        cursor.execute("ATTACH DATABASE ':memory:' AS dealers")
+        cursor.execute("ATTACH DATABASE ':memory:' AS finance")
+        cursor.execute("ATTACH DATABASE ':memory:' AS rentals")
+        cursor.execute("ATTACH DATABASE ':memory:' AS inventory")
+        cursor.execute("ATTACH DATABASE ':memory:' AS stations")
+        cursor.execute("ATTACH DATABASE ':memory:' AS logistics")
+        cursor.close()
 
 # Initialize all tables before any test session
 SQLModel.metadata.create_all(engine)
 
 @pytest.fixture(name="session")
 def session_fixture():
-    from sqlmodel import Session
-    from sqlalchemy import text
-    
     with Session(engine) as session:
-        # Seed basic driver role if missing
+        # Seed basic roles for tests
         from app.models.rbac import Role
-        driver_role = session.exec(select(Role).where(Role.name == "driver")).first()
-        if not driver_role:
+        if not session.exec(select(Role).where(Role.name == "driver")).first():
             driver_role = Role(
                 name="driver", 
                 slug="driver",
@@ -61,17 +79,21 @@ def session_fixture():
                 is_system_role=True
             )
             session.add(driver_role)
-            session.commit()
+            try:
+                session.commit()
+            except Exception:
+                session.rollback()
             
         yield session
-        
-        # Teardown logic: Use TRUNCATE CASCADE to handle circular foreign keys
-        # We need a list of all tables in the correct order or just truncate all
-        tables = SQLModel.metadata.tables.keys()
-        if tables:
-            truncate_stmt = f"TRUNCATE TABLE {', '.join(tables)} CASCADE;"
-            session.execute(text(truncate_stmt))
-            session.commit()
+        # Teardown: delete all data
+        session.rollback()
+        for table in reversed(SQLModel.metadata.sorted_tables):
+            try:
+                session.execute(table.delete())
+            except Exception:
+                session.rollback()
+        session.commit()
+
 
 @pytest.fixture(autouse=True)
 def seed_basics(session: Session):
@@ -79,13 +101,7 @@ def seed_basics(session: Session):
     Seed minimal roles, menus, permissions and a superuser so RBAC/user tests have baseline data.
     Data is cleared after each test by session_fixture teardown.
     """
-    from app.models.rbac import Role, Permission
-    from app.models.menu import Menu
-    from app.models.role_right import RoleRight
-    from app.models.user import User, UserStatus, UserType
-    from app.core.security import get_password_hash
-
-    # Check if admin role already exists (to avoid duplicate seed errors in same session)
+    # Role
     admin_role = session.exec(select(Role).where(Role.name == "admin")).first()
     if not admin_role:
         admin_role = Role(name="admin", description="Super Admin", category="system", level=100)
@@ -110,7 +126,7 @@ def seed_basics(session: Session):
         session.refresh(perm)
 
     # RoleRight and RolePermission association
-    rr = session.exec(select(RoleRight).where(and_(RoleRight.role_id == admin_role.id, RoleRight.menu_id == menu.id))).first()
+    rr = session.exec(select(RoleRight).where(RoleRight.role_id == admin_role.id, RoleRight.menu_id == menu.id)).first()
     if not rr:
         rr = RoleRight(role_id=admin_role.id, menu_id=menu.id, can_view=True, can_create=True, can_edit=True, can_delete=True)
         session.add(rr)
@@ -188,4 +204,76 @@ def normal_user_fixture(session: Session):
     session.commit()
     session.refresh(user)
     return user
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    """
+    Hook to capture test results and save them to the production database,
+    grouping by the actual test file/module name.
+    """
+    stats = terminalreporter.stats
+    
+    # We will accumulate results grouped by file path (e.g., tests/test_login.py)
+    modules = {}
+
+    def get_module(nodeid):
+        return nodeid.split("::")[0] if "::" in nodeid else "unknown_module"
+
+    # Process all reports
+    for outcome in ["passed", "failed", "skipped", "error"]:
+        for report in stats.get(outcome, []):
+            if hasattr(report, "when") and report.when != "call" and outcome == "passed":
+                continue # Skip setup/teardown passes
+            mod = get_module(report.nodeid)
+            if mod not in modules:
+                modules[mod] = {"passed": 0, "failed": 0, "skipped": 0, "error": 0, "failures": [], "errors": []}
+            
+            modules[mod][outcome] += 1
+            
+            if outcome == "failed":
+                modules[mod]["failures"].append({
+                    "nodeid": report.nodeid,
+                    "message": str(report.longreprtext) if hasattr(report, 'longreprtext') else "No traceback"
+                })
+            elif outcome == "error":
+                modules[mod]["errors"].append({
+                    "nodeid": report.nodeid,
+                    "message": str(report.longreprtext) if hasattr(report, 'longreprtext') else "Error during setup/teardown"
+                })
+
+    duration = time.time() - getattr(terminalreporter, '_sessionstarttime', time.time())
+    
+    # If no modules found but total tests ran (maybe just nothing failed/passed?), fallback:
+    if not modules:
+        passed = len(stats.get('passed', []))
+        failed = len(stats.get('failed', []))
+        skipped = len(stats.get('skipped', []))
+        error = len(stats.get('error', []))
+        total = passed + failed + skipped + error
+        if total > 0:
+            modules["pytest_run"] = {"passed": passed, "failed": failed, "skipped": skipped, "error": error, "failures": [], "errors": []}
+
+    report_data = {}
+    for mod, data in modules.items():
+        total_mod = data["passed"] + data["failed"] + data["skipped"] + data["error"]
+        report_data[mod] = {
+            "total_tests": total_mod,
+            "passed": data["passed"],
+            "failed": data["failed"] + data["error"],
+            "failures": data["failures"],
+            "errors": data["errors"],
+            "execution_time": f"{round(duration, 2)}s",
+            "environment": os.getenv("ENVIRONMENT", "local_test"),
+            "created_by": os.getenv("USER", "dev")
+        }
+
+    print(f"\n[REPORT] Saving results for {len(report_data)} module(s) to production database...")
+    
+    try:
+        from sqlmodel import Session
+        with Session(prod_engine) as db:
+            test_report_service.save_from_dict(db, report_data)
+            print("[REPORT] Success: Test results stored in 'test_reports' table.")
+    except Exception as e:
+        print(f"[REPORT] Error saving results to DB: {e}")
 

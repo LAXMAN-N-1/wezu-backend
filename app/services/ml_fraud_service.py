@@ -8,7 +8,7 @@ from datetime import datetime, UTC, timedelta
 from app.models.user import User
 from app.models.rental import Rental
 from app.models.device_fingerprint import DeviceFingerprint
-from app.models.kyc_verification import KYCVerification
+from app.models.kyc import KYCRecord
 import logging
 
 logger = logging.getLogger(__name__)
@@ -51,9 +51,9 @@ class MLFraudDetectionService:
             risk_factors.append("Extremely high swap frequency (< 1 day average)")
 
         # 4. KYC Status (30 points)
-        from app.models.kyc_verification import KYCVerification
-        kyc = session.exec(select(KYCVerification).where(KYCVerification.user_id == user_id)).first()
-        if not kyc or kyc.status != "VERIFIED":
+        from app.models.kyc import KYCRecord
+        kyc = session.exec(select(KYCRecord).where(KYCRecord.user_id == user_id)).first()
+        if not kyc or kyc.status.lower() != "verified":
             risk_score += 30
             risk_factors.append("KYC not verified")
 

@@ -1,10 +1,16 @@
-from typing import Optional, List
-from datetime import datetime, UTC
+from typing import Optional, TYPE_CHECKING, List
+from datetime import datetime
 from sqlmodel import SQLModel, Field, Relationship
+
+if TYPE_CHECKING:
+    from app.models.dealer import DealerProfile
+    from app.models.commission import CommissionLog
+    from app.models.vendor import Vendor
 
 
 class Settlement(SQLModel, table=True):
     __tablename__ = "settlements"
+    # __table_args__ = {"schema": "public"}
     id: Optional[int] = Field(default=None, primary_key=True)
     
     dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id", index=True)
@@ -33,7 +39,7 @@ class Settlement(SQLModel, table=True):
     transaction_reference: Optional[str] = None  # Bank transfer ref
     payment_proof_url: Optional[str] = None      # Receipt/proof URL
 
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(default_factory=datetime.utcnow)
     paid_at: Optional[datetime] = None
 
     # Relationship

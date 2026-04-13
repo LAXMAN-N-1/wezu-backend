@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from app.models.station import Station
     from app.models.commission import Commission # If it existed
     from app.models.staff import StaffProfile
+    from app.models.settlement import Settlement
 # from pydantic import EmailStr
 import sqlalchemy as sa
 from sqlalchemy import JSON
@@ -52,6 +53,9 @@ class DealerProfile(SQLModel, table=True):
     global_inventory_rules: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     global_rental_settings: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     holiday_calendar: Optional[List[Dict]] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
+    
+    # Portal Settings (Preferences, Localization, Formatting, Rental)
+    settings: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
     is_active: bool = Field(default=False)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

@@ -16,6 +16,14 @@ from app.schemas.dealer_ledger import LedgerResponse, LedgerDetailResponse
 from app.services.dealer_ledger_service import DealerLedgerService
 from pydantic import BaseModel
 
+class StageUpdate(BaseModel):
+    stage: str
+    note: str = ""
+
+class VisitSchedule(BaseModel):
+    application_id: int
+    officer_id: int
+    date: datetime
 router = APIRouter()
 
 

@@ -30,6 +30,7 @@ from app.core.audit import audit_log
 from app.models.station import Station
 
 router = APIRouter()
+
 class QRGenerateRequest(BaseModel):
     battery_id: int
 
@@ -483,7 +484,6 @@ def update_battery_lifecycle(
             description=f"Status changed to {update_in.status}. {update_in.description or ''}"
         )
         session.add(event)
-
     if update_in.health_status:
         battery.health_status = update_in.health_status
     if update_in.health_percentage is not None:

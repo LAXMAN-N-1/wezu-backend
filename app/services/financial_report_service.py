@@ -11,7 +11,7 @@ from typing import Optional, Dict, Any, List
 
 from sqlmodel import Session, select, func
 
-from app.models.financial import Transaction
+from app.models.financial import Transaction, TransactionType
 from app.models.revenue_report import RevenueReport
 
 logger = logging.getLogger(__name__)
@@ -41,23 +41,24 @@ class FinancialReportService:
         )
         transactions = db.exec(base).all()
 
-        total_revenue = sum(t.amount for t in transactions if t.type == "credit")
-        total_refunds = sum(abs(t.amount) for t in transactions if t.category == "refund")
+        total_revenue = sum(t.amount for t in transactions if t.amount > 0)
+        total_refunds = sum(abs(t.amount) for t in transactions if t.transaction_type == TransactionType.REFUND)
         total_count = len(transactions)
         avg_value = (total_revenue / total_count) if total_count > 0 else 0.0
         net_revenue = total_revenue - total_refunds
 
-        # Breakdown by category
+        # Breakdown by category (using transaction_type as proxy for category)
         by_category: Dict[str, float] = {}
         for t in transactions:
-            cat = t.category if hasattr(t, "category") else (t.transaction_type.value if hasattr(t.transaction_type, "value") else str(t.transaction_type))
+            cat = t.transaction_type.value if hasattr(t.transaction_type, "value") else str(t.transaction_type)
             by_category[cat] = by_category.get(cat, 0.0) + abs(t.amount)
 
-        # Breakdown by source (rental vs purchase vs others)
+        # Breakdown by source
         by_source: Dict[str, float] = {}
         for t in transactions:
-            source = "rental" if "RENTAL" in str(t.transaction_type) or "SWAP" in str(t.transaction_type) else "purchase"
-            if "PURCHASE" not in str(t.transaction_type) and "RENTAL" not in str(t.transaction_type) and "SWAP" not in str(t.transaction_type):
+            type_str = str(t.transaction_type)
+            source = "rental" if "RENTAL" in type_str or "SWAP" in type_str else "purchase"
+            if "PURCHASE" not in type_str and "RENTAL" not in type_str and "SWAP" not in type_str:
                 source = "other"
             by_source[source] = by_source.get(source, 0.0) + abs(t.amount)
 
@@ -138,7 +139,7 @@ class FinancialReportService:
                 Transaction.created_at >= start,
                 Transaction.created_at < end,
                 Transaction.status == "success",
-                Transaction.type == "credit",
+                Transaction.amount > 0,
             )
         ).one()
 
@@ -147,7 +148,7 @@ class FinancialReportService:
                 Transaction.created_at >= start,
                 Transaction.created_at < end,
                 Transaction.status == "success",
-                Transaction.type == "credit",
+                Transaction.amount > 0,
             )
         ).one()
 

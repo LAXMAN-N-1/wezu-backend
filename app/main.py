@@ -1,67 +1,18 @@
 import traceback
 import sys
-import ssl
-import asyncio
-from contextlib import asynccontextmanager
-from app.core.logging import setup_logging, get_logger
-
-# Initialize structured logging globally
-setup_logging()
-
-# Ensure ALL models are registered before router initialization to prevent mapper errors
-import app.models.all  # noqa: F401
-
-from fastapi import FastAPI, Depends, Request
+from fastapi import FastAPI, Depends, status, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
-from starlette.middleware.trustedhost import TrustedHostMiddleware
-import sentry_sdk
-from sentry_sdk.integrations.fastapi import FastApiIntegration
+from contextlib import asynccontextmanager
+from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
+from fastapi import FastAPI, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.db.session import engine
-import app.models.all  # Force register all models so relationships map successfully
-from app.api import deps
-from app.middleware.rate_limit import limiter
-from app.middleware.audit import AuditMiddleware
-from app.middleware.security import SecureHeadersMiddleware
-from app.middleware.proxy_headers import TrustedProxyHeadersMiddleware
-from app.middleware.rbac_middleware import RBACMiddleware
-from app.middleware.audit_interceptor import AuditInterceptorMiddleware
-from app.api.errors.handlers import add_exception_handlers
-from app.workers import start_scheduler, stop_scheduler
-from app.services.websocket_service import heartbeat_task
-from app.services.mqtt_service import start_mqtt_service, stop_mqtt_service
-
-# Import all routers (Consolidated)
-# Import all routers (Consolidated)
-from app.api.v1 import (
-    auth, customer_auth, sessions, users, profile, kyc, stations, batteries, 
-    rentals, wallet, payments, notifications, support, favorites, analytics, 
-    transactions, promo, faqs, iot, swaps, i18n, fraud, branches, organizations, 
-    warehouses, screens, stock, dealers, logistics, settlements, telemetry, 
-    telematics, vehicles, locations, system, roles, menus, role_rights, 
-    admin_kyc, audit, ml, inventory, admin_stations, station_monitoring, 
-    dealer_portal_auth, dealer_portal_dashboard, dealer_portal_tickets, 
-    dealer_portal_customers, dealer_portal_settings, dealer_onboarding, 
-    dealer_documents, dealer_portal_roles, dealer_portal_users, 
-    dealer_analytics, dealer_campaigns, dealer_stations, dealer_portal_inventory,
-    drivers, catalog,
-    admin_invoices, admin_financial_reports, admin_audit, admin_rbac, admin_users,
-    admin_dealers, admin_audit_analytics, admin_security_settings, admin_fraud
-)
-from app.api.v1.admin import (
-    support as admin_support, faqs as admin_faqs, analytics as admin_analytics, 
-    users as admin_sub_users, promo as admin_coupons, reviews as admin_reviews, 
-    roles as admin_roles, legal as admin_legal, banners as admin_banners, 
-    media as admin_media, blogs as admin_blogs
-)
-from app.api.admin import router as global_admin_router
-from app.api.v1.dashboard import router as dashboard_router
-from app.api.v1.internal_fix import router as internal_fix_router
-from app.api.webhooks import razorpay as razorpay_webhook
+import ssl
+from contextlib import asynccontextmanager
+import logging
 
 # Fix for macOS local dev SSL certificate verification errors with urlopen
 if settings.ENVIRONMENT != "production":
@@ -72,85 +23,116 @@ if settings.ENVIRONMENT != "production":
     else:
         ssl._create_default_https_context = _create_unverified_https_context
 
-if settings.SENTRY_DSN:
-    sentry_sdk.init(
-        dsn=settings.SENTRY_DSN,
-        environment=settings.ENVIRONMENT,
-        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
-        integrations=[FastApiIntegration()]
-    )
+try:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    if getattr(settings, "SENTRY_DSN", None):
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            environment=settings.ENVIRONMENT,
+            traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+            integrations=[FastApiIntegration()]
+        )
+except ImportError:
+    pass
 
-logger = get_logger(__name__)
+# Customer-facing endpoints
+from app.api.v1 import (
+    auth, users, profile, kyc, stations, station_clusters, batteries, rentals, bookings, warranty,
+    wallet, payments, notifications, support, favorites, analytics, 
+    transactions, promo, faqs, iot, swaps, i18n, fraud, branches, 
+    organizations, warehouses, screens, stock, dealers, logistics, 
+    settlements, telemetry, vehicles, locations, system, roles, 
+    menus, role_rights, admin_kyc, audit, ml, inventory,
+    admin_stations, station_monitoring, battery_alerts,
+    admin_alerts, maintenance, vendors, dealer_portal_settings
+)
 
-from app.utils.cors import cors_headers_for_origin
+from app.api.v1.admin import (
+    support as admin_support, 
+    faqs as admin_faqs, 
+    analytics as admin_analytics, 
+    users as admin_users,
+    promo as admin_coupons,
+    reviews as admin_reviews,
+    roles as admin_roles,
+    legal as admin_legal,
+    banners as admin_banners,
+    media as admin_media,
+    blogs as admin_blogs
+)
+from app.api.admin import router as admin_router
+from app.api.v1.dashboard import router as dashboard_router
+from app.api.webhooks import razorpay as razorpay_webhook
+from app.middleware.rate_limit import limiter
+from app.middleware.audit import AuditMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from app.workers import start_scheduler, stop_scheduler
+from app.services.websocket_service import heartbeat_task
+from app.services.mqtt_service import start_mqtt_service, stop_mqtt_service
+import asyncio
 
-CORS_ALLOWED_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
-CORS_ALLOWED_HEADERS = ["*"]
+logger = logging.getLogger(__name__)
 
-
-class CORSErrorMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
-        origin = request.headers.get("origin", "")
-        for key, value in cors_headers_for_origin(origin).items():
-            response.headers[key] = value
-        return response
-
-
+# ----------------------------
+# Lifespan
+# ----------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Start background scheduler and connections on startup"""
+    """Start background scheduler on app startup and init DB"""
     scheduler_started = False
     mqtt_started = False
 
+    # During tests we skip heavy startup work (DB schema seeds, schedulers, MQTT).
     if settings.ENVIRONMENT == "test":
         yield
         return
 
     if settings.DB_INIT_ON_STARTUP:
         try:
-            logger.info("Running Alembic migrations (DB_INIT_ON_STARTUP is True)...")
-            from alembic.config import Config as AlembicConfig
-            from alembic import command as alembic_command
-            alembic_cfg = AlembicConfig("alembic.ini")
-            alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
-            alembic_command.upgrade(alembic_cfg, "head")
-            logger.info("Alembic migrations complete.")
+            from app.db.session import init_db
+            init_db()
         except Exception:
-            logger.exception("Alembic migration on startup failed; falling back to create_all")
-            try:
-                from app.db.session import init_db
-                init_db()
-            except Exception:
-                logger.exception("Fallback create_all also failed")
+            logger.exception("DB init on startup failed; continuing without bootstrap")
+    else:
+        logger.info("DB bootstrap on startup disabled by configuration")
 
     if settings.RUN_BACKGROUND_TASKS:
-        logger.info("Starting background tasks...")
         if settings.SCHEDULER_ENABLED:
             try:
-                logger.info("Starting background scheduler...")
                 start_scheduler()
                 scheduler_started = True
-                logger.info("Background scheduler started.")
             except Exception:
-                logger.exception("Scheduler startup failed")
+                logger.exception("Scheduler startup failed; continuing without scheduler")
+        else:
+            logger.info("Scheduler disabled by configuration")
 
         if settings.MQTT_ENABLED:
             try:
-                logger.info("Starting MQTT service...")
                 start_mqtt_service()
                 mqtt_started = True
-                logger.info("MQTT service startup sequence initiated.")
             except Exception:
-                logger.exception("MQTT startup failed")
+                logger.exception("MQTT startup failed; continuing without MQTT")
+        else:
+            logger.info("MQTT service disabled by configuration")
 
-        logger.info("Creating heartbeat task...")
         asyncio.create_task(heartbeat_task())
+    else:
+        logger.info("Background tasks disabled by configuration")
     
     yield
     
-    if scheduler_started: stop_scheduler()
-    if mqtt_started: stop_mqtt_service()
+    if scheduler_started:
+        try:
+            stop_scheduler()
+        except Exception:
+            logger.exception("Scheduler shutdown failed")
+    if mqtt_started:
+        try:
+            stop_mqtt_service()
+        except Exception:
+            logger.exception("MQTT shutdown failed")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -158,197 +140,247 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+@app.get("/debug-routes")
+def debug_routes():
+    return {"status": "ok", "routes": [r.path for r in app.routes]}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
 # ----------------------------
-# Middlewares & Global Config
+# Rate Limiting & Exception Handlers
 # ----------------------------
 app.state.limiter = limiter
-add_exception_handlers(app)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+from app.middleware.rbac_middleware import RBACMiddleware
 app.add_middleware(RBACMiddleware)
+
+# GZip Compression
+from fastapi.middleware.gzip import GZipMiddleware
 app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+from app.middleware.security import SecureHeadersMiddleware
 app.add_middleware(SecureHeadersMiddleware)
-if settings.AUDIT_REQUEST_LOGGING_ENABLED:
-    app.add_middleware(AuditMiddleware)
-app.add_middleware(AuditInterceptorMiddleware)
-if settings.ENABLE_TRUSTED_HOST_MIDDLEWARE:
-    app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.ALLOWED_HOSTS)
 
-# Must run before TrustedHostMiddleware to rewrite Host from trusted proxy headers.
-# In Starlette, the most recently added middleware runs first.
-app.add_middleware(TrustedProxyHeadersMiddleware)
+# Audit Logging Middleware
+app.add_middleware(AuditMiddleware)
 
-# Keep error-header patching near the edge, then wrap everything with CORSMiddleware.
-app.add_middleware(CORSErrorMiddleware)
 
-# CORSMiddleware must be the outermost layer (added last) so OPTIONS preflight never
-# reaches auth middleware and CORS headers are consistently returned.
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_origin_regex=settings.cors_allow_origin_regex,
+    allow_origins=settings.CORS_ORIGINS if settings.ENVIRONMENT == "production" else ["*"],
     allow_credentials=True,
-    allow_methods=CORS_ALLOWED_METHODS,
-    allow_headers=CORS_ALLOWED_HEADERS,
-    expose_headers=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-
-@app.options("/{full_path:path}", include_in_schema=False)
-async def global_options_handler(full_path: str, request: Request):
-    origin = request.headers.get("origin", "")
-    headers = {
-        "Access-Control-Allow-Methods": ", ".join(CORS_ALLOWED_METHODS),
-        "Access-Control-Allow-Headers": ", ".join(CORS_ALLOWED_HEADERS),
-        "Access-Control-Max-Age": "600",
-    }
-    headers.update(cors_headers_for_origin(origin))
-    return Response(status_code=200, headers=headers)
-
-# ----------------------------
-# System & Health
-# ----------------------------
-@app.get("/health", tags=["System"])
-async def health_check():
-    """Deep health check for database and basic connectivity"""
-    from sqlalchemy import text
-    db_ok = False
-    redis_ok = False
-    mongo_ok = False
-
-    # PostgreSQL check
-    try:
-        from app.db.session import SessionLocal
-        with SessionLocal() as db:
-            db.execute(text("SELECT 1"))
-            db_ok = True
-    except Exception as e:
-        logger.error(f"Health check DB failure: {e}")
-
-    # Redis check
-    try:
-        import redis
-        r = redis.from_url(settings.REDIS_URL, socket_connect_timeout=2)
-        r.ping()
-        redis_ok = True
-    except Exception as e:
-        logger.error(f"Health check Redis failure: {e}")
-
-    # MongoDB check (non-critical)
-    try:
-        if settings.MONGODB_URL and settings.MONGODB_URL != "mongodb://localhost:27017":
-            from pymongo import MongoClient
-            client = MongoClient(settings.MONGODB_URL, serverSelectionTimeoutMS=2000)
-            client.admin.command("ping")
-            mongo_ok = True
-        else:
-            mongo_ok = None  # Not configured
-    except Exception as e:
-        logger.error(f"Health check MongoDB failure: {e}")
-
-    all_ok = db_ok and redis_ok and (mongo_ok is None or mongo_ok)
-
-    return {
-        "status": "ok" if all_ok else "degraded",
-        "database": "online" if db_ok else "offline",
-        "redis": "online" if redis_ok else "offline",
-        "mongodb": "online" if mongo_ok else ("not_configured" if mongo_ok is None else "offline"),
-        "environment": settings.ENVIRONMENT,
-        "version": settings.APP_VERSION
-    }
+# Shared Auth Routes (needed for admin login at /api/v1/auth/admin/login)
+app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Auth"])
 
 
-@app.get("/ready", tags=["System"])
-async def readiness_check():
-    return await health_check()
+# Customer API Routes
+app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["Authentication"])
 
-@app.get("/", tags=["System"])
-async def root():
-    return {"message": f"Welcome to {settings.PROJECT_NAME} API", "version": settings.APP_VERSION}
+# Customer App Auth (JSON-based login/register for Flutter app)
+from app.api.v1 import customer_auth
+app.include_router(customer_auth.router, prefix=f"{settings.API_V1_STR}/customer/auth", tags=["Customer Auth"])
+from app.api.v1 import sessions
+app.include_router(sessions.router, prefix=f"{settings.API_V1_STR}/sessions", tags=["Session Management"])
+app.include_router(profile.router, prefix=f"{settings.API_V1_STR}/profile", tags=["Customer: Profile"])
+app.include_router(station_clusters.router, prefix=f"{settings.API_V1_STR}/stations", tags=["Customer: Stations"])
+app.include_router(bookings.router, prefix=f"{settings.API_V1_STR}/bookings", tags=["Customer: Bookings"])
+app.include_router(battery_alerts.router, prefix=f"{settings.API_V1_STR}/customer/battery-alerts", tags=["Customer: Battery Alerts"])
+app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["Users"])
+from app.api.v1 import admin_users, admin_user_bulk
+app.include_router(admin_users.router, prefix=f"{settings.API_V1_STR}/admin/users", tags=["Admin User Management"])
+app.include_router(admin_user_bulk.router, prefix=f"{settings.API_V1_STR}/admin/users", tags=["Admin User Bulk Operations"])
+app.include_router(kyc.router, prefix=f"{settings.API_V1_STR}", tags=["KYC"])
+app.include_router(stations.router, prefix=f"{settings.API_V1_STR}/stations", tags=["Stations"])
+app.include_router(batteries.router, prefix=f"{settings.API_V1_STR}/batteries", tags=["Batteries"])
+app.include_router(rentals.router, prefix=f"{settings.API_V1_STR}/rentals", tags=["Rentals"])
+app.include_router(wallet.router, prefix=f"{settings.API_V1_STR}/wallet", tags=["Wallet"])
+app.include_router(payments.router, prefix=f"{settings.API_V1_STR}/payments", tags=["Payments"])
+app.include_router(notifications.router, prefix=f"{settings.API_V1_STR}/notifications", tags=["Notifications"])
+app.include_router(support.router, prefix=f"{settings.API_V1_STR}/support", tags=["Support"])
+app.include_router(favorites.router, prefix=f"{settings.API_V1_STR}/favorites", tags=["Favorites"])
+app.include_router(analytics.router, prefix=f"{settings.API_V1_STR}/analytics", tags=["Analytics"])
+app.include_router(transactions.router, prefix=f"{settings.API_V1_STR}/transactions", tags=["Transactions"])
+app.include_router(promo.router, prefix=f"{settings.API_V1_STR}/promo", tags=["Promo"])
+app.include_router(faqs.router, prefix=f"{settings.API_V1_STR}/faqs", tags=["FAQs"])
+app.include_router(iot.router, prefix=f"{settings.API_V1_STR}/iot", tags=["IoT"])
+app.include_router(swaps.router, prefix=f"{settings.API_V1_STR}/swaps", tags=["Swaps"])
+app.include_router(i18n.router, prefix=f"{settings.API_V1_STR}/i18n", tags=["i18n"])
+app.include_router(fraud.router, prefix=f"{settings.API_V1_STR}/fraud", tags=["Fraud Detection"])
+app.include_router(branches.router, prefix=f"{settings.API_V1_STR}/branches", tags=["Branches"])
+app.include_router(organizations.router, prefix=f"{settings.API_V1_STR}/organizations", tags=["Organizations"])
+app.include_router(warehouses.router, prefix=f"{settings.API_V1_STR}/warehouses", tags=["Warehouses"])
+app.include_router(screens.router, prefix=f"{settings.API_V1_STR}/screens", tags=["UI Configuration"])
+app.include_router(dealer_portal_settings.router, prefix=f"{settings.API_V1_STR}/dealer-portal/settings", tags=["Dealer Portal Settings"])
 
-# ----------------------------
-# API V1 - Customer Endpoints
-# ----------------------------
-v1_str = settings.API_V1_STR
-
-# Authentication
-app.include_router(auth.router, prefix=f"{v1_str}/auth", tags=["Auth"])
-app.include_router(customer_auth.router, prefix=f"{v1_str}/customer/auth", tags=["Customer Auth"])
-app.include_router(sessions.router, prefix=f"{v1_str}/sessions", tags=["Sessions"])
-
-# Core Entities
-app.include_router(users.router, prefix=f"{v1_str}/users", tags=["Users"])
-app.include_router(profile.router, prefix=f"{v1_str}/profile", tags=["Profile"])
-app.include_router(kyc.router, prefix=v1_str, tags=["KYC"])
-app.include_router(stations.router, prefix=f"{v1_str}/stations", tags=["Stations"])
-app.include_router(batteries.router, prefix=f"{v1_str}/batteries", tags=["Batteries"])
-app.include_router(rentals.router, prefix=f"{v1_str}/rentals", tags=["Rentals"])
-app.include_router(vehicles.router, prefix=f"{v1_str}/vehicles", tags=["Vehicles"])
-app.include_router(swaps.router, prefix=f"{v1_str}/swaps", tags=["Swaps"])
-
-# Finance & Notifications
-app.include_router(wallet.router, prefix=f"{v1_str}/wallet", tags=["Wallet"])
-app.include_router(payments.router, prefix=f"{v1_str}/payments", tags=["Payments"])
-app.include_router(notifications.router, prefix=f"{v1_str}/notifications", tags=["Notifications"])
-app.include_router(support.router, prefix=f"{v1_str}/support", tags=["Support"])
-app.include_router(favorites.router, prefix=f"{v1_str}/favorites", tags=["Favorites"])
-
-# Utility & Information
-app.include_router(promo.router, prefix=f"{v1_str}/promo", tags=["Promo"])
-app.include_router(faqs.router, prefix=f"{v1_str}/faqs", tags=["FAQs"])
-app.include_router(catalog.router, prefix=f"{v1_str}/catalog", tags=["Catalog"])
-app.include_router(i18n.router, prefix=f"{v1_str}/i18n", tags=["i18n"])
-app.include_router(screens.router, prefix=f"{v1_str}/screens", tags=["UI Config"])
-
-# ----------------------------
-# API V1 - Admin Endpoints
-# ----------------------------
-admin_api = f"{v1_str}/admin"
+# 2. Admin Application Endpoints
+admin_api = f"{settings.API_V1_STR}/admin"
+from app.api import deps
 admin_deps = [Depends(deps.get_current_active_superuser)]
 
-# Global Admin Router
-app.include_router(global_admin_router, prefix=admin_api, tags=["Admin: Core"], dependencies=admin_deps)
-app.include_router(dashboard_router, prefix=f"{v1_str}/dashboard", tags=["Admin: Dashboard"], dependencies=admin_deps)
-
-# Admin Domain Specific
+# Use the consolidated admin router which includes stations, users, rentals, etc.
+app.include_router(admin_router, prefix=f"{admin_api}", tags=["Admin: Main"], dependencies=admin_deps)
+app.include_router(admin_alerts.router, prefix=f"{admin_api}/alerts", tags=["Admin: Alerts"], dependencies=admin_deps)
+app.include_router(maintenance.router, prefix=f"{admin_api}/maintenance", tags=["Admin: Maintenance"], dependencies=admin_deps)
+app.include_router(vendors.router, prefix=f"{admin_api}/vendors", tags=["Admin: Vendors"], dependencies=admin_deps)
+app.include_router(inventory.router, prefix=f"{admin_api}/inventory", tags=["Admin: Inventory"], dependencies=admin_deps)
+app.include_router(warranty.admin_router, prefix=f"{admin_api}/warranty", tags=["Admin: Warranty"], dependencies=admin_deps)
 app.include_router(admin_users.router, prefix=f"{admin_api}/users", tags=["Admin: Users"], dependencies=admin_deps)
+app.include_router(admin_roles.router, prefix=f"{admin_api}/roles", tags=["Admin: Roles"], dependencies=admin_deps)
 app.include_router(admin_kyc.router, prefix=f"{admin_api}/kyc", tags=["Admin: KYC"], dependencies=admin_deps)
-app.include_router(admin_stations.router, prefix=f"{admin_api}/stations", tags=["Admin: Stations"], dependencies=admin_deps)
-app.include_router(admin_invoices.router, prefix=f"{admin_api}/invoices", tags=["Admin: Invoices"], dependencies=admin_deps)
+app.include_router(audit.router, prefix=f"{admin_api}/audit", tags=["Admin: Audit"], dependencies=admin_deps)
+app.include_router(fraud.router, prefix=f"{admin_api}/fraud", tags=["Admin: Fraud"], dependencies=admin_deps)
+app.include_router(ml.router, prefix=f"{admin_api}/ml", tags=["Admin: ML & Analytics"], dependencies=admin_deps)
+app.include_router(admin_support.router, prefix=f"{admin_api}/support", tags=["Admin: Support"], dependencies=admin_deps)
+app.include_router(admin_faqs.router, prefix=f"{admin_api}/faq", tags=["Admin: FAQ"], dependencies=admin_deps)
+app.include_router(admin_legal.router, prefix=f"{admin_api}/legal", tags=["Admin: CMS - Legal"], dependencies=admin_deps)
+app.include_router(admin_banners.router, prefix=f"{admin_api}/banners", tags=["Admin: CMS - Banners"], dependencies=admin_deps)
+app.include_router(admin_media.router, prefix=f"{admin_api}/media", tags=["Admin: CMS - Media"], dependencies=admin_deps)
 app.include_router(admin_analytics.router, prefix=f"{admin_api}/analytics", tags=["Admin: Analytics"], dependencies=admin_deps)
-app.include_router(admin_audit.router, prefix=f"{admin_api}/audit-logs", tags=["Admin: Audit"], dependencies=admin_deps)
-app.include_router(admin_rbac.router, prefix=f"{admin_api}/rbac", tags=["Admin: RBAC"], dependencies=admin_deps)
-app.include_router(admin_legal.router, prefix=f"{admin_api}/legal", tags=["Admin: Legal"], dependencies=admin_deps)
-app.include_router(admin_banners.router, prefix=f"{admin_api}/banners", tags=["Admin: Banners"], dependencies=admin_deps)
-app.include_router(admin_blogs.router, prefix=f"{admin_api}/blogs", tags=["Admin: Blogs"], dependencies=admin_deps)
-app.include_router(admin_dealers.router, prefix=f"{admin_api}/dealers", tags=["Admin: Dealers"], dependencies=admin_deps)
-app.include_router(admin_audit_analytics.router, prefix=f"{admin_api}/audit-analytics", tags=["Admin: Audit Analytics"], dependencies=admin_deps)
-app.include_router(admin_security_settings.router, prefix=f"{admin_api}/security", tags=["Admin: Security Settings"], dependencies=admin_deps)
-app.include_router(admin_fraud.router, prefix=f"{admin_api}/fraud", tags=["Admin: Fraud Monitoring"], dependencies=admin_deps)
+app.include_router(admin_coupons.router, prefix=f"{admin_api}/coupons", tags=["Admin: Coupons"], dependencies=admin_deps)
+app.include_router(admin_blogs.router, prefix=f"{admin_api}/blogs", tags=["Admin: CMS - Blogs"], dependencies=admin_deps)
+app.include_router(admin_reviews.router, prefix=f"{admin_api}/reviews", tags=["Admin: Review Moderation"], dependencies=admin_deps)
+app.include_router(admin_stations.router, prefix=f"{admin_api}/stations", tags=["Admin: Stations"], dependencies=admin_deps)
 
-# ----------------------------
-# API V1 - Dealer Endpoints
-# ----------------------------
-dealer_api = f"{v1_str}/dealer"
-dealer_deps = [Depends(deps.get_current_user)]
+# Dashboard specific
+app.include_router(dashboard_router, prefix=f"{settings.API_V1_STR}/dashboard", tags=["Admin: Dashboard"], dependencies=admin_deps)
 
-app.include_router(dealer_portal_auth.router, prefix=f"{dealer_api}/auth", tags=["Dealer: Auth"])
-app.include_router(dealers.router, prefix=f"{v1_str}/dealers", tags=["Dealer: Profile"], dependencies=dealer_deps)
-app.include_router(dealer_stations.router, prefix=f"{v1_str}/dealer-stations", tags=["Dealer: Stations"], dependencies=dealer_deps)
-app.include_router(dealer_portal_dashboard.router, prefix=f"{dealer_api}/portal", tags=["Dealer: Dashboard"], dependencies=dealer_deps)
-app.include_router(dealer_portal_tickets.router, prefix=f"{dealer_api}/portal/tickets", tags=["Dealer: Tickets"], dependencies=dealer_deps)
-app.include_router(dealer_portal_roles.router, prefix=f"{dealer_api}/portal/roles", tags=["Dealer: Roles"], dependencies=dealer_deps)
-app.include_router(dealer_portal_users.router, prefix=f"{dealer_api}/portal/users", tags=["Dealer: Users"], dependencies=dealer_deps)
-app.include_router(dealer_portal_settings.router, prefix=f"{dealer_api}/portal/settings", tags=["Dealer: Settings"], dependencies=dealer_deps)
-app.include_router(dealer_analytics.router, prefix=f"{dealer_api}/analytics", tags=["Dealer: Analytics"], dependencies=dealer_deps)
-app.include_router(dealer_portal_customers.router, prefix=f"{dealer_api}/analytics", tags=["Dealer: Customers"], dependencies=dealer_deps)
-app.include_router(dealer_campaigns.router, prefix=f"{dealer_api}/campaigns", tags=["Dealer: Campaigns"], dependencies=dealer_deps)
-app.include_router(dealer_onboarding.router, prefix=f"{dealer_api}/onboarding", tags=["Dealer: Onboarding"], dependencies=dealer_deps)
-app.include_router(dealer_portal_inventory.router, prefix=f"{dealer_api}/portal", tags=["Dealer: Inventory"], dependencies=dealer_deps)
+# 3. Monitoring Application Endpoints
+monitoring_api = f"{settings.API_V1_STR}/monitoring"
+from app.api.v1 import station_monitoring
+app.include_router(station_monitoring.router, prefix=f"{monitoring_api}/stations", tags=["Monitoring: Stations"])
 
-# ----------------------------
-# API V1 - Logistics & System
-# ----------------------------
-app.include_router(logistics.router, prefix=f"{v1_str}/logistics", tags=["Logistics"])
-app.include_router(telematics.router, prefix=f"{v1_str}/telematics", tags=["Telematics"])
-app.include_router(iot.router, prefix=f"{v1_str}/iot", tags=["IoT"])
+# 3. Dealer Application Endpoints
+dealer_api = f"{settings.API_V1_STR}/dealer"
+dealer_deps = [Depends(deps.get_current_user)] # Granular checks inside routers for now, or check_permission("dealer_dashboard")
+app.include_router(dealers.router, prefix=f"{dealer_api}/profile", tags=["Dealer: Profile"], dependencies=dealer_deps)
+app.include_router(stock.router, prefix=f"{dealer_api}/stock", tags=["Dealer: Stock"], dependencies=dealer_deps)
+app.include_router(settlements.router, prefix=f"{dealer_api}/settlements", tags=["Dealer: Settlements"], dependencies=dealer_deps)
+
+# 3b. Dealer Portal Endpoints (Auth, Dashboard, Tickets, Customers, Settings, Onboarding, Documents, Roles)
+from app.api.v1 import dealer_portal_auth, dealer_portal_dashboard, dealer_portal_tickets, dealer_portal_customers, dealer_portal_settings, dealer_onboarding, dealer_documents, dealer_portal_roles, dealer_portal_users
+app.include_router(dealer_portal_auth.router, prefix=f"{dealer_api}/auth", tags=["Dealer Portal: Auth"])
+app.include_router(dealer_onboarding.router, prefix=f"{dealer_api}/onboarding", tags=["Dealer Portal: Onboarding"], dependencies=dealer_deps)
+app.include_router(dealer_documents.router, prefix=f"{dealer_api}/documents", tags=["Dealer Portal: Documents"], dependencies=dealer_deps)
+app.include_router(dealer_portal_dashboard.router, prefix=f"{dealer_api}/portal", tags=["Dealer Portal: Dashboard"], dependencies=dealer_deps)
+app.include_router(dealer_portal_tickets.router, prefix=f"{dealer_api}/portal/tickets", tags=["Dealer Portal: Tickets"], dependencies=dealer_deps)
+app.include_router(dealer_portal_customers.router, prefix=f"{dealer_api}/portal/customers", tags=["Dealer Portal: Customers"], dependencies=dealer_deps)
+app.include_router(dealer_portal_settings.router, prefix=f"{dealer_api}/portal/settings", tags=["Dealer Portal: Settings"], dependencies=dealer_deps)
+app.include_router(dealer_portal_roles.router, prefix=f"{dealer_api}/portal/roles", tags=["Dealer Portal: Roles"], dependencies=dealer_deps)
+app.include_router(dealer_portal_users.router, prefix=f"{dealer_api}/portal/users", tags=["Dealer Portal: Users"], dependencies=dealer_deps)
+
+
+# 4. Logistics Application Endpoints
+logistics_api = f"{settings.API_V1_STR}/logistics"
+logistics_deps = [Depends(deps.get_current_user)]
+app.include_router(logistics.router, prefix=f"{logistics_api}", tags=["Logistics: Main"], dependencies=logistics_deps)
+app.include_router(warehouses.router, prefix=f"{logistics_api}/warehouses", tags=["Logistics: Warehouses"], dependencies=logistics_deps)
+
+
+# Customer Vehicles
+from app.api.v1 import vehicles
+app.include_router(vehicles.router, prefix=f"{settings.API_V1_STR}/vehicles", tags=["Customer Vehicles"])
+# Swap Operations
+from app.api.v1 import swaps
+app.include_router(swaps.router, prefix=f"{settings.API_V1_STR}/swaps", tags=["Swap Operations"])
+
+# Financial Settlements
+from app.api.v1 import settlements
+app.include_router(settlements.router, prefix=f"{settings.API_V1_STR}/settlements", tags=["Financial Settlements"])
+
+# Telematics Ingestion
+from app.api.v1 import telematics
+app.include_router(telematics.router, prefix=f"{settings.API_V1_STR}/telematics", tags=["Telematics & IoT"])
+app.include_router(telemetry.router, prefix=f"{settings.API_V1_STR}/telemetry", tags=["Telemetry"])
+app.include_router(locations.router, prefix=f"{settings.API_V1_STR}/locations", tags=["Locations"])
+app.include_router(system.router, prefix=f"{settings.API_V1_STR}/system", tags=["System & Metrics"])
+
+# Support Tickets
+from app.api.v1 import support
+app.include_router(support.router, prefix=f"{settings.API_V1_STR}/support", tags=["Support & Ticketing"])
+
+# Admin / RBAC
+from app.api.v1 import admin_rbac, security
+app.include_router(admin_rbac.router, prefix=f"{settings.API_V1_STR}/admin/rbac", tags=["Admin RBAC"])
+app.include_router(security.router, prefix=f"{settings.API_V1_STR}/admin/security", tags=["Admin Security"])
+
+# Analytics & Enhanced Endpoints
+from app.api.v1 import admin_analytics
+app.include_router(admin_analytics.router, prefix=f"{settings.API_V1_STR}/admin/analytics", tags=["Admin Analytics"])
+
+# Swap Operations
+from app.api.v1 import swaps
+app.include_router(swaps.router, prefix=f"{settings.API_V1_STR}/swaps", tags=["Swap Operations"])
+
+from app.api.v1 import admin_audit
+app.include_router(admin_audit.router, prefix=f"{settings.API_V1_STR}/admin/audit-logs", tags=["Admin Audit Logs"])
+from app.api.v1 import admin_invoices
+app.include_router(admin_invoices.router, prefix=f"{settings.API_V1_STR}/admin/invoices", tags=["Admin: Invoices"])
+
+# Dealer Analytics & Management
+from app.api.v1 import dealer_analytics, dealer_campaigns, dealer_stations
+app.include_router(dealer_analytics.router, prefix=f"{settings.API_V1_STR}/dealer-analytics", tags=["Dealer Analytics"])
+app.include_router(dealer_campaigns.router, prefix=f"{settings.API_V1_STR}/dealer-campaigns", tags=["Dealer Campaigns"])
+app.include_router(dealer_stations.router, prefix=f"{settings.API_V1_STR}/dealer-stations", tags=["Dealer Stations"])
+# RBAC API Routes
+app.include_router(roles.router, prefix=f"{settings.API_V1_STR}/roles", tags=["Roles"])
+app.include_router(menus.router, prefix=f"{settings.API_V1_STR}/menus", tags=["Menus"])
+app.include_router(role_rights.router, prefix=f"{settings.API_V1_STR}/role-rights", tags=["Role Rights"])
+
+# ML & Dynamics (Phase 5)
+from app.api.v1 import ml, admin_roles, admin_kyc, admin_financial_reports, admin_users
+app.include_router(ml.router, prefix=f"{settings.API_V1_STR}/ml", tags=["Machine Learning"])
+app.include_router(admin_roles.router, prefix=f"{settings.API_V1_STR}/admin", tags=["Admin Role Management"])
+app.include_router(admin_kyc.router, prefix=f"{settings.API_V1_STR}/admin/kyc", tags=["Admin KYC Management"])
+app.include_router(admin_financial_reports.router, prefix=f"{settings.API_V1_STR}/admin/reports", tags=["Admin Financial Reports"])
+app.include_router(admin_users.router, prefix=f"{settings.API_V1_STR}/admin/users", tags=["Admin User Analytics"])
+
+# Audit Logs
+from app.api.v1 import audit
+app.include_router(audit.router, prefix=f"{settings.API_V1_STR}/audit", tags=["Audit Logs"])
+
+
+# Test Reports (CI / QA)
+from app.api.v1 import test_reports
+app.include_router(test_reports.router, prefix=f"{settings.API_V1_STR}/test-reports", tags=["Test Reports"])
+
+# Webhooks
 app.include_router(razorpay_webhook.router, prefix="/api/webhooks", tags=["Webhooks"])
+
+# Battery Catalog (Specs)
+from app.api.v1 import catalog
+app.include_router(catalog.router, prefix=f"{settings.API_V1_STR}/catalog", tags=["Battery Catalog"])
+
+# Logistics already included above
+
+# Dealer Onboarding
+from app.api.v1 import dealers, dealer_kyc, dealer_commission
+app.include_router(dealers.router, prefix=f"{settings.API_V1_STR}/dealers", tags=["Dealers"])
+app.include_router(dealer_kyc.router, prefix=f"{settings.API_V1_STR}/dealer-kyc", tags=["Dealer KYC"])
+app.include_router(dealer_commission.router, prefix=f"{settings.API_V1_STR}/dealer-commission", tags=["Dealer Commission & Settlement"])
+app.include_router(admin_financial_reports.router, prefix=f"{settings.API_V1_STR}/admin/reports", tags=["Admin Financial Reports"])
+
+# Driver Onboarding
+from app.api.v1 import drivers
+app.include_router(drivers.router, prefix=f"{settings.API_V1_STR}/drivers", tags=["Driver Onboarding"])
+
+
+@app.get("/")
+async def root():
+    return {
+        "message": "Welcome to WEZU Energy API",
+        "status": "Running",
+        "version": "1.0.0",
+    }
+
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}

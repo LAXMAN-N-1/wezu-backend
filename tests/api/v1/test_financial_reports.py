@@ -5,7 +5,7 @@ from sqlmodel import Session, select
 from app.models.user import User
 from app.models.roles import RoleEnum
 from app.models.rbac import Role, UserRole
-from app.models.financial import Wallet, Transaction
+from app.models.financial import Wallet, Transaction, TransactionType, TransactionStatus
 from app.models.revenue_report import RevenueReport
 
 
@@ -25,24 +25,29 @@ def admin_and_dealer(session: Session):
         session.add(dealer_role)
     session.commit()
 
-    admin = User(
-        email="fin_admin@test.com", hashed_password="pw",
-        is_active=True, is_superuser=True, status="active",
-    )
-    session.add(admin)
-    session.commit()
-    session.refresh(admin)
-    session.add(UserRole(user_id=admin.id, role_id=admin_role.id))
+    admin = session.exec(select(User).where(User.email == "fin_admin@test.com")).first()
+    if not admin:
+        admin = User(
+            email="fin_admin@test.com", hashed_password="pw",
+            is_active=True, is_superuser=True, status="active",
+        )
+        session.add(admin)
+        session.commit()
+        session.refresh(admin)
+        session.add(UserRole(user_id=admin.id, role_id=admin_role.id))
+        session.commit()
 
-    dealer = User(
-        email="fin_dealer@test.com", hashed_password="pw",
-        is_active=True, status="active",
-    )
-    session.add(dealer)
-    session.commit()
-    session.refresh(dealer)
-    session.add(UserRole(user_id=dealer.id, role_id=dealer_role.id))
-    session.commit()
+    dealer = session.exec(select(User).where(User.email == "fin_dealer@test.com")).first()
+    if not dealer:
+        dealer = User(
+            email="fin_dealer@test.com", hashed_password="pw",
+            is_active=True, status="active",
+        )
+        session.add(dealer)
+        session.commit()
+        session.refresh(dealer)
+        session.add(UserRole(user_id=dealer.id, role_id=dealer_role.id))
+        session.commit()
 
     # Create wallet + transactions for aggregation testing
     wallet = Wallet(user_id=admin.id, balance=1000.0)
@@ -52,20 +57,18 @@ def admin_and_dealer(session: Session):
 
     now = datetime.now(UTC)
     txns = [
-        Transaction(wallet_id=wallet.id, amount=500.0, balance_after=1500.0,
-                     type="credit", category="deposit", status="success",
-                     reference_type="payment_gateway", razorpay_payment_id="pay_test1",
+        Transaction(user_id=admin.id, wallet_id=wallet.id, amount=500.0,
+                     transaction_type=TransactionType.WALLET_TOPUP, status=TransactionStatus.SUCCESS,
+                     payment_gateway_ref="pay_test1", created_at=now),
+        Transaction(user_id=admin.id, wallet_id=wallet.id, amount=300.0,
+                     transaction_type=TransactionType.SWAP_FEE, status=TransactionStatus.SUCCESS,
                      created_at=now),
-        Transaction(wallet_id=wallet.id, amount=300.0, balance_after=1800.0,
-                     type="credit", category="swap_fee", status="success",
-                     reference_type="swap_session", created_at=now),
-        Transaction(wallet_id=wallet.id, amount=-50.0, balance_after=1750.0,
-                     type="debit", category="refund", status="success",
-                     reference_type="admin_adjustment", created_at=now),
-        Transaction(wallet_id=wallet.id, amount=200.0, balance_after=1950.0,
-                     type="credit", category="deposit", status="success",
-                     reference_type="payment_gateway", razorpay_payment_id="pay_test2",
-                     created_at=now),
+        Transaction(user_id=admin.id, wallet_id=wallet.id, amount=-50.0,
+                     transaction_type=TransactionType.REFUND, status=TransactionStatus.SUCCESS,
+                     description="Test Refund", created_at=now),
+        Transaction(user_id=admin.id, wallet_id=wallet.id, amount=200.0,
+                     transaction_type=TransactionType.WALLET_TOPUP, status=TransactionStatus.SUCCESS,
+                     payment_gateway_ref="pay_test2", created_at=now),
     ]
     for t in txns:
         session.add(t)
