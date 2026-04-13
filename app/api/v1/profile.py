@@ -18,7 +18,7 @@ from app.schemas.user import (
     AddressUpdate,
     AddressResponse,
 )
-from app.schemas.input_contracts import PreferencesUpdate
+from app.schemas.input_contracts import PreferencesUpdate, ChangePasswordRequest
 
 from app.api import deps
 from app.api.deps import invalidate_user_token_cache
@@ -281,13 +281,11 @@ def upload_profile_picture(
 
 @router.post("/change-password")
 def change_password(
-    data: "ChangePasswordRequest",
+    data: ChangePasswordRequest,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ):
     """Change password"""
-    from app.schemas.input_contracts import ChangePasswordRequest
-
     if not verify_password(data.old_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect password")
 

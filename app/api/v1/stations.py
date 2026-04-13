@@ -18,6 +18,7 @@ from app.models.station import StationStatus, Station, StationImage
 from app.models.battery import Battery
 from app.models.favorite import Favorite
 from datetime import datetime, UTC
+from app.schemas.input_contracts import MaintenanceTaskCreate
 
 router = APIRouter()
 
@@ -196,11 +197,10 @@ async def read_station_maintenance_schedule(
 @router.post("/{station_id}/maintenance-schedule")
 async def create_station_maintenance_task(
     station_id: int,
-    data: "MaintenanceTaskCreate",
+    data: MaintenanceTaskCreate,
     current_user: User = Depends(deps.get_current_active_superuser),
     db: Session = Depends(deps.get_db),
 ):
-    from app.schemas.input_contracts import MaintenanceTaskCreate
     task_data = data.model_dump(exclude_unset=True)
     task_data.update({"entity_type": "station", "entity_id": station_id})
     return MaintenanceService.record_maintenance(db, current_user.id, task_data)

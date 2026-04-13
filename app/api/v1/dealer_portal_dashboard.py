@@ -19,6 +19,7 @@ from app.models.notification import Notification
 from app.models.rental import Rental
 from app.models.dealer_promotion import DealerPromotion, PromotionUsage
 from app.utils.runtime_cache import cached_call
+from app.schemas.input_contracts import DealerDocumentUpload
 
 router = APIRouter()
 
@@ -452,12 +453,11 @@ def list_dealer_documents(
 
 @router.post("/documents/upload")
 def upload_dealer_document(
-    data: "DealerDocumentUpload",
+    data: DealerDocumentUpload,
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Upload a new document or a newer version of an existing document."""
-    from app.schemas.input_contracts import DealerDocumentUpload
     dealer = _get_dealer(db, current_user.id)
     from app.models.dealer import DealerDocument
 
