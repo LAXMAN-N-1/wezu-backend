@@ -12,8 +12,8 @@ class Order(SQLModel, table=True):
     
     id: str = Field(primary_key=True)  # ORD-XXXXXX
     # Statuses: pending, in_transit, delivered, failed, cancelled
-    status: str = Field(default="pending")
-    priority: str = Field(default="normal")  # urgent, normal, low
+    status: str = Field(default="pending", index=True)
+    priority: str = Field(default="normal", index=True)  # urgent, normal, low
     units: int = Field(default=1)
     destination: str
     
@@ -28,10 +28,10 @@ class Order(SQLModel, table=True):
     tracking_number: Optional[str] = None
     # Denormalized JSON mirror for API compatibility. Source of truth is logistics_order_batteries.
     assigned_battery_ids: Optional[str] = None
-    assigned_driver_id: Optional[int] = Field(default=None, foreign_key="driver_profiles.id")
-    
+    assigned_driver_id: Optional[int] = Field(default=None, foreign_key="driver_profiles.id", index=True)
+
     # Timestamps
-    order_date: datetime = Field(default_factory=datetime.utcnow)
+    order_date: datetime = Field(default_factory=datetime.utcnow, index=True)
     estimated_delivery: Optional[datetime] = None
     dispatch_date: Optional[datetime] = None
     delivered_at: Optional[datetime] = None

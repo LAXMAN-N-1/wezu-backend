@@ -120,3 +120,13 @@ from app.models.notification_admin import PushCampaign, AutomatedTrigger, Notifi
 from app.models.api_key import ApiKeyConfig
 from app.models.dealer_stock_request import DealerStockRequest
 
+# Previously orphaned — imported so SQLModel.metadata sees them (required for
+# alembic autogenerate to include these tables).
+from app.models.analytics import DemandForecast, ChurnPrediction, PricingRecommendation
+from app.models.battery_reservation import BatteryReservation
+from app.models.biometric import BiometricCredential
+from app.models.cart import CartItem
+from app.models.inventory_audit import InventoryAuditLog
+from app.models.security_question import SecurityQuestion, UserSecurityQuestion
+from app.models.user_history import UserStatusLog
+

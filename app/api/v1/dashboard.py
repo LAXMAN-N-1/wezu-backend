@@ -155,35 +155,24 @@ async def get_dashboard_summary(
     current_metrics = get_metrics_for_period(current_start, now)
     previous_metrics = get_metrics_for_period(previous_start, previous_end)
 
-    period_rentals = db.exec(
-        select(Rental.start_time, Rental.end_time).where(
-            Rental.start_time >= current_start,
-            Rental.start_time < now,
-            Rental.end_time.isnot(None),
+    # Compute avg session duration in SQL rather than loading every rental row
+    # into Python. Returns duration in minutes (epoch seconds / 60).
+    def _avg_session_minutes(range_start: datetime, range_end: datetime) -> float:
+        duration_seconds = func.extract(
+            "epoch", Rental.end_time - Rental.start_time
         )
-    ).all()
+        avg_seconds = db.exec(
+            select(func.avg(duration_seconds)).where(
+                Rental.start_time >= range_start,
+                Rental.start_time < range_end,
+                Rental.end_time.isnot(None),
+                Rental.end_time > Rental.start_time,
+            )
+        ).first()
+        return float(avg_seconds) / 60.0 if avg_seconds else 0.0
 
-    current_avg_session = 0.0
-    if period_rentals:
-        total_seconds = sum((end - start).total_seconds() for start, end in period_rentals if end and start and end > start)
-        valid_sessions = sum(1 for start, end in period_rentals if end and start and end > start)
-        if valid_sessions > 0:
-            current_avg_session = float(total_seconds) / valid_sessions / 60.0
-
-    prev_period_rentals = db.exec(
-        select(Rental.start_time, Rental.end_time).where(
-            Rental.start_time >= previous_start,
-            Rental.start_time < previous_end,
-            Rental.end_time.isnot(None),
-        )
-    ).all()
-
-    previous_avg_session = 0.0
-    if prev_period_rentals:
-        total_seconds = sum((end - start).total_seconds() for start, end in prev_period_rentals if end and start and end > start)
-        valid_sessions = sum(1 for start, end in prev_period_rentals if end and start and end > start)
-        if valid_sessions > 0:
-            previous_avg_session = float(total_seconds) / valid_sessions / 60.0
+    current_avg_session = _avg_session_minutes(current_start, now)
+    previous_avg_session = _avg_session_minutes(previous_start, previous_end)
 
     total_batteries_val = db.exec(select(func.count(Battery.id))).first()
     total_batteries = int(total_batteries_val) if total_batteries_val else 0
