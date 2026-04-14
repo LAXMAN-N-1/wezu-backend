@@ -13,7 +13,7 @@ This repository now uses a layered Compose deployment model with a multi-stage D
 Start stateful dependencies first.
 
 ```bash
-docker compose -f docker-compose.yml up -d db redis
+docker compose -f docker-compose.yml --profile local-db up -d db redis
 # Optional IoT broker:
 docker compose -f docker-compose.yml --profile iot up -d mqtt
 ```
@@ -38,6 +38,11 @@ Start background scheduler and event workers.
 ```bash
 docker compose -f docker-compose.yml --profile workers up -d scheduler event-worker
 ```
+
+Note:
+- Default `docker compose -f docker-compose.yml up -d` starts only `api` + `redis`.
+- Postgres is now opt-in behind `local-db` profile so managed/external DB setups stay cleaner.
+- If you do not use `local-db`, set `DATABASE_URL` to your managed Postgres URL in `.env`/platform env.
 
 ## Local Development
 

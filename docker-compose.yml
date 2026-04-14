@@ -32,7 +32,7 @@ x-app-environment: &app-environment
   LOGISTICS_SCHEMA_CHECK_ENABLED: ${LOGISTICS_SCHEMA_CHECK_ENABLED:-false}
   LOGISTICS_SCHEMA_STRICT: ${LOGISTICS_SCHEMA_STRICT:-false}
   SQL_SLOW_QUERY_LOG_MS: ${SQL_SLOW_QUERY_LOG_MS:-500}
-  ALLOW_START_WITHOUT_DB: ${ALLOW_START_WITHOUT_DB:-false}
+  ALLOW_START_WITHOUT_DB: ${ALLOW_START_WITHOUT_DB:-true}
   AUDIT_REQUEST_LOGGING_ENABLED: ${AUDIT_REQUEST_LOGGING_ENABLED:-true}
   AUDIT_REQUEST_QUEUE_MAXSIZE: ${AUDIT_REQUEST_QUEUE_MAXSIZE:-2000}
   AUDIT_REQUEST_BATCH_SIZE: ${AUDIT_REQUEST_BATCH_SIZE:-50}
@@ -74,6 +74,7 @@ x-app-service: &app-service
 services:
   db:
     image: postgres:15-alpine
+    profiles: ["local-db"]
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-wezu}
@@ -144,8 +145,8 @@ services:
       - "8000"
     environment:
       <<: *app-environment
-      WAIT_FOR_DB: "true"
-      WAIT_FOR_REDIS: "true"
+      WAIT_FOR_DB: ${WAIT_FOR_DB:-false}
+      WAIT_FOR_REDIS: ${WAIT_FOR_REDIS:-true}
       RUN_DB_MIGRATIONS: ${RUN_DB_MIGRATIONS:-false}
       RUN_BACKGROUND_TASKS: "false"
       SCHEDULER_ENABLED: "false"

@@ -63,6 +63,8 @@ Notes:
 - Internal nginx service is removed.
 - Production compose no longer publishes `80/443` from a bundled nginx.
 - Local database can be enabled via the optional `local-db` profile in `docker-compose.prod.yml`.
+- Root compose keeps Postgres behind `local-db` profile; default stack is API + Redis.
+- In Coolify, assign a public domain only to `api`; keep all other services internal/private.
 
 ## 4. Deploy
 
