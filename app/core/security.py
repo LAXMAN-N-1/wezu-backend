@@ -9,7 +9,7 @@ import secrets
 
 from app.core.config import settings
 
-pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
+pwd_context = CryptContext(schemes=["bcrypt", "pbkdf2_sha256"], deprecated="auto")
 
 
 # ── JWT ────────────────────────────────────────────────────────────────────

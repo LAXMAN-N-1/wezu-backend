@@ -16,7 +16,7 @@ Revises: (auto-detect)
 from alembic import op
 
 revision = "perf_indexes_ph11"
-down_revision = None  # Will be set by autogenerate; safe for manual apply
+down_revision = "b2c3d4e5f6g7"
 branch_labels = None
 depends_on = None
 

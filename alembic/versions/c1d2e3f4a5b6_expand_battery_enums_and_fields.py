@@ -7,7 +7,7 @@ types (customer, transit, shelf).  Add lifecycle milestone columns to batteries.
 Also fixes RentalService.return_battery referencing drop_station_id (now uses
 end_station_id which already exists in the model).
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: c1d2e3f4a5b6
 Revises: 3f9b2a1c4d5e
 Create Date: 2026-04-07 00:20:00.000000
 
@@ -18,7 +18,7 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision: str = "a1b2c3d4e5f6"
+revision: str = "c1d2e3f4a5b6"
 down_revision: Union[str, None] = "3f9b2a1c4d5e"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

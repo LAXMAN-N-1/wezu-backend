@@ -68,7 +68,16 @@ def _on_connect(dbapi_connection, connection_record):
     elif parsed_url.drivername.startswith("postgresql"):
         cursor = dbapi_connection.cursor()
         try:
-            cursor.execute("SET search_path TO public")
+            # Detect actual schema where app tables live; fall back to public.
+            cursor.execute(
+                "SELECT table_schema FROM information_schema.tables "
+                "WHERE table_name = 'users' "
+                "  AND table_schema NOT IN ('information_schema', 'pg_catalog') "
+                "LIMIT 1"
+            )
+            row = cursor.fetchone()
+            app_schema = row[0] if row else "public"
+            cursor.execute(f"SET search_path TO {app_schema}, public")
         finally:
             cursor.close()
 
