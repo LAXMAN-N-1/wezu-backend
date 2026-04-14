@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     DATABASE_CONNECT_TIMEOUT_SECONDS: int = 10
     DATABASE_SSL_MODE: Optional[str] = None
     SQL_SLOW_QUERY_LOG_MS: int = 0
+    SQL_SLOW_QUERY_WARN_COOLDOWN_SECONDS: int = 60
+    SQL_SLOW_QUERY_IGNORE_PATTERNS: list[str] = ["from order_realtime_outbox"]
     STARTUP_DIAGNOSTICS_CACHE_TTL_SECONDS: float = 5.0
 
     # ── Redis (Sessions & Caching) ─────────────────────────────────────────
@@ -437,6 +439,7 @@ class Settings(BaseSettings):
         "TRUSTED_PROXY_CIDRS", "PASSKEY_ORIGINS",
         "PASSKEY_ANDROID_RELATIONS", "PASSKEY_ANDROID_SHA256_CERT_FINGERPRINTS",
         "SUPABASE_ALLOWED_ALGORITHMS", "LOG_EXCLUDE_PATHS",
+        "SQL_SLOW_QUERY_IGNORE_PATTERNS",
         "DB_NOOP_MUTATION_IGNORE_TABLES",
         mode="before",
     )

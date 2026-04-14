@@ -114,10 +114,25 @@ def _mutation_info(statement: object) -> tuple[str | None, str | None]:
 
 def _register_sql_observability() -> None:
     slow_threshold_ms = int(getattr(settings, "SQL_SLOW_QUERY_LOG_MS", 0) or 0)
+    slow_warn_cooldown_seconds = max(
+        0, int(getattr(settings, "SQL_SLOW_QUERY_WARN_COOLDOWN_SECONDS", 0) or 0)
+    )
+    slow_ignore_patterns = tuple(
+        pattern.strip().lower()
+        for pattern in (getattr(settings, "SQL_SLOW_QUERY_IGNORE_PATTERNS", []) or [])
+        if pattern and pattern.strip()
+    )
     log_noop_mutations = bool(getattr(settings, "DB_LOG_NOOP_MUTATIONS", True))
-    ignore_tables = {name.strip().lower() for name in (settings.DB_NOOP_MUTATION_IGNORE_TABLES or []) if name.strip()}
+    ignore_tables = {
+        name.strip().lower()
+        for name in (settings.DB_NOOP_MUTATION_IGNORE_TABLES or [])
+        if name.strip()
+    }
     if slow_threshold_ms <= 0 and not log_noop_mutations:
         return
+
+    slow_query_last_warned_at: dict[str, float] = {}
+    slow_query_suppressed_count: dict[str, int] = {}
 
     @event.listens_for(engine, "before_cursor_execute")
     def _before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
@@ -134,14 +149,44 @@ def _register_sql_observability() -> None:
         sql_text = _compact_sql(statement)
 
         if slow_threshold_ms > 0 and duration_ms >= slow_threshold_ms:
-            logger.warning(
-                "anomaly.db.slow_query",
-                duration_ms=round(duration_ms, 2),
-                threshold_ms=slow_threshold_ms,
-                rowcount=rowcount,
-                executemany=executemany,
-                sql=sql_text,
-            )
+            sql_key = sql_text.lower()
+            if not any(pattern in sql_key for pattern in slow_ignore_patterns):
+                if slow_warn_cooldown_seconds > 0:
+                    now_monotonic = time.monotonic()
+                    last_warned_at = slow_query_last_warned_at.get(sql_key)
+                    if (
+                        last_warned_at is not None
+                        and (now_monotonic - last_warned_at) < slow_warn_cooldown_seconds
+                    ):
+                        slow_query_suppressed_count[sql_key] = (
+                            slow_query_suppressed_count.get(sql_key, 0) + 1
+                        )
+                    else:
+                        # Prevent unbounded growth in long-lived workers.
+                        if len(slow_query_last_warned_at) > 2048:
+                            slow_query_last_warned_at.clear()
+                            slow_query_suppressed_count.clear()
+                        suppressed = slow_query_suppressed_count.pop(sql_key, 0)
+                        slow_query_last_warned_at[sql_key] = now_monotonic
+                        log_payload = {
+                            "duration_ms": round(duration_ms, 2),
+                            "threshold_ms": slow_threshold_ms,
+                            "rowcount": rowcount,
+                            "executemany": executemany,
+                            "sql": sql_text,
+                        }
+                        if suppressed:
+                            log_payload["suppressed_since_last"] = suppressed
+                        logger.warning("anomaly.db.slow_query", **log_payload)
+                else:
+                    logger.warning(
+                        "anomaly.db.slow_query",
+                        duration_ms=round(duration_ms, 2),
+                        threshold_ms=slow_threshold_ms,
+                        rowcount=rowcount,
+                        executemany=executemany,
+                        sql=sql_text,
+                    )
 
         if not log_noop_mutations:
             return
