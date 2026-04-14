@@ -39,7 +39,7 @@ class KYCService:
         if settings.ENVIRONMENT == "production":
             # Production: queue for manual review until real KYC API is integrated
             self.provider = PendingReviewProvider()
-            logger.warning("kyc.manual_review_mode_active")
+            logger.info("kyc.manual_review_mode_active")
         else:
             self.provider = MockKYCProvider()
 
