@@ -35,6 +35,14 @@ _SENSITIVE_KEY_MARKERS = {
 _REDACTED = "***REDACTED***"
 
 
+def _default_log_meta() -> dict[str, Any]:
+    return {
+        "service": settings.LOG_SERVICE_NAME or settings.PROJECT_NAME,
+        "environment": settings.ENVIRONMENT,
+        "schema_version": settings.LOG_SCHEMA_VERSION,
+    }
+
+
 def _truncate_string(value: str, max_len: int) -> str:
     if max_len <= 0:
         return value
@@ -120,31 +128,33 @@ class _FallbackBoundLogger:
         merged.update(kwargs)
         return _FallbackBoundLogger(self._logger, merged)
 
-    def _emit(self, level: int, event: str, **kwargs: Any) -> None:
-        payload = sanitize_for_logging({**self._context, **kwargs})
+    def _emit(self, level: int, event: str, *args: Any, **kwargs: Any) -> None:
+        event_text = event % args if args else event
+        payload = sanitize_for_logging({**_default_log_meta(), **self._context, **kwargs})
         if payload:
-            self._logger.log(level, "%s %s", event, json.dumps(payload, ensure_ascii=False))
+            self._logger.log(level, "%s %s", event_text, json.dumps(payload, ensure_ascii=False))
         else:
-            self._logger.log(level, "%s", event)
+            self._logger.log(level, "%s", event_text)
 
-    def debug(self, event: str, **kwargs: Any) -> None:
-        self._emit(logging.DEBUG, event, **kwargs)
+    def debug(self, event: str, *args: Any, **kwargs: Any) -> None:
+        self._emit(logging.DEBUG, event, *args, **kwargs)
 
-    def info(self, event: str, **kwargs: Any) -> None:
-        self._emit(logging.INFO, event, **kwargs)
+    def info(self, event: str, *args: Any, **kwargs: Any) -> None:
+        self._emit(logging.INFO, event, *args, **kwargs)
 
-    def warning(self, event: str, **kwargs: Any) -> None:
-        self._emit(logging.WARNING, event, **kwargs)
+    def warning(self, event: str, *args: Any, **kwargs: Any) -> None:
+        self._emit(logging.WARNING, event, *args, **kwargs)
 
-    def error(self, event: str, **kwargs: Any) -> None:
-        self._emit(logging.ERROR, event, **kwargs)
+    def error(self, event: str, *args: Any, **kwargs: Any) -> None:
+        self._emit(logging.ERROR, event, *args, **kwargs)
 
-    def exception(self, event: str, **kwargs: Any) -> None:
-        payload = sanitize_for_logging({**self._context, **kwargs})
+    def exception(self, event: str, *args: Any, **kwargs: Any) -> None:
+        event_text = event % args if args else event
+        payload = sanitize_for_logging({**_default_log_meta(), **self._context, **kwargs})
         if payload:
-            self._logger.exception("%s %s", event, json.dumps(payload, ensure_ascii=False))
+            self._logger.exception("%s %s", event_text, json.dumps(payload, ensure_ascii=False))
         else:
-            self._logger.exception("%s", event)
+            self._logger.exception("%s", event_text)
 
 
 class _HealthcheckAccessFilter(logging.Filter):
@@ -168,6 +178,12 @@ def _sanitize_event_processor(_: Any, __: str, event_dict: dict[str, Any]) -> di
     return sanitize_for_logging(event_dict)
 
 
+def _log_meta_processor(_: Any, __: str, event_dict: dict[str, Any]) -> dict[str, Any]:
+    for key, value in _default_log_meta().items():
+        event_dict.setdefault(key, value)
+    return event_dict
+
+
 def _shared_processors() -> list[Any]:
     if structlog is None:
         return []
@@ -179,6 +195,7 @@ def _shared_processors() -> list[Any]:
         structlog.processors.TimeStamper(fmt="iso", utc=False),
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
+        _log_meta_processor,
         _sanitize_event_processor,
     ]
 

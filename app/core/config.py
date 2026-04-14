@@ -268,10 +268,18 @@ class Settings(BaseSettings):
     LOG_REQUESTS: bool = True
     LOG_HEALTHCHECKS: bool = False
     LOG_SLOW_REQUEST_THRESHOLD_MS: int = 2000
+    LOG_SERVICE_NAME: str = "wezu-backend"
+    LOG_SCHEMA_VERSION: str = "1.0"
     LOG_REDACT_SENSITIVE_FIELDS: bool = True
     LOG_MAX_FIELD_LENGTH: int = 2048
     LOG_MAX_COLLECTION_ITEMS: int = 50
     LOG_EXCLUDE_PATHS: list[str] = ["/health", "/ready", "/live"]
+    LOG_ANOMALY_DETECTION_ENABLED: bool = True
+    LOG_ANOMALY_MAX_UNKNOWN_FIELDS: int = 25
+    LOG_ANOMALY_MAX_BODY_BYTES: int = 262144
+    LOG_ANOMALY_EMPTY_SUCCESS_RESPONSE: bool = True
+    DB_LOG_NOOP_MUTATIONS: bool = True
+    DB_NOOP_MUTATION_IGNORE_TABLES: list[str] = ["alembic_version"]
     AUTH_TOKEN_CACHE_TTL_SECONDS: int = 5
     ANALYTICS_CACHE_TTL_SECONDS: int = 30
     DEALER_PORTAL_CACHE_TTL_SECONDS: int = 30
@@ -429,6 +437,7 @@ class Settings(BaseSettings):
         "TRUSTED_PROXY_CIDRS", "PASSKEY_ORIGINS",
         "PASSKEY_ANDROID_RELATIONS", "PASSKEY_ANDROID_SHA256_CERT_FINGERPRINTS",
         "SUPABASE_ALLOWED_ALGORITHMS", "LOG_EXCLUDE_PATHS",
+        "DB_NOOP_MUTATION_IGNORE_TABLES",
         mode="before",
     )
     @classmethod

@@ -1,4 +1,4 @@
-import logging
+import re
 import time
 
 from sqlalchemy import event, pool
@@ -6,8 +6,9 @@ from sqlalchemy.engine import make_url
 from sqlmodel import Session, create_engine
 
 from app.core.config import settings
+from app.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def _build_engine():
@@ -82,11 +83,40 @@ def _on_connect(dbapi_connection, connection_record):
             cursor.close()
 
 
-# ── Slow query logger (from Hardened) ──────────────────────────────────────
+# ── SQL observability (slow queries + suspicious no-op mutations) ───────────
 
-def _register_slow_query_logger() -> None:
-    threshold_ms = int(getattr(settings, "SQL_SLOW_QUERY_LOG_MS", 0) or 0)
-    if threshold_ms <= 0:
+_UPDATE_TABLE_RE = re.compile(r"^\s*UPDATE\s+([a-zA-Z0-9_\.\"`]+)", re.IGNORECASE)
+_DELETE_TABLE_RE = re.compile(r"^\s*DELETE\s+FROM\s+([a-zA-Z0-9_\.\"`]+)", re.IGNORECASE)
+_INSERT_TABLE_RE = re.compile(r"^\s*INSERT\s+INTO\s+([a-zA-Z0-9_\.\"`]+)", re.IGNORECASE)
+
+
+def _compact_sql(statement: object, *, max_len: int = 400) -> str:
+    compact = " ".join(str(statement).split())
+    if len(compact) <= max_len:
+        return compact
+    return f"{compact[:max_len]}..."
+
+
+def _mutation_info(statement: object) -> tuple[str | None, str | None]:
+    sql = str(statement)
+    stripped = sql.lstrip().upper()
+    if stripped.startswith("UPDATE"):
+        match = _UPDATE_TABLE_RE.match(sql)
+        return "UPDATE", (match.group(1) if match else None)
+    if stripped.startswith("DELETE"):
+        match = _DELETE_TABLE_RE.match(sql)
+        return "DELETE", (match.group(1) if match else None)
+    if stripped.startswith("INSERT"):
+        match = _INSERT_TABLE_RE.match(sql)
+        return "INSERT", (match.group(1) if match else None)
+    return None, None
+
+
+def _register_sql_observability() -> None:
+    slow_threshold_ms = int(getattr(settings, "SQL_SLOW_QUERY_LOG_MS", 0) or 0)
+    log_noop_mutations = bool(getattr(settings, "DB_LOG_NOOP_MUTATIONS", True))
+    ignore_tables = {name.strip().lower() for name in (settings.DB_NOOP_MUTATION_IGNORE_TABLES or []) if name.strip()}
+    if slow_threshold_ms <= 0 and not log_noop_mutations:
         return
 
     @event.listens_for(engine, "before_cursor_execute")
@@ -100,22 +130,39 @@ def _register_slow_query_logger() -> None:
             return
         started_at = start_times.pop()
         duration_ms = (time.perf_counter() - started_at) * 1000
-        if duration_ms < threshold_ms:
+        rowcount = getattr(cursor, "rowcount", None)
+        sql_text = _compact_sql(statement)
+
+        if slow_threshold_ms > 0 and duration_ms >= slow_threshold_ms:
+            logger.warning(
+                "anomaly.db.slow_query",
+                duration_ms=round(duration_ms, 2),
+                threshold_ms=slow_threshold_ms,
+                rowcount=rowcount,
+                executemany=executemany,
+                sql=sql_text,
+            )
+
+        if not log_noop_mutations:
             return
-        compact_sql = " ".join(str(statement).split())
-        if len(compact_sql) > 400:
-            compact_sql = f"{compact_sql[:400]}..."
-        logger.warning(
-            "Slow SQL query detected duration_ms=%.2f threshold_ms=%s rows=%s executemany=%s sql=%s",
-            duration_ms,
-            threshold_ms,
-            getattr(cursor, "rowcount", None),
-            executemany,
-            compact_sql,
-        )
+        operation, raw_table = _mutation_info(statement)
+        if not operation:
+            return
+        table_name = (raw_table or "").strip().strip('"`').lower()
+        if table_name and table_name in ignore_tables:
+            return
+        if rowcount == 0:
+            logger.warning(
+                "anomaly.db.noop_mutation",
+                operation=operation,
+                table=table_name or None,
+                rowcount=rowcount,
+                executemany=executemany,
+                sql=sql_text,
+            )
 
 
-_register_slow_query_logger()
+_register_sql_observability()
 
 
 # ── Session dependency ─────────────────────────────────────────────────────

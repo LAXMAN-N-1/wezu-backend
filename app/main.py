@@ -36,6 +36,7 @@ from app.middleware.security import SecureHeadersMiddleware
 from app.middleware.proxy_headers import TrustedProxyHeadersMiddleware
 from app.middleware.proxy_host import ProxyHostRewriteMiddleware
 from app.middleware.request_logging import RequestLoggingMiddleware
+from app.middleware.anomaly_logging import AnomalyLoggingMiddleware
 from app.middleware.rbac_middleware import RBACMiddleware
 from app.middleware.server_timing import ServerTimingMiddleware
 from app.api.errors.handlers import add_exception_handlers
@@ -365,6 +366,7 @@ trusted_host_allowlist = sorted(
 if settings.ENABLE_TRUSTED_HOST_MIDDLEWARE:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=trusted_host_allowlist)
 
+app.add_middleware(AnomalyLoggingMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(TrustedProxyHeadersMiddleware)
 app.add_middleware(ProxyHostRewriteMiddleware)
