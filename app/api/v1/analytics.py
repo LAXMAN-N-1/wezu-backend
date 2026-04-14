@@ -81,29 +81,37 @@ async def get_carbon_savings(
 ):
     """Calculate carbon savings from battery usage"""
     from app.models.rental import Rental
-    from sqlmodel import select
-    
-    # Get all completed rentals
-    statement = select(Rental).where(
-        Rental.user_id == current_user.id,
-        Rental.status == "completed"
-    )
-    rentals = session.exec(statement).all()
-    
-    # Calculate carbon savings (Assume 1 hour usage saves 0.5 kg CO2)
-    total_hours = 0.0
-    for rental in rentals:
-        if rental.actual_end_time and rental.start_time:
-            duration = (rental.actual_end_time - rental.start_time).total_seconds() / 3600
-            total_hours += duration
-    
+    from sqlmodel import select, func
+
+    # Single SQL query: count + sum duration in seconds (replaces fetching all rows)
+    result = session.exec(
+        select(
+            func.count(Rental.id),
+            func.coalesce(
+                func.sum(
+                    func.extract("epoch", Rental.actual_end_time)
+                    - func.extract("epoch", Rental.start_time)
+                ),
+                0.0,
+            ),
+        ).where(
+            Rental.user_id == current_user.id,
+            Rental.status == "completed",
+            Rental.actual_end_time.isnot(None),
+            Rental.start_time.isnot(None),
+        )
+    ).one()
+    total_rentals, total_seconds = result
+    total_hours = total_seconds / 3600.0
+
+    # Assume 1 hour usage saves 0.5 kg CO2
     carbon_saved_kg = total_hours * 0.5
     trees_equivalent = carbon_saved_kg / 21
     
     return DataResponse(
         success=True,
         data={
-            "total_rentals": len(rentals),
+            "total_rentals": total_rentals,
             "total_hours": round(total_hours, 2),
             "carbon_saved_kg": round(carbon_saved_kg, 2),
             "trees_equivalent": round(trees_equivalent, 2),
@@ -126,12 +134,12 @@ async def export_analytics_data(
     from sqlmodel import select
     import datetime
     
-    # Get rentals
-    rentals_stmt = select(Rental).where(Rental.user_id == current_user.id)
+    # Get rentals (capped at 5000 to prevent unbounded export)
+    rentals_stmt = select(Rental).where(Rental.user_id == current_user.id).limit(5000)
     rentals = session.exec(rentals_stmt).all()
     
-    # Get transactions
-    txn_stmt = select(Transaction).where(Transaction.user_id == current_user.id)
+    # Get transactions (capped at 5000 to prevent unbounded export)
+    txn_stmt = select(Transaction).where(Transaction.user_id == current_user.id).limit(5000)
     transactions = session.exec(txn_stmt).all()
     
     data = {

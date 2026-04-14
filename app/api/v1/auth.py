@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Form
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 from sqlmodel import Session, select
 from app.db.session import get_session
 from app.models.user import User, UserStatus, KYCStatus
@@ -36,7 +38,6 @@ from app.schemas.auth import (
 
 router = APIRouter()
 logger = logging.getLogger("wezu_auth")
-logging.basicConfig(level=logging.INFO)
 
 class UserCreate(BaseModel):
     email: Optional[EmailStr] = None
@@ -342,7 +343,7 @@ async def verify_registration_otp(
             db.refresh(user)
         
         # Check Fraud Risk
-        FraudService.calculate_risk_score(user.id)
+        FraudService.calculate_risk_score(db, user.id)
     else:
         logger.info(f"Existing user linked via OTP: {verify_data.target}")
         
@@ -357,7 +358,7 @@ async def verify_registration_otp(
             logger.info(f"User {user.id} activated after OTP verification")
 
     # Update Last Login
-    user.last_login_at = datetime.now(UTC)
+    user.last_login = datetime.now(UTC)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -497,7 +498,7 @@ async def social_login(
             db.refresh(user)
             
         # Check Fraud Risk
-        FraudService.calculate_risk_score(user.id)
+        FraudService.calculate_risk_score(db, user.id)
         
     else:
         # Update existing user info
@@ -514,7 +515,7 @@ async def social_login(
         db.refresh(user)
 
     # Update Last Login
-    user.last_login_at = datetime.now(UTC)
+    user.last_login = datetime.now(UTC)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -603,7 +604,7 @@ async def register_with_password(
         db.refresh(new_user)
     
     # Check Fraud Risk
-    FraudService.calculate_risk_score(new_user.id)
+    FraudService.calculate_risk_score(db, new_user.id)
     
     # Audit log
     AuditLogger.log_event(db, new_user.id, "USER_CREATION", "USER", resource_id=str(new_user.id), target_id=new_user.id)
@@ -758,7 +759,7 @@ async def login(
         selected_role_name = login_data.role
             
     # Update Last Login
-    user.last_login_at = datetime.now(UTC)
+    user.last_login = datetime.now(UTC)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -845,15 +846,12 @@ async def logout_all(
     Invalidate ALL sessions for the current user.
     Updates 'last_global_logout_at' timestamp. Any token issued before this time will be rejected.
     """
-    current_user.last_global_logout_at = datetime.now(UTC)
-    # Merge into current session to avoid "already attached to session" error
-    # if current_user came from a different dependency session context
-    updated_user = db.merge(current_user)
-    db.add(updated_user)
-    db.commit()
-    
+    revoked_count = AuthService.revoke_all_user_sessions(db, current_user.id)
     logger.info(f"User {current_user.id} performed global logout")
-    return {"message": "Logged out from all devices successfully"}
+    return {
+        "message": "Logged out from all devices successfully",
+        "sessions_revoked": revoked_count,
+    }
 
 @router.post("/forgot-password")
 @limiter.limit("5/hour")
@@ -1195,58 +1193,68 @@ async def admin_login(
     Admin login endpoint (JSON body).
     Validates credentials and ensures the user has an admin-level role.
     """
-    # Look up user by email (case-insensitive & stripped)
-    username_clean = login_data.username.strip().lower()
-    from sqlalchemy import func
-    user = db.exec(select(User).where(func.lower(User.email) == username_clean)).first()
+    # Prefer index-friendly equality lookups before falling back to a
+    # case-insensitive scan for legacy mixed-case rows.
+    username_raw = login_data.username.strip()
+    username_clean = username_raw.lower()
+    base_statement = select(User).options(joinedload(User.role))
+
+    user = db.exec(base_statement.where(User.email == username_clean)).first()
+    if not user and username_raw != username_clean:
+        user = db.exec(base_statement.where(User.email == username_raw)).first()
+    if not user:
+        user = db.exec(
+            base_statement.where(func.lower(User.email) == username_clean)
+        ).first()
 
     if not user:
         logger.warning(f"Admin login - user not found: {login_data.username}")
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
-    password_clean = login_data.password.strip()
-    
-    if not verify_password(password_clean, user.hashed_password):
+    if not verify_password(login_data.password, user.hashed_password):
         logger.warning(f"Admin login - invalid password for: {login_data.username}")
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
     if user.status != UserStatus.ACTIVE:
         raise HTTPException(status_code=400, detail="Inactive user")
 
-    # Verify user has admin-level role
+    # Verify user has admin-level role.
     from app.models.user import UserType
     admin_types = [UserType.ADMIN] if hasattr(UserType, 'ADMIN') else []
-    is_admin = False
+    role_name = user.role.name.strip().lower() if user.role and user.role.name else None
+    is_admin = bool(user.is_superuser)
 
-    # Check user_type field
     if hasattr(user, 'user_type') and user.user_type in admin_types:
         is_admin = True
 
-    # Check role name
-    if hasattr(user, 'role') and user.role and user.role.name in ("admin", "super_admin", "superadmin"):
+    if role_name in ("admin", "super_admin", "superadmin"):
         is_admin = True
 
-    # Fallback: also allow if role_id exists (seeded admin may have role set)
-    if hasattr(user, 'role_id') and user.role_id is not None:
+    # Rare fallback when the role relationship is missing but role_id exists.
+    if not is_admin and hasattr(user, 'role_id') and user.role_id is not None:
         from app.models.rbac import Role
         role = db.get(Role, user.role_id)
-        if role and role.name in ("admin", "super_admin", "superadmin"):
+        if role and role.name and role.name.strip().lower() in ("admin", "super_admin", "superadmin"):
             is_admin = True
 
     if not is_admin:
         logger.warning(f"Admin login - non-admin user attempted: {login_data.username}")
         raise HTTPException(status_code=403, detail="User does not have admin privileges")
 
-    # Generate tokens
-    access_token = create_access_token(subject=user.id)
-    refresh_tok = create_refresh_token(subject=user.id)
+    token_jti = str(uuid.uuid4())
+    access_token = create_access_token(subject=user.id, extra_claims={"sid": token_jti})
+    refresh_tok = create_refresh_token(subject=user.id, jti=token_jti)
 
-    # Create session
+    # Persist last login alongside the new session in the same commit.
+    user.last_login = datetime.now(UTC)
+    db.add(user)
+
     AuthService.create_user_session(
         db, 
         user.id, 
         refresh_tok,
         request=request,
+        token_jti=token_jti,
         user_agent="Admin Web"
     )
 

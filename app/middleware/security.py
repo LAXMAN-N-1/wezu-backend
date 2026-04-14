@@ -1,6 +1,19 @@
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import Request, Response
 
+
+# Paths whose GET responses can be cached by CDN/browser.
+_CACHEABLE_PREFIXES = (
+    "/live",
+    "/api/v1/stations/map",
+    "/api/v1/stations/heatmap",
+    "/api/v1/faqs",
+    "/api/v1/i18n",
+    "/api/v1/catalog",
+    "/api/v1/locations",
+)
+
+
 class SecureHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         response = await call_next(request)
@@ -15,4 +28,13 @@ class SecureHeadersMiddleware(BaseHTTPMiddleware):
             "img-src 'self' https://fastapi.tiangolo.com data:;"
         )
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+        # Apply Cache-Control on safe GET responses for cacheable endpoints.
+        if request.method == "GET" and "Cache-Control" not in response.headers:
+            path = request.url.path
+            if path.startswith(_CACHEABLE_PREFIXES):
+                response.headers["Cache-Control"] = "public, max-age=60, stale-while-revalidate=30"
+            else:
+                response.headers["Cache-Control"] = "no-store"
+
         return response

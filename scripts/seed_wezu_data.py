@@ -21,16 +21,16 @@ NOW = datetime.now(UTC)
 
 def fully_dynamic_seed():
     with Session(engine) as db:
-        print("Starting Fully Dynamic Seed for Laxman...")
+        print("Starting Fully Dynamic Seed for Wezu...")
 
-        # 1. Look up Laxman dynamically by email
+        # 1. Look up Wezu Dealer dynamically by email
         dealer_user = db.exec(select(User).where(User.email == "dealer@wezu.com")).first()
         if not dealer_user:
             dealer_user = User(
                 email="dealer@wezu.com",
                 phone_number="8888888888",
-                full_name="Laxman Kumar",
-                hashed_password=get_password_hash("laxman123"),
+                full_name="Wezu Dealer Kumar",
+                hashed_password=get_password_hash("wezu123"),
                 user_type=UserType.DEALER,
                 status=UserStatus.ACTIVE,
             )
@@ -39,7 +39,7 @@ def fully_dynamic_seed():
             db.refresh(dealer_user)
         else:
             # Ensure password is updated to new requirement
-            dealer_user.hashed_password = get_password_hash("laxman123")
+            dealer_user.hashed_password = get_password_hash("wezu123")
             db.add(dealer_user)
             db.commit()
             db.refresh(dealer_user)
@@ -47,10 +47,10 @@ def fully_dynamic_seed():
         # 2. Look up his correct dealer profile ID
         dealer = db.exec(select(DealerProfile).where(DealerProfile.user_id == dealer_user.id)).first()
         if not dealer:
-            print("Dealer profile missing for Laxman. Creating one.")
+            print("Dealer profile missing for Wezu Dealer. Creating one.")
             dealer = DealerProfile(
                 user_id=dealer_user.id,
-                business_name="Laxman Energy Solutions",
+                business_name="Wezu Energy Solutions",
                 contact_email="dealer@wezu.com",
                 contact_phone="8888888888",
                 status="approved"
@@ -60,11 +60,11 @@ def fully_dynamic_seed():
             db.refresh(dealer)
 
         # 3. Unlink any old/stale stations from this dealer (keep only the 2 we want)
-        laxman_station_names = ["kakinda station", "golapudi sttaion"]
+        wezu_station_names = ["kakinda station", "golapudi sttaion"]
         old_stations = db.exec(
             select(Station).where(
                 Station.dealer_id == dealer.id,
-                Station.name.notin_(laxman_station_names)
+                Station.name.notin_(wezu_station_names)
             )
         ).all()
         for old_st in old_stations:
@@ -72,7 +72,7 @@ def fully_dynamic_seed():
             db.add(old_st)
         if old_stations:
             db.commit()
-            print(f"Unlinked {len(old_stations)} stale stations from Laxman")
+            print(f"Unlinked {len(old_stations)} stale stations from Wezu Dealer")
 
         # 4. Create or update stations with EXACT correct dealer_id
         stations_data = {
@@ -128,7 +128,7 @@ def fully_dynamic_seed():
         print("Purging old seed records safely...")
         from sqlalchemy import text
         db.exec(text(f"UPDATE core.station_slots SET battery_id = NULL, status = 'empty' WHERE station_id IN ({kakinada_id}, {gollapudi_id})"))
-        db.exec(text("DELETE FROM core.batteries WHERE notes = 'seed_laxman_script'"))
+        db.exec(text("DELETE FROM core.batteries WHERE notes = 'seed_wezu_script'"))
         db.commit()
 
         # 5. Exact Distribution of 1000 Total Batteries
@@ -161,14 +161,14 @@ def fully_dynamic_seed():
                     health = BatteryHealth.DAMAGED
                 
                 bat = Battery(
-                    serial_number=f"LAX-BATT-{st_id if st_id else 'ADM'}-{uuid.uuid4().hex[:8]}",
-                    qr_code_data=f"QR-LAX-{uuid.uuid4().hex[:12]}",
+                    serial_number=f"WEZU-BATT-{st_id if st_id else 'ADM'}-{uuid.uuid4().hex[:8]}",
+                    qr_code_data=f"QR-WEZU-{uuid.uuid4().hex[:12]}",
                     station_id=st_id,
                     status=status,
                     health_status=health,
                     current_charge=random.uniform(20, 100) if status != BatteryStatus.RETIRED else 0.0,
                     location_type=LocationType.STATION if st_id else LocationType.WAREHOUSE,
-                    notes="seed_laxman_script"
+                    notes="seed_wezu_script"
                 )
                 bats.append(bat)
             return bats
@@ -186,8 +186,8 @@ def fully_dynamic_seed():
         db.commit()
 
         # Re-fetch batteries to get their generated IDs
-        saved_kak = db.exec(select(Battery).where(Battery.station_id == kakinada_id, Battery.notes == "seed_laxman_script")).all()
-        saved_gol = db.exec(select(Battery).where(Battery.station_id == gollapudi_id, Battery.notes == "seed_laxman_script")).all()
+        saved_kak = db.exec(select(Battery).where(Battery.station_id == kakinada_id, Battery.notes == "seed_wezu_script")).all()
+        saved_gol = db.exec(select(Battery).where(Battery.station_id == gollapudi_id, Battery.notes == "seed_wezu_script")).all()
         
         # 6. Assign batteries physically to their station slots
         def assign_to_slots(station_id, station_bats):

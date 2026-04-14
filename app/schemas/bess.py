@@ -6,6 +6,8 @@ from pydantic import BaseModel, ConfigDict
 
 # --- BessUnit ---
 class BessUnitBase(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     name: str
     location: str
     capacity_kwh: float

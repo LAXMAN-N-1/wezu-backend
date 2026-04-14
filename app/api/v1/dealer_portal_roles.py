@@ -140,12 +140,13 @@ def create_role(
     db.commit()
     db.refresh(role)
     
-    # Assign permissions if provided
+    # Assign permissions if provided (batch lookup)
     if role_in.permissions:
-        for slug in role_in.permissions:
-            perm = db.exec(select(Permission).where(Permission.slug == slug)).first()
-            if perm:
-                db.add(RolePermission(role_id=role.id, permission_id=perm.id))
+        found_perms = db.exec(
+            select(Permission).where(Permission.slug.in_(list(role_in.permissions)))
+        ).all()
+        for perm in found_perms:
+            db.add(RolePermission(role_id=role.id, permission_id=perm.id))
         db.commit()
         db.refresh(role)
     
@@ -194,11 +195,13 @@ def update_role(
     db.add(role)
     
     if permissions is not None:
-        # Clear existing and add new
+        # Clear existing and add new (batch lookup)
         db.exec(sa.delete(RolePermission).where(RolePermission.role_id == role.id))
-        for slug in permissions:
-            perm = db.exec(select(Permission).where(Permission.slug == slug)).first()
-            if perm:
+        if permissions:
+            found_perms = db.exec(
+                select(Permission).where(Permission.slug.in_(list(permissions)))
+            ).all()
+            for perm in found_perms:
                 db.add(RolePermission(role_id=role.id, permission_id=perm.id))
                 
     db.commit()
@@ -375,9 +378,13 @@ def get_role_audit_log(
         ).order_by(AuditLog.timestamp.desc())
     ).all()
     
+    # Batch-load users (eliminates N+1 per log entry)
+    log_user_ids = list({log.user_id for log in logs if log.user_id})
+    users_map = {u.id: u for u in db.exec(select(User).where(User.id.in_(log_user_ids))).all()} if log_user_ids else {}
+
     results = []
     for log in logs:
-        user = db.get(User, log.user_id) if log.user_id else None
+        user = users_map.get(log.user_id) if log.user_id else None
         results.append(RoleAuditLog(
             action=log.action,
             user_name=user.full_name if user else "System",

@@ -5,6 +5,10 @@ from app.core.proxy import get_client_ip
 from fastapi import HTTPException, status, Request
 from sqlmodel import Session, select
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class AuthService:
     @staticmethod
     async def verify_google_token(token: str):
@@ -84,22 +88,33 @@ class AuthService:
             )
 
     @staticmethod
-    def get_permissions_for_role(db: Session, role_identifier: int | str) -> list[str]:
+    def get_permissions_for_role(
+        db_or_role_identifier: Session | int | str,
+        role_identifier: int | str | None = None,
+    ) -> list[str]:
         """
         Fetch permissions for a given role from the database.
         role_identifier can be role ID (int) or role name (str).
         """
         from app.models.rbac import Role, RolePermission, Permission
         from sqlmodel import select
-        
-        if isinstance(role_identifier, int):
-            statement = select(Permission.slug).join(RolePermission).where(RolePermission.role_id == role_identifier)
+
+        db: Session | None = None
+        if role_identifier is None:
+            role_identifier = db_or_role_identifier
         else:
-            statement = select(Permission.slug).join(RolePermission).join(Role).where(Role.name == role_identifier)
-            
-        perms = db.exec(statement).all()
-        
-        # Fallbacks for empty DB states just to ensure login works while seeding
+            db = db_or_role_identifier  # type: ignore[assignment]
+
+        perms: list[str] = []
+        if db is not None:
+            if isinstance(role_identifier, int):
+                statement = select(Permission.slug).join(RolePermission).where(RolePermission.role_id == role_identifier)
+            else:
+                statement = select(Permission.slug).join(RolePermission).join(Role).where(Role.name == role_identifier)
+
+            perms = list(db.exec(statement).all())
+
+        # Fallbacks for empty DB states or legacy callers without a DB session.
         if not perms and isinstance(role_identifier, str):
             fallback = {
                 "customer": ["profile:read:own", "stations:view:all", "rentals:create:own", "rentals:view:own", "wallet:view:own"],
@@ -110,22 +125,33 @@ class AuthService:
             }
             return fallback.get(role_identifier, [])
             
-        return list(perms)
+        return perms
 
     @staticmethod
-    def get_menu_for_role(db: Session, role_identifier: int | str) -> list[dict]:
+    def get_menu_for_role(
+        db_or_role_identifier: Session | int | str,
+        role_identifier: int | str | None = None,
+    ) -> list[dict]:
         from app.models.rbac import Role
         from app.models.role_right import RoleRight
         from app.models.menu import Menu
         from sqlmodel import select
-        
-        if isinstance(role_identifier, int):
-            statement = select(Menu).join(RoleRight, RoleRight.menu_id == Menu.id).where(RoleRight.role_id == role_identifier).order_by(Menu.menu_order)
+
+        db: Session | None = None
+        if role_identifier is None:
+            role_identifier = db_or_role_identifier
         else:
-            statement = select(Menu).join(RoleRight, RoleRight.menu_id == Menu.id).join(Role).where(Role.name == role_identifier).order_by(Menu.menu_order)
-            
-        menus = db.exec(statement).all()
-        
+            db = db_or_role_identifier  # type: ignore[assignment]
+
+        menus: list[Menu] = []
+        if db is not None:
+            if isinstance(role_identifier, int):
+                statement = select(Menu).join(RoleRight, RoleRight.menu_id == Menu.id).where(RoleRight.role_id == role_identifier).order_by(Menu.menu_order)
+            else:
+                statement = select(Menu).join(RoleRight, RoleRight.menu_id == Menu.id).join(Role).where(Role.name == role_identifier).order_by(Menu.menu_order)
+
+            menus = list(db.exec(statement).all())
+
         if not menus and isinstance(role_identifier, str):
             # Fallback
             if role_identifier == "customer":
@@ -255,6 +281,7 @@ class AuthService:
                 payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
                 token_jti = payload.get("jti")
             except Exception:
+                logger.warning("auth.refresh_token_decode_failed_for_jti", exc_info=True)
                 token_jti = "unknown"
 
         # 4. Create Session
@@ -271,6 +298,57 @@ class AuthService:
         )
         db.add(session)
         db.commit()
+        return session
+
+    @staticmethod
+    def create_session(
+        db: Session,
+        user_id: int,
+        access_token: str,
+        refresh_token: str,
+        device_info: str = None,
+        ip_address: str = None,
+        user_agent: str = None,
+        request: Request = None,
+    ):
+        """
+        Backward-compatible session creation contract used by passkey login.
+        Persists a UserSession keyed by access sid (preferred) or refresh jti.
+        """
+        token_id = None
+        try:
+            from jose import jwt
+
+            access_payload = jwt.decode(access_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+            token_id = access_payload.get("sid")
+        except Exception:
+            token_id = None
+
+        if not token_id:
+            try:
+                from jose import jwt
+
+                refresh_payload = jwt.decode(refresh_token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+                token_id = refresh_payload.get("jti")
+            except Exception:
+                token_id = None
+
+        effective_user_agent = user_agent or device_info or "unknown"
+        session = AuthService.create_user_session(
+            db=db,
+            user_id=user_id,
+            refresh_token=refresh_token,
+            request=request,
+            token_jti=token_id,
+            ip_address=ip_address,
+            user_agent=effective_user_agent,
+        )
+
+        if device_info and session:
+            session.device_name = device_info
+            db.add(session)
+            db.commit()
+            db.refresh(session)
         return session
 
     @staticmethod
@@ -305,6 +383,7 @@ class AuthService:
             new_token_jti = payload.get("jti")
             user_id = int(payload.get("sub"))
         except Exception:
+            logger.warning("auth.refresh_token_rotate_decode_failed", exc_info=True)
             return None # Cannot update invalid token
             
         # 3. Hash new refresh token
@@ -420,6 +499,8 @@ class AuthService:
         session.revoked_at = datetime.now(UTC)
         db.add(session)
         db.commit()
+        from app.api.deps import invalidate_token_cache
+        invalidate_token_cache(token)
         return True
 
     @staticmethod
@@ -451,4 +532,113 @@ class AuthService:
             db.add(s)
             
         db.commit()
+        from app.api.deps import invalidate_user_token_cache
+        invalidate_user_token_cache(user_id)
         return len(sessions)
+
+    # ── P1-A-3: Two-Factor Authentication helpers ─────────────────────────
+
+    @staticmethod
+    def initiate_2fa_setup(user) -> dict:
+        """Generate a TOTP secret and provisioning URI for QR code display."""
+        try:
+            import pyotp
+        except ImportError:
+            raise HTTPException(
+                status_code=501,
+                detail="pyotp is not installed; 2FA is unavailable in this deployment",
+            )
+
+        secret = pyotp.random_base32()
+        totp = pyotp.TOTP(secret)
+        provisioning_uri = totp.provisioning_uri(
+            name=getattr(user, "email", None) or str(user.id),
+            issuer_name="WEZU Energy",
+        )
+        return {
+            "secret": secret,
+            "qr_uri": provisioning_uri,
+        }
+
+    @staticmethod
+    def verify_and_enable_2fa(db: Session, user, code: str, secret: str) -> list[str] | None:
+        """Verify a TOTP code against the given secret, enable 2FA, return backup codes."""
+        try:
+            import pyotp
+        except ImportError:
+            raise HTTPException(status_code=501, detail="pyotp is not installed")
+
+        totp = pyotp.TOTP(secret)
+        if not totp.verify(code, valid_window=1):
+            return None
+
+        import secrets as _secrets
+
+        backup_codes = [_secrets.token_hex(4).upper() for _ in range(8)]
+
+        user.two_factor_enabled = True
+        user.two_factor_secret = secret  # ideally encrypt at rest
+        user.backup_codes = ",".join(backup_codes)
+        db.add(user)
+        db.commit()
+        return backup_codes
+
+    # ── P1-A-3: Biometric (passkey-style) helpers ─────────────────────────
+
+    @staticmethod
+    def register_biometric(
+        db: Session,
+        user_id: int,
+        device_id: str,
+        credential_id: str,
+        public_key: str,
+    ) -> None:
+        """Store a biometric / passkey credential."""
+        from app.models.biometric import BiometricCredential
+
+        existing = db.exec(
+            select(BiometricCredential).where(
+                BiometricCredential.credential_id == credential_id
+            )
+        ).first()
+        if existing:
+            raise HTTPException(status_code=409, detail="Credential already registered")
+
+        cred = BiometricCredential(
+            user_id=user_id,
+            device_id=device_id,
+            credential_id=credential_id,
+            public_key=public_key,
+        )
+        db.add(cred)
+        db.commit()
+
+    @staticmethod
+    def verify_biometric_signature(
+        db: Session,
+        user_id: int,
+        credential_id: str,
+        signature: str,
+        challenge: str,
+    ) -> bool:
+        """
+        Verify a biometric challenge/response.
+
+        A production implementation would use the ``cryptography`` library to
+        verify the signature against the stored public key.  For now we do a
+        simple lookup-only check so that the endpoint is not a hard crash.
+        """
+        from app.models.biometric import BiometricCredential
+
+        cred = db.exec(
+            select(BiometricCredential).where(
+                BiometricCredential.credential_id == credential_id,
+                BiometricCredential.user_id == user_id,
+            )
+        ).first()
+        if not cred:
+            return False
+
+        # Stub: real verification would use cred.public_key + cryptography
+        # For now return True if credential exists (biometric trust-on-device model).
+        return True

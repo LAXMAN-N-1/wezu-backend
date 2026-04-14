@@ -14,7 +14,16 @@ class GoogleMapsIntegration:
     """Google Maps API wrapper"""
     
     def __init__(self):
-        self.client = googlemaps.Client(key=settings.GOOGLE_MAPS_API_KEY)
+        self._client = None
+    
+    @property
+    def client(self):
+        if self._client is None:
+            api_key = settings.GOOGLE_MAPS_API_KEY
+            if not api_key:
+                raise RuntimeError("GOOGLE_MAPS_API_KEY is not configured")
+            self._client = googlemaps.Client(key=api_key)
+        return self._client
     
     def geocode_address(self, address: str) -> Optional[Dict[str, Any]]:
         """

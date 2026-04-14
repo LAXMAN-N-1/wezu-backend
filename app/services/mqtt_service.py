@@ -2,20 +2,21 @@
 MQTT Service for Real-time Battery Monitoring
 Subscribes to IoT device telemetry and processes battery data
 """
-import paho.mqtt.client as mqtt
 import json
 import logging
-from datetime import datetime, UTC
+from datetime import datetime
 from typing import Optional, Callable
-from sqlmodel import Session
+import paho.mqtt.client as mqtt
+from sqlmodel import Session, select
+
 from app.core.config import settings
 from app.core.database import engine
 from app.models.battery import Battery
-from app.models.telemetry import Telemetry
-from app.services.telematics_service import TelematicsService
-from app.services.websocket_service import manager
 import redis
-import asyncio
+
+from app.schemas.telematics import TelemeticsDataIngest
+from app.services.event_stream_service import EventStreamService
+from app.services.telematics_ingest_service import TelematicsIngestService
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ class MQTTService:
                 port = 1883
             
             # Create client
-            client_id = f"{settings.MQTT_CLIENT_ID_PREFIX}_{datetime.now(UTC).timestamp()}"
+            client_id = f"{settings.MQTT_CLIENT_ID_PREFIX}_{datetime.utcnow().timestamp()}"
             self.client = mqtt.Client(client_id=client_id)
             
             # Set callbacks
@@ -62,8 +63,8 @@ class MQTTService:
             logger.info(f"Connected to MQTT broker at {host}:{port}")
             
         except Exception as e:
-            logger.warning(f"MQTT Service: Failed to connect to broker at {broker_url}. Real-time updates disabled. Error: {str(e)}")
-            self.client = None
+            logger.error(f"Failed to connect to MQTT broker: {str(e)}")
+            raise
     
     def disconnect(self):
         """Disconnect from MQTT broker"""
@@ -92,26 +93,16 @@ class MQTTService:
     def publish(self, topic: str, payload: dict):
         """
         Publish message to MQTT topic
+        
+        Args:
+            topic: MQTT topic
+            payload: Message payload (dict)
         """
         if not self.client:
             raise Exception("MQTT client not connected")
         
         message = json.dumps(payload)
         self.client.publish(topic, message, qos=1)
-
-    def send_command(self, device_id: str, command_type: str, params: Optional[dict] = None):
-        """
-        Send command to IoT device
-        Topic: wezu/batteries/{device_id}/commands
-        """
-        topic = f"{settings.MQTT_TOPIC_PREFIX}/{device_id}/commands"
-        payload = {
-            "command": command_type,
-            "params": params or {},
-            "timestamp": datetime.now(UTC).isoformat()
-        }
-        self.publish(topic, payload)
-        logger.info(f"Command {command_type} sent to device {device_id}")
     
     def _on_connect(self, client, userdata, flags, rc):
         """Callback when connected to broker"""
@@ -166,43 +157,92 @@ class MQTTService:
         except Exception as e:
             logger.error(f"Error processing MQTT message: {str(e)}")
     
-    def _process_telemetry(self, battery_id: str, data: dict):
+    def _resolve_battery_id(self, battery_key: str) -> int | None:
+        try:
+            return int(battery_key)
+        except (TypeError, ValueError):
+            logger.debug(f"battery_key '{battery_key}' is not numeric, resolving by serial_number")
+
+        with Session(engine) as session:
+            battery = session.exec(
+                select(Battery).where(Battery.serial_number == battery_key)
+            ).first()
+            return int(battery.id) if battery else None
+
+    def _build_ingest_payload(self, battery_id: int, data: dict) -> TelemeticsDataIngest:
+        timestamp_raw = data.get("timestamp")
+        parsed_timestamp = None
+        if timestamp_raw:
+            try:
+                parsed_timestamp = datetime.fromisoformat(str(timestamp_raw).replace("Z", "+00:00"))
+            except Exception:
+                parsed_timestamp = None
+
+        return TelemeticsDataIngest(
+            battery_id=battery_id,
+            timestamp=parsed_timestamp or datetime.utcnow(),
+            voltage=float(data.get("voltage", 0.0)),
+            current=float(data.get("current", 0.0)),
+            temperature=float(data.get("temperature", data.get("temp", 0.0))),
+            soc=float(data.get("soc", 0.0)),
+            soh=float(data.get("soh", data.get("health", 100.0))),
+            gps_latitude=data.get("gps_latitude") if data.get("gps_latitude") is not None else data.get("lat"),
+            gps_longitude=data.get("gps_longitude") if data.get("gps_longitude") is not None else data.get("lng"),
+            gps_altitude=data.get("gps_altitude"),
+            gps_speed=data.get("gps_speed") if data.get("gps_speed") is not None else data.get("speed"),
+            error_codes=data.get("error_codes"),
+            raw_payload=data,
+        )
+
+    def _process_telemetry(self, battery_key: str, data: dict):
         """
         Process battery telemetry data
         
         Args:
-            battery_id: Battery ID
-            data: Telemetry data
+            battery_key: Topic key (numeric battery ID or serial number)
+            data: Telemetry data payload
         """
         try:
             # Store in Redis for real-time access (5-minute TTL)
-            redis_key = f"battery:{battery_id}:telemetry"
-            self.redis_client.setex(
-                redis_key,
-                300,  # 5 minutes
-                json.dumps(data)
-            )
-            
-            # Use centralized TelematicsService for DB updates and advanced logic
-            with Session(engine) as session:
-                TelematicsService.process_telemetry(session, battery_id, data)
-            
-            # Check for alerts
-            self._check_alerts(battery_id, data)
-            
-            # 3. Broadcast to WebSockets
+            redis_key = f"battery:{battery_key}:telemetry"
             try:
-                # MQTT usually runs in its own background thread, so we schedule the coroutine in the main loop
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    asyncio.run_coroutine_threadsafe(
-                        manager.broadcast_battery_update(int(battery_id) if battery_id.isdigit() else 0, data),
-                        loop
-                    )
-            except Exception as e:
-                logger.error(f"Failed to broadcast WS update: {str(e)}")
+                self.redis_client.setex(
+                    redis_key,
+                    300,  # 5 minutes
+                    json.dumps(data)
+                )
+            except Exception as redis_exc:
+                logger.warning(f"Failed to cache telemetry for battery {battery_key}: {redis_exc}")
             
-            logger.debug(f"Processed telemetry for battery {battery_id}")
+            resolved_battery_id = self._resolve_battery_id(battery_key)
+            if not resolved_battery_id:
+                logger.warning("Telemetry received for unknown battery key=%s", battery_key)
+                return
+
+            ingest_payload = self._build_ingest_payload(resolved_battery_id, data)
+            if settings.TELEMATICS_QUEUE_ENABLED:
+                event = EventStreamService.build_event(
+                    event_type="telematics.ingest.v1",
+                    source="mqtt",
+                    payload=ingest_payload.model_dump(mode="json"),
+                    idempotency_key=f"mqtt:{battery_key}:{ingest_payload.timestamp.isoformat()}",
+                )
+                stream_id = EventStreamService.publish(settings.TELEMATICS_STREAM_NAME, event)
+                if stream_id is None and settings.TELEMATICS_QUEUE_REQUIRED:
+                    logger.warning("Telemetry queue unavailable for battery_key=%s", battery_key)
+                    return
+
+                if settings.TELEMATICS_DUAL_WRITE_SHADOW or stream_id is None:
+                    with Session(engine) as session:
+                        TelematicsIngestService.persist_telemetry(session, data_in=ingest_payload)
+            else:
+                with Session(engine) as session:
+                    TelematicsIngestService.persist_telemetry(session, data_in=ingest_payload)
+
+            # Check for alerts
+            self._check_alerts(str(resolved_battery_id), data)
+            
+            logger.debug(f"Processed telemetry for battery {resolved_battery_id}")
             
         except Exception as e:
             logger.error(f"Failed to process telemetry: {str(e)}")
@@ -247,18 +287,6 @@ class MQTTService:
             self.redis_client.lpush(redis_key, *[json.dumps(alert) for alert in alerts])
             self.redis_client.expire(redis_key, 86400)  # 24 hours
             
-            # Broadcast alerts via WebSocket
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    for alert in alerts:
-                        asyncio.run_coroutine_threadsafe(
-                            manager.broadcast_alert(int(battery_id) if battery_id.isdigit() else 0, alert),
-                            loop
-                        )
-            except Exception as e:
-                logger.error(f"Failed to broadcast WS alert: {str(e)}")
-
             logger.warning(f"Alerts generated for battery {battery_id}: {len(alerts)}")
     
     def get_realtime_data(self, battery_id: int) -> Optional[dict]:
@@ -272,7 +300,11 @@ class MQTTService:
             Telemetry data or None
         """
         redis_key = f"battery:{battery_id}:telemetry"
-        data = self.redis_client.get(redis_key)
+        try:
+            data = self.redis_client.get(redis_key)
+        except Exception as exc:
+            logger.warning(f"Failed to fetch telemetry cache for battery {battery_id}: {exc}")
+            return None
         
         if data:
             return json.loads(data)
@@ -289,7 +321,11 @@ class MQTTService:
             List of alerts
         """
         redis_key = f"battery:{battery_id}:alerts"
-        alerts_data = self.redis_client.lrange(redis_key, 0, -1)
+        try:
+            alerts_data = self.redis_client.lrange(redis_key, 0, -1)
+        except Exception as exc:
+            logger.warning(f"Failed to fetch alerts cache for battery {battery_id}: {exc}")
+            return []
         
         return [json.loads(alert) for alert in alerts_data]
 

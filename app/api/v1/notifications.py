@@ -26,17 +26,10 @@ async def mark_notification_read(
     NotificationService.mark_read(db, notification_id, current_user.id)
     return {"message": "Notification marked as read"}
 
-@router.patch("/read-all")
-async def mark_all_notifications_read(
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db)
-):
-    """Mark all notifications as read"""
-    count = NotificationService.mark_all_read(db, current_user.id)
-    return {
-        "message": f"{count} notifications marked as read",
-        "count": count
-    }
+# DECONFLICTED P0-B: PATCH /read-all removed.
+# Canonical handler lives in app/api/v1/notifications_enhanced.py
+# (supports app_scope filtering + include_global param).
+# Removed 2026-04-06.
 
 @router.delete("/{notification_id}")
 async def delete_notification(
@@ -124,39 +117,7 @@ async def put_mark_all_read(
     count = NotificationService.mark_all_read(db, current_user.id)
     return {"message": f"{count} notifications marked as read", "count": count}
 
-from pydantic import BaseModel
-class DeviceTokenRequest(BaseModel):
-    token: str
-    platform: str  # ios, android, web
-
-@router.post("/device-token")
-async def register_device_token(
-    request: DeviceTokenRequest,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db)
-):
-    """Register device token for push notifications"""
-    from app.models.device import Device
-    from sqlmodel import select
-    
-    # Check if token already exists
-    statement = select(Device).where(
-        (Device.user_id == current_user.id) &
-        (Device.fcm_token == request.token)
-    )
-    existing = db.exec(statement).first()
-    
-    if existing:
-        existing.is_active = True
-        db.add(existing)
-    else:
-        device = Device(
-            user_id=current_user.id,
-            fcm_token=request.token,
-            device_type=request.platform,
-            is_active=True
-        )
-        db.add(device)
-    
-    db.commit()
-    return {"message": "Device token registered successfully"}
+# DECONFLICTED P0-B: POST /device-token removed.
+# Canonical handler lives in app/api/v1/notifications_enhanced.py
+# (supports device_id, app_scope, cross-user token deactivation).
+# Removed 2026-04-06.

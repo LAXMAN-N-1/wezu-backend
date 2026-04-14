@@ -1,38 +1,47 @@
-from slowapi import Limiter
+from __future__ import annotations
+
+import logging
+
 from fastapi import Request
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from app.core.config import settings
-from app.core.proxy import get_client_ip
-
-
-def _rate_limit_key(request: Request) -> str:
-    return get_client_ip(request)
-
-import redis
-import logging
+from app.core.proxy import extract_forwarded_client_ip
 
 logger = logging.getLogger(__name__)
 
-def get_limiter_storage():
-    """Attempt to connect to Redis, falback to memory if unavailable."""
-    if not hasattr(settings, "REDIS_URL") or not settings.REDIS_URL:
-        return "memory://"
-        
-    try:
-        r = redis.from_url(settings.REDIS_URL, socket_timeout=1.0)
-        r.ping()
-        return settings.REDIS_URL
-    except (redis.exceptions.ConnectionError, redis.exceptions.TimeoutError):
-        logger.warning("Redis is unavailable. Falling back to MemoryStorage for rate limiting.")
-        return "memory://"
 
-# Distributed rate limiting using Redis as storage (with memory fallback)
-# This ensures rate limits are shared across multiple API instances in production
-limiter = Limiter(
-    key_func=_rate_limit_key,
-    storage_uri=get_limiter_storage(),
-    enabled=(settings.ENVIRONMENT != "test")
-)
+def _get_rate_limit_key(request: Request) -> str:
+    source_ip = request.client.host if request.client else None
+    client_ip = extract_forwarded_client_ip(
+        source_ip,
+        request.headers.get("x-forwarded-for"),
+        request.headers.get("forwarded"),
+        request.headers.get("x-real-ip"),
+    )
+    return client_ip or get_remote_address(request)
+
+
+def _resolve_rate_limit_storage_url() -> str:
+    explicit_url = (settings.RATE_LIMIT_STORAGE_URL or "").strip()
+    if explicit_url:
+        return explicit_url
+
+    # Reuse Redis as the distributed limiter backend by default in production-safe deployments.
+    redis_url = (settings.REDIS_URL or "").strip()
+    if redis_url:
+        return redis_url
+
+    return "memory://"
+
+
+try:
+    limiter = Limiter(key_func=_get_rate_limit_key, storage_uri=_resolve_rate_limit_storage_url())
+except Exception as exc:
+    logger.warning("Failed to initialize distributed rate limiter backend; falling back to in-memory: %s", exc)
+    limiter = Limiter(key_func=_get_rate_limit_key, storage_uri="memory://")
 
 # Can serve as dependency or direct import
 def limit(limit_value: str):

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, func
 from typing import Dict
 from datetime import datetime, UTC, timedelta
@@ -35,7 +35,7 @@ def system_health(
             logger.info(f"DATABASE_OK: {count} users found")
         except Exception as e:
             logger.error(f"DATABASE_CHECK_FAILED: {str(e)}")
-            health_status["checks"]["database"] = {"status": "down", "error": str(e)}
+            health_status["checks"]["database"] = {"status": "down", "error": "Database unreachable"}
             health_status["status"] = "degraded"
         
         # Check critical services
@@ -45,7 +45,7 @@ def system_health(
         return health_status
     except Exception as e:
         logger.exception("CRITICAL_ERROR_IN_HEALTH_CHECK")
-        raise HTTPException(status_code=500, detail=f"Internal health check error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Health check failed")
 
 @router.get("/metrics")
 def performance_metrics(
@@ -53,10 +53,10 @@ def performance_metrics(
     session: Session = Depends(get_db)
 ):
     """Get performance KPIs"""
-    from app.models.rental import Rental
+    from app.models.rental import Rental, RentalStatus
     from app.models.station import Station
-    from app.models.battery import Battery
-    from app.models.financial import Transaction
+    from app.models.battery import Battery, BatteryStatus
+    from app.models.financial import Transaction, TransactionStatus
     
     # Calculate various metrics
     now = datetime.now(UTC)
@@ -66,7 +66,7 @@ def performance_metrics(
     
     # Active rentals
     active_rentals = session.exec(
-        select(func.count(Rental.id)).where(Rental.status == "active")
+        select(func.count(Rental.id)).where(Rental.status == RentalStatus.ACTIVE)
     ).one()
     
     # Total users
@@ -75,20 +75,20 @@ def performance_metrics(
     # Active users (logged in last 7 days)
     active_users = session.exec(
         select(func.count(User.id))
-        .where(User.last_login_at >= week_start)
-    ).one() if hasattr(User, 'last_login_at') else 0
+        .where(User.last_login >= week_start)
+    ).one()
     
     # Revenue metrics
     daily_revenue = session.exec(
         select(func.sum(Transaction.amount))
         .where(Transaction.created_at >= today_start)
-        .where(Transaction.status == "completed")
+        .where(Transaction.status == TransactionStatus.SUCCESS)
     ).one() or 0
-    
+
     monthly_revenue = session.exec(
         select(func.sum(Transaction.amount))
         .where(Transaction.created_at >= month_start)
-        .where(Transaction.status == "completed")
+        .where(Transaction.status == TransactionStatus.SUCCESS)
     ).one() or 0
     
     # Station metrics
@@ -97,7 +97,7 @@ def performance_metrics(
     # Battery metrics
     total_batteries = session.exec(select(func.count(Battery.id))).one()
     available_batteries = session.exec(
-        select(func.count(Battery.id)).where(Battery.status == "available")
+        select(func.count(Battery.id)).where(Battery.status == BatteryStatus.AVAILABLE)
     ).one()
     
     return {

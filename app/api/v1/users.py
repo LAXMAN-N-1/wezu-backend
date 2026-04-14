@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Request, UploadFile, File, Form
 from sqlmodel import Session, select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict
 from datetime import datetime, UTC
 from app.api import deps
 from app.core.audit import audit_log
 from app.db.session import get_session
-from app.models.user import User
+from app.models.user import User, UserStatus
 from app.models.address import Address
 from app.models.user_profile import UserProfile
 from app.schemas.user import UserResponse, UserCreate, UserUpdate, AddressCreate, AddressResponse, AddressUpdate, DeviceCreate, DeviceResponse
@@ -27,12 +27,29 @@ from app.services.audit_service import audit_service
 from app.services.analytics_service import AnalyticsService
 from app.services.membership_service import MembershipService
 from app.core.proxy import get_client_ip
+from app.api.deps import invalidate_user_token_cache
+from app.core.config import settings
+from app.utils.runtime_cache import cached_call, invalidate_cache
 import os
 import shutil
 import json
 from app.core.security import generate_totp_secret, verify_totp, generate_backup_codes, generate_qr_uri
 
 router = APIRouter()
+
+
+def _user_self_cache(user_id: int, key: str, call):
+    return cached_call(
+        "user-self",
+        user_id,
+        key,
+        ttl_seconds=settings.SESSION_CACHE_TTL_SECONDS,
+        call=call,
+    )
+
+
+def _invalidate_user_self_cache(user_id: int) -> None:
+    invalidate_cache("user-self", user_id)
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 @audit_log("CREATE_USER", "USER")
@@ -100,6 +117,42 @@ def calculate_profile_completion(user: User, user_profile: Optional[UserProfile]
     return min(base_percentage + kyc_bonus, 100)
 
 
+def _format_primary_address(user: User) -> Optional[str]:
+    """Build a display-safe address string from the user's address list."""
+    addresses = list(user.addresses or [])
+    if not addresses:
+        return None
+
+    default_address = next(
+        (addr for addr in addresses if getattr(addr, "is_default", False)),
+        addresses[0],
+    )
+
+    raw_parts = [
+        default_address.address_line1,
+        default_address.address_line2,
+        default_address.street_address,
+        default_address.city,
+        default_address.state,
+        default_address.postal_code,
+        default_address.country,
+    ]
+
+    parts: list[str] = []
+    seen: set[str] = set()
+    for value in raw_parts:
+        cleaned = (value or "").strip()
+        if not cleaned:
+            continue
+        key = cleaned.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        parts.append(cleaned)
+
+    return ", ".join(parts) if parts else None
+
+
 def _build_user_profile_response(user: User, db: Session = None) -> UserProfileResponse:
     """Helper to build consistent UserProfileResponse"""
     
@@ -108,8 +161,20 @@ def _build_user_profile_response(user: User, db: Session = None) -> UserProfileR
     user_roles = [current_role]
     
     # Get permissions and menu for current role
-    permissions = AuthService.get_permissions_for_role(current_role) if current_role else []
-    menu = AuthService.get_menu_for_role(current_role) if current_role else []
+    if current_role:
+        permissions = (
+            AuthService.get_permissions_for_role(db, current_role)
+            if db is not None
+            else AuthService.get_permissions_for_role(current_role)
+        )
+        menu = (
+            AuthService.get_menu_for_role(db, current_role)
+            if db is not None
+            else AuthService.get_menu_for_role(current_role)
+        )
+    else:
+        permissions = []
+        menu = []
     
     # Get wallet balance (handle if wallet relationship not loaded but available in session?)
     # Ideally user.wallet should be loaded.
@@ -174,16 +239,17 @@ async def read_user_me(
     """
     Get current user's full profile.
     """
-    # Reload user with relationships
-    statement = select(User).where(User.id == current_user.id).options(
-        selectinload(User.role),
-        selectinload(User.wallet),
-        selectinload(User.staff_profile),
-        selectinload(User.user_profile)
-    )
-    user = db.exec(statement).first()
-    
-    return _build_user_profile_response(user, db)
+    def _load_profile() -> dict:
+        statement = select(User).where(User.id == current_user.id).options(
+            joinedload(User.role),
+            joinedload(User.wallet),
+            joinedload(User.staff_profile),
+            joinedload(User.user_profile)
+        )
+        user = db.exec(statement).first()
+        return _build_user_profile_response(user, db).model_dump(mode="json")
+
+    return _user_self_cache(current_user.id, "profile", _load_profile)
 
 @router.put("/me", response_model=UserProfileResponse)
 @audit_log("UPDATE_USER", "USER")
@@ -200,7 +266,11 @@ async def update_user_me(
     from datetime import datetime, UTC
     
     # Get fresh user with profile
-    user = db.exec(select(User).where(User.id == current_user.id).options(selectinload(User.user_profile))).first()
+    user = db.exec(
+        select(User)
+        .where(User.id == current_user.id)
+        .options(joinedload(User.user_profile))
+    ).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -234,13 +304,14 @@ async def update_user_me(
     db.add(user)
     db.commit()
     db.refresh(user)
+    _invalidate_user_self_cache(current_user.id)
     
     # Reload for response
     statement = select(User).where(User.id == current_user.id).options(
-        selectinload(User.role),
-        selectinload(User.wallet),
-        selectinload(User.staff_profile),
-        selectinload(User.user_profile)
+        joinedload(User.role),
+        joinedload(User.wallet),
+        joinedload(User.staff_profile),
+        joinedload(User.user_profile)
     )
     user = db.exec(statement).first()
     
@@ -306,7 +377,8 @@ async def upload_profile_picture(
     user.updated_at = datetime.now(UTC)
     db.add(user)
     db.commit()
-    
+    _invalidate_user_self_cache(current_user.id)
+
     return ProfilePictureResponse(url=file_url)
 
 
@@ -694,47 +766,49 @@ def get_notification_preferences(
     from app.models.notification_preference import NotificationPreference
     from sqlmodel import select
     
-    pref = db.exec(
-        select(NotificationPreference).where(NotificationPreference.user_id == current_user.id)
-    ).first()
-    
-    if not pref:
-        # Return defaults if no settings found
-        prefs = _get_default_notification_preferences()
-        return NotificationPreferencesResponse(
-            email=EmailPreferences(**prefs["email"]),
-            sms=SMSPreferences(**prefs["sms"]),
-            push=PushPreferences(**prefs["push"]),
-            quiet_hours=QuietHours(**prefs["quiet_hours"]),
-        )
+    def _load_preferences() -> dict:
+        pref = db.exec(
+            select(NotificationPreference).where(NotificationPreference.user_id == current_user.id)
+        ).first()
 
-    return NotificationPreferencesResponse(
-        email=EmailPreferences(
-            enabled=pref.email_enabled,
-            rental_confirmations=pref.transactional_email,
-            payment_receipts=pref.payment_email,
-            promotional=pref.promotional_email,
-            security_alerts=True
-        ),
-        sms=SMSPreferences(
-            enabled=pref.sms_enabled,
-            rental_confirmations=pref.transactional_sms,
-            payment_receipts=pref.payment_sms,
-            otp=True
-        ),
-        push=PushPreferences(
-            enabled=pref.push_enabled,
-            battery_available=pref.battery_alerts_push,
-            payment_reminders=pref.payment_push,
-            promotional=pref.promotional_push
-        ),
-        quiet_hours=QuietHours(
-            enabled=pref.quiet_hours_enabled,
-            start_time=pref.quiet_hours_start.strftime("%H:%M") if pref.quiet_hours_start else "22:00",
-            end_time=pref.quiet_hours_end.strftime("%H:%M") if pref.quiet_hours_end else "07:00",
-            timezone="UTC"
-        )
-    )
+        if not pref:
+            prefs = _get_default_notification_preferences()
+            return NotificationPreferencesResponse(
+                email=EmailPreferences(**prefs["email"]),
+                sms=SMSPreferences(**prefs["sms"]),
+                push=PushPreferences(**prefs["push"]),
+                quiet_hours=QuietHours(**prefs["quiet_hours"]),
+            ).model_dump(mode="json")
+
+        return NotificationPreferencesResponse(
+            email=EmailPreferences(
+                enabled=pref.email_enabled,
+                rental_confirmations=pref.transactional_email,
+                payment_receipts=pref.payment_email,
+                promotional=pref.promotional_email,
+                security_alerts=True
+            ),
+            sms=SMSPreferences(
+                enabled=pref.sms_enabled,
+                rental_confirmations=pref.transactional_sms,
+                payment_receipts=pref.payment_sms,
+                otp=True
+            ),
+            push=PushPreferences(
+                enabled=pref.push_enabled,
+                battery_available=pref.battery_alerts_push,
+                payment_reminders=pref.payment_push,
+                promotional=pref.promotional_push
+            ),
+            quiet_hours=QuietHours(
+                enabled=pref.quiet_hours_enabled,
+                start_time=pref.quiet_hours_start.strftime("%H:%M") if pref.quiet_hours_start else "22:00",
+                end_time=pref.quiet_hours_end.strftime("%H:%M") if pref.quiet_hours_end else "07:00",
+                timezone="UTC"
+            )
+        ).model_dump(mode="json")
+
+    return _user_self_cache(current_user.id, "notification-preferences", _load_preferences)
 
 
 @router.put("/me/notification-preferences", response_model=NotificationPreferencesResponse)
@@ -783,6 +857,7 @@ def update_notification_preferences(
             
     db.commit()
     db.refresh(pref)
+    _invalidate_user_self_cache(current_user.id)
     
     return NotificationPreferencesResponse(
         email=EmailPreferences(
@@ -827,7 +902,7 @@ async def read_users(
     sort_order: Optional[str] = "desc", # asc, desc
     # Filters
     role: Optional[str] = None,
-    status: Optional[str] = None, # active, inactive
+    user_status: Optional[str] = Query(default=None, alias="status"), # active, inactive
     # Dependencies
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
@@ -869,10 +944,10 @@ async def read_users(
         query = query.join(User.role).where(Role.name == role)
 
     # Status filter
-    if status:
-        if status.lower() == "active":
+    if user_status:
+        if user_status.lower() == "active":
             conditions.append(User.is_active == True)
-        elif status.lower() == "inactive":
+        elif user_status.lower() == "inactive":
             conditions.append(User.is_active == False)
     
     # Apply Regional Manager Restriction
@@ -949,7 +1024,7 @@ async def read_users(
             "sort_by": sort_by,
             "sort_order": sort_order,
             "role": role,
-            "status": status
+            "status": user_status
         }
     )
 
@@ -1309,7 +1384,7 @@ async def get_user_by_id(
         email=target_user.email,
         phone_number=target_user.phone_number,
         profile_picture=target_user.profile_picture,
-        address=target_user.address,
+        address=_format_primary_address(target_user),
         is_active=target_user.is_active,
         is_superuser=target_user.is_superuser,
         kyc_status=target_user.kyc_status,
@@ -1357,7 +1432,10 @@ async def update_user_status(
         )
         
     # 2. Fetch User
-    user = db.get(User, user_id)
+    statement = select(User).where(User.id == user_id).options(
+        selectinload(User.addresses)
+    )
+    user = db.exec(statement).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
@@ -1534,7 +1612,10 @@ async def delete_user(
             )
             
     # 2. Fetch User
-    user = db.get(User, user_id)
+    user_statement = (
+        select(User).where(User.id == user_id).options(selectinload(User.addresses))
+    )
+    user = db.exec(user_statement).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
         
@@ -1550,7 +1631,7 @@ async def delete_user(
     user.is_deleted = True
     user.deleted_at = datetime.now(UTC)
     user.is_active = False
-    user.status = "deleted"
+    user.status = UserStatus.DELETED
     
     # Anonymize PII
     user.email = f"deleted_{deletion_uuid}@deleted.wezu"
@@ -1558,12 +1639,14 @@ async def delete_user(
     user.phone_number = f"del_{deletion_uuid}" 
     user.full_name = "Deleted User"
     user.profile_picture = None
-    user.address = None
-    user.emergency_contact = None
     user.security_question = None
     user.security_answer = None
     user.google_id = None
     user.apple_id = None
+
+    # Remove dependent address rows to avoid stale PII and invalid relationship writes.
+    for address in list(user.addresses or []):
+        db.delete(address)
     
     # Invalidate sessions
     user.last_global_logout_at = datetime.now(UTC)
@@ -1638,6 +1721,7 @@ async def revoke_session(
     session.is_active = False
     db.add(session)
     db.commit()
+    invalidate_user_token_cache(current_user.id)
     
     # Optional: Blacklist token if TokenService is available
     if session.token_id:

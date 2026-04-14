@@ -1,0 +1,245 @@
+# ─────────────────────────────────────────────────────────────────────
+# Bounded Context Domain Map
+# Generated: 2026-04-06 (P3-C)
+#
+# Each domain owns a set of services and models.  Cross-domain imports
+# are restricted to the "shared" layer plus explicitly listed exceptions.
+# The test_module_boundaries.py CI guard enforces these rules via AST.
+# ─────────────────────────────────────────────────────────────────────
+
+shared:
+  description: >
+    Shared kernel — models and utilities every domain may import.
+  models:
+    - app.models.user
+    - app.models.enums
+    - app.models.all
+    - app.models.audit_log       # security_service writes audit logs
+    - app.models.address          # user addresses are cross-cutting
+    - app.models.device           # notification targeting
+    - app.models.rbac             # workflow_automation reads roles
+  services:
+    - app.services.redis_service
+    - app.services.storage_service
+    - app.services.notification_service
+    - app.services.sms_service
+    - app.services.security_service
+    - app.services.workflow_automation_service
+  core:
+    - app.core.config
+    - app.core.database
+    - app.core.security
+    - app.core.logging
+    - app.core.observability
+    - app.core.proxy
+    - app.core.public_url
+
+domains:
+
+  financial:
+    description: Wallet, payments, settlements, refunds, commissions.
+    services:
+      - app.services.wallet_service
+      - app.services.payment_service
+      - app.services.payment_method_service
+      - app.services.settlement_service
+      - app.services.receipt_service
+      - app.services.commission_service
+      - app.services.razorpay_webhook_service
+      - app.services.dispute_service
+    models:
+      - app.models.financial
+      - app.models.payment
+      - app.models.refund
+      - app.models.chargeback
+      - app.models.commission
+    allowed_cross_domain:
+      - rental    # settlement needs swap/rental models
+      - station   # settlement aggregates by station
+      - dealer    # settlement references dealer entities
+      - content   # receipt/pdf generation
+
+  rental:
+    description: Rentals, bookings, reservations, swaps.
+    services:
+      - app.services.rental_service
+      - app.services.rental_alert_service
+      - app.services.booking_service
+      - app.services.swap_service
+      - app.services.cart_service
+    models:
+      - app.models.rental
+      - app.models.rental_event
+      - app.models.rental_modification
+      - app.models.battery_reservation
+      - app.models.swap
+      - app.models.cart
+      - app.models.late_fee
+    allowed_cross_domain:
+      - financial   # rental → wallet for deposit/payment
+      - battery     # rental → battery status
+      - station     # swap references station
+      - infra       # GPS tracking for swap
+      - content     # promo codes for rentals
+
+  battery:
+    description: Battery lifecycle, catalog, health, telematics.
+    services:
+      - app.services.battery_service
+      - app.services.battery_batch_service
+      - app.services.battery_consistency
+      - app.services.charging_service
+      - app.services.telematics_service
+      - app.services.telematics_ingest_service
+      - app.services.demand_predictor
+    models:
+      - app.models.battery
+      - app.models.battery_catalog
+      - app.models.battery_health
+      - app.models.battery_health_log
+      - app.models.bess
+      - app.models.charging_queue
+    allowed_cross_domain:
+      - rental     # demand_predictor reads reservations
+      - station    # battery_consistency references station
+      - content    # battery_service uses QR generation
+      - infra      # battery_service creates alerts
+
+  station:
+    description: Station management, stock, metrics.
+    services:
+      - app.services.station_service
+      - app.services.station_metrics_service
+      - app.services.stock
+      - app.services.warehouse
+      - app.services.route_service
+    models:
+      - app.models.station
+      - app.models.station_models
+      - app.models.delivery_assignment
+      - app.models.delivery_route
+    allowed_cross_domain:
+      - battery
+      - rental     # station_metrics reads rental data
+      - infra      # alert models
+      - content    # QR generation
+      - identity   # route_service reads driver profiles
+
+  identity:
+    description: Auth, KYC, fraud, RBAC, tokens, passkeys.
+    services:
+      - app.services.auth_service
+      - app.services.apple_auth_service
+      - app.services.kyc_service
+      - app.services.dealer_kyc_service
+      - app.services.video_kyc_service
+      - app.services.fraud_service
+      - app.services.rbac_service
+      - app.services.role_service
+      - app.services.role_right_service
+      - app.services.token_service
+      - app.services.passkey_service
+      - app.services.password_service
+      - app.services.user_service
+      - app.services.user_state_service
+      - app.services.driver_service
+    models:
+      - app.models.rbac
+      - app.models.role_right
+      - app.models.menu
+      - app.models.api_key
+      - app.models.biometric
+      - app.models.device
+      - app.models.device_fingerprint
+      - app.models.driver_profile
+      - app.models.admin_user
+      - app.models.admin_group
+      - app.models.kyc
+      - app.models.dealer_kyc
+    allowed_cross_domain:
+      - infra      # user_service reads addresses
+
+  dealer:
+    description: Dealer operations, analytics, ledger.
+    services:
+      - app.services.dealer_service
+      - app.services.dealer_analytics_service
+      - app.services.dealer_ledger_service
+      - app.services.dealer_station_service
+    models:
+      - app.models.dealer
+      - app.models.dealer_inventory
+      - app.models.dealer_promotion
+    allowed_cross_domain:
+      - financial
+      - station
+      - identity
+      - battery    # dealer analytics reads battery data
+      - rental     # dealer reports include rental data
+      - content    # PDF report generation
+
+  analytics:
+    description: Dashboards, reports, admin analytics, audit.
+    services:
+      - app.services.analytics_service
+      - app.services.analytics_dashboard_service
+      - app.services.analytics_report_service
+      - app.services.admin_analytics_service
+      - app.services.audit_service
+    models:
+      - app.models.analytics
+      - app.models.analytics_dashboard
+      - app.models.audit_log
+    allowed_cross_domain:
+      - financial
+      - rental
+      - battery
+      - station
+      - identity
+      - dealer     # admin analytics reads dealer data
+      - infra      # distributed cache for dashboards
+
+  content:
+    description: Blogs, banners, FAQs, promos, referrals, support.
+    services:
+      - app.services.campaign_service
+      - app.services.promo_service
+      - app.services.referral_service
+      - app.services.review_service
+      - app.services.support_service
+      - app.services.pdf_service
+      - app.services.qr_service
+      - app.services.chat_service
+    models:
+      - app.models.banner
+      - app.models.blog
+      - app.models.faq
+      - app.models.promo_code
+      - app.models.feedback
+      - app.models.favorite
+      - app.models.ecommerce
+      - app.models.catalog
+    allowed_cross_domain:
+      - battery    # QR service references batteries
+      - identity   # support reads RBAC roles
+      - dealer     # campaign_service reads dealer promotions
+      - station    # campaign_service references stations
+
+  infra:
+    description: Infrastructure — caching, alerts, websocket, bootstrap.
+    services:
+      - app.services.alert_service
+      - app.services.background_runtime_service
+      - app.services.bootstrap_service
+      - app.services.distributed_cache_service
+      - app.services.gps_service
+      - app.services.startup_diagnostics_service
+      - app.services.timescale_service
+      - app.services.websocket_service
+      - app.services.request_audit_queue
+    models:
+      - app.models.alert
+      - app.models.batch_job
+      - app.models.address
+    allowed_cross_domain:
+      - "*"  # infra may reach into any domain

@@ -20,10 +20,14 @@ router = APIRouter()
 
 @router.get("/general")
 def get_general_settings(
+    key: Optional[str] = Query(None, description="Filter by specific config key"),
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_admin),
 ):
-    configs = session.exec(select(SystemConfig)).all()
+    stmt = select(SystemConfig)
+    if key:
+        stmt = stmt.where(SystemConfig.key == key)
+    configs = session.exec(stmt).all()
     result = {c.key: {"value": c.value, "description": c.description, "id": c.id} for c in configs}
     return result
 

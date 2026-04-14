@@ -1,132 +1,234 @@
+from __future__ import annotations
+
+import logging
+from datetime import UTC, datetime, timedelta
+from typing import Dict, List
+
 from sqlmodel import Session, select
-from typing import List, Optional, Dict
-from datetime import datetime, UTC, timedelta
-from app.models.station import Station, StationStatus
+
 from app.models.battery import Battery, BatteryStatus
 from app.models.battery_reservation import BatteryReservation
+from app.models.station import Station
 from app.services.gps_service import GPSTrackingService
 from app.services.notification_service import NotificationService
-import logging
 
 logger = logging.getLogger(__name__)
 
+
 class BookingService:
+    ACTIVE_RESERVATION_STATUSES = {"PENDING", "ACTIVE"}
+    TERMINAL_STATUSES = {"COMPLETED", "CANCELLED", "EXPIRED"}
+    DEFAULT_RESERVATION_MINUTES = 30
+
+    @staticmethod
+    def _safe_commit(db: Session, *, context: str = "booking_service") -> None:
+        """Commit with rollback-on-failure and logging."""
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("db.commit_failed context=%s", context)
+            raise
+
+    @staticmethod
+    def _utcnow() -> datetime:
+        # Store/query as naive UTC for compatibility across engines (SQLite/Postgres).
+        return datetime.now(UTC).replace(tzinfo=None)
+
+    @staticmethod
+    def _normalize_status(value: str | None) -> str:
+        return (value or "").strip().upper()
+
+    @staticmethod
+    def _normalize_station_status(value: str | None) -> str:
+        return (value or "").strip().lower()
+
+    @staticmethod
+    def _is_station_bookable(station: Station) -> bool:
+        status = BookingService._normalize_station_status(station.status)
+        if status in {"maintenance", "closed", "offline", "error"}:
+            return False
+        return True
+
+    @staticmethod
+    def release_expired_reservations(db: Session, *, user_id: int | None = None) -> int:
+        """Expire pending reservations whose reservation window has elapsed."""
+        now = BookingService._utcnow()
+        statement = select(BatteryReservation).where(
+            BatteryReservation.status == "PENDING",
+            BatteryReservation.end_time <= now,
+        )
+        if user_id is not None:
+            statement = statement.where(BatteryReservation.user_id == user_id)
+
+        expired = db.exec(statement).all()
+        for reservation in expired:
+            reservation.status = "EXPIRED"
+            reservation.updated_at = now
+            db.add(reservation)
+
+        if expired:
+            BookingService._safe_commit(db, context="release_expired_reservations")
+        return len(expired)
+
+    @staticmethod
+    def mark_expired_if_due(db: Session, reservation: BatteryReservation) -> bool:
+        if BookingService._normalize_status(reservation.status) != "PENDING":
+            return False
+
+        now = BookingService._utcnow()
+        end_time = reservation.end_time
+        if end_time.tzinfo is not None:
+            end_time = end_time.astimezone(UTC).replace(tzinfo=None)
+        if end_time > now:
+            return False
+
+        reservation.status = "EXPIRED"
+        reservation.updated_at = now
+        db.add(reservation)
+        BookingService._safe_commit(db, context="mark_expired_if_due")
+        db.refresh(reservation)
+        return True
+
     @staticmethod
     def get_stations_nearby(
         db: Session,
         lat: float,
         lon: float,
         radius_km: float = 10,
-        limit: int = 10
+        limit: int = 10,
     ) -> List[Dict]:
-        """Find stations within radius with real-time availability"""
-        statement = select(Station).where(Station.status == StationStatus.OPERATIONAL)
-        stations = db.exec(statement).all()
-        
-        results = []
+        """Find nearby stations with currently bookable batteries."""
+        stations = db.exec(select(Station)).all()
+
+        now = BookingService._utcnow()
+        reserved_rows = db.exec(
+            select(BatteryReservation.battery_id)
+            .where(BatteryReservation.status.in_(list(BookingService.ACTIVE_RESERVATION_STATUSES)))
+            .where(BatteryReservation.end_time > now)
+            .where(BatteryReservation.battery_id.is_not(None))
+        ).all()
+        reserved_ids = {int(row[0] if isinstance(row, tuple) else row) for row in reserved_rows if row is not None}
+
+        results: list[dict] = []
         for station in stations:
+            if not BookingService._is_station_bookable(station):
+                continue
             distance = GPSTrackingService.calculate_distance(lat, lon, station.latitude, station.longitude)
-            if distance <= radius_km:
-                # Get available batteries count
-                available_count = db.exec(
-                    select(Battery).where(
-                        Battery.station_id == station.id,
-                        Battery.status == BatteryStatus.AVAILABLE,
-                        Battery.current_charge >= 80
-                    )
-                ).all()
-                
-                results.append({
+            if distance > radius_km:
+                continue
+
+            battery_query = (
+                select(Battery)
+                .where(Battery.station_id == station.id)
+                .where(Battery.status == BatteryStatus.AVAILABLE)
+                .where(Battery.current_charge >= 70)
+            )
+            if reserved_ids:
+                battery_query = battery_query.where(Battery.id.notin_(reserved_ids))
+
+            available_count = len(db.exec(battery_query).all())
+            results.append(
+                {
                     "id": station.id,
                     "name": station.name,
                     "address": station.address,
                     "latitude": station.latitude,
                     "longitude": station.longitude,
                     "distance": round(distance, 2),
-                    "available_batteries": len(available_count),
+                    "available_batteries": available_count,
                     "rating": station.rating,
-                    "is_24x7": station.is_24x7
-                })
-        
-        # Sort by distance
-        results.sort(key=lambda x: x["distance"])
+                    "is_24x7": station.is_24x7,
+                }
+            )
+
+        results.sort(key=lambda row: row["distance"])
         return results[:limit]
 
     @staticmethod
-    def create_reservation(
-        db: Session,
-        user_id: int,
-        station_id: int
-    ) -> BatteryReservation:
-        """Create a 30-minute reservation for a battery at a station"""
-        # 1. Check if station has available batteries
-        battery = db.exec(
-            select(Battery).where(
-                Battery.station_id == station_id,
-                Battery.status == BatteryStatus.AVAILABLE
-            ).order_by(Battery.current_charge.desc())
-        ).first()
-        
-        if not battery:
-            raise ValueError("No batteries available at this station")
-            
-        # 2. Check if user already has an active reservation
+    def create_reservation(db: Session, user_id: int, station_id: int) -> BatteryReservation:
+        """Create a reservation only when station and battery availability checks pass."""
+        BookingService.release_expired_reservations(db, user_id=user_id)
+
+        station = db.get(Station, station_id)
+        if not station:
+            raise ValueError("Station not found")
+        if not BookingService._is_station_bookable(station):
+            raise ValueError("Station is currently not accepting bookings")
+
+        now = BookingService._utcnow()
         existing = db.exec(
-            select(BatteryReservation).where(
-                BatteryReservation.user_id == user_id,
-                BatteryReservation.status == "PENDING"
-            )
+            select(BatteryReservation)
+            .where(BatteryReservation.user_id == user_id)
+            .where(BatteryReservation.status.in_(list(BookingService.ACTIVE_RESERVATION_STATUSES)))
+            .where(BatteryReservation.end_time > now)
+            .order_by(BatteryReservation.end_time.desc())
         ).first()
         if existing:
             raise ValueError("User already has an active reservation")
 
-        # 3. Create Reservation
-        now = datetime.now(UTC)
-        expiry = now + timedelta(minutes=30)
-        
+        reserved_rows = db.exec(
+            select(BatteryReservation.battery_id)
+            .where(BatteryReservation.status.in_(list(BookingService.ACTIVE_RESERVATION_STATUSES)))
+            .where(BatteryReservation.end_time > now)
+            .where(BatteryReservation.battery_id.is_not(None))
+        ).all()
+        reserved_ids = {int(row[0] if isinstance(row, tuple) else row) for row in reserved_rows if row is not None}
+
+        battery_query = (
+            select(Battery)
+            .where(Battery.station_id == station_id)
+            .where(Battery.status == BatteryStatus.AVAILABLE)
+            .where(Battery.current_charge >= 70)
+            .order_by(Battery.current_charge.desc(), Battery.id.asc())
+        )
+        if reserved_ids:
+            battery_query = battery_query.where(Battery.id.notin_(reserved_ids))
+
+        battery = db.exec(battery_query).first()
+        if not battery:
+            raise ValueError("No bookable batteries available at this station")
+
+        expiry = now + timedelta(minutes=BookingService.DEFAULT_RESERVATION_MINUTES)
         reservation = BatteryReservation(
             user_id=user_id,
             station_id=station_id,
             battery_id=battery.id,
             start_time=now,
             end_time=expiry,
-            status="PENDING"
+            status="PENDING",
+            updated_at=now,
         )
-        
-        # 4. Mark battery as reserved (using a pseudo-status or separate field if needed, 
-        # but for now we'll just keep it in PENDING reservation)
-        # Actually, let's mark the battery as 'reserved' to prevent duplicate bookings
-        # BatteryStatus doesn't have RESERVED, so let's update it or use a logic
-        # For MVP, we'll just trust the reservation table.
-        
+
         db.add(reservation)
-        db.commit()
+        BookingService._safe_commit(db, context="create_reservation")
         db.refresh(reservation)
 
-        # 5. Schedule reminder (10 mins before expiry)
         reminder_time = reservation.end_time - timedelta(minutes=10)
-        if reminder_time > datetime.now(UTC):
-            NotificationService.schedule_notification(
-                db=db,
-                user_id=user_id,
-                title="Reservation Reminder",
-                message="Your battery reservation at " + battery.station_id + " expires in 10 minutes.", # Station name would be better
-                scheduled_at=reminder_time
-            )
+        if reminder_time > BookingService._utcnow():
+            try:
+                NotificationService.schedule_notification(
+                    db=db,
+                    user_id=user_id,
+                    title="Reservation Reminder",
+                    message=f"Your battery reservation at {station.name} expires in 10 minutes.",
+                    scheduled_at=reminder_time,
+                )
+            except Exception:
+                logger.exception("Failed to schedule reservation reminder reservation_id=%s", reservation.id)
 
         return reservation
 
     @staticmethod
-    def release_expired_reservations(db: Session):
-        """Release reservations older than 30 minutes"""
-        now = datetime.now(UTC)
-        statement = select(BatteryReservation).where(
-            BatteryReservation.status == "PENDING",
-            BatteryReservation.end_time < now
-        )
-        expired = db.exec(statement).all()
-        for res in expired:
-            res.status = "EXPIRED"
-            db.add(res)
-        db.commit()
-        return len(expired)
+    def is_transition_allowed(current_status: str, target_status: str) -> bool:
+        current = BookingService._normalize_status(current_status)
+        target = BookingService._normalize_status(target_status)
+
+        allowed_transitions = {
+            "PENDING": {"ACTIVE", "CANCELLED", "EXPIRED"},
+            "ACTIVE": {"COMPLETED", "CANCELLED"},
+            "COMPLETED": set(),
+            "CANCELLED": set(),
+            "EXPIRED": set(),
+        }
+        return target in allowed_transitions.get(current, set())

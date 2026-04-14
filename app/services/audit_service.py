@@ -4,7 +4,7 @@ import json
 import logging
 from typing import Optional, Dict, Any
 
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 from app.core.database import engine
 from app.models.audit_log import AuditLog, SecurityEvent
 from datetime import datetime, UTC
@@ -47,7 +47,7 @@ class AuditService:
             try:
                 db.rollback()
             except Exception:
-                pass
+                logger.warning("audit.rollback_failed_after_write", exc_info=True)
             logger.error(f"Failed to write audit log: {e}")
 
     async def log_event(
@@ -78,7 +78,7 @@ class AuditService:
                 try:
                     db.rollback()
                 except Exception:
-                    pass
+                    logger.warning("audit.rollback_failed_after_event", exc_info=True)
                 logger.error(f"Failed to log event: {e}")
 
     async def log_security_event(self, user_id: int, event: str, metadata: Dict[str, Any]):
@@ -118,17 +118,19 @@ class AuditService:
             try:
                 db.rollback()
             except Exception:
-                pass
+                logger.warning("audit.rollback_failed_after_security_event", exc_info=True)
             logger.error(f"Failed to write security event: {e}")
 
     async def get_logs(self, user_id: int = None, page: int = 1, limit: int = 20):
         """Fetch paginated logs."""
         with Session(engine) as db:
             query = select(AuditLog)
+            count_query = select(func.count(AuditLog.id))
             if user_id:
                 query = query.where(AuditLog.user_id == user_id)
-            
-            total = len(db.exec(query).all())
+                count_query = count_query.where(AuditLog.user_id == user_id)
+
+            total = int(db.exec(count_query).one() or 0)
             query = query.order_by(AuditLog.timestamp.desc()).offset((page - 1) * limit).limit(limit)
             logs = db.exec(query).all()
             
@@ -167,9 +169,8 @@ class AuditService:
     def export_logs_csv(
         db: Session, **filters
     ) -> str:
-        """Export filtered logs to a CSV string. Handles 100k+ records in-memory."""
+        """Export filtered logs to CSV while iterating rows to avoid large memory spikes."""
         query = AuditService._build_query(db, **filters)
-        logs = db.exec(query).all()
 
         output = io.StringIO()
         writer = csv.writer(output)
@@ -177,7 +178,7 @@ class AuditService:
             "id", "user_id", "action", "resource_type", "target_id",
             "old_value", "new_value", "ip_address", "user_agent", "timestamp",
         ])
-        for log in logs:
+        for log in db.exec(query):
             writer.writerow([
                 log.id, log.user_id, log.action, log.resource_type, log.target_id,
                 json.dumps(log.old_value) if log.old_value else "",
@@ -193,7 +194,6 @@ class AuditService:
     ) -> list:
         """Export filtered logs as a JSON-serializable list."""
         query = AuditService._build_query(db, **filters)
-        logs = db.exec(query).all()
         return [
             {
                 "id": log.id,
@@ -207,7 +207,7 @@ class AuditService:
                 "user_agent": log.user_agent,
                 "timestamp": log.timestamp.isoformat() if log.timestamp else None,
             }
-            for log in logs
+            for log in db.exec(query)
         ]
 
 audit_service = AuditService()

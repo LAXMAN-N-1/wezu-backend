@@ -1,5 +1,5 @@
 from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, Query
 from sqlmodel import Session, select
 from app.api import deps
 from app.models.user import User
@@ -42,11 +42,13 @@ def update_driver_status(
     """Update driver availability status"""
     from app.services.driver_service import DriverService
     is_online = status == "online"
-    DriverService.toggle_status(id, is_online)
+    DriverService.toggle_status(session, id, is_online)
     return {"status": "success", "driver_id": id, "online": is_online}
 
 @router.get("/me/assignments", response_model=DataResponse[List[DeliveryOrderResponse]])
 def get_my_assignments(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     session: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ):
@@ -58,7 +60,12 @@ def get_my_assignments(
     if not driver:
         raise HTTPException(status_code=404, detail="Driver profile not found")
         
-    orders = session.exec(select(DeliveryOrder).where(DeliveryOrder.driver_id == driver.id)).all()
+    orders = session.exec(
+        select(DeliveryOrder)
+        .where(DeliveryOrder.driver_id == driver.id)
+        .offset(skip)
+        .limit(limit)
+    ).all()
     return DataResponse(success=True, data=orders)
 
 @router.get("/dashboard", response_model=DataResponse[dict])
@@ -89,6 +96,8 @@ def create_logistics_order(
 @router.get("/orders", response_model=DataResponse[List[DeliveryOrderResponse]])
 def list_logistics_orders(
     status: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     session: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_superuser),
 ):
@@ -97,7 +106,7 @@ def list_logistics_orders(
     statement = select(DeliveryOrder)
     if status:
         statement = statement.where(DeliveryOrder.status == status)
-    orders = session.exec(statement).all()
+    orders = session.exec(statement.offset(skip).limit(limit)).all()
     return DataResponse(success=True, data=orders)
 
 @router.get("/orders/{id}", response_model=DataResponse[dict])
@@ -164,22 +173,36 @@ def retrieve_order_pod(
 # --- Delivery Management (LOG-4.3) ---
 @router.get("/deliveries/active", response_model=DataResponse[List[DeliveryOrderResponse]])
 def get_active_deliveries(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     session: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ):
     """List all currently active delivery jobs for the driver"""
     from app.models.logistics import DeliveryOrder
-    orders = session.exec(select(DeliveryOrder).where(DeliveryOrder.status == "in_transit")).all()
+    orders = session.exec(
+        select(DeliveryOrder)
+        .where(DeliveryOrder.status == "in_transit")
+        .offset(skip)
+        .limit(limit)
+    ).all()
     return DataResponse(success=True, data=orders)
 
 @router.get("/deliveries/history", response_model=DataResponse[List[DeliveryOrderResponse]])
 def get_delivery_history(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     session: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_user),
 ):
     """List completed delivery history for the driver"""
     from app.models.logistics import DeliveryOrder
-    orders = session.exec(select(DeliveryOrder).where(DeliveryOrder.status == "delivered")).all()
+    orders = session.exec(
+        select(DeliveryOrder)
+        .where(DeliveryOrder.status == "delivered")
+        .offset(skip)
+        .limit(limit)
+    ).all()
     return DataResponse(success=True, data=orders)
 
 @router.get("/deliveries/{id}/tracking", response_model=DataResponse[dict])
@@ -200,17 +223,19 @@ def create_driver(
 ):
     """Create a new driver profile"""
     from app.services.driver_service import DriverService
-    profile = DriverService.create_profile(request.user_id, request.dict(exclude={"user_id"}))
+    profile = DriverService.create_profile(session, request.user_id, request.dict(exclude={"user_id"}))
     return DataResponse(success=True, data=profile)
 
 @router.get("/drivers", response_model=DataResponse[List[DriverProfileResponse]])
 def list_drivers(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     session: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_superuser),
 ):
     """List all drivers"""
     from app.models.driver_profile import DriverProfile
-    drivers = session.exec(select(DriverProfile)).all()
+    drivers = session.exec(select(DriverProfile).offset(skip).limit(limit)).all()
     return DataResponse(success=True, data=drivers)
 
 @router.get("/drivers/{id}", response_model=DataResponse[DriverProfileResponse])
@@ -257,7 +282,7 @@ def toggle_driver_availability(
 ):
     """Toggle driver availability"""
     from app.services.driver_service import DriverService
-    DriverService.toggle_status(id, is_online)
+    DriverService.toggle_status(session, id, is_online)
     return DataResponse(success=True, data={"id": id, "is_online": is_online})
 
 @router.get("/drivers/{id}/performance", response_model=DataResponse[DriverPerformanceResponse])
@@ -297,6 +322,8 @@ def get_route_details_endpoint(
 @router.get("/routes/history", response_model=DataResponse[List[dict]])
 def get_route_history_endpoint(
     driver_id: Optional[int] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     session: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_superuser),
 ):
@@ -305,7 +332,7 @@ def get_route_history_endpoint(
     statement = select(DeliveryRoute)
     if driver_id:
         statement = statement.where(DeliveryRoute.driver_id == driver_id)
-    routes = session.exec(statement).all()
+    routes = session.exec(statement.offset(skip).limit(limit)).all()
     return DataResponse(success=True, data=routes)
 
 @router.put("/routes/{id}/recalculate")

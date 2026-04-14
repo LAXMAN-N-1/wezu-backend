@@ -22,3 +22,17 @@ class BookingResponse(BookingBase):
     updated_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
+
+
+class BookingPaymentRequest(BaseModel):
+    amount: Optional[float] = None
+    payment_method: str = "wallet"
+
+
+class BookingPaymentResponse(BaseModel):
+    booking_id: int
+    status: str
+    amount_paid: float
+    wallet_balance: float
+    transaction_id: int
+    message: str

@@ -1,6 +1,9 @@
-from pydantic import BaseModel
-from typing import Dict, List, Any
-from .base import KpiCard, TrendPoint, GeoIncident
+from datetime import datetime
+from typing import Any, Dict, Optional
+
+from pydantic import BaseModel, Field
+
+from .base import KpiCard
 
 class AdminOverviewResponse(BaseModel):
     platform_overview: Dict[str, KpiCard]
@@ -12,3 +15,20 @@ class AdminOverviewResponse(BaseModel):
     financial_analytics: Dict[str, Any]
     operational_analytics: Dict[str, Any]
     charts: Dict[str, Any] = {}
+
+
+class AdminDashboardBootstrapResponse(BaseModel):
+    model_config = {"populate_by_name": True}
+
+    period: str
+    generated_at: datetime
+    overview: Dict[str, Any] = Field(default_factory=dict)
+    trends: Dict[str, Any] = Field(default_factory=dict)
+    conversion_funnel: Dict[str, Any] = Field(default_factory=dict)
+    battery_health_distribution: Dict[str, Any] = Field(default_factory=dict)
+    inventory_status: Dict[str, Any] = Field(default_factory=dict)
+    demand_forecast: Dict[str, Any] = Field(default_factory=dict)
+    revenue_by_station: Dict[str, Any] = Field(default_factory=dict)
+    recent_activity: Dict[str, Any] = Field(default_factory=dict)
+    top_stations: Dict[str, Any] = Field(default_factory=dict)
+    errors: Optional[Dict[str, str]] = Field(default=None, alias="_errors")

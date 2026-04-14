@@ -100,6 +100,8 @@ class DealerPortalInventoryService:
         # Filter: status
         if status:
             status_list = [s.strip().lower() for s in status.split(",")]
+            # Map UI 'defective' to DB 'retired'
+            status_list = ['retired' if s == 'defective' else s for s in status_list]
             query = query.where(Battery.status.in_(status_list))
 
         # Filter: health range
@@ -169,6 +171,7 @@ class DealerPortalInventoryService:
                     "last_test_date": str(b.last_inspected_at) if b.last_inspected_at else None,
                 },
                 "current_status": b.status.value if hasattr(b.status, "value") else str(b.status),
+                "fault_reason": b.notes if (hasattr(b.status, 'value') and b.status.value == 'retired') or str(b.status) == 'retired' else None,
                 "location": {
                     "station_id": b.station_id,
                     "station_name": station_map.get(b.station_id, ""),
@@ -535,6 +538,7 @@ class DealerPortalInventoryService:
             "charging": BatteryStatus.CHARGING,
             "rented": BatteryStatus.RENTED,
             "retired": BatteryStatus.RETIRED,
+            "defective": BatteryStatus.RETIRED,  # UI sends 'defective', maps to 'retired'
         }
         if new_status.lower() not in status_map:
             raise ValueError(f"Invalid status: {new_status}. Must be one of: {list(status_map.keys())}")
@@ -827,6 +831,7 @@ class DealerPortalInventoryService:
             "charging": BatteryStatus.CHARGING,
             "rented": BatteryStatus.RENTED,
             "retired": BatteryStatus.RETIRED,
+            "defective": BatteryStatus.RETIRED,
         }
         if new_status.lower() not in status_map:
             raise ValueError(f"Invalid status: {new_status}")

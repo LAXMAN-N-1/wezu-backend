@@ -15,6 +15,7 @@ from app.schemas.dealer import (
 from app.schemas.dealer_ledger import LedgerResponse, LedgerDetailResponse
 from app.services.dealer_ledger_service import DealerLedgerService
 from pydantic import BaseModel
+from app.schemas.input_contracts import DealerPromotionCreate, DealerPromotionUpdate, BankAccountUpdate
 
 router = APIRouter()
 
@@ -73,7 +74,7 @@ def get_dealer_dashboard(
     if not profile:
         raise HTTPException(status_code=403, detail="Access denied")
         
-    stats = DealerService.get_dashboard_stats(profile.id)
+    stats = DealerService.get_dashboard_stats(session, profile.id)
     return DataResponse(data=stats)
 
 # Admin Endpoints (Should be protected by superuser dependency in real app)
@@ -85,7 +86,7 @@ def update_stage(
     session: Session = Depends(get_db)
 ):
     try:
-        app = DealerService.update_application_stage(app_id, update_in.stage, update_in.note)
+        app = DealerService.update_application_stage(session, app_id, update_in.stage, update_in.notes or "")
         return DataResponse(data=app)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -96,7 +97,7 @@ def schedule_visit(
     current_user: User = Depends(get_current_user), # Check Is Admin
     session: Session = Depends(get_db)
 ):
-    visit = DealerService.schedule_field_visit(visit_in.application_id, visit_in.officer_id, visit_in.date)
+    visit = DealerService.schedule_field_visit(session, visit_in.application_id, visit_in.officer_id, visit_in.date)
     return DataResponse(data=visit)
 
 from app.services.financial_service import FinancialService
@@ -359,7 +360,7 @@ def delete_dealer_document(
 
 @router.post("/me/promotions", response_model=DataResponse[dict])
 def create_dealer_promotion(
-    request: dict = Body(...),
+    request: DealerPromotionCreate = Body(...),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
@@ -367,9 +368,9 @@ def create_dealer_promotion(
     profile = DealerService.get_dealer_by_user(session, current_user.id)
     if not profile:
         raise HTTPException(status_code=404, detail="Not a dealer")
-    
+
     from app.models.dealer_promotion import DealerPromotion
-    promo = DealerPromotion(dealer_id=profile.id, **request)
+    promo = DealerPromotion(dealer_id=profile.id, **request.model_dump(exclude_unset=True))
     session.add(promo)
     session.commit()
     return DataResponse(success=True, data={"id": promo.id, "promo_code": promo.promo_code})
@@ -427,7 +428,7 @@ def get_dealer_sales(
 @router.put("/me/promotions/{id}", response_model=DataResponse[dict])
 def update_dealer_promotion(
     id: int,
-    request: dict = Body(...),
+    request: DealerPromotionUpdate = Body(...),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
@@ -455,7 +456,7 @@ def get_bank_account(
 
 @router.post("/me/bank-account", response_model=DataResponse[dict])
 def update_bank_account(
-    request: dict = Body(...),
+    request: BankAccountUpdate = Body(...),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
@@ -464,11 +465,11 @@ def update_bank_account(
     if not profile:
         raise HTTPException(status_code=404, detail="Not a dealer")
     
-    # Inject verified status default
-    request["verified"] = False
+    bank_data = request.model_dump()
+    bank_data["verified"] = False
     
-    profile.bank_details = request
+    profile.bank_details = bank_data
     session.add(profile)
     session.commit()
     
-    return DataResponse(success=True, data={"message": "Bank account updated", "bank_details": request})
+    return DataResponse(success=True, data={"message": "Bank account updated", "bank_details": bank_data})

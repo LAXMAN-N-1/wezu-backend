@@ -1,7 +1,7 @@
 from typing import Any, List, Optional
 from sqlmodel import Session, select, func
 from app.core.database import engine
-from app.models.logistics import BatteryTransfer, Manifest
+from app.models.logistics import BatteryTransfer, LogisticsManifest as Manifest
 from app.models.warehouse import Warehouse
 from app.models.delivery_assignment import DeliveryAssignment
 from app.models.driver_profile import DriverProfile
@@ -220,12 +220,17 @@ class LogisticsService:
         db.add(manifest)
         db.flush() # Get manifest.id
         
-        for t_id in transfer_ids:
-            transfer = db.get(BatteryTransfer, t_id)
-            if transfer and transfer.status == "pending":
-                transfer.manifest_id = manifest.id
-                transfer.status = "assigned"
-                db.add(transfer)
+        # Batch-load transfers (eliminates per-id db.get N+1)
+        transfers = db.exec(
+            select(BatteryTransfer).where(
+                BatteryTransfer.id.in_(transfer_ids),
+                BatteryTransfer.status == "pending",
+            )
+        ).all()
+        for transfer in transfers:
+            transfer.manifest_id = manifest.id
+            transfer.status = "assigned"
+            db.add(transfer)
         
         db.commit()
         db.refresh(manifest)

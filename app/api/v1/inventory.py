@@ -31,6 +31,8 @@ def list_transfers(
     session: Session = Depends(deps.get_db),
     status: Optional[str] = None,
     battery_id: Optional[int] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     current_user: User = Depends(deps.get_current_active_superuser),
 ) -> Any:
     """List all transfer orders with status"""
@@ -40,7 +42,7 @@ def list_transfers(
     if battery_id:
         statement = statement.where(BatteryTransfer.battery_id == battery_id)
         
-    return session.exec(statement).all()
+    return session.exec(statement.offset(skip).limit(limit)).all()
 
 @router.get("/low-stock", response_model=List[dict])
 def get_low_stock_alerts(
@@ -93,6 +95,8 @@ def get_inventory_audit_trail(
     session: Session = Depends(deps.get_db),
     battery_id: Optional[int] = None,
     action: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     current_user: User = Depends(deps.get_current_active_superuser),
 ) -> Any:
     """Full audit log of inventory changes with filters"""
@@ -103,7 +107,7 @@ def get_inventory_audit_trail(
         statement = statement.where(InventoryAuditLog.action_type == action)
     
     statement = statement.order_by(InventoryAuditLog.timestamp.desc())
-    return session.exec(statement).all()
+    return session.exec(statement.offset(skip).limit(limit)).all()
 
 @router.post("/audit-trail/export")
 def export_inventory_audit(
@@ -117,7 +121,7 @@ def export_inventory_audit(
     if battery_id:
         statement = statement.where(InventoryAuditLog.battery_id == battery_id)
         
-    logs = session.exec(statement).all()
+    logs = session.exec(statement.order_by(InventoryAuditLog.timestamp.desc()).limit(10000)).all()
     
     output = io.StringIO()
     writer = csv.writer(output)

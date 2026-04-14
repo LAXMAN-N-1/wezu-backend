@@ -4,7 +4,12 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine, select, and_
 from sqlmodel.pool import StaticPool
 import sys
+import datetime as _datetime
 from unittest.mock import MagicMock
+
+# Python 3.9 compatibility: emulate datetime.UTC used by application modules.
+if not hasattr(_datetime, "UTC"):
+    _datetime.UTC = _datetime.timezone.utc
 
 # --- MOCK FIREBASE BEFORE APP IMPORTS ---
 # Prevents "Firebase Init Error" from top-level module code
@@ -12,6 +17,13 @@ mock_firebase = MagicMock()
 sys.modules["firebase_admin"] = mock_firebase
 sys.modules["firebase_admin.credentials"] = MagicMock()
 sys.modules["firebase_admin.messaging"] = MagicMock()
+
+# --- MOCK SENTRY BEFORE APP IMPORTS ---
+mock_sentry = MagicMock()
+sys.modules["sentry_sdk"] = mock_sentry
+sentry_fastapi = MagicMock()
+setattr(sentry_fastapi, "FastApiIntegration", MagicMock())
+sys.modules["sentry_sdk.integrations.fastapi"] = sentry_fastapi
 
 from app.main import app
 from app.api import deps
@@ -34,12 +46,20 @@ SQLiteTypeCompiler.visit_JSONB = visit_JSONB
 # --------------------------------------------
 
 # Use PostgreSQL for tests (dedicated test database is required)
-# Read from environment variable if available, otherwise fallback to a default
-DATABASE_URL = os.getenv("TEST_DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/wezu_test")
+# Read from environment variable if available, otherwise fallback to SQLite for local dev
+DATABASE_URL = os.getenv("TEST_DATABASE_URL", "sqlite:///./test_wezu.db")
+
+_is_sqlite = DATABASE_URL.startswith("sqlite")
 
 # Create engine with proper configuration
-# Removed StaticPool as it is primarily for SQLite in-memory and causes TypeErrors with PostgreSQL
-engine = create_engine(DATABASE_URL)
+if _is_sqlite:
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+else:
+    engine = create_engine(DATABASE_URL)
 
 # Initialize all tables before any test session
 SQLModel.metadata.create_all(engine)
@@ -65,13 +85,20 @@ def session_fixture():
             
         yield session
         
-        # Teardown logic: Use TRUNCATE CASCADE to handle circular foreign keys
-        # We need a list of all tables in the correct order or just truncate all
+        # Teardown logic: clear all table data
         tables = SQLModel.metadata.tables.keys()
         if tables:
-            truncate_stmt = f"TRUNCATE TABLE {', '.join(tables)} CASCADE;"
-            session.execute(text(truncate_stmt))
-            session.commit()
+            if _is_sqlite:
+                for table_name in reversed(list(tables)):
+                    try:
+                        session.execute(text(f"DELETE FROM \"{table_name}\";"))
+                    except Exception:
+                        session.rollback()
+                session.commit()
+            else:
+                truncate_stmt = f"TRUNCATE TABLE {', '.join(tables)} CASCADE;"
+                session.execute(text(truncate_stmt))
+                session.commit()
 
 @pytest.fixture(autouse=True)
 def seed_basics(session: Session):
@@ -188,4 +215,3 @@ def normal_user_fixture(session: Session):
     session.commit()
     session.refresh(user)
     return user
-

@@ -18,8 +18,10 @@ from app.schemas.user import (
     AddressUpdate,
     AddressResponse,
 )
+from app.schemas.input_contracts import PreferencesUpdate, ChangePasswordRequest
 
 from app.api import deps
+from app.api.deps import invalidate_user_token_cache
 from app.core.security import verify_password, get_password_hash
 
 router = APIRouter()
@@ -44,9 +46,6 @@ def update_profile(
 
     if user_in.full_name:
         current_user.full_name = user_in.full_name
-
-    if user_in.phone:
-        current_user.phone = user_in.phone
 
     if user_in.date_of_birth:
         current_user.date_of_birth = user_in.date_of_birth
@@ -216,13 +215,12 @@ def get_preferences(
 
 @router.put("/preferences")
 def update_preferences(
-    preferences: dict,
+    preferences: PreferencesUpdate,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ):
     """Update preferences"""
     from app.models.notification_preference import NotificationPreference
-    from sqlmodel import select
     
     pref = db.exec(
         select(NotificationPreference).where(NotificationPreference.user_id == current_user.id)
@@ -232,7 +230,7 @@ def update_preferences(
         pref = NotificationPreference(user_id=current_user.id)
         db.add(pref)
         
-    for key, value in preferences.items():
+    for key, value in preferences.model_dump(exclude_unset=True).items():
         if hasattr(pref, key) and key not in ["id", "user_id"]:
             setattr(pref, key, value)
 
@@ -283,16 +281,15 @@ def upload_profile_picture(
 
 @router.post("/change-password")
 def change_password(
-    data: dict,
+    data: ChangePasswordRequest,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ):
     """Change password"""
-
-    if not verify_password(data["old_password"], current_user.hashed_password):
+    if not verify_password(data.old_password, current_user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect password")
 
-    current_user.hashed_password = get_password_hash(data["new_password"])
+    current_user.hashed_password = get_password_hash(data.new_password)
 
     db.add(current_user)
     db.commit()
@@ -348,5 +345,6 @@ def revoke_session(
 
     db.add(session)
     db.commit()
+    invalidate_user_token_cache(current_user.id)
 
     return {"message": "Session revoked"}

@@ -18,6 +18,7 @@ from app.models.station import StationStatus, Station, StationImage
 from app.models.battery import Battery
 from app.models.favorite import Favorite
 from datetime import datetime, UTC
+from app.schemas.input_contracts import MaintenanceTaskCreate
 
 router = APIRouter()
 
@@ -196,12 +197,13 @@ async def read_station_maintenance_schedule(
 @router.post("/{station_id}/maintenance-schedule")
 async def create_station_maintenance_task(
     station_id: int,
-    data: dict, # Simplified for now, should use schema
+    data: MaintenanceTaskCreate,
     current_user: User = Depends(deps.get_current_active_superuser),
     db: Session = Depends(deps.get_db),
 ):
-    data.update({"entity_type": "station", "entity_id": station_id})
-    return MaintenanceService.record_maintenance(db, current_user.id, data)
+    task_data = data.model_dump(exclude_unset=True)
+    task_data.update({"entity_type": "station", "entity_id": station_id})
+    return MaintenanceService.record_maintenance(db, current_user.id, task_data)
 
 @router.put("/{station_id}/maintenance-schedule/{task_id}")
 async def update_station_maintenance_task(
@@ -226,10 +228,12 @@ async def update_station_maintenance_task(
 
 @router.get("/map", response_model=List[StationMapResponse])
 async def get_stations_map(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(200, ge=1, le=500),
     db: Session = Depends(deps.get_db),
 ):
-    """Return all station coordinates and status for map rendering."""
-    stations = db.exec(select(Station)).all()
+    """Return station coordinates and status for map rendering."""
+    stations = db.exec(select(Station).offset(skip).limit(limit)).all()
     return stations
 
 @router.get("/heatmap", response_model=List[HeatmapPoint])
@@ -310,14 +314,15 @@ async def unfavorite_station(
 @router.get("/{station_id}/batteries", response_model=List[BatteryResponse])
 async def read_station_batteries(
     station_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(deps.get_db),
 ):
     try:
-        # Assuming we just need to query by station_id since location_id doesn't exist anymore
-        query = select(Battery).where(Battery.station_id == station_id)
+        query = select(Battery).where(Battery.station_id == station_id).offset(skip).limit(limit)
         results = db.exec(query).all()
         return results
     except Exception as e:
         import logging
-        logging.error(f"DATABASE_ERROR: Failed to fetch batteries for station {station_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+        logging.getLogger(__name__).exception("fetch_station_batteries_failed", extra={"station_id": station_id})
+        raise HTTPException(status_code=500, detail="Failed to fetch station batteries")

@@ -275,3 +275,46 @@ class SetSecurityQuestionRequest(BaseModel):
 
 class VerifySecurityQuestionRequest(BaseModel):
     answer: str
+
+
+# ── Passkey / WebAuthn Schemas (from hardened repo) ────────────────────────
+from datetime import datetime
+
+class PasskeyRegistrationOptionsRequest(BaseModel):
+    passkey_name: Optional[str] = Field(default=None, max_length=120)
+
+class PasskeyOptionsRequest(BaseModel):
+    username: Optional[str] = None
+
+class PasskeyRegistrationVerifyRequest(BaseModel):
+    challenge_id: str = Field(min_length=8, max_length=128)
+    credential: Dict[str, Any]
+    passkey_name: Optional[str] = Field(default=None, max_length=120)
+
+class PasskeyVerifyRequest(BaseModel):
+    challenge_id: str = Field(min_length=8, max_length=128)
+    credential: Dict[str, Any]
+    role: Optional[str] = None
+
+class PasskeyOptionsResponse(BaseModel):
+    challenge_id: str
+    public_key: Dict[str, Any]
+    expires_at: datetime
+
+class PasskeyCredentialInfo(BaseModel):
+    credential_id: str
+    passkey_name: Optional[str] = None
+    created_at: datetime
+    last_used_at: Optional[datetime] = None
+    device_type: Optional[str] = None
+    backed_up: bool = False
+
+class PasskeyListResponse(BaseModel):
+    items: List[PasskeyCredentialInfo]
+
+class PasskeyOperationResponse(BaseModel):
+    success: bool = True
+    message: str = "OK"
+
+class PasskeyRegistrationVerifyResponse(PasskeyOperationResponse):
+    credential: PasskeyCredentialInfo

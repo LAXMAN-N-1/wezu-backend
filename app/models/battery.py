@@ -19,6 +19,13 @@ class BatteryStatus(str, Enum):
     MAINTENANCE = "maintenance"
     CHARGING = "charging"
     RETIRED = "retired"
+    # Extended statuses used by battery_consistency service layer
+    DEPLOYED = "deployed"
+    RESERVED = "reserved"
+    IN_TRANSIT = "in_transit"
+    FAULTY = "faulty"
+    NEW = "new"
+    READY = "ready"
 
 class BatteryHealth(str, Enum):
     GOOD = "GOOD"
@@ -34,6 +41,10 @@ class LocationType(str, Enum):
     WAREHOUSE = "warehouse"
     SERVICE_CENTER = "service_center"
     RECYCLING = "recycling"
+    # Extended types used by battery_consistency service layer
+    CUSTOMER = "customer"
+    TRANSIT = "transit"
+    SHELF = "shelf"
 
 class Battery(SQLModel, table=True):
     __tablename__ = "batteries"
@@ -88,6 +99,12 @@ class Battery(SQLModel, table=True):
     # Current Location Context
     # Polymorphic-like tracking: location_type enum ('warehouse', 'station', 'customer', 'transit')
     location_id: Optional[int] = None 
+
+    # Lifecycle milestones (used by battery_consistency service)
+    retirement_date: Optional[datetime] = None
+    decommissioned_at: Optional[datetime] = None
+    decommissioned_by: Optional[int] = Field(default=None, foreign_key="users.id")
+    decommission_reason: Optional[str] = None
 
     
     # Timestamps

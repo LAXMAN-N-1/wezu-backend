@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+from sqlmodel import select
 from app.api import deps
 from app.models.user import User
 from app.schemas.analytics.dealer import DealerOverviewResponse

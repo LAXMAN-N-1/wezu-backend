@@ -24,3 +24,20 @@ class PaginatedResponse(ResponseBase, Generic[T]):
     page: int
     limit: int
     total_pages: int
+
+
+class DataResponseWithPagination(ResponseBase, Generic[T]):
+    """DataResponse wrapper that includes pagination metadata."""
+    data: List[T] = []
+    total: int = 0
+    page: int = 1
+    limit: int = 10
+    total_pages: int = 0
+
+
+class PaginationMeta(BaseModel):
+    """Standalone pagination metadata object."""
+    total: int = 0
+    page: int = 1
+    limit: int = 10
+    total_pages: int = 0

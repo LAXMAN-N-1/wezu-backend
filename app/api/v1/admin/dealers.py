@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
-from typing import List, Optional, Any
-from pydantic import BaseModel
+from typing import List, Optional
 from app.api import deps
 
 from app.models.user import User

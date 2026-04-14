@@ -14,13 +14,15 @@ class StationCreate(BaseModel):
     address: str
     latitude: float
     longitude: float
-    capacity: int
+    total_slots: int
+    max_capacity: int = 0
 
 
 class StationUpdate(BaseModel):
     name: Optional[str] = None
-    is_active: Optional[bool] = None
-    capacity: Optional[int] = None
+    status: Optional[str] = None
+    total_slots: Optional[int] = None
+    max_capacity: Optional[int] = None
 
 
 class StationRepository(BaseRepository[Station, StationCreate, StationUpdate]):
@@ -38,7 +40,7 @@ class StationRepository(BaseRepository[Station, StationCreate, StationUpdate]):
     ) -> List[Station]:
         """Get all active stations"""
         query = select(Station).where(
-            Station.is_active == True
+            Station.status == "active"
         ).offset(skip).limit(limit)
         return list(db.exec(query).all())
     
@@ -57,7 +59,7 @@ class StationRepository(BaseRepository[Station, StationCreate, StationUpdate]):
         lon_diff = radius_km / (111.0 * func.cos(func.radians(latitude)))
         
         query = select(Station).where(
-            (Station.is_active == True) &
+            (Station.status == "active") &
             (Station.latitude.between(latitude - lat_diff, latitude + lat_diff)) &
             (Station.longitude.between(longitude - lon_diff, longitude + lon_diff))
         ).limit(limit)

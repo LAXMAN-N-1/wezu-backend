@@ -34,3 +34,7 @@ class TelematicsDataResponse(TelematicsDataBase):
 
 class TelematicsHistoryResponse(BaseModel):
     items: List[TelematicsDataResponse]
+
+# Backward-compat aliases (hardened repo used this spelling)
+TelemeticsDataIngest = TelematicsDataIngest
+TelemeticsDataResponse = TelematicsDataResponse

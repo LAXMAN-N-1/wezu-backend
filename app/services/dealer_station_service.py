@@ -11,6 +11,10 @@ from app.models.station import Station, StationSlot
 from app.models.dealer_inventory import DealerInventory
 from app.models.maintenance import StationDowntime
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class DealerStationService:
 
@@ -77,11 +81,10 @@ class DealerStationService:
         
         from app.models.battery import Battery
         
-        # Use LEFT OUTER JOIN so we return batteries even if not assigned to a specific slot
         query = (
             select(Battery, StationSlot.slot_number)
-            .join(StationSlot, StationSlot.battery_id == Battery.id, isouter=True)
-            .where(Battery.station_id == station_id)
+            .join(StationSlot, StationSlot.battery_id == Battery.id)
+            .where(StationSlot.station_id == station_id)
         )
              
         results = db.exec(query).all()
@@ -101,7 +104,7 @@ class DealerStationService:
                  "health_status": health_stat,
                  "cycle_count": battery.cycle_count,
                  "slot_number": slot_num,
-                 "status": battery.status.value if hasattr(battery.status, 'value') else str(battery.status)
+                 "status": battery.status
              })
         return batteries
 
@@ -216,7 +219,7 @@ class DealerStationService:
                  if current_time < start_time or current_time > end_time:
                       return False, "Station is currently closed outside of operating hours"
              except Exception:
-                 pass # Soft fallback if hours are misformatted
+                 logger.warning("dealer_station.operating_hours_parse_failed", exc_info=True)
                  
         return True, "Operational"
 

@@ -35,6 +35,7 @@ from app.models.delivery_assignment import DeliveryAssignment
 from app.models.delivery_route import DeliveryRoute, RouteStop
 from app.models.return_request import ReturnRequest
 from app.models.maintenance import MaintenanceSchedule, MaintenanceRecord, StationDowntime
+from app.models.maintenance_checklist import MaintenanceChecklistTemplate, MaintenanceChecklistSubmission
 from app.models.charging_queue import ChargingQueue
 from app.models.vehicle import Vehicle
 
@@ -94,10 +95,22 @@ from app.models.membership import UserMembership
 from app.models.oauth import BlacklistedToken
 from app.models.dealer_kyc import DealerKYCApplication, KYCStateTransition
 from app.models.dealer_inventory import DealerInventory, InventoryTransaction
-from app.models.dealer_stock_request import DealerStockRequest
 from app.models.stock import Stock
 from app.models.stock_movement import StockMovement
 from app.models.dealer_promotion import DealerPromotion, PromotionUsage
+
+# ── Hardened-only models (ported) ──────────────────────────────────────────
+from app.models.analytics_dashboard import AnalyticsActivityEvent, AnalyticsReportJob
+from app.models.idempotency import IdempotencyKey
+from app.models.inventory import InventoryTransfer, InventoryTransferItem, StockDiscrepancy
+from app.models.manifest import Manifest, ManifestItem
+from app.models.notification_outbox import NotificationOutbox
+from app.models.order import Order, OrderBattery
+from app.models.order_realtime_outbox import OrderRealtimeOutbox
+from app.models.passkey import PasskeyCredential, PasskeyChallenge
+from app.models.payment_method import PaymentMethod
+from app.models.station_metrics import StationDailyMetric
+from app.models.telematics import TelemeticsData
 from app.models.search_history import SearchHistory
 
 # New modules
@@ -105,5 +118,5 @@ from app.models.system import SystemConfig, FeatureFlag
 from app.models.bess import BessUnit, BessEnergyLog, BessGridEvent, BessReport
 from app.models.notification_admin import PushCampaign, AutomatedTrigger, NotificationLog, NotificationConfig
 from app.models.api_key import ApiKeyConfig
-
+from app.models.dealer_stock_request import DealerStockRequest
 

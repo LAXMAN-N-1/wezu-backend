@@ -43,11 +43,19 @@ class Transaction(SQLModel, table=True):
     subtotal: float = Field(default=0.0)
     currency: str = Field(default="INR")
     
-    transaction_type: TransactionType = Field(index=True)
+    transaction_type: Optional[TransactionType] = Field(default=None, index=True)
     status: TransactionStatus = Field(default=TransactionStatus.PENDING, index=True)
     
     payment_method: str = Field(default="upi") # upi, card, netbanking, wallet
     payment_gateway_ref: Optional[str] = Field(default=None, index=True) # Razorpay/Stripe ID
+    
+    # ── P1-C canonical fields (used by WalletService, previously not in schema) ──
+    type: Optional[str] = Field(default=None, index=True)  # "credit" | "debit"
+    category: Optional[str] = Field(default=None, index=True)  # deposit, withdrawal, cashback, transfer, etc.
+    balance_after: Optional[float] = Field(default=None)
+    reference_type: Optional[str] = Field(default=None)  # wallet_recharge, withdrawal_request, booking_payment
+    reference_id: Optional[str] = Field(default=None, index=True)
+    razorpay_payment_id: Optional[str] = Field(default=None, index=True)
     
     description: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

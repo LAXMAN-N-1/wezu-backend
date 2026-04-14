@@ -3,20 +3,31 @@ Battery Swap Service
 Enhanced battery swap execution and management
 """
 from sqlmodel import Session, select
+from sqlalchemy import func
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 from app.models.rental import Rental
 from app.models.battery import Battery
 from app.models.station import Station
 from app.services.gps_service import GPSTrackingService
-from app.services.wallet_service import WalletService
-import logging
+from app.services.battery_consistency import apply_battery_transition
+from app.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger("wezu_swaps")
 
 class SwapService:
     """Battery swap management"""
-    
+
+    @staticmethod
+    def _safe_commit(session: Session, *, context: str = "swap_service") -> None:
+        """Commit with rollback-on-failure and structured logging."""
+        try:
+            session.commit()
+        except Exception:
+            session.rollback()
+            logger.exception("db.commit_failed", context=context)
+            raise
+
     @staticmethod
     def get_swap_suggestions(
         rental_id: int,
@@ -48,7 +59,9 @@ class SwapService:
         
         # Find nearby stations with available batteries
         stations = session.exec(
-            select(Station).where(Station.is_active == True)
+            select(Station)
+            .where(func.replace(func.replace(func.lower(Station.status), "-", "_"), " ", "_") == "active")
+            .where(Station.is_deleted == False)
         ).all()
         
         suggestions = []
@@ -67,9 +80,10 @@ class SwapService:
             # Count available batteries at station
             available_batteries = session.exec(
                 select(Battery)
-                .where(Battery.station_id == station.id)
+                .where(Battery.location_id == station.id)
+                .where(Battery.location_type == "station")
                 .where(Battery.status == "available")
-                .where(Battery.current_soc >= 80)  # At least 80% charged
+                .where(Battery.current_charge >= 80)  # At least 80% charged
                 .where(Battery.health_percentage >= 85)  # Good health
             ).all()
             
@@ -86,10 +100,10 @@ class SwapService:
                 'distance_km': round(distance, 2),
                 'travel_time_minutes': travel_time_minutes,
                 'available_batteries': len(available_batteries),
-                'best_battery_soc': max(b.current_soc for b in available_batteries),
+                'best_battery_soc': max(b.current_charge for b in available_batteries),
                 'latitude': station.latitude,
                 'longitude': station.longitude,
-                'operating_hours': f"{station.opening_time} - {station.closing_time}" if station.opening_time else "24/7"
+                'operating_hours': station.operating_hours or ("24/7" if station.is_24x7 else "N/A")
             })
         
         # Sort by distance
@@ -118,47 +132,70 @@ class SwapService:
         """
         try:
             # Get rental
-            rental = session.get(Rental, rental_id)
+            rental = session.exec(select(Rental).where(Rental.id == rental_id).with_for_update()).first()
             if not rental or rental.status != "active":
                 raise ValueError("Invalid rental")
             
             # Get old battery
-            old_battery = session.get(Battery, rental.battery_id)
+            old_battery = session.exec(select(Battery).where(Battery.id == rental.battery_id).with_for_update()).first()
             if not old_battery:
                 raise ValueError("Old battery not found")
             
             # Get new battery
-            new_battery = session.get(Battery, new_battery_id)
+            new_battery = session.exec(select(Battery).where(Battery.id == new_battery_id).with_for_update()).first()
             if not new_battery or new_battery.status != "available":
                 raise ValueError("New battery not available")
             
             # Verify new battery is at the station
-            if new_battery.station_id != station_id:
+            if new_battery.location_id != station_id or new_battery.location_type != "station":
                 raise ValueError("Battery not at specified station")
             
             # Return old battery to station
-            old_battery.status = "available"
-            old_battery.station_id = station_id
-            session.add(old_battery)
+            apply_battery_transition(
+                session,
+                battery=old_battery,
+                to_status="available",
+                to_location_type="station",
+                to_location_id=station_id,
+                event_type="swap_returned",
+                event_description=f"Swap return for rental #{rental_id} at station #{station_id}",
+            )
             
-            # Assign new battery to rental
-            new_battery.status = "rented"
-            new_battery.station_id = None
-            session.add(new_battery)
+            # Assign new battery to rental/customer possession.
+            apply_battery_transition(
+                session,
+                battery=new_battery,
+                to_status="deployed",
+                to_location_type="customer",
+                to_location_id=None,
+                event_type="swap_dispensed",
+                event_description=f"Swap dispense for rental #{rental_id} at station #{station_id}",
+            )
             
-            # 5. Handle Payment
-            fee = self.calculate_swap_fee(rental_id, session)
-            if fee > 0:
-                WalletService.deduct_for_swap(session, rental.user_id, fee, rental_id) # Using rental_id as swap context
+            # Update rental
+            rental.battery_id = new_battery_id
+            session.add(rental)
             
-            session.commit()
+            # Log swap event
+            from app.models.rental_event import RentalEvent
+            swap_event = RentalEvent(
+                rental_id=rental_id,
+                event_type="swap_complete",
+                description=f"Swapped battery from {old_battery.serial_number} to {new_battery.serial_number} at station {station_id}",
+                station_id=station_id,
+                battery_id=new_battery_id,
+                created_at=datetime.utcnow(),
+            )
+            session.add(swap_event)
             
-            logger.info(f"Battery swap completed for rental {rental_id}")
+            SwapService._safe_commit(session, context="execute_swap")
+            
+            logger.info("swap.completed", rental_id=rental_id, old_battery=old_battery.serial_number, new_battery=new_battery.serial_number)
             return True
             
         except Exception as e:
             session.rollback()
-            logger.error(f"Failed to execute swap: {str(e)}")
+            logger.error("swap.failed", rental_id=rental_id, error=str(e))
             return False
     
     @staticmethod
@@ -173,24 +210,24 @@ class SwapService:
         Returns:
             Swap fee amount
         """
-        # For demo purposes, let's charge 50 INR
-        return 50.0
+        # Currently free as per requirements
+        return 0.0
     
     @staticmethod
     def get_swap_history(rental_id: int, session: Session) -> List[Dict]:
         """Get swap history for rental"""
-        from app.models.rental import RentalHistory
+        from app.models.rental_event import RentalEvent
         
         swaps = session.exec(
-            select(RentalHistory)
-            .where(RentalHistory.rental_id == rental_id)
-            .where(RentalHistory.event_type == "BATTERY_SWAP")
-            .order_by(RentalHistory.timestamp.desc())
+            select(RentalEvent)
+            .where(RentalEvent.rental_id == rental_id)
+            .where(RentalEvent.event_type == "swap_complete")
+            .order_by(RentalEvent.created_at.desc())
         ).all()
         
         return [
             {
-                'timestamp': swap.timestamp.isoformat(),
+                'timestamp': swap.created_at.isoformat(),
                 'description': swap.description
             }
             for swap in swaps

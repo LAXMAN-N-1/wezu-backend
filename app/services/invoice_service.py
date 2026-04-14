@@ -195,13 +195,15 @@ class InvoiceService:
             elements.append(Spacer(1, 0.3*inch))
             
             # Rental details
+            duration_hours = int(((rental.end_time or rental.expected_end_time) - rental.start_time).total_seconds() / 3600) if rental.start_time else 0
+            computed_daily_rate = (rental.total_amount / max(1, duration_hours / 24)) if duration_hours > 0 else rental.total_amount
             rental_data = [
                 ['Rental ID:', str(rental.id)],
                 ['Start Date:', rental.start_time.strftime('%d-%m-%Y %H:%M')],
                 ['End Date:', rental.end_time.strftime('%d-%m-%Y %H:%M') if rental.end_time else 'Active'],
-                ['Duration:', f"{int(((rental.end_time or rental.expected_end_time) - rental.start_time).total_seconds() / 3600)} hours" if rental.start_time else 'N/A'],
-                ['Daily Rate:', f"₹{rental.daily_rate:.2f}"],
-                ['Total Amount:', f"₹{rental.total_cost:.2f}"],
+                ['Duration:', f"{duration_hours} hours" if rental.start_time else 'N/A'],
+                ['Daily Rate:', f"₹{computed_daily_rate:.2f}"],
+                ['Total Amount:', f"₹{rental.total_amount:.2f}"],
                 ['Status:', rental.status]
             ]
             

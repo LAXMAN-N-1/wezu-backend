@@ -13,11 +13,12 @@ if TYPE_CHECKING:
     from app.models.review import Review
 
 class StationStatus(str, Enum):
-    OPERATIONAL = "OPERATIONAL"
-    MAINTENANCE = "MAINTENANCE"
-    CLOSED = "CLOSED"
-    ERROR = "ERROR"
-    OFFLINE = "OFFLINE"
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    MAINTENANCE = "maintenance"
+    CLOSED = "closed"
+    ERROR = "error"
+    OFFLINE = "offline"
 
 class Station(SQLModel, table=True):
     __tablename__ = "stations"
@@ -35,7 +36,7 @@ class Station(SQLModel, table=True):
     # Ownership
     owner_id: Optional[int] = Field(default=None, foreign_key="users.id") # Dealer/Owner
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id") # Assuming vendor is in finance or core? I'll check.
-    dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id")
+    dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id", index=True)
     
     # Hardware Specs
     station_type: str = Field(default="automated") # automated, manual, hybrid
@@ -68,6 +69,9 @@ class Station(SQLModel, table=True):
     low_stock_threshold_pct: float = Field(default=20.0)
 
     
+    # Soft Delete
+    is_deleted: bool = Field(default=False)
+
     # Timestamps
     last_heartbeat: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

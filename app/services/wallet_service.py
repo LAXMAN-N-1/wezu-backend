@@ -1,312 +1,699 @@
-from sqlmodel import Session, select
-from app.models.user import User
-from app.models.financial import Transaction, TransactionType, TransactionStatus, Wallet
-from app.services.payment_service import PaymentService
-from app.services.financial_service import FinancialService
-from app.repositories.wallet_repository import wallet_repository
-from typing import Optional, List
-from datetime import datetime, UTC
-import logging
+from __future__ import annotations
 
-logger = logging.getLogger(__name__)
+from datetime import datetime
+from decimal import Decimal, InvalidOperation
+from typing import Optional
+
+from fastapi import HTTPException
+from sqlmodel import Session, select
+
+from app.core.logging import get_logger
+from app.core.observability import SLOTimer
+from app.models.financial import Transaction, Wallet, WalletWithdrawalRequest
+from app.models.refund import Refund
+from app.services.security_service import SecurityService
+from app.services.workflow_automation_service import WorkflowAutomationService
+
+logger = get_logger("wezu_wallet")
+
 
 class WalletService:
     @staticmethod
-    def get_wallet(db: Session, user_id: int) -> Wallet:
-        """Get or create user wallet"""
-        return wallet_repository.get_or_create(db, user_id)
-
-    @staticmethod
-    def initiate_topup(db: Session, user_id: int, amount: float) -> Transaction:
-        """Create a Razorpay order and a pending transaction record"""
-        # Ensure wallet exists
-        wallet = wallet_repository.get_or_create(db, user_id)
-        # 1. Create Razorpay order
-        order = PaymentService.create_order(amount)
-        
-        # 2. Save Transaction
-        tx = Transaction(
-            user_id=user_id,
-            wallet_id=wallet.id,
-            amount=amount,
-            transaction_type=TransactionType.WALLET_TOPUP,
-            status=TransactionStatus.PENDING,
-            payment_gateway_ref=order["id"],
-            description=f"Wallet topup of {amount}"
-        )
-        db.add(tx)
-        db.commit()
-        db.refresh(tx)
-        return tx
-
-    @staticmethod
-    def confirm_topup(
-        db: Session, 
-        user_id: int, 
-        order_id: str, 
-        payment_id: str, 
-        signature: str
-    ) -> Transaction:
-        """Verify payment and update user wallet balance"""
-        wallet = wallet_repository.get_or_create(db, user_id)
-        # 1. Verify Signature
-        params = {
-            "razorpay_order_id": order_id,
-            "razorpay_payment_id": payment_id,
-            "razorpay_signature": signature
-        }
-        if not PaymentService.verify_payment_signature(params):
-            raise ValueError("Invalid payment signature")
-            
-        # 2. Find Transaction
-        statement = select(Transaction).where(
-            Transaction.payment_gateway_ref == order_id,
-            Transaction.user_id == user_id
-        )
-        tx = db.exec(statement).first()
-        if not tx:
-            raise ValueError("Transaction not found")
-            
-        if tx.status == TransactionStatus.SUCCESS:
-            return tx
-            
-        # 3. Update Transaction and Wallet
-        tx.status = TransactionStatus.SUCCESS
-        tx.payment_gateway_ref = payment_id # Update with final payment ID
-        tx.updated_at = datetime.now(UTC)
-        
-        # Calculate Taxes for Audit (18% GST inclusive)
-        tx.subtotal = round(tx.amount / 1.18, 2)
-        tx.tax_amount = round(tx.amount - tx.subtotal, 2)
-        
-        wallet.balance += tx.amount
-        tx.wallet_id = wallet.id
-
-        db.add(tx)
-        db.add(wallet)
-        db.commit()
-        db.refresh(tx)
-        
-        # Auto-generate Invoice
+    def _to_money(value: float | int | str | Decimal) -> Decimal:
         try:
-            FinancialService.create_invoice(tx.id, user_id)
-        except Exception as e:
-            logger.error(f"Failed to auto-generate invoice for topup {tx.id}: {e}")
-            
-        return tx
+            amount = Decimal(str(value))
+        except (InvalidOperation, TypeError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail="Invalid amount") from exc
+        return amount.quantize(Decimal("0.01"))
 
     @staticmethod
-    def deduct_for_swap(db: Session, user_id: int, amount: float, swap_id: int) -> Transaction:
-        """Deduct funds from wallet for a swap"""
-        wallet = wallet_repository.get_or_create(db, user_id)
-        if wallet.balance < amount:
-            raise ValueError("Insufficient wallet balance")
-            
-        wallet.balance -= amount
-        
-        subtotal = round(amount / 1.18, 2)
-        tax = round(amount - subtotal, 2)
-        
-        tx = Transaction(
-            user_id=user_id,
-            wallet_id=wallet.id,
-            amount=amount,
-            subtotal=subtotal,
-            tax_amount=tax,
-            transaction_type=TransactionType.SWAP_FEE,
-            status=TransactionStatus.SUCCESS,
-            description=f"Swap fee for swap #{swap_id}",
-            metadata={"swap_id": swap_id}
-        )
-        
-        db.add(tx)
+    def get_wallet(
+        db: Session,
+        user_id: int,
+        for_update: bool = False,
+        auto_commit_if_created: bool = True,
+    ) -> Wallet:
+        query = select(Wallet).where(Wallet.user_id == user_id)
+        if for_update:
+            query = query.with_for_update()
+
+        wallet = db.exec(query).first()
+        if wallet:
+            return wallet
+
+        wallet = Wallet(user_id=user_id, balance=Decimal("0.00"))
         db.add(wallet)
-        db.commit()
-        db.refresh(tx)
-        
-        # Auto-generate Invoice
-        try:
-            FinancialService.create_invoice(tx.id, user_id)
-        except Exception as e:
-            logger.error(f"Failed to auto-generate invoice for swap {tx.id}: {e}")
-            
-        return tx
-        
-    @staticmethod
-    def refund_to_wallet(db: Session, user_id: int, amount: float, reason: str) -> Transaction:
-        """Refund funds back to user wallet"""
-        wallet = wallet_repository.get_or_create(db, user_id)
-        wallet.balance += amount
-        
-        subtotal = round(amount / 1.18, 2)
-        tax = round(amount - subtotal, 2)
-        
-        tx = Transaction(
-            user_id=user_id,
-            wallet_id=wallet.id,
-            amount=amount,
-            subtotal=subtotal,
-            tax_amount=tax,
-            transaction_type=TransactionType.REFUND,
-            status=TransactionStatus.SUCCESS,
-            description=f"Refund: {reason}"
-        )
-        
-        db.add(tx)
-        db.add(wallet)
-        db.commit()
-        db.refresh(tx)
-        
-        # Auto-generate Invoice (Refund Receipt)
-        try:
-            FinancialService.create_invoice(tx.id, user_id)
-        except Exception as e:
-            logger.error(f"Failed to auto-generate invoice for refund {tx.id}: {e}")
-            
-        return tx
+        db.flush()
+        if auto_commit_if_created:
+            db.commit()
+        db.refresh(wallet)
+        if for_update and auto_commit_if_created:
+            wallet = db.exec(select(Wallet).where(Wallet.user_id == user_id).with_for_update()).first()
+        return wallet
 
     @staticmethod
-    def add_balance(db: Session, user_id: int, amount: float, description: str) -> Transaction:
-        """Add balance to wallet (e.g. from webhook or manual admin action)"""
-        wallet = WalletService.get_wallet(db, user_id)
-        wallet.balance += amount
-        
-        subtotal = round(amount / 1.18, 2)
-        tax = round(amount - subtotal, 2)
-        
-        tx = Transaction(
-            user_id=user_id,
-            wallet_id=wallet.id,
-            amount=amount,
-            subtotal=subtotal,
-            tax_amount=tax,
-            transaction_type=TransactionType.WALLET_TOPUP,
-            status=TransactionStatus.SUCCESS,
-            description=description
-        )
-        
-        db.add(tx)
-        db.add(wallet)
-        db.commit()
-        db.refresh(tx)
-        
-        # Auto-generate Invoice
-        try:
-            FinancialService.create_invoice(tx.id, user_id)
-        except Exception as e:
-            logger.error(f"Failed to auto-generate invoice for manual credit {tx.id}: {e}")
-            
-        return tx
+    def add_balance(
+        db: Session,
+        user_id: int,
+        amount: float | Decimal,
+        description: str = "Deposit",
+        gateway_payment_id: Optional[str] = None,
+        *,
+        category: str = "deposit",
+        reference_type: Optional[str] = None,
+        reference_id: Optional[str] = None,
+    ) -> Wallet:
+        with SLOTimer("wallet.add_balance", budget_ms=500, extra={"user_id": user_id}):
+            amount_value = WalletService._to_money(amount)
+            if amount_value <= 0:
+                raise HTTPException(status_code=400, detail="Amount must be greater than zero")
 
-    @staticmethod
-    def get_cashback_history(db: Session, user_id: int) -> List[Transaction]:
-        """Get cashback transaction history"""
-        from sqlalchemy import or_
-        statement = select(Transaction).where(
-            Transaction.user_id == user_id,
-            or_(
-                Transaction.transaction_type == TransactionType.CASHBACK,
-                Transaction.description.ilike("%cashback%")
+            wallet = WalletService.get_wallet(
+                db,
+                user_id,
+                for_update=True,
+                auto_commit_if_created=False,
             )
-        )
-        return db.exec(statement).all()
+            wallet.balance = WalletService._to_money(wallet.balance) + amount_value
+            wallet.updated_at = datetime.utcnow()
+            db.add(wallet)
+
+            txn = Transaction(
+                user_id=wallet.user_id,
+                wallet_id=wallet.id,
+                amount=amount_value,
+                balance_after=WalletService._to_money(wallet.balance),
+                type="credit",
+                category=category,
+                status="success",
+                description=description,
+                razorpay_payment_id=gateway_payment_id,
+                reference_type=reference_type,
+                reference_id=reference_id,
+            )
+            db.add(txn)
+
+            db.commit()
+            db.refresh(wallet)
+            return wallet
 
     @staticmethod
-    def transfer_balance(db: Session, sender_id: int, recipient_phone: str, amount: float, note: Optional[str] = None) -> Transaction:
-        """Transfer money to another user by phone number"""
-        sender_wallet = WalletService.get_wallet(db, sender_id)
-        if sender_wallet.balance < amount:
-            from fastapi import HTTPException
+    def deduct_balance(db: Session, user_id: int, amount: float | Decimal, description: str = "Payment") -> Wallet:
+        with SLOTimer("wallet.deduct_balance", budget_ms=500, extra={"user_id": user_id}):
+            amount_value = WalletService._to_money(amount)
+            if amount_value <= 0:
+                raise HTTPException(status_code=400, detail="Amount must be greater than zero")
+
+            wallet = WalletService.get_wallet(
+                db,
+                user_id,
+                for_update=True,
+                auto_commit_if_created=False,
+            )
+            current_balance = WalletService._to_money(wallet.balance)
+            if current_balance < amount_value:
+                raise HTTPException(status_code=400, detail="Insufficient balance")
+
+            wallet.balance = current_balance - amount_value
+            wallet.updated_at = datetime.utcnow()
+            db.add(wallet)
+
+            txn = Transaction(
+                user_id=wallet.user_id,
+                wallet_id=wallet.id,
+                amount=-amount_value,
+                balance_after=WalletService._to_money(wallet.balance),
+                type="debit",
+                category="withdrawal",
+                status="success",
+                description=description,
+            )
+            db.add(txn)
+
+            db.commit()
+            db.refresh(wallet)
+            return wallet
+
+    @staticmethod
+    def create_recharge_intent(
+        db: Session,
+        *,
+        user_id: int,
+        amount: float | Decimal,
+        order_id: str,
+        description: str = "Wallet recharge intent",
+    ) -> Transaction:
+        if not order_id:
+            raise HTTPException(status_code=400, detail="order_id is required")
+        amount_value = WalletService._to_money(amount)
+        if amount_value <= 0:
+            raise HTTPException(status_code=400, detail="Amount must be greater than zero")
+
+        wallet = WalletService.get_wallet(
+            db,
+            user_id,
+            for_update=True,
+            auto_commit_if_created=False,
+        )
+
+        existing = db.exec(
+            select(Transaction)
+            .where(Transaction.wallet_id == wallet.id)
+            .where(Transaction.reference_type == "wallet_recharge")
+            .where(Transaction.reference_id == order_id)
+            .with_for_update()
+        ).first()
+        if existing:
+            return existing
+
+        intent = Transaction(
+            user_id=wallet.user_id,
+            wallet_id=wallet.id,
+            amount=amount_value,
+            balance_after=WalletService._to_money(wallet.balance),
+            type="credit",
+            category="deposit",
+            status="pending",
+            description=description,
+            reference_type="wallet_recharge",
+            reference_id=order_id,
+        )
+        db.add(intent)
+        db.commit()
+        db.refresh(intent)
+        return intent
+
+    @staticmethod
+    def apply_recharge_capture(
+        db: Session,
+        *,
+        order_id: str,
+        payment_id: str,
+        amount: float | Decimal,
+        noted_user_id: Optional[int] = None,
+    ) -> Transaction:
+        with SLOTimer("wallet.apply_recharge_capture", budget_ms=1000, extra={"order_id": order_id}):
+            amount_value = WalletService._to_money(amount)
+            if amount_value <= 0:
+                raise HTTPException(status_code=400, detail="Recharge amount must be greater than zero")
+
+            intent = db.exec(
+                select(Transaction)
+                .where(Transaction.reference_type == "wallet_recharge")
+                .where(Transaction.reference_id == order_id)
+                .with_for_update()
+            ).first()
+            if not intent:
+                raise HTTPException(status_code=404, detail="Recharge intent not found")
+
+            wallet = db.exec(select(Wallet).where(Wallet.id == intent.wallet_id).with_for_update()).first()
+            if not wallet:
+                raise HTTPException(status_code=404, detail="Wallet not found")
+
+            if noted_user_id is not None and wallet.user_id != noted_user_id:
+                raise HTTPException(status_code=400, detail="Webhook user mismatch for recharge intent")
+
+            # ── Idempotency guard ────────────────────────────────────────────
+            # Razorpay webhooks may fire multiple times for the same capture.
+            # If the intent is already "success", return it as-is without
+            # crediting the wallet again.  This guarantees exactly-once balance
+            # updates even under concurrent webhook deliveries.
+            if intent.status == "success":
+                logger.info(
+                    "wallet.recharge_capture_idempotent",
+                    order_id=order_id,
+                )
+                return intent
+
+            wallet.balance = WalletService._to_money(wallet.balance) + amount_value
+            wallet.updated_at = datetime.utcnow()
+            db.add(wallet)
+
+            intent.status = "success"
+            intent.amount = amount_value
+            intent.balance_after = WalletService._to_money(wallet.balance)
+            intent.razorpay_payment_id = payment_id
+            intent.description = f"Wallet recharge captured ({payment_id})"
+            db.add(intent)
+
+            db.commit()
+            db.refresh(intent)
+            WorkflowAutomationService.notify_wallet_recharge_captured(
+                db,
+                user_id=wallet.user_id,
+                amount=amount_value,
+                payment_id=payment_id,
+            )
+            return intent
+
+    @staticmethod
+    def mark_recharge_intent_failed(db: Session, *, order_id: str, payment_id: Optional[str] = None) -> Optional[Transaction]:
+        intent = db.exec(
+            select(Transaction)
+            .where(Transaction.reference_type == "wallet_recharge")
+            .where(Transaction.reference_id == order_id)
+            .with_for_update()
+        ).first()
+        if not intent:
+            return None
+        if intent.status == "success":
+            return intent
+
+        wallet = db.exec(select(Wallet).where(Wallet.id == intent.wallet_id)).first()
+        user_id = wallet.user_id if wallet else None
+        intent.status = "failed"
+        if payment_id:
+            intent.razorpay_payment_id = payment_id
+        db.add(intent)
+        db.commit()
+        db.refresh(intent)
+        if user_id is not None:
+            WorkflowAutomationService.notify_wallet_recharge_failed(
+                db,
+                user_id=user_id,
+                order_id=order_id,
+                payment_id=payment_id,
+            )
+        return intent
+
+    @staticmethod
+    def request_withdrawal(db: Session, user_id: int, amount: float, bank_details: dict) -> WalletWithdrawalRequest:
+        amount_value = WalletService._to_money(amount)
+        if amount_value <= 0:
+            raise HTTPException(status_code=400, detail="Amount must be greater than zero")
+
+        wallet = WalletService.get_wallet(
+            db,
+            user_id,
+            for_update=True,
+            auto_commit_if_created=False,
+        )
+        current_balance = WalletService._to_money(wallet.balance)
+        if current_balance < amount_value:
             raise HTTPException(status_code=400, detail="Insufficient balance")
-            
-        recipient = db.exec(select(User).where(User.phone_number == recipient_phone)).first()
-        if not recipient:
-            from fastapi import HTTPException
-            raise HTTPException(status_code=404, detail="Recipient not found")
-            
-        recipient_wallet = WalletService.get_wallet(db, recipient.id)
-        
-        # Deduct from sender
-        sender_wallet.balance -= amount
-        subtotal = round(abs(amount) / 1.18, 2)
-        tax = round(abs(amount) - subtotal, 2)
-        
-        sender_tx = Transaction(
-            user_id=sender_id,
-            wallet_id=sender_wallet.id,
-            amount=-amount,
-            subtotal=subtotal,
-            tax_amount=tax,
-            transaction_type=TransactionType.TRANSFER,
-            status=TransactionStatus.SUCCESS,
-            description=f"Transfer to {recipient_phone}: {note or ''}"
+
+        req = WalletWithdrawalRequest(
+            wallet_id=wallet.id,
+            amount=amount_value,
+            bank_details=str(bank_details),
+            status="requested",
         )
-        
-        # Add to recipient
-        recipient_wallet.balance += amount
-        recipient_tx = Transaction(
-            user_id=recipient.id,
-            wallet_id=recipient_wallet.id,
-            amount=amount,
-            subtotal=subtotal,
-            tax_amount=tax,
-            transaction_type=TransactionType.TRANSFER,
-            status=TransactionStatus.SUCCESS,
-            description=f"Received from {sender_id}: {note or ''}"
+        db.add(req)
+        db.flush()
+
+        wallet.balance = current_balance - amount_value
+        wallet.updated_at = datetime.utcnow()
+        db.add(wallet)
+
+        txn = Transaction(
+            user_id=wallet.user_id,
+            wallet_id=wallet.id,
+            amount=-amount_value,
+            balance_after=WalletService._to_money(wallet.balance),
+            type="debit",
+            category="withdrawal_request",
+            status="pending",
+            description=f"Withdrawal request #{req.id}",
+            reference_type="withdrawal_request",
+            reference_id=str(req.id),
         )
-        
-        db.add(sender_wallet)
-        db.add(recipient_wallet)
-        db.add(sender_tx)
-        db.add(recipient_tx)
+        db.add(txn)
+
         db.commit()
-        db.refresh(sender_tx)
-        
-        # Auto-generate Invoices for both parties
-        try:
-            FinancialService.create_invoice(sender_tx.id, sender_id)
-            FinancialService.create_invoice(recipient_tx.id, recipient.id)
-        except Exception as e:
-            logger.error(f"Failed to auto-generate invoices for transfer {sender_tx.id}: {e}")
-            
-        return sender_tx
+        db.refresh(req)
+
+        SecurityService.log_event(
+            db,
+            event_type="withdrawal_request",
+            severity="medium",
+            details=f"User {user_id} requested withdrawal of {amount_value}",
+            user_id=user_id,
+        )
+        WorkflowAutomationService.notify_withdrawal_requested(
+            db,
+            user_id=user_id,
+            request_id=req.id,
+            amount=amount_value,
+        )
+        return req
 
     @staticmethod
-    def request_withdrawal(db: Session, user_id: int, amount: float, bank_details: dict) -> "WalletWithdrawalRequest":
-        """Request withdrawal to bank account"""
-        wallet = WalletService.get_wallet(db, user_id)
-        if wallet.balance < amount:
-            from fastapi import HTTPException
-            raise HTTPException(status_code=400, detail="Insufficient balance for withdrawal")
-            
-        wallet.balance -= amount
-        
-        from app.models.financial import WalletWithdrawalRequest
-        import json
-        wr = WalletWithdrawalRequest(
+    def approve_withdrawal_request(
+        db: Session,
+        *,
+        request_id: int,
+        approver_user_id: int,
+        payout_reference: Optional[str] = None,
+    ) -> WalletWithdrawalRequest:
+        req = db.exec(
+            select(WalletWithdrawalRequest).where(WalletWithdrawalRequest.id == request_id).with_for_update()
+        ).first()
+        if not req:
+            raise HTTPException(status_code=404, detail="Request not found")
+        if req.status != "requested":
+            raise HTTPException(status_code=400, detail="Request already processed")
+
+        txn = db.exec(
+            select(Transaction)
+            .where(Transaction.reference_type == "withdrawal_request")
+            .where(Transaction.reference_id == str(req.id))
+            .with_for_update()
+        ).first()
+
+        req.status = "processed"
+        req.processed_at = datetime.utcnow()
+        db.add(req)
+
+        if txn:
+            txn.status = "success"
+            if payout_reference:
+                txn.description = f"Withdrawal payout processed ({payout_reference})"
+            db.add(txn)
+
+        db.commit()
+        db.refresh(req)
+
+        wallet = db.exec(select(Wallet).where(Wallet.id == req.wallet_id)).first()
+        if wallet:
+            WorkflowAutomationService.notify_withdrawal_processed(
+                db,
+                user_id=wallet.user_id,
+                request_id=req.id,
+                amount=req.amount,
+                payout_reference=payout_reference,
+            )
+
+        SecurityService.log_event(
+            db,
+            event_type="withdrawal_processed",
+            severity="medium",
+            details=f"Withdrawal request {req.id} approved by user {approver_user_id}",
+            user_id=approver_user_id,
+        )
+        return req
+
+    @staticmethod
+    def reject_withdrawal_request(
+        db: Session,
+        *,
+        request_id: int,
+        approver_user_id: int,
+        reason: Optional[str] = None,
+    ) -> WalletWithdrawalRequest:
+        req = db.exec(
+            select(WalletWithdrawalRequest).where(WalletWithdrawalRequest.id == request_id).with_for_update()
+        ).first()
+        if not req:
+            raise HTTPException(status_code=404, detail="Request not found")
+        if req.status != "requested":
+            raise HTTPException(status_code=400, detail="Request already processed")
+
+        wallet = db.exec(select(Wallet).where(Wallet.id == req.wallet_id).with_for_update()).first()
+        if not wallet:
+            raise HTTPException(status_code=404, detail="Wallet not found")
+
+        pending_txn = db.exec(
+            select(Transaction)
+            .where(Transaction.reference_type == "withdrawal_request")
+            .where(Transaction.reference_id == str(req.id))
+            .with_for_update()
+        ).first()
+        if pending_txn and pending_txn.status == "success":
+            raise HTTPException(status_code=400, detail="Cannot reject an already processed withdrawal")
+
+        amount = WalletService._to_money(req.amount)
+        wallet.balance = WalletService._to_money(wallet.balance) + amount
+        wallet.updated_at = datetime.utcnow()
+        db.add(wallet)
+
+        reversal = Transaction(
+            user_id=wallet.user_id,
             wallet_id=wallet.id,
             amount=amount,
-            status="requested",
-            bank_details=json.dumps(bank_details)
+            balance_after=WalletService._to_money(wallet.balance),
+            type="credit",
+            category="withdrawal_reversal",
+            status="success",
+            description=f"Withdrawal request #{req.id} rejected" + (f": {reason}" if reason else ""),
+            reference_type="withdrawal_request",
+            reference_id=str(req.id),
         )
-        
-        subtotal = round(abs(amount) / 1.18, 2)
-        tax = round(abs(amount) - subtotal, 2)
-        
-        tx = Transaction(
-            user_id=user_id,
-            wallet_id=wallet.id,
-            amount=-amount,
-            subtotal=subtotal,
-            tax_amount=tax,
-            transaction_type=TransactionType.WITHDRAWAL,
-            status=TransactionStatus.SUCCESS,
-            description=f"Withdrawal request: {amount}"
-        )
-        
-        db.add(wallet)
-        db.add(wr)
-        db.add(tx)
+        db.add(reversal)
+
+        if pending_txn:
+            pending_txn.status = "failed"
+            if reason:
+                pending_txn.description = f"Withdrawal request #{req.id} rejected: {reason}"
+            db.add(pending_txn)
+
+        req.status = "rejected"
+        req.processed_at = datetime.utcnow()
+        db.add(req)
         db.commit()
-        db.refresh(wr)
-        return wr
+        db.refresh(req)
+
+        WorkflowAutomationService.notify_withdrawal_rejected(
+            db,
+            user_id=wallet.user_id,
+            request_id=req.id,
+            amount=req.amount,
+            reason=reason,
+        )
+
+        SecurityService.log_event(
+            db,
+            event_type="withdrawal_rejected",
+            severity="medium",
+            details=f"Withdrawal request {req.id} rejected by user {approver_user_id}",
+            user_id=approver_user_id,
+        )
+        return req
+
+    @staticmethod
+    def apply_cashback(db: Session, user_id: int, amount: float, reason: str = "Cashback"):
+        return WalletService.add_balance(db, user_id, amount, description=reason, category="cashback")
+
+    # ── P1-A-1: Wallet-to-wallet transfer ─────────────────────────────────
+    @staticmethod
+    def transfer_balance(
+        db: Session,
+        sender_id: int,
+        recipient_phone: str,
+        amount: float | Decimal,
+        note: str | None = None,
+    ) -> Transaction:
+        """Transfer balance between two user wallets, identified by phone number."""
+        from app.models.user import User
+
+        with SLOTimer("wallet.transfer_balance", budget_ms=800, extra={"sender_id": sender_id}):
+            amount_value = WalletService._to_money(amount)
+            if amount_value <= 0:
+                raise HTTPException(status_code=400, detail="Transfer amount must be greater than zero")
+
+            recipient = db.exec(
+                select(User).where(User.phone_number == recipient_phone)
+            ).first()
+            if not recipient:
+                raise HTTPException(status_code=404, detail="Recipient not found")
+            if recipient.id == sender_id:
+                raise HTTPException(status_code=400, detail="Cannot transfer to yourself")
+
+            # Lock both wallets (always lock lower id first to avoid deadlocks)
+            ids = sorted([sender_id, recipient.id])
+            wallet_a = WalletService.get_wallet(db, ids[0], for_update=True, auto_commit_if_created=False)
+            wallet_b = WalletService.get_wallet(db, ids[1], for_update=True, auto_commit_if_created=False)
+            sender_wallet = wallet_a if wallet_a.user_id == sender_id else wallet_b
+            recipient_wallet = wallet_b if wallet_b.user_id == recipient.id else wallet_a
+
+            sender_balance = WalletService._to_money(sender_wallet.balance)
+            if sender_balance < amount_value:
+                raise HTTPException(status_code=400, detail="Insufficient balance")
+
+            # Debit sender
+            sender_wallet.balance = sender_balance - amount_value
+            sender_wallet.updated_at = datetime.utcnow()
+            db.add(sender_wallet)
+
+            debit_txn = Transaction(
+                user_id=sender_wallet.user_id,
+                wallet_id=sender_wallet.id,
+                amount=-amount_value,
+                balance_after=WalletService._to_money(sender_wallet.balance),
+                type="debit",
+                category="transfer",
+                status="success",
+                description=note or f"Transfer to {recipient_phone}",
+                reference_type="transfer",
+                reference_id=str(recipient.id),
+            )
+            db.add(debit_txn)
+
+            # Credit recipient
+            recipient_wallet.balance = WalletService._to_money(recipient_wallet.balance) + amount_value
+            recipient_wallet.updated_at = datetime.utcnow()
+            db.add(recipient_wallet)
+
+            credit_txn = Transaction(
+                user_id=recipient_wallet.user_id,
+                wallet_id=recipient_wallet.id,
+                amount=amount_value,
+                balance_after=WalletService._to_money(recipient_wallet.balance),
+                type="credit",
+                category="transfer",
+                status="success",
+                description=note or f"Transfer from user #{sender_id}",
+                reference_type="transfer",
+                reference_id=str(sender_id),
+            )
+            db.add(credit_txn)
+
+            db.commit()
+            db.refresh(debit_txn)
+            return debit_txn
+
+    # ── P1-A-2: Cashback transaction history ──────────────────────────────
+    @staticmethod
+    def get_cashback_history(db: Session, user_id: int) -> list[Transaction]:
+        """Return up to 100 cashback transactions for a user, newest first."""
+        wallet = WalletService.get_wallet(db, user_id)
+        return list(
+            db.exec(
+                select(Transaction)
+                .where(Transaction.wallet_id == wallet.id, Transaction.category == "cashback")
+                .order_by(Transaction.created_at.desc())
+                .limit(100)
+            ).all()
+        )
+
+    @staticmethod
+    def initiate_refund(
+        db: Session,
+        transaction_id: int,
+        amount: Optional[float] = None,
+        reason: str = "Customer Request",
+    ) -> Optional[Refund]:
+        """Create a refund request with exactly-once semantics.
+
+        Guards:
+        1. Original transaction must exist and be a credit.
+        2. No pending/processed refund may already exist for this transaction
+           (prevents duplicate refunds from UI double-clicks or webhook retries).
+        3. Refund amount must be > 0 and <= original transaction amount.
+        """
+        orig_txn = db.get(Transaction, transaction_id)
+        if not orig_txn or orig_txn.type != "credit":
+            return None
+
+        # ── Duplicate-refund guard (exactly-once) ────────────────────────
+        existing_refund = db.exec(
+            select(Refund).where(
+                Refund.transaction_id == transaction_id,
+                Refund.status.in_(["pending", "processed"]),
+            )
+        ).first()
+        if existing_refund:
+            logger.info(
+                "wallet.refund_duplicate_blocked",
+                refund_id=existing_refund.id,
+                status=existing_refund.status,
+            )
+            return existing_refund  # idempotent: return the in-flight refund
+
+        refund_amount = WalletService._to_money(amount if amount is not None else orig_txn.amount)
+        if refund_amount <= 0:
+            raise HTTPException(status_code=400, detail="Refund amount must be greater than zero")
+        if refund_amount > WalletService._to_money(orig_txn.amount):
+            raise HTTPException(status_code=400, detail="Refund amount exceeds original transaction")
+
+        refund = Refund(
+            transaction_id=transaction_id,
+            amount=refund_amount,
+            reason=reason,
+            status="pending",
+        )
+        db.add(refund)
+        db.commit()
+        db.refresh(refund)
+        logger.info(
+            "wallet.refund_initiated",
+            refund_id=refund.id,
+            transaction_id=transaction_id,
+            amount=refund_amount,
+        )
+        return refund
+
+    @staticmethod
+    def process_refund(db: Session, refund_id: int) -> Refund:
+        """Transition a refund from pending → processed | failed.
+
+        State machine:
+          pending → processed  (wallet credited back)
+          pending → failed     (gateway failure)
+          processed → (no-op)  idempotent return
+          failed → pending     (allowed for retry via initiate_refund)
+        """
+        with SLOTimer("wallet.process_refund", budget_ms=600, extra={"refund_id": refund_id}):
+            refund = db.exec(
+                select(Refund).where(Refund.id == refund_id).with_for_update()
+            ).first()
+            if not refund:
+                raise HTTPException(status_code=404, detail="Refund not found")
+
+            if refund.status == "processed":
+                return refund  # idempotent
+
+            if refund.status != "pending":
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot process refund with status '{refund.status}'",
+                )
+
+            orig_txn = db.get(Transaction, refund.transaction_id)
+            if not orig_txn:
+                refund.status = "failed"
+                db.add(refund)
+                db.commit()
+                raise HTTPException(status_code=404, detail="Original transaction not found")
+
+            wallet = db.exec(
+                select(Wallet).where(Wallet.id == orig_txn.wallet_id).with_for_update()
+            ).first()
+            if not wallet:
+                refund.status = "failed"
+                db.add(refund)
+                db.commit()
+                raise HTTPException(status_code=404, detail="Wallet not found")
+
+            # Credit wallet back
+            wallet.balance = WalletService._to_money(wallet.balance) + WalletService._to_money(refund.amount)
+            wallet.updated_at = datetime.utcnow()
+            db.add(wallet)
+
+            # Record refund transaction
+            refund_txn = Transaction(
+                user_id=wallet.user_id,
+                wallet_id=wallet.id,
+                amount=WalletService._to_money(refund.amount),
+                type="credit",
+                category="refund",
+                description=f"Refund for transaction #{refund.transaction_id}: {refund.reason}",
+                status="success",
+                balance_after=WalletService._to_money(wallet.balance),
+                reference_type="refund",
+                reference_id=str(refund.id),
+            )
+            db.add(refund_txn)
+
+            refund.status = "processed"
+            refund.processed_at = datetime.utcnow()
+            db.add(refund)
+
+            db.commit()
+            db.refresh(refund)
+            logger.info(
+                "wallet.refund_processed",
+                refund_id=refund.id,
+                amount=refund.amount,
+                wallet_id=wallet.id,
+            )
+            return refund

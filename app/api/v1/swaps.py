@@ -90,7 +90,7 @@ def complete_swap(
     swap_session.new_battery_id = complete_in.new_battery_id
     swap_session.old_battery_soc = complete_in.old_battery_soc
     swap_session.new_battery_soc = complete_in.new_battery_soc
-    swap_session.amount = cost
+    swap_session.swap_amount = cost
     swap_session.status = "completed"
     swap_session.payment_status = "paid"
     swap_session.completed_at = datetime.now(UTC)
@@ -126,6 +126,6 @@ def complete_swap(
         "id": swap_session.id, 
         "status": swap_session.status, 
         "station_id": swap_session.station_id,
-        "amount": swap_session.amount,
+        "amount": swap_session.swap_amount,
         "created_at": swap_session.created_at
     }
