@@ -1,9 +1,14 @@
-# Environment
+# Environment — NEVER commit secrets
 .env
 .env.local
+.env.production
+.env.staging
+*.env
 
-# Firebase
+# Firebase credentials
 firebase-*.json
+*-firebase-adminsdk-*.json
+google-services.json
 
 # Python
 __pycache__/
@@ -28,28 +33,39 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environment
+# Virtual environments
 .venv/
+venv/
 wezu_env/
 
-# Uploads
+# Local uploads (use S3/CDN in production)
 uploads/
-.gsd/
-.gemini/
-.agent/
+
 # Logs
 logs/
 *.log
 
-# Database
+# Database files
 *.db
 *.sqlite
 *_dump.sql
 
-# Generated API Docs
+# Generated / cache
 openapi.json
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Apple files
+.DS_Store
+.gsd/
 
 # IDE
 .vscode/
 .idea/
-walkthrough.mdrequirements.txt.bak
+.gemini/
+.agent/
+walkthrough.md

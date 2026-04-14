@@ -1,0 +1,46 @@
+# Version control
+.git
+.gitignore
+
+# Environment — never bake secrets into image
+.env
+.env.*
+*.env
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+.venv/
+venv/
+wezu_env/
+
+# Local uploads (S3 in production)
+uploads/
+
+# Logs
+logs/
+*.log
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# IDE
+.vscode/
+.idea/
+
+# Dev files
+docker-compose*.yml
+Makefile
+*.md
+.mypy_cache/
+
+# Apple
+.DS_Store
