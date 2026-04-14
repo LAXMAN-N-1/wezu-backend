@@ -414,3 +414,38 @@ async def request_battery_swap(
 # Canonical handler lives in app/api/v1/rentals_enhanced.py
 # (returns structured receipt JSON instead of requiring InvoiceService PDF).
 # Removed 2026-04-06.
+
+class PriceCalculationRequest(BaseModel):
+    battery_id: int
+    duration_days: int = 1
+    promo_code: Optional[str] = None
+
+class ConfirmationRequest(BaseModel):
+    payment_reference: str
+
+@router.post("/calculate-price")
+async def calculate_rental_price(
+    req: PriceCalculationRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db)
+):
+    from app.services.rental_service import RentalService
+    return RentalService.calculate_price(db, req.battery_id, req.duration_days, req.promo_code)
+
+@router.post("/{rental_id}/confirm", response_model=RentalResponse)
+async def confirm_rental(
+    rental_id: int,
+    req: ConfirmationRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    rental = db.query(Rental).filter(Rental.id == rental_id).first()
+    if not rental or rental.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Rental not found")
+    rental.status = "ACTIVE"
+    # Note: adding payment_reference logic if model supports it, else ignored.
+    if hasattr(rental, 'payment_reference'):
+        rental.payment_reference = req.payment_reference
+    db.commit()
+    db.refresh(rental)
+    return rental

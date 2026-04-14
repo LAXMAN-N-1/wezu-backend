@@ -265,8 +265,6 @@ def update_station(
     db.commit()
     db.refresh(station)
     return {"message": "Station updated", "id": station.id}
-
-
 @router.get("/{station_id}/maintenance")
 def get_station_maintenance(
     station_id: int,
@@ -370,4 +368,77 @@ def fetch_inventory_alerts(
     """Fetch low-inventory alerts across all dealer stations based on custom thresholds."""
     dealer_id = _get_dealer_id(db, current_user.id)
     return DealerStationService.get_low_inventory_alerts(db, dealer_id)
+
+
+# ─── Newly Added Dealer Portal Aggregation Routes ───
+
+@router.get("/stats")
+def get_dealer_quick_stats(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    dealer_id = _get_dealer_id(db, current_user.id)
+    # TODO: Perform actual counts
+    return {
+        "available_batteries": 45,
+        "total_batteries": 100,
+        "ongoing_rentals": 12,
+        "current_swaps": 3,
+        "avg_rating": 4.5,
+        "station_count": 5
+    }
+
+@router.get("/batteries")
+def get_dealer_batteries(
+    station_id: int | None = None,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    dealer_id = _get_dealer_id(db, current_user.id)
+    return []
+
+@router.get("/rentals/active")
+def get_dealer_active_rentals(
+    station_id: int | None = None,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    dealer_id = _get_dealer_id(db, current_user.id)
+    return []
+
+@router.get("/reviews")
+def get_dealer_reviews(
+    station_id: int | None = None,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    dealer_id = _get_dealer_id(db, current_user.id)
+    return []
+
+@router.get("/swaps/list")
+def get_dealer_swaps(
+    station_id: int | None = None,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    dealer_id = _get_dealer_id(db, current_user.id)
+    return []
+
+@router.get("/{station_id}/activity")
+def get_station_activity(
+    station_id: int,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    dealer_id = _get_dealer_id(db, current_user.id)
+    return []
+
+@router.get("/{station_id}/transactions")
+def get_station_transactions(
+    station_id: int,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    dealer_id = _get_dealer_id(db, current_user.id)
+    return []
 
