@@ -11,7 +11,10 @@ This backend is configured for Coolify/Traefik ingress.
 
 1. Create a new service in Coolify from this repository.
 2. Track branch `main`.
-3. Use Docker Compose deployment (root `docker-compose.yml`).
+3. Use Docker Compose deployment with:
+   - `docker-compose.yml`
+   - `docker-compose.prod.yml`
+   - keep `local-db` profile disabled when using external Neon/Postgres
 4. Set the public domain on the API service (for example `api1.powerfrill.com`).
 5. In Coolify, map the service internal port to `8000`.
 
@@ -41,6 +44,11 @@ DB_INIT_ON_STARTUP=false
 RUN_BACKGROUND_TASKS=false
 SCHEDULER_ENABLED=false
 MQTT_ENABLED=false
+ENFORCE_PRODUCTION_SAFETY=false
+STRICT_STARTUP_DEPENDENCY_CHECKS=false
+ALLOW_START_WITHOUT_DB=true
+WAIT_FOR_DB=false
+WAIT_FOR_REDIS=false
 ```
 
 Notes:
@@ -51,9 +59,10 @@ Notes:
 
 ## 3. Compose Behavior in This Repo
 
-- API service uses `expose: ["8000"]` (not `ports`).
+- API service uses `expose: ["8000"]` (not `ports`) in production mode.
 - Internal nginx service is removed.
 - Production compose no longer publishes `80/443` from a bundled nginx.
+- Local database can be enabled via the optional `local-db` profile in `docker-compose.prod.yml`.
 
 ## 4. Deploy
 
@@ -92,6 +101,11 @@ If client IPs are wrong in logs/rate limits:
 If deployment fails from env conflicts in Coolify:
 - Remove stale variables from compose-level environment blocks first.
 - Re-add them only in Coolify Environment Variables.
+
+If API container keeps restarting:
+- Temporarily keep `ENFORCE_PRODUCTION_SAFETY=false` and `STRICT_STARTUP_DEPENDENCY_CHECKS=false` until all production host/CORS/payment/sms settings are verified.
+- Keep `WAIT_FOR_DB=false` and `WAIT_FOR_REDIS=false` so transient dependency startup does not hard-exit PID 1.
+- Ensure only `api` (and optionally `redis`) are running in Coolify unless you explicitly need workers.
 
 ## 7. Hostinger VPS Performance Tuning
 

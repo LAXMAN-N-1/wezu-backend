@@ -35,6 +35,7 @@ High-performance FastAPI backend powering the WEZU battery swapping ecosystem, i
 For ingress through Coolify/Traefik (no app host port publishing), follow:
 
 - [DEPLOY_COOLIFY_TRAEFIK.md](docs/DEPLOY_COOLIFY_TRAEFIK.md)
+- [DOCKER_MULTI_PHASE_DEPLOYMENT.md](docs/DOCKER_MULTI_PHASE_DEPLOYMENT.md)
 
 ## 📂 Repository Structure
 - `app/api/v1`: Route handlers grouped by domain.

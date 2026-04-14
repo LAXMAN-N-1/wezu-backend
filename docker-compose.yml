@@ -1,115 +1,218 @@
-services:
-  # The WEZU Backend Application
-  api:
-    build: .
-    restart: "on-failure:5"
-    init: true
-    stop_grace_period: 30s
-    cpus: "1.5"
-    mem_limit: "768m"
-    expose:
-      - "8000"
-    # In Coolify/production, inject env vars from platform UI.
-    # Keep compose free of fixed DATABASE_URL so external Neon DB is authoritative.
-    environment:
-      # Keep DATABASE_URL / REDIS_URL out of compose-level environment
-      # so platforms like Coolify can manage/delete them directly.
-      #
-      # Tuned for Hostinger VPS (2-4 vCPU, 4-8 GB RAM):
-      - GUNICORN_WORKERS=2
-      - GUNICORN_TIMEOUT=120
-      - GUNICORN_GRACEFUL_TIMEOUT=45
-      - GUNICORN_KEEPALIVE=65
-      # DB pool: 3 conns × 2 workers = 6 base, +3 overflow = 9 max.
-      # Keeps well within Neon/small PG limits (25-50 connections).
-      - DB_POOL_SIZE=3
-      - DB_MAX_OVERFLOW=3
-      - DB_POOL_TIMEOUT=20
-      - DB_POOL_RECYCLE=900
-      - DB_POOL_PRE_PING=true
-      - DB_POOL_USE_LIFO=true
-      - SQL_SLOW_QUERY_LOG_MS=500
-      - AUDIT_REQUEST_LOGGING_ENABLED=true
-      - AUDIT_REQUEST_QUEUE_MAXSIZE=2000
-      - AUDIT_REQUEST_BATCH_SIZE=50
-      - AUDIT_REQUEST_FLUSH_MS=500
-      - AUDIT_REQUEST_DROP_WARN_EVERY=100
-      - AUDIT_REQUEST_WORKERS=1
-      - DB_INIT_ON_STARTUP=false
-      - RUN_BACKGROUND_TASKS=false
-      - SCHEDULER_ENABLED=false
-      - MQTT_ENABLED=false
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/live', timeout=2)"]
-      interval: 20s
-      timeout: 5s
-      retries: 5
-      start_period: 40s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - wezu_net
-    depends_on:
-      redis:
-        condition: service_healthy
+name: wezu-backend
 
-  # Primary Database
+x-app-environment: &app-environment
+  ENVIRONMENT: ${ENVIRONMENT:-development}
+  DEBUG: ${DEBUG:-true}
+  SECRET_KEY: ${SECRET_KEY:-change-this-secret-before-production}
+  DATABASE_URL: ${DATABASE_URL:-postgresql://wezu:wezupassword@db:5432/wezu_prod}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  API_PUBLIC_BASE_URL: ${API_PUBLIC_BASE_URL:-http://localhost:8000}
+  MEDIA_BASE_URL: ${MEDIA_BASE_URL:-http://localhost:8000/uploads}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1,testserver}
+  ENABLE_API_DOCS: ${ENABLE_API_DOCS:-true}
+  ENFORCE_PRODUCTION_SAFETY: ${ENFORCE_PRODUCTION_SAFETY:-false}
+  ENABLE_TRUSTED_HOST_MIDDLEWARE: ${ENABLE_TRUSTED_HOST_MIDDLEWARE:-false}
+  TRUST_X_FORWARDED_HOST: ${TRUST_X_FORWARDED_HOST:-true}
+  FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-127.0.0.1/32,::1/128,172.16.0.0/12}
+  DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+  DB_MAX_OVERFLOW: ${DB_MAX_OVERFLOW:-5}
+  DB_POOL_TIMEOUT: ${DB_POOL_TIMEOUT:-30}
+  DB_POOL_RECYCLE: ${DB_POOL_RECYCLE:-1800}
+  DB_POOL_PRE_PING: ${DB_POOL_PRE_PING:-true}
+  DB_POOL_USE_LIFO: ${DB_POOL_USE_LIFO:-true}
+  DB_INIT_ON_STARTUP: ${DB_INIT_ON_STARTUP:-false}
+  AUTO_CREATE_TABLES: ${AUTO_CREATE_TABLES:-false}
+  AUTO_SEED_ROLES: ${AUTO_SEED_ROLES:-false}
+  RUN_BACKGROUND_TASKS: ${RUN_BACKGROUND_TASKS:-false}
+  SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-false}
+  ENABLE_EVENT_STREAMS: ${ENABLE_EVENT_STREAMS:-true}
+  MQTT_ENABLED: ${MQTT_ENABLED:-false}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  LOGISTICS_SCHEMA_CHECK_ENABLED: ${LOGISTICS_SCHEMA_CHECK_ENABLED:-false}
+  LOGISTICS_SCHEMA_STRICT: ${LOGISTICS_SCHEMA_STRICT:-false}
+  SQL_SLOW_QUERY_LOG_MS: ${SQL_SLOW_QUERY_LOG_MS:-500}
+  ALLOW_START_WITHOUT_DB: ${ALLOW_START_WITHOUT_DB:-false}
+  AUDIT_REQUEST_LOGGING_ENABLED: ${AUDIT_REQUEST_LOGGING_ENABLED:-true}
+  AUDIT_REQUEST_QUEUE_MAXSIZE: ${AUDIT_REQUEST_QUEUE_MAXSIZE:-2000}
+  AUDIT_REQUEST_BATCH_SIZE: ${AUDIT_REQUEST_BATCH_SIZE:-50}
+  AUDIT_REQUEST_FLUSH_MS: ${AUDIT_REQUEST_FLUSH_MS:-500}
+  AUDIT_REQUEST_DROP_WARN_EVERY: ${AUDIT_REQUEST_DROP_WARN_EVERY:-100}
+  AUDIT_REQUEST_WORKERS: ${AUDIT_REQUEST_WORKERS:-1}
+  GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+  GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-120}
+  GUNICORN_GRACEFUL_TIMEOUT: ${GUNICORN_GRACEFUL_TIMEOUT:-45}
+  GUNICORN_KEEPALIVE: ${GUNICORN_KEEPALIVE:-65}
+
+x-app-service: &app-service
+  build:
+    context: .
+    dockerfile: Dockerfile
+    target: runtime
+  image: wezu/backend:${WEZU_IMAGE_TAG:-latest}
+  restart: unless-stopped
+  init: true
+  stop_grace_period: 30s
+  environment:
+    <<: *app-environment
+  volumes:
+    - uploads_data:/app/uploads
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  tmpfs:
+    - /tmp
+  networks:
+    - wezu_net
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+services:
   db:
-    # Opt-in only for local development. Not started in normal deployments.
-    profiles: ["local-db"]
     image: postgres:15-alpine
-    restart: "on-failure:5"
-    init: true
-    cpus: "0.75"
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: wezu
-      POSTGRES_PASSWORD: wezupassword
-      POSTGRES_DB: wezu_prod
+      POSTGRES_USER: ${POSTGRES_USER:-wezu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-wezupassword}
+      POSTGRES_DB: ${POSTGRES_DB:-wezu_prod}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U wezu -d wezu_prod"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-wezu} -d ${POSTGRES_DB:-wezu_prod}"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
       start_period: 20s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
     networks:
       - wezu_net
 
-  # Redis for Caching and Rate Limiting
   redis:
     image: redis:7-alpine
-    restart: "on-failure:5"
-    init: true
-    cpus: "0.25"
-    command: redis-server --appendonly yes
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory ${REDIS_MAXMEMORY:-256mb} --maxmemory-policy ${REDIS_MAXMEMORY_POLICY:-allkeys-lru}
     volumes:
       - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
-      timeout: 3s
-      retries: 5
+      timeout: 5s
+      retries: 10
       start_period: 10s
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
     networks:
       - wezu_net
+
+  mqtt:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    profiles: ["iot"]
+    volumes:
+      - ./mosquitto/config:/mosquitto/config:ro
+      - mqtt_data:/mosquitto/data
+      - mqtt_log:/mosquitto/log
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - wezu_net
+
+  migrate:
+    <<: *app-service
+    profiles: ["migrations"]
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    environment:
+      <<: *app-environment
+      WAIT_FOR_DB: "true"
+      WAIT_FOR_REDIS: "false"
+      RUN_DB_MIGRATIONS: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  api:
+    <<: *app-service
+    command: ["gunicorn", "app.main:app", "-c", "gunicorn_conf.py"]
+    expose:
+      - "8000"
+    environment:
+      <<: *app-environment
+      WAIT_FOR_DB: "true"
+      WAIT_FOR_REDIS: "true"
+      RUN_DB_MIGRATIONS: ${RUN_DB_MIGRATIONS:-false}
+      RUN_BACKGROUND_TASKS: "false"
+      SCHEDULER_ENABLED: "false"
+      BACKGROUND_RUNTIME_MODE: ${BACKGROUND_RUNTIME_MODE:-api_only}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/live', timeout=2)"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+  scheduler:
+    <<: *app-service
+    profiles: ["workers"]
+    command: ["python", "-m", "app.workers.runner"]
+    environment:
+      <<: *app-environment
+      WAIT_FOR_DB: "true"
+      WAIT_FOR_REDIS: "true"
+      RUN_BACKGROUND_TASKS: "true"
+      SCHEDULER_ENABLED: "true"
+      BACKGROUND_RUNTIME_MODE: "workers_only"
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os; os.kill(1, 0)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  event-worker:
+    <<: *app-service
+    profiles: ["workers"]
+    command: ["python", "-m", "app.workers.event_runner", "--mode", "all"]
+    environment:
+      <<: *app-environment
+      WAIT_FOR_DB: "true"
+      WAIT_FOR_REDIS: "true"
+      ENABLE_EVENT_STREAMS: "true"
+      RUN_BACKGROUND_TASKS: "false"
+      SCHEDULER_ENABLED: "false"
+      BACKGROUND_RUNTIME_MODE: "workers_only"
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import os; os.kill(1, 0)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
 volumes:
   postgres_data:
   redis_data:
+  uploads_data:
+  mqtt_data:
+  mqtt_log:
 
 networks:
   wezu_net:

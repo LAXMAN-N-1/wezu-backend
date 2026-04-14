@@ -1,0 +1,103 @@
+services:
+  db:
+    profiles: ["local-db"]
+    restart: on-failure:5
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-wezu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set when local-db profile is enabled}
+      POSTGRES_DB: ${POSTGRES_DB:-wezu_prod}
+
+  redis:
+    restart: on-failure:5
+
+  migrate:
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "false"
+      ENABLE_API_DOCS: "false"
+      ENFORCE_PRODUCTION_SAFETY: ${ENFORCE_PRODUCTION_SAFETY:-false}
+      STRICT_STARTUP_DEPENDENCY_CHECKS: ${STRICT_STARTUP_DEPENDENCY_CHECKS:-false}
+      ALLOW_START_WITHOUT_DB: ${ALLOW_START_WITHOUT_DB:-true}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required for production}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required for production}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      WAIT_FOR_DB: "true"
+      WAIT_FOR_REDIS: "false"
+      RUN_DB_MIGRATIONS: "false"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    restart: on-failure:5
+    read_only: true
+    pids_limit: 256
+    mem_limit: ${API_MEM_LIMIT:-1024m}
+    cpus: ${API_CPUS:-2.0}
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "false"
+      ENABLE_API_DOCS: "false"
+      ENFORCE_PRODUCTION_SAFETY: ${ENFORCE_PRODUCTION_SAFETY:-false}
+      STRICT_STARTUP_DEPENDENCY_CHECKS: ${STRICT_STARTUP_DEPENDENCY_CHECKS:-false}
+      ALLOW_START_WITHOUT_DB: ${ALLOW_START_WITHOUT_DB:-true}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required for production}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required for production}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      DB_INIT_ON_STARTUP: "false"
+      RUN_DB_MIGRATIONS: ${RUN_DB_MIGRATIONS:-false}
+      RUN_BACKGROUND_TASKS: "false"
+      SCHEDULER_ENABLED: "false"
+      MQTT_ENABLED: ${MQTT_ENABLED:-false}
+      ALLOW_TEST_OTP_BYPASS: "false"
+      LOGISTICS_SCHEMA_CHECK_ENABLED: ${LOGISTICS_SCHEMA_CHECK_ENABLED:-true}
+      LOGISTICS_SCHEMA_STRICT: ${LOGISTICS_SCHEMA_STRICT:-false}
+      WAIT_FOR_DB: ${WAIT_FOR_DB:-false}
+      WAIT_FOR_REDIS: ${WAIT_FOR_REDIS:-false}
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  scheduler:
+    read_only: true
+    pids_limit: 128
+    mem_limit: ${SCHEDULER_MEM_LIMIT:-768m}
+    cpus: ${SCHEDULER_CPUS:-1.0}
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "false"
+      ENABLE_API_DOCS: "false"
+      ENFORCE_PRODUCTION_SAFETY: ${ENFORCE_PRODUCTION_SAFETY:-false}
+      STRICT_STARTUP_DEPENDENCY_CHECKS: ${STRICT_STARTUP_DEPENDENCY_CHECKS:-false}
+      ALLOW_START_WITHOUT_DB: ${ALLOW_START_WITHOUT_DB:-true}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required for production}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required for production}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      RUN_BACKGROUND_TASKS: "true"
+      SCHEDULER_ENABLED: "true"
+      BACKGROUND_RUNTIME_MODE: "workers_only"
+      WAIT_FOR_DB: ${WAIT_FOR_DB:-false}
+      WAIT_FOR_REDIS: ${WAIT_FOR_REDIS:-false}
+
+  event-worker:
+    read_only: true
+    pids_limit: 128
+    mem_limit: ${EVENT_WORKER_MEM_LIMIT:-768m}
+    cpus: ${EVENT_WORKER_CPUS:-1.0}
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "false"
+      ENABLE_API_DOCS: "false"
+      ENFORCE_PRODUCTION_SAFETY: ${ENFORCE_PRODUCTION_SAFETY:-false}
+      STRICT_STARTUP_DEPENDENCY_CHECKS: ${STRICT_STARTUP_DEPENDENCY_CHECKS:-false}
+      ALLOW_START_WITHOUT_DB: ${ALLOW_START_WITHOUT_DB:-true}
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required for production}
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required for production}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      RUN_BACKGROUND_TASKS: "false"
+      SCHEDULER_ENABLED: "false"
+      ENABLE_EVENT_STREAMS: "true"
+      BACKGROUND_RUNTIME_MODE: "workers_only"
+      WAIT_FOR_DB: ${WAIT_FOR_DB:-false}
+      WAIT_FOR_REDIS: ${WAIT_FOR_REDIS:-false}
