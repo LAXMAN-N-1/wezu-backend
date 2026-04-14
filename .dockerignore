@@ -1,23 +1,46 @@
+# Version control
 .git
 .gitignore
+
+# Environment — never bake secrets into image
 .env
 .env.*
-__pycache__
-*.pyc
+*.env
+
+# Python cache
+__pycache__/
+*.py[cod]
 *.pyo
-.pytest_cache
-.mypy_cache
-.venv
-venv
-node_modules
-*.md
-docs/
-tests/
-scripts/
-k8s/
-mosquitto/
-*.bak
-.bak/
+*.pyd
+.Python
+
+# Virtual environments
+.venv/
+venv/
+wezu_env/
+
+# Local uploads (S3 in production)
+uploads/
+
+# Logs
+logs/
 *.log
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# IDE
+.vscode/
+.idea/
+
+# Dev files
+docker-compose*.yml
+Makefile
+*.md
+.mypy_cache/
+
+# Apple
 .DS_Store
-WEZU Energy/

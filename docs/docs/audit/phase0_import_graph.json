@@ -1,0 +1,2980 @@
+{
+  "app.api.admin": [
+    "app.api.admin.admin_groups",
+    "app.api.admin.audit_trails",
+    "app.api.admin.batteries",
+    "app.api.admin.bess",
+    "app.api.admin.cms",
+    "app.api.admin.finance",
+    "app.api.admin.fraud",
+    "app.api.admin.health",
+    "app.api.admin.iot",
+    "app.api.admin.jobs",
+    "app.api.admin.kyc_admin",
+    "app.api.admin.logistics",
+    "app.api.admin.main",
+    "app.api.admin.monitoring",
+    "app.api.admin.notifications",
+    "app.api.admin.rbac_admin",
+    "app.api.admin.rentals",
+    "app.api.admin.security",
+    "app.api.admin.settings",
+    "app.api.admin.stations",
+    "app.api.admin.stock",
+    "app.api.admin.support",
+    "app.api.admin.users"
+  ],
+  "app.api.admin.admin_groups": [
+    "app.api.deps",
+    "app.core.config",
+    "app.models.admin_group",
+    "app.models.admin_user",
+    "app.schemas.admin_group",
+    "app.utils.runtime_cache"
+  ],
+  "app.api.admin.analytics": [
+    "app.api.deps",
+    "app.models.battery",
+    "app.models.financial",
+    "app.models.station",
+    "app.models.swap",
+    "app.models.user"
+  ],
+  "app.api.admin.audit_trails": [
+    "app.api.deps",
+    "app.core.database",
+    "app.models.inventory_audit",
+    "app.models.user"
+  ],
+  "app.api.admin.batteries": [
+    "app.api.deps",
+    "app.core.database",
+    "app.models.battery",
+    "app.models.user",
+    "app.schemas.battery"
+  ],
+  "app.api.admin.bess": [
+    "app.api.deps",
+    "app.core.database",
+    "app.models.bess",
+    "app.models.user",
+    "app.schemas.bess"
+  ],
+  "app.api.admin.cms": [
+    "app.api.deps",
+    "app.core.database",
+    "app.models.banner",
+    "app.models.blog",
+    "app.models.faq",
+    "app.models.legal",
+    "app.models.media",
+    "app.models.user",
+    "app.schemas.banner",
+    "app.schemas.blog",
+    "app.schemas.faq",
+    "app.schemas.legal",
+    "app.schemas.media"
+  ],
+  "app.api.admin.dealers": [
+    "app.api.deps",
+    "app.core.database",
+    "app.models.commission",
+    "app.models.dealer",
+    "app.models.user"
+  ],
+  "app.api.admin.finance": [
+    "app.api.deps",
+    "app.core.database",
+    "app.models.dealer",
+    "app.models.financial",
+    "app.models.invoice",
+    "app.models.refund",
+    "app.models.settlement",
+    "app.models.user"
+  ],
+  "app.api.admin.fraud": [
+    "app.api.deps",
+    "app.core.database",
+    "app.models.device_fingerprint",
+    "app.models.fraud",
+    "app.models.user"
+  ],
+  "app.api.admin.health": [
+    "app.api.deps",
+    "app.models.battery",
+    "app.models.battery_health",
+    "app.schemas.battery_health"
+  ],
+  "app.api.admin.iot": [
+    "app.api.deps",
+    "app.core.database",
+    "app.models.alert",
+    "app.models.battery",
+    "app.models.geofence",
+    "app.models.iot",
+    "app.models.station",
+    "app.models.telemetry",
+    "app.models.user"
+  ],
+  "app.api.admin.jobs": [
+    "app.api.deps",
+    "app.core.database",
+    "app.models.batch_job",
+    "app.models.user"
+  ],
+  "app.api.admin.kyc_admin": [
+    "app.api.deps",
+    "app.core.database",
+    "app.models.kyc",
+    "app.models.user"
+  ],
+  "app.api.admin.logistics": [
+    "app.api.deps",
+    "app.core.database",
+    "app.models.delivery_route",
+    "app.models.driver_profile",
+    "app.models.logistics",
+    "app.models.return_request",
+    "app.models.user"
+  ],
+  "app.api.admin.main": [
+    "app.api.deps",
+    "app.models.battery",
+    "app.models.kyc",
+    "app.models.rental",
+    "app.models.station",
+    "app.models.user"
+  ],
+  "app.api.admin.monitoring": [
+    "app.api.deps",
+    "app.core.database",
+    "app.models.audit_log",
+    "app.models.battery",
+    "app.models.financial",
+    "app.models.rental",
+    "app.models.station",
+    "app.models.user"
+  ],
+  "app.api.admin.notifications": [
+    "app.api.deps",
+    "app.core.database",
+    "app.models.notification_admin",
+    "app.models.user",
+    "app.schemas.notification_admin"
+  ],
+  "app.api.admin.rbac_admin": [
+    "app.api.v1.admin_rbac"
+  ],
+  "app.api.admin.rentals": [
+    "app.api.deps",
+    "app.core.database",
+    "app.models.late_fee",
+    "app.models.rental",
+    "app.models.swap",
+    "app.models.user"
+  ],
+  "app.api.admin.security": [
+    "app.api.deps",
+    "app.core.database",
+    "app.models.audit_log",
+    "app.models.system",
+    "app.models.user"
+  ],
+  "app.api.admin.settings": [
+    "app.api.deps",
+    "app.core.database",
+    "app.models.api_key",
+    "app.models.battery",
+    "app.models.rental",
+    "app.models.station",
+    "app.models.system",
+    "app.models.user"
+  ],
+  "app.api.admin.stations": [
+    "app.api.deps",
+    "app.core.database",
+    "app.models.maintenance",
+    "app.models.maintenance_checklist",
+    "app.models.station",
+    "app.models.user"
+  ],
+  "app.api.admin.stock": [
+    "app.api.deps",
+    "app.models.battery",
+    "app.models.station",
+    "app.models.station_stock",
+    "app.schemas.station_stock"
+  ],
+  "app.api.admin.support": [
+    "app.api.deps",
+    "app.models.faq",
+    "app.models.support",
+    "app.models.user"
+  ],
+  "app.api.admin.users": [
+    "app.api.deps",
+    "app.core.config",
+    "app.core.database",
+    "app.core.security",
+    "app.models.rbac",
+    "app.models.user",
+    "app.schemas.user",
+    "app.utils.runtime_cache"
+  ],
+  "app.api.deps": [
+    "app.core.config",
+    "app.core.database",
+    "app.core.security",
+    "app.models.oauth",
+    "app.models.role_right",
+    "app.models.roles",
+    "app.models.session",
+    "app.models.user",
+    "app.schemas.user",
+    "app.services.rbac_service"
+  ],
+  "app.api.errors.handlers": [
+    "app.utils.cors"
+  ],
+  "app.api.internal": [],
+  "app.api.internal.hotspots": [
+    "app.api.deps",
+    "app.db.session",
+    "app.schemas.telematics",
+    "app.services.telematics_ingest_service"
+  ],
+  "app.api.v1.admin.analytics": [
+    "app.api.deps",
+    "app.core.config",
+    "app.models.user",
+    "app.schemas.analytics.admin",
+    "app.services.analytics_service",
+    "app.utils.runtime_cache"
+  ],
+  "app.api.v1.admin.banners": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.banner",
+    "app.models.user",
+    "app.schemas.banner"
+  ],
+  "app.api.v1.admin.blogs": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.blog",
+    "app.models.user",
+    "app.schemas.blog"
+  ],
+  "app.api.v1.admin.dealers": [
+    "app.api.deps",
+    "app.models.commission",
+    "app.models.dealer",
+    "app.models.user",
+    "app.schemas.common",
+    "app.schemas.dealer",
+    "app.services.dealer_service",
+    "app.services.settlement_service"
+  ],
+  "app.api.v1.admin.faqs": [
+    "app.api.deps",
+    "app.models.faq",
+    "app.models.user",
+    "app.schemas.faq"
+  ],
+  "app.api.v1.admin.legal": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.legal",
+    "app.models.user",
+    "app.schemas.legal"
+  ],
+  "app.api.v1.admin.media": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.media",
+    "app.models.user",
+    "app.schemas.media"
+  ],
+  "app.api.v1.admin.promo": [
+    "app.api.deps",
+    "app.models.promo_code",
+    "app.models.user",
+    "app.schemas.promo",
+    "app.services.promo_service"
+  ],
+  "app.api.v1.admin.reviews": [
+    "app.api.deps",
+    "app.models.user",
+    "app.schemas.review",
+    "app.services.review_service"
+  ],
+  "app.api.v1.admin.roles": [
+    "app.api.deps",
+    "app.models.rbac",
+    "app.models.user",
+    "app.schemas.rbac",
+    "app.services.rbac_service"
+  ],
+  "app.api.v1.admin.support": [
+    "app.api.deps",
+    "app.models.support",
+    "app.models.user",
+    "app.schemas.support",
+    "app.services.support_service"
+  ],
+  "app.api.v1.admin.users": [
+    "app.api.deps",
+    "app.api.v1.users",
+    "app.core.security",
+    "app.models.rbac",
+    "app.models.security",
+    "app.models.user",
+    "app.schemas.admin_user",
+    "app.schemas.user",
+    "app.services.email_service",
+    "app.services.user_service"
+  ],
+  "app.api.v1.admin_alerts": [
+    "app.api.deps",
+    "app.schemas.common",
+    "app.services.alert_service"
+  ],
+  "app.api.v1.admin_analytics": [
+    "app.api.deps",
+    "app.services.admin_analytics_service"
+  ],
+  "app.api.v1.admin_audit": [
+    "app.api.deps",
+    "app.core.database",
+    "app.models.audit_log",
+    "app.models.user",
+    "app.services.audit_service"
+  ],
+  "app.api.v1.admin_dealers": [
+    "app.api.deps",
+    "app.core.security",
+    "app.models.commission",
+    "app.models.dealer",
+    "app.models.station",
+    "app.models.user"
+  ],
+  "app.api.v1.admin_financial_reports": [
+    "app.api.deps",
+    "app.core.database",
+    "app.models.financial",
+    "app.models.revenue_report",
+    "app.models.user",
+    "app.services.analytics_service",
+    "app.services.financial_report_service"
+  ],
+  "app.api.v1.admin_invoices": [
+    "app.api.deps",
+    "app.core.database",
+    "app.models.financial",
+    "app.models.invoice",
+    "app.models.user",
+    "app.services.invoice_service"
+  ],
+  "app.api.v1.admin_kyc": [
+    "app.api.deps",
+    "app.models.kyc",
+    "app.models.user",
+    "app.schemas.kyc",
+    "app.schemas.kyc_admin",
+    "app.schemas.video_kyc",
+    "app.services.email_service",
+    "app.services.kyc_service",
+    "app.services.video_kyc_service"
+  ],
+  "app.api.v1.admin_rbac": [
+    "app.api.deps",
+    "app.models.address",
+    "app.models.admin_user",
+    "app.models.audit_log",
+    "app.models.rbac",
+    "app.models.session",
+    "app.models.user",
+    "app.schemas.rbac",
+    "app.services.audit_service",
+    "app.services.auth_service",
+    "app.services.notification_service"
+  ],
+  "app.api.v1.admin_roles": [
+    "app.api.deps",
+    "app.models.rbac",
+    "app.models.user",
+    "app.services.audit_service"
+  ],
+  "app.api.v1.admin_stations": [
+    "app.api.deps",
+    "app.models.alert",
+    "app.models.station",
+    "app.models.station_heartbeat",
+    "app.schemas.common",
+    "app.schemas.station_monitoring",
+    "app.services.charging_service"
+  ],
+  "app.api.v1.admin_user_bulk": [
+    "app.api.deps",
+    "app.core.audit",
+    "app.core.database",
+    "app.core.security",
+    "app.models.rbac",
+    "app.models.user",
+    "app.services.auth_service"
+  ],
+  "app.api.v1.admin_users": [
+    "app.api.admin.users",
+    "app.api.deps",
+    "app.core.audit",
+    "app.core.security",
+    "app.db.session",
+    "app.models.session",
+    "app.models.user",
+    "app.services.auth_service",
+    "app.services.password_service",
+    "app.services.user_state_service"
+  ],
+  "app.api.v1.analytics": [
+    "app.api.deps",
+    "app.api.v1.analytics.admin",
+    "app.api.v1.analytics.customer",
+    "app.api.v1.analytics.dealer",
+    "app.api.v1.analytics.logistics",
+    "app.models.financial",
+    "app.models.rental",
+    "app.models.user",
+    "app.schemas.common",
+    "app.services.analytics_service"
+  ],
+  "app.api.v1.analytics.admin": [
+    "app.api.deps",
+    "app.models.user",
+    "app.schemas.analytics.admin",
+    "app.services.analytics.admin_service"
+  ],
+  "app.api.v1.analytics.customer": [
+    "app.api.deps",
+    "app.models.user",
+    "app.schemas.analytics.customer",
+    "app.services.analytics.customer_service"
+  ],
+  "app.api.v1.analytics.dealer": [
+    "app.api.deps",
+    "app.models.dealer",
+    "app.models.user",
+    "app.schemas.analytics.dealer",
+    "app.services.analytics.dealer_service"
+  ],
+  "app.api.v1.analytics.logistics": [
+    "app.api.deps",
+    "app.models.user",
+    "app.schemas.analytics.logistics",
+    "app.services.analytics.logistics_service"
+  ],
+  "app.api.v1.analytics_enhanced": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.financial",
+    "app.models.rental",
+    "app.models.user"
+  ],
+  "app.api.v1.audit": [
+    "app.api.deps",
+    "app.models.address",
+    "app.models.audit_log",
+    "app.models.rbac",
+    "app.models.user",
+    "app.services.audit_service"
+  ],
+  "app.api.v1.auth": [
+    "app.api.deps",
+    "app.core.audit",
+    "app.core.config",
+    "app.core.proxy",
+    "app.core.security",
+    "app.db.session",
+    "app.middleware.rate_limit",
+    "app.models.biometric",
+    "app.models.login_history",
+    "app.models.otp",
+    "app.models.rbac",
+    "app.models.session",
+    "app.models.user",
+    "app.repositories.user_repository",
+    "app.schemas.auth",
+    "app.schemas.user",
+    "app.services.auth_service",
+    "app.services.fraud_service",
+    "app.services.otp_service",
+    "app.services.security_service",
+    "app.services.token_service"
+  ],
+  "app.api.v1.batteries": [
+    "app.api.deps",
+    "app.core.audit",
+    "app.db.session",
+    "app.models.battery",
+    "app.models.station",
+    "app.models.user",
+    "app.schemas.battery",
+    "app.schemas.common",
+    "app.schemas.station_monitoring",
+    "app.services.battery_batch_service",
+    "app.services.battery_service",
+    "app.services.maintenance_service",
+    "app.services.mqtt_service",
+    "app.services.qr_service",
+    "app.services.websocket_service"
+  ],
+  "app.api.v1.battery_catalog": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.battery_catalog",
+    "app.models.user",
+    "app.schemas.battery_catalog"
+  ],
+  "app.api.v1.bookings": [
+    "app.api.deps",
+    "app.core.config",
+    "app.models.battery_reservation",
+    "app.models.financial",
+    "app.models.station",
+    "app.models.user",
+    "app.schemas.booking",
+    "app.services.booking_service",
+    "app.services.notification_service"
+  ],
+  "app.api.v1.branches": [
+    "app.api.deps",
+    "app.models.user",
+    "app.schemas.branch",
+    "app.services.branch"
+  ],
+  "app.api.v1.catalog": [
+    "app.api.deps",
+    "app.models.catalog",
+    "app.models.support",
+    "app.models.user",
+    "app.schemas.catalog",
+    "app.schemas.common",
+    "app.services.cart_service",
+    "app.services.catalog_service",
+    "app.services.invoice_service",
+    "app.services.order_service"
+  ],
+  "app.api.v1.customer_auth": [
+    "app.api.deps",
+    "app.core.security",
+    "app.db.session",
+    "app.models.rbac",
+    "app.models.user",
+    "app.repositories.user_repository",
+    "app.services.auth_service"
+  ],
+  "app.api.v1.dashboard": [
+    "app.api.deps",
+    "app.models.battery",
+    "app.models.financial",
+    "app.models.rental",
+    "app.models.station",
+    "app.models.user"
+  ],
+  "app.api.v1.dealer_analytics": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.dealer",
+    "app.models.user",
+    "app.services.dealer_analytics_service"
+  ],
+  "app.api.v1.dealer_campaigns": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.dealer",
+    "app.models.user",
+    "app.services.campaign_service"
+  ],
+  "app.api.v1.dealer_commission": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.commission",
+    "app.models.dealer",
+    "app.models.settlement",
+    "app.models.settlement_dispute",
+    "app.models.user",
+    "app.services.dispute_service",
+    "app.services.settlement_service"
+  ],
+  "app.api.v1.dealer_documents": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.dealer",
+    "app.models.user"
+  ],
+  "app.api.v1.dealer_kyc": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.dealer_kyc",
+    "app.models.roles",
+    "app.models.user",
+    "app.schemas.common",
+    "app.services.dealer_kyc_service"
+  ],
+  "app.api.v1.dealer_onboarding": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.dealer",
+    "app.models.user"
+  ],
+  "app.api.v1.dealer_portal_auth": [
+    "app.api.deps",
+    "app.core.config",
+    "app.core.security",
+    "app.db.session",
+    "app.models.audit_log",
+    "app.models.dealer",
+    "app.models.rbac",
+    "app.models.user",
+    "app.repositories.user_repository",
+    "app.services.auth_service"
+  ],
+  "app.api.v1.dealer_portal_customers": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.battery",
+    "app.models.dealer",
+    "app.models.rental",
+    "app.models.station",
+    "app.models.user"
+  ],
+  "app.api.v1.dealer_portal_dashboard": [
+    "app.api.deps",
+    "app.core.config",
+    "app.db.session",
+    "app.models.commission",
+    "app.models.dealer",
+    "app.models.dealer_inventory",
+    "app.models.dealer_promotion",
+    "app.models.notification",
+    "app.models.rental",
+    "app.models.station",
+    "app.models.support",
+    "app.models.user",
+    "app.schemas.input_contracts",
+    "app.utils.runtime_cache"
+  ],
+  "app.api.v1.dealer_portal_roles": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.audit_log",
+    "app.models.dealer",
+    "app.models.rbac",
+    "app.models.user",
+    "app.schemas.role"
+  ],
+  "app.api.v1.dealer_portal_settings": [
+    "app.api.deps",
+    "app.core.config",
+    "app.db.session",
+    "app.models.dealer",
+    "app.models.notification",
+    "app.models.notification_preference",
+    "app.models.user",
+    "app.schemas.input_contracts",
+    "app.utils.runtime_cache"
+  ],
+  "app.api.v1.dealer_portal_tickets": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.support",
+    "app.models.user"
+  ],
+  "app.api.v1.dealer_portal_users": [
+    "app.api.deps",
+    "app.core.config",
+    "app.core.security",
+    "app.db.session",
+    "app.models.audit_log",
+    "app.models.dealer",
+    "app.models.rbac",
+    "app.models.session",
+    "app.models.user",
+    "app.schemas.dealer_user",
+    "app.services.email_service"
+  ],
+  "app.api.v1.dealer_stations": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.dealer",
+    "app.models.maintenance",
+    "app.models.rental",
+    "app.models.station",
+    "app.models.user",
+    "app.services.dealer_station_service"
+  ],
+  "app.api.v1.dealers": [
+    "app.api.deps",
+    "app.models.dealer",
+    "app.models.dealer_inventory",
+    "app.models.dealer_promotion",
+    "app.models.settlement",
+    "app.models.station",
+    "app.models.user",
+    "app.schemas.common",
+    "app.schemas.dealer",
+    "app.schemas.dealer_ledger",
+    "app.schemas.input_contracts",
+    "app.services.dealer_ledger_service",
+    "app.services.dealer_service",
+    "app.services.financial_service"
+  ],
+  "app.api.v1.drivers": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.delivery_route",
+    "app.models.driver_profile",
+    "app.models.rbac",
+    "app.models.roles",
+    "app.models.user",
+    "app.schemas.common",
+    "app.services.driver_service"
+  ],
+  "app.api.v1.endpoints.warehouse": [
+    "app.api.deps",
+    "app.schemas.warehouse",
+    "app.services.warehouse"
+  ],
+  "app.api.v1.faqs": [
+    "app.api.deps",
+    "app.models.faq",
+    "app.schemas.faq"
+  ],
+  "app.api.v1.favorites": [
+    "app.api.deps",
+    "app.models.favorite",
+    "app.models.station",
+    "app.models.user",
+    "app.schemas.station",
+    "app.services.station_service"
+  ],
+  "app.api.v1.fraud": [
+    "app.api.deps",
+    "app.models.device_fingerprint",
+    "app.models.fraud",
+    "app.models.user"
+  ],
+  "app.api.v1.i18n": [
+    "app.api.deps",
+    "app.models.i18n",
+    "app.models.user",
+    "app.services.i18n_service"
+  ],
+  "app.api.v1.inventory": [
+    "app.api.deps",
+    "app.models.inventory_audit",
+    "app.models.logistics",
+    "app.models.station",
+    "app.models.user",
+    "app.schemas.inventory",
+    "app.services.inventory_service"
+  ],
+  "app.api.v1.iot": [
+    "app.api.deps",
+    "app.models.battery",
+    "app.models.user",
+    "app.services.mqtt_service"
+  ],
+  "app.api.v1.kyc": [
+    "app.api.deps",
+    "app.models.kyc",
+    "app.models.user",
+    "app.schemas.kyc",
+    "app.services.kyc_service",
+    "app.services.video_kyc_service"
+  ],
+  "app.api.v1.location": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.rental",
+    "app.models.user",
+    "app.schemas.common",
+    "app.services.geofence_service",
+    "app.services.gps_service"
+  ],
+  "app.api.v1.locations": [
+    "app.api.deps",
+    "app.models.admin_user",
+    "app.models.location",
+    "app.schemas.location"
+  ],
+  "app.api.v1.logistics": [
+    "app.api.deps",
+    "app.models.delivery_route",
+    "app.models.driver_profile",
+    "app.models.logistics",
+    "app.models.return_request",
+    "app.models.user",
+    "app.schemas.common",
+    "app.schemas.logistics",
+    "app.services.driver_service",
+    "app.services.logistics_service"
+  ],
+  "app.api.v1.maintenance": [
+    "app.api.deps",
+    "app.models.maintenance",
+    "app.models.user",
+    "app.services.maintenance_service"
+  ],
+  "app.api.v1.manifests": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.battery",
+    "app.models.manifest",
+    "app.models.user",
+    "app.schemas.common",
+    "app.schemas.manifest",
+    "app.services.battery_consistency",
+    "app.services.idempotency_service",
+    "app.services.qr_service"
+  ],
+  "app.api.v1.menus": [
+    "app.api.deps",
+    "app.core.database",
+    "app.schemas.menu",
+    "app.services.menu_service"
+  ],
+  "app.api.v1.ml": [
+    "app.api.deps",
+    "app.services.ml_service"
+  ],
+  "app.api.v1.notifications": [
+    "app.api.deps",
+    "app.models.notification",
+    "app.models.user",
+    "app.schemas.notification",
+    "app.services.notification_service"
+  ],
+  "app.api.v1.notifications_enhanced": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.device",
+    "app.models.notification",
+    "app.models.user",
+    "app.repositories.notification_repository"
+  ],
+  "app.api.v1.orders": [
+    "app.api.deps",
+    "app.core.config",
+    "app.db.session",
+    "app.models.battery",
+    "app.models.driver_profile",
+    "app.models.financial",
+    "app.models.inventory",
+    "app.models.order",
+    "app.models.refund",
+    "app.models.user",
+    "app.models.warehouse",
+    "app.schemas.common",
+    "app.schemas.order",
+    "app.services.battery_consistency",
+    "app.services.distributed_cache_service",
+    "app.services.idempotency_service",
+    "app.services.notification_service",
+    "app.services.order_realtime_outbox_service",
+    "app.services.payment_service",
+    "app.services.sms_service",
+    "app.services.wallet_service",
+    "app.services.workflow_automation_service"
+  ],
+  "app.api.v1.orders_realtime": [
+    "app.api.deps",
+    "app.core.database",
+    "app.services.websocket_service"
+  ],
+  "app.api.v1.organizations": [
+    "app.api.deps",
+    "app.models.user",
+    "app.schemas.organization",
+    "app.services.organization"
+  ],
+  "app.api.v1.passkeys": [
+    "app.api.deps",
+    "app.core.config",
+    "app.core.proxy",
+    "app.core.security",
+    "app.db.session",
+    "app.models.user",
+    "app.schemas.auth",
+    "app.services.auth_service",
+    "app.services.passkey_service"
+  ],
+  "app.api.v1.payments": [
+    "app.api.deps",
+    "app.core.audit",
+    "app.core.config",
+    "app.models.catalog",
+    "app.models.financial",
+    "app.models.refund",
+    "app.models.rental",
+    "app.models.user",
+    "app.schemas.common",
+    "app.schemas.payment",
+    "app.services.analytics_service",
+    "app.services.invoice_service",
+    "app.services.payment_method_service",
+    "app.services.payment_service",
+    "app.services.wallet_service"
+  ],
+  "app.api.v1.payments_enhanced": [
+    "app.api.deps",
+    "app.core.config",
+    "app.db.session",
+    "app.models.financial",
+    "app.models.payment_method",
+    "app.models.refund",
+    "app.models.user",
+    "app.services.razorpay_webhook_service"
+  ],
+  "app.api.v1.profile": [
+    "app.api.deps",
+    "app.core.security",
+    "app.models.address",
+    "app.models.login_history",
+    "app.models.notification_preference",
+    "app.models.session",
+    "app.models.user",
+    "app.schemas.input_contracts",
+    "app.schemas.user"
+  ],
+  "app.api.v1.promo": [
+    "app.api.deps",
+    "app.models.user",
+    "app.services.promo_service"
+  ],
+  "app.api.v1.purchases_enhanced": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.catalog",
+    "app.models.support",
+    "app.models.user",
+    "app.services.workflow_automation_service"
+  ],
+  "app.api.v1.rentals": [
+    "app.api.deps",
+    "app.models.battery",
+    "app.models.battery_catalog",
+    "app.models.late_fee",
+    "app.models.rental",
+    "app.models.rental_event",
+    "app.models.rental_modification",
+    "app.models.user",
+    "app.schemas.rental",
+    "app.schemas.station",
+    "app.services.dealer_station_service",
+    "app.services.invoice_service",
+    "app.services.late_fee_service",
+    "app.services.rental_service",
+    "app.services.station_service"
+  ],
+  "app.api.v1.rentals_enhanced": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.rental",
+    "app.models.support",
+    "app.models.user",
+    "app.services.workflow_automation_service"
+  ],
+  "app.api.v1.role_rights": [
+    "app.api.deps",
+    "app.core.database",
+    "app.schemas.role_right",
+    "app.services.role_right_service"
+  ],
+  "app.api.v1.roles": [
+    "app.api.deps",
+    "app.core.database",
+    "app.schemas.role",
+    "app.services.role_service"
+  ],
+  "app.api.v1.routes": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.user",
+    "app.schemas.common",
+    "app.schemas.route",
+    "app.services.route_service"
+  ],
+  "app.api.v1.screens": [
+    "app.api.deps",
+    "app.core.screen_config",
+    "app.models.user",
+    "app.schemas.ui_config",
+    "app.services.auth_service"
+  ],
+  "app.api.v1.security": [
+    "app.api.deps",
+    "app.core.security",
+    "app.models.audit_log",
+    "app.models.two_factor_auth",
+    "app.models.user"
+  ],
+  "app.api.v1.sessions": [
+    "app.api.deps",
+    "app.core.audit",
+    "app.core.config",
+    "app.core.security",
+    "app.db.session",
+    "app.models.session",
+    "app.models.user",
+    "app.services.token_service",
+    "app.utils.runtime_cache"
+  ],
+  "app.api.v1.settlements": [
+    "app.api.deps",
+    "app.models.commission",
+    "app.models.settlement",
+    "app.models.station",
+    "app.models.swap",
+    "app.models.vendor",
+    "app.schemas.settlement"
+  ],
+  "app.api.v1.station_monitoring": [
+    "app.api.deps",
+    "app.models.station_heartbeat",
+    "app.schemas.common",
+    "app.schemas.station_monitoring",
+    "app.services.charging_service",
+    "app.services.station_service"
+  ],
+  "app.api.v1.stations": [
+    "app.api.deps",
+    "app.core.audit",
+    "app.models.battery",
+    "app.models.favorite",
+    "app.models.maintenance",
+    "app.models.roles",
+    "app.models.station",
+    "app.models.user",
+    "app.schemas.battery",
+    "app.schemas.input_contracts",
+    "app.schemas.review",
+    "app.schemas.station",
+    "app.services.maintenance_service",
+    "app.services.review_service",
+    "app.services.station_service"
+  ],
+  "app.api.v1.stock": [
+    "app.api.deps",
+    "app.models.stock",
+    "app.models.user",
+    "app.schemas.stock",
+    "app.services.stock"
+  ],
+  "app.api.v1.support": [
+    "app.api.deps",
+    "app.api.v1.faqs",
+    "app.models.faq",
+    "app.models.feedback",
+    "app.models.support",
+    "app.models.user",
+    "app.schemas.common",
+    "app.schemas.faq",
+    "app.schemas.feedback",
+    "app.schemas.support",
+    "app.services.support_service"
+  ],
+  "app.api.v1.support_enhanced": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.faq",
+    "app.models.support",
+    "app.models.user"
+  ],
+  "app.api.v1.swaps": [
+    "app.api.deps",
+    "app.core.audit",
+    "app.db.session",
+    "app.models.battery",
+    "app.models.financial",
+    "app.models.station",
+    "app.models.swap",
+    "app.models.user",
+    "app.schemas.swap",
+    "app.services.dealer_station_service"
+  ],
+  "app.api.v1.system": [
+    "app.api.deps",
+    "app.core.config"
+  ],
+  "app.api.v1.telematics": [
+    "app.api.deps",
+    "app.models.battery",
+    "app.models.telemetry",
+    "app.schemas.telematics"
+  ],
+  "app.api.v1.telemetry": [
+    "app.api.deps",
+    "app.models.battery",
+    "app.models.geofence",
+    "app.models.rental",
+    "app.models.user",
+    "app.schemas.common",
+    "app.services.geofence_service",
+    "app.services.gps_service"
+  ],
+  "app.api.v1.transactions": [
+    "app.api.deps",
+    "app.models.financial",
+    "app.models.invoice",
+    "app.models.user",
+    "app.schemas.wallet",
+    "app.services.financial_service"
+  ],
+  "app.api.v1.users": [
+    "app.api.deps",
+    "app.core.audit",
+    "app.core.config",
+    "app.core.dashboard_config",
+    "app.core.menu_config",
+    "app.core.proxy",
+    "app.core.security",
+    "app.db.session",
+    "app.models.address",
+    "app.models.audit_log",
+    "app.models.kyc",
+    "app.models.notification_preference",
+    "app.models.rbac",
+    "app.models.session",
+    "app.models.staff",
+    "app.models.user",
+    "app.models.user_profile",
+    "app.schemas.dashboard",
+    "app.schemas.notification",
+    "app.schemas.user",
+    "app.services.analytics_service",
+    "app.services.audit_service",
+    "app.services.auth_service",
+    "app.services.membership_service",
+    "app.services.notification_service",
+    "app.services.storage_service",
+    "app.services.token_service",
+    "app.services.user_service",
+    "app.utils.runtime_cache"
+  ],
+  "app.api.v1.utils": [
+    "app.api.deps",
+    "app.models.user",
+    "app.services.storage_service"
+  ],
+  "app.api.v1.vehicles": [
+    "app.api.deps",
+    "app.models.user",
+    "app.models.vehicle",
+    "app.schemas.vehicle"
+  ],
+  "app.api.v1.vendors": [
+    "app.api.deps",
+    "app.models.vendor",
+    "app.schemas.vendor"
+  ],
+  "app.api.v1.wallet": [
+    "app.api.deps",
+    "app.core.audit",
+    "app.models.financial",
+    "app.models.user",
+    "app.schemas.payment",
+    "app.schemas.wallet",
+    "app.services.invoice_service",
+    "app.services.payment_method_service",
+    "app.services.payment_service",
+    "app.services.wallet_service"
+  ],
+  "app.api.v1.wallet_enhanced": [
+    "app.api.deps",
+    "app.db.session",
+    "app.models.financial",
+    "app.models.user",
+    "app.repositories.wallet_repository",
+    "app.services.wallet_service"
+  ],
+  "app.api.v1.warehouse_structure": [
+    "app.api.deps",
+    "app.core.config",
+    "app.db.session",
+    "app.models.battery",
+    "app.models.user",
+    "app.models.warehouse",
+    "app.schemas.warehouse_structure",
+    "app.services.battery_consistency",
+    "app.services.distributed_cache_service",
+    "app.services.idempotency_service",
+    "app.services.redis_service"
+  ],
+  "app.api.v1.warehouses": [
+    "app.api.deps",
+    "app.models.user",
+    "app.schemas.warehouse",
+    "app.services.warehouse"
+  ],
+  "app.api.webhooks.razorpay": [
+    "app.api.deps",
+    "app.core.config",
+    "app.models.financial",
+    "app.models.refund",
+    "app.services.wallet_service"
+  ],
+  "app.app.ml.feature_store": [],
+  "app.app.ml.registry": [],
+  "app.configs.logger": [],
+  "app.controllers.auth_controller": [
+    "app.core.proxy",
+    "app.core.security",
+    "app.models.rbac",
+    "app.models.user",
+    "app.repositories.user_repository",
+    "app.schemas.auth",
+    "app.services.auth_service",
+    "app.services.fraud_service"
+  ],
+  "app.core.audit": [
+    "app.core.proxy",
+    "app.models.audit_log"
+  ],
+  "app.core.config": [],
+  "app.core.dashboard_config": [],
+  "app.core.database": [
+    "app.core.config"
+  ],
+  "app.core.firebase": [
+    "app.core.config"
+  ],
+  "app.core.logging": [
+    "app.core.config"
+  ],
+  "app.core.menu_config": [],
+  "app.core.observability": [],
+  "app.core.proxy": [
+    "app.core.config"
+  ],
+  "app.core.public_url": [
+    "app.core.config"
+  ],
+  "app.core.scheduler": [
+    "app.services.maintenance_service"
+  ],
+  "app.core.screen_config": [],
+  "app.core.security": [
+    "app.core.config"
+  ],
+  "app.db.initial_data": [
+    "app.models.rbac"
+  ],
+  "app.db.logistics_schema_guard": [
+    "app.db.session"
+  ],
+  "app.db.seed_ecommerce": [
+    "app.db.session",
+    "app.models",
+    "app.models.catalog",
+    "app.models.session",
+    "app.models.staff",
+    "app.models.user"
+  ],
+  "app.db.seed_stations": [
+    "app.db.session",
+    "app.models",
+    "app.models.battery",
+    "app.models.dealer",
+    "app.models.session",
+    "app.models.staff",
+    "app.models.station",
+    "app.models.user",
+    "app.models.vendor"
+  ],
+  "app.db.seeds.fast_seed_financial": [
+    "app.core.security",
+    "app.models.battery",
+    "app.models.commission",
+    "app.models.dealer",
+    "app.models.financial",
+    "app.models.invoice",
+    "app.models.revenue_report",
+    "app.models.settlement",
+    "app.models.station",
+    "app.models.swap",
+    "app.models.user"
+  ],
+  "app.db.seeds.populate_analytics_data": [
+    "app.core.database",
+    "app.models.battery_health",
+    "app.models.financial",
+    "app.models.rental",
+    "app.models.support",
+    "app.models.user"
+  ],
+  "app.db.seeds.populate_users_data": [
+    "app.core.config"
+  ],
+  "app.db.seeds.run_seeds": [
+    "app.core.database",
+    "app.db.seeds.seed_cms",
+    "app.db.seeds.seed_modules",
+    "app.models"
+  ],
+  "app.db.seeds.seed_admin_analytics": [
+    "app.db.session",
+    "app.models.battery",
+    "app.models.battery_health",
+    "app.models.financial",
+    "app.models.kyc",
+    "app.models.rental",
+    "app.models.station",
+    "app.models.support",
+    "app.models.user"
+  ],
+  "app.db.seeds.seed_all": [
+    "app.core.security",
+    "app.db.session",
+    "app.models"
+  ],
+  "app.db.seeds.seed_all_admin": [
+    "app.core.database"
+  ],
+  "app.db.seeds.seed_analytics": [
+    "app.core.database",
+    "app.core.security",
+    "app.main",
+    "app.models.battery",
+    "app.models.dealer",
+    "app.models.rental",
+    "app.models.station",
+    "app.models.support",
+    "app.models.user"
+  ],
+  "app.db.seeds.seed_analytics_data": [
+    "app.db.session",
+    "app.models",
+    "app.models.analytics",
+    "app.models.swap",
+    "app.models.telemetry"
+  ],
+  "app.db.seeds.seed_batteries": [
+    "app.db.session",
+    "app.models.battery"
+  ],
+  "app.db.seeds.seed_batteries_advanced": [
+    "app.db.session",
+    "app.models.battery",
+    "app.models.station",
+    "app.models.user"
+  ],
+  "app.db.seeds.seed_battery_health": [
+    "app.db.session",
+    "app.models.battery",
+    "app.models.battery_health",
+    "app.models.user"
+  ],
+  "app.db.seeds.seed_catalog": [
+    "app.db.session",
+    "app.models.battery",
+    "app.models.battery_catalog",
+    "app.models.battery_health"
+  ],
+  "app.db.seeds.seed_cms": [
+    "app.models.banner",
+    "app.models.blog",
+    "app.models.faq",
+    "app.models.legal",
+    "app.models.media"
+  ],
+  "app.db.seeds.seed_complete_db": [
+    "app.core.security"
+  ],
+  "app.db.seeds.seed_data": [
+    "app.core.database",
+    "app.core.security",
+    "app.models",
+    "app.models.battery",
+    "app.models.ecommerce",
+    "app.models.staff",
+    "app.models.station",
+    "app.models.user"
+  ],
+  "app.db.seeds.seed_dealer_data": [
+    "app.db.session",
+    "app.models.dealer"
+  ],
+  "app.db.seeds.seed_dealer_portal": [
+    "app.core.database"
+  ],
+  "app.db.seeds.seed_full_db": [
+    "app.core.security",
+    "app.db.session",
+    "app.models"
+  ],
+  "app.db.seeds.seed_modules": [
+    "app.models.api_key",
+    "app.models.audit_log",
+    "app.models.bess",
+    "app.models.notification_admin",
+    "app.models.system",
+    "app.models.user"
+  ],
+  "app.db.seeds.seed_phase2": [
+    "app.core.database",
+    "app.models.alert",
+    "app.models.battery",
+    "app.models.dealer",
+    "app.models.delivery_assignment",
+    "app.models.delivery_route",
+    "app.models.driver_profile",
+    "app.models.ecommerce",
+    "app.models.financial",
+    "app.models.geofence",
+    "app.models.invoice",
+    "app.models.iot",
+    "app.models.logistics",
+    "app.models.return_request",
+    "app.models.settlement",
+    "app.models.station",
+    "app.models.telemetry",
+    "app.models.user"
+  ],
+  "app.db.seeds.seed_production_data": [
+    "app.core.security",
+    "app.db.session",
+    "app.models.battery",
+    "app.models.financial",
+    "app.models.rbac",
+    "app.models.station",
+    "app.models.user",
+    "app.models.warehouse"
+  ],
+  "app.db.seeds.seed_products": [
+    "app.models.catalog"
+  ],
+  "app.db.seeds.seed_quick": [],
+  "app.db.seeds.seed_support": [
+    "app.core.database",
+    "app.models.faq",
+    "app.models.support",
+    "app.models.user"
+  ],
+  "app.db.seeds.seed_test_customer": [
+    "app.core.security",
+    "app.db.session",
+    "app.models.user"
+  ],
+  "app.db.seeds.seed_test_dealer": [
+    "app.core.security",
+    "app.db.session",
+    "app.models.dealer",
+    "app.models.user"
+  ],
+  "app.db.seeds.sync_and_seed": [
+    "app.db.session",
+    "app.models"
+  ],
+  "app.db.session": [
+    "app.core.database",
+    "app.db.initial_data",
+    "app.models.all"
+  ],
+  "app.integrations": [],
+  "app.integrations.aadhaar_kyc": [
+    "app.core.config"
+  ],
+  "app.integrations.aws_s3": [
+    "app.core.config"
+  ],
+  "app.integrations.firebase": [
+    "app.core.config",
+    "app.core.firebase"
+  ],
+  "app.integrations.google_maps": [
+    "app.core.config"
+  ],
+  "app.integrations.gst_verification": [
+    "app.core.config"
+  ],
+  "app.integrations.pan_verification": [
+    "app.core.config"
+  ],
+  "app.integrations.razorpay": [
+    "app.core.config"
+  ],
+  "app.integrations.twilio": [
+    "app.core.config"
+  ],
+  "app.main": [
+    "app.api.admin",
+    "app.api.deps",
+    "app.api.errors.handlers",
+    "app.api.internal.hotspots",
+    "app.api.v1.admin.analytics",
+    "app.api.v1.admin.banners",
+    "app.api.v1.admin.blogs",
+    "app.api.v1.admin.faqs",
+    "app.api.v1.admin.legal",
+    "app.api.v1.admin.media",
+    "app.api.v1.admin.promo",
+    "app.api.v1.admin.reviews",
+    "app.api.v1.admin.roles",
+    "app.api.v1.admin.support",
+    "app.api.v1.admin.users",
+    "app.api.v1.admin_audit",
+    "app.api.v1.admin_dealers",
+    "app.api.v1.admin_financial_reports",
+    "app.api.v1.admin_invoices",
+    "app.api.v1.admin_kyc",
+    "app.api.v1.admin_rbac",
+    "app.api.v1.admin_stations",
+    "app.api.v1.admin_users",
+    "app.api.v1.analytics",
+    "app.api.v1.analytics_enhanced",
+    "app.api.v1.audit",
+    "app.api.v1.auth",
+    "app.api.v1.batteries",
+    "app.api.v1.battery_catalog",
+    "app.api.v1.bookings",
+    "app.api.v1.branches",
+    "app.api.v1.catalog",
+    "app.api.v1.customer_auth",
+    "app.api.v1.dashboard",
+    "app.api.v1.dealer_analytics",
+    "app.api.v1.dealer_campaigns",
+    "app.api.v1.dealer_documents",
+    "app.api.v1.dealer_onboarding",
+    "app.api.v1.dealer_portal_auth",
+    "app.api.v1.dealer_portal_customers",
+    "app.api.v1.dealer_portal_dashboard",
+    "app.api.v1.dealer_portal_roles",
+    "app.api.v1.dealer_portal_settings",
+    "app.api.v1.dealer_portal_tickets",
+    "app.api.v1.dealer_portal_users",
+    "app.api.v1.dealer_stations",
+    "app.api.v1.dealers",
+    "app.api.v1.drivers",
+    "app.api.v1.faqs",
+    "app.api.v1.favorites",
+    "app.api.v1.fraud",
+    "app.api.v1.i18n",
+    "app.api.v1.inventory",
+    "app.api.v1.iot",
+    "app.api.v1.kyc",
+    "app.api.v1.location",
+    "app.api.v1.locations",
+    "app.api.v1.logistics",
+    "app.api.v1.maintenance",
+    "app.api.v1.manifests",
+    "app.api.v1.menus",
+    "app.api.v1.ml",
+    "app.api.v1.notifications",
+    "app.api.v1.notifications_enhanced",
+    "app.api.v1.orders",
+    "app.api.v1.orders_realtime",
+    "app.api.v1.organizations",
+    "app.api.v1.passkeys",
+    "app.api.v1.payments",
+    "app.api.v1.payments_enhanced",
+    "app.api.v1.profile",
+    "app.api.v1.promo",
+    "app.api.v1.purchases_enhanced",
+    "app.api.v1.rentals",
+    "app.api.v1.rentals_enhanced",
+    "app.api.v1.role_rights",
+    "app.api.v1.roles",
+    "app.api.v1.routes",
+    "app.api.v1.screens",
+    "app.api.v1.security",
+    "app.api.v1.sessions",
+    "app.api.v1.settlements",
+    "app.api.v1.station_monitoring",
+    "app.api.v1.stations",
+    "app.api.v1.stock",
+    "app.api.v1.support",
+    "app.api.v1.support_enhanced",
+    "app.api.v1.swaps",
+    "app.api.v1.system",
+    "app.api.v1.telematics",
+    "app.api.v1.telemetry",
+    "app.api.v1.transactions",
+    "app.api.v1.users",
+    "app.api.v1.utils",
+    "app.api.v1.vehicles",
+    "app.api.v1.wallet",
+    "app.api.v1.wallet_enhanced",
+    "app.api.v1.warehouse_structure",
+    "app.api.v1.warehouses",
+    "app.api.webhooks.razorpay",
+    "app.core.config",
+    "app.core.logging",
+    "app.db.logistics_schema_guard",
+    "app.db.session",
+    "app.middleware.audit",
+    "app.middleware.proxy_headers",
+    "app.middleware.proxy_host",
+    "app.middleware.rate_limit",
+    "app.middleware.rbac_middleware",
+    "app.middleware.request_logging",
+    "app.middleware.security",
+    "app.middleware.server_timing",
+    "app.models.all",
+    "app.services.background_runtime_service",
+    "app.services.mqtt_service",
+    "app.services.request_audit_queue",
+    "app.services.startup_diagnostics_service",
+    "app.services.websocket_service",
+    "app.utils.cors",
+    "app.workers"
+  ],
+  "app.middleware.audit": [
+    "app.core.proxy",
+    "app.services.request_audit_queue"
+  ],
+  "app.middleware.error_handler": [
+    "app.core.config",
+    "app.core.logging"
+  ],
+  "app.middleware.proxy_headers": [
+    "app.core.proxy"
+  ],
+  "app.middleware.proxy_host": [
+    "app.core.config",
+    "app.core.proxy"
+  ],
+  "app.middleware.rate_limit": [
+    "app.core.config",
+    "app.core.proxy"
+  ],
+  "app.middleware.rbac_middleware": [
+    "app.core.config",
+    "app.models.roles",
+    "app.schemas.user"
+  ],
+  "app.middleware.request_logging": [
+    "app.core.config",
+    "app.core.logging",
+    "app.core.proxy"
+  ],
+  "app.middleware.security": [],
+  "app.middleware.server_timing": [],
+  "app.ml.feature_store": [
+    "app.models.battery",
+    "app.models.financial",
+    "app.models.rental",
+    "app.models.swap",
+    "app.models.telemetry"
+  ],
+  "app.ml.models.battery_health": [],
+  "app.ml.pipeline": [
+    "app.ml.feature_store",
+    "app.ml.registry",
+    "app.models.battery",
+    "app.models.swap"
+  ],
+  "app.ml.registry": [],
+  "app.models": [],
+  "app.models.address": [
+    "app.models.user"
+  ],
+  "app.models.admin_group": [
+    "app.models.admin_user"
+  ],
+  "app.models.admin_user": [
+    "app.models.admin_group",
+    "app.models.rbac"
+  ],
+  "app.models.alert": [
+    "app.models.station"
+  ],
+  "app.models.all": [
+    "app.models.address",
+    "app.models.admin_group",
+    "app.models.admin_user",
+    "app.models.alert",
+    "app.models.analytics_dashboard",
+    "app.models.api_key",
+    "app.models.audit_log",
+    "app.models.banner",
+    "app.models.batch_job",
+    "app.models.battery",
+    "app.models.battery_catalog",
+    "app.models.battery_health",
+    "app.models.battery_health_log",
+    "app.models.bess",
+    "app.models.blog",
+    "app.models.branch",
+    "app.models.catalog",
+    "app.models.chargeback",
+    "app.models.charging_queue",
+    "app.models.commission",
+    "app.models.dealer",
+    "app.models.dealer_inventory",
+    "app.models.dealer_kyc",
+    "app.models.dealer_promotion",
+    "app.models.delivery_assignment",
+    "app.models.delivery_route",
+    "app.models.device",
+    "app.models.device_fingerprint",
+    "app.models.driver_profile",
+    "app.models.ecommerce",
+    "app.models.faq",
+    "app.models.favorite",
+    "app.models.feedback",
+    "app.models.financial",
+    "app.models.fraud",
+    "app.models.geofence",
+    "app.models.gps_log",
+    "app.models.i18n",
+    "app.models.idempotency",
+    "app.models.inventory",
+    "app.models.invoice",
+    "app.models.iot",
+    "app.models.kyc",
+    "app.models.late_fee",
+    "app.models.legal",
+    "app.models.location",
+    "app.models.login_history",
+    "app.models.logistics",
+    "app.models.maintenance",
+    "app.models.maintenance_checklist",
+    "app.models.manifest",
+    "app.models.media",
+    "app.models.membership",
+    "app.models.menu",
+    "app.models.notification",
+    "app.models.notification_admin",
+    "app.models.notification_outbox",
+    "app.models.notification_preference",
+    "app.models.oauth",
+    "app.models.order",
+    "app.models.order_realtime_outbox",
+    "app.models.organization",
+    "app.models.otp",
+    "app.models.passkey",
+    "app.models.password_history",
+    "app.models.payment",
+    "app.models.payment_method",
+    "app.models.promo_code",
+    "app.models.rbac",
+    "app.models.referral",
+    "app.models.refund",
+    "app.models.rental",
+    "app.models.rental_event",
+    "app.models.rental_modification",
+    "app.models.return_request",
+    "app.models.revenue_report",
+    "app.models.review",
+    "app.models.role_right",
+    "app.models.search_history",
+    "app.models.session",
+    "app.models.settlement",
+    "app.models.settlement_dispute",
+    "app.models.staff",
+    "app.models.station",
+    "app.models.station_heartbeat",
+    "app.models.station_metrics",
+    "app.models.station_stock",
+    "app.models.stock",
+    "app.models.stock_movement",
+    "app.models.support",
+    "app.models.swap",
+    "app.models.swap_suggestion",
+    "app.models.system",
+    "app.models.telematics",
+    "app.models.telemetry",
+    "app.models.token",
+    "app.models.two_factor_auth",
+    "app.models.user",
+    "app.models.user_profile",
+    "app.models.vehicle",
+    "app.models.vendor",
+    "app.models.video_kyc",
+    "app.models.warehouse"
+  ],
+  "app.models.analytics": [],
+  "app.models.analytics_dashboard": [],
+  "app.models.api_key": [],
+  "app.models.audit_log": [],
+  "app.models.banner": [],
+  "app.models.batch_job": [],
+  "app.models.battery": [
+    "app.models.battery_catalog",
+    "app.models.iot",
+    "app.models.logistics",
+    "app.models.rental",
+    "app.models.station"
+  ],
+  "app.models.battery_catalog": [
+    "app.models.battery"
+  ],
+  "app.models.battery_health": [
+    "app.models.battery",
+    "app.models.user"
+  ],
+  "app.models.battery_health_log": [],
+  "app.models.battery_reservation": [],
+  "app.models.bess": [],
+  "app.models.biometric": [],
+  "app.models.blog": [],
+  "app.models.branch": [
+    "app.models.organization",
+    "app.models.user",
+    "app.models.warehouse"
+  ],
+  "app.models.cart": [],
+  "app.models.catalog": [],
+  "app.models.chargeback": [],
+  "app.models.charging_queue": [],
+  "app.models.commission": [],
+  "app.models.dealer": [
+    "app.models.commission",
+    "app.models.staff",
+    "app.models.station"
+  ],
+  "app.models.dealer_inventory": [],
+  "app.models.dealer_kyc": [],
+  "app.models.dealer_promotion": [
+    "app.models.dealer",
+    "app.models.user"
+  ],
+  "app.models.delivery_assignment": [
+    "app.models.driver_profile",
+    "app.models.ecommerce",
+    "app.models.return_request"
+  ],
+  "app.models.delivery_route": [],
+  "app.models.device": [],
+  "app.models.device_fingerprint": [],
+  "app.models.driver_profile": [
+    "app.models.user"
+  ],
+  "app.models.ecommerce": [],
+  "app.models.enums": [],
+  "app.models.faq": [],
+  "app.models.favorite": [],
+  "app.models.feedback": [],
+  "app.models.financial": [
+    "app.models.invoice",
+    "app.models.refund",
+    "app.models.rental",
+    "app.models.user"
+  ],
+  "app.models.fraud": [],
+  "app.models.geofence": [],
+  "app.models.gps_log": [],
+  "app.models.i18n": [],
+  "app.models.idempotency": [],
+  "app.models.inventory": [],
+  "app.models.inventory_audit": [],
+  "app.models.invoice": [],
+  "app.models.iot": [],
+  "app.models.kyc": [
+    "app.models.user"
+  ],
+  "app.models.kyc_verification": [
+    "app.models.kyc"
+  ],
+  "app.models.late_fee": [],
+  "app.models.legal": [],
+  "app.models.location": [],
+  "app.models.login_history": [
+    "app.models.user"
+  ],
+  "app.models.logistics": [
+    "app.models.return_request",
+    "app.models.user"
+  ],
+  "app.models.maintenance": [],
+  "app.models.maintenance_checklist": [],
+  "app.models.manifest": [
+    "app.models.battery"
+  ],
+  "app.models.media": [],
+  "app.models.membership": [
+    "app.models.user"
+  ],
+  "app.models.menu": [],
+  "app.models.notification": [],
+  "app.models.notification_admin": [],
+  "app.models.notification_outbox": [],
+  "app.models.notification_preference": [],
+  "app.models.oauth": [],
+  "app.models.order": [
+    "app.models.driver_profile"
+  ],
+  "app.models.order_realtime_outbox": [],
+  "app.models.organization": [],
+  "app.models.otp": [],
+  "app.models.passkey": [
+    "app.models.user"
+  ],
+  "app.models.password_history": [],
+  "app.models.payment": [],
+  "app.models.payment_method": [],
+  "app.models.promo_code": [],
+  "app.models.rbac": [
+    "app.models.role_right",
+    "app.models.user"
+  ],
+  "app.models.referral": [],
+  "app.models.refund": [],
+  "app.models.rental": [
+    "app.models.battery",
+    "app.models.financial",
+    "app.models.rental_event",
+    "app.models.station",
+    "app.models.swap",
+    "app.models.user"
+  ],
+  "app.models.rental_event": [],
+  "app.models.rental_modification": [],
+  "app.models.return_request": [
+    "app.models.delivery_assignment",
+    "app.models.logistics"
+  ],
+  "app.models.revenue_report": [],
+  "app.models.review": [],
+  "app.models.role_right": [],
+  "app.models.roles": [],
+  "app.models.search_history": [],
+  "app.models.security_question": [
+    "app.models.user"
+  ],
+  "app.models.session": [
+    "app.models.user"
+  ],
+  "app.models.settlement": [],
+  "app.models.settlement_dispute": [],
+  "app.models.staff": [],
+  "app.models.station": [
+    "app.models.battery",
+    "app.models.dealer",
+    "app.models.location",
+    "app.models.review",
+    "app.models.vendor"
+  ],
+  "app.models.station_heartbeat": [
+    "app.models.station"
+  ],
+  "app.models.station_metrics": [],
+  "app.models.station_stock": [],
+  "app.models.stock": [
+    "app.models.battery_catalog",
+    "app.models.stock_movement",
+    "app.models.warehouse"
+  ],
+  "app.models.stock_movement": [],
+  "app.models.support": [
+    "app.models.user"
+  ],
+  "app.models.swap": [
+    "app.models.battery",
+    "app.models.rental",
+    "app.models.station",
+    "app.models.user"
+  ],
+  "app.models.swap_suggestion": [],
+  "app.models.system": [],
+  "app.models.telematics": [],
+  "app.models.telemetry": [],
+  "app.models.token": [],
+  "app.models.two_factor_auth": [],
+  "app.models.user": [
+    "app.models.dealer",
+    "app.models.device",
+    "app.models.driver_profile",
+    "app.models.financial",
+    "app.models.kyc",
+    "app.models.location",
+    "app.models.notification_preference",
+    "app.models.rbac",
+    "app.models.session",
+    "app.models.staff",
+    "app.models.token",
+    "app.models.two_factor_auth",
+    "app.models.vehicle"
+  ],
+  "app.models.user_history": [],
+  "app.models.user_profile": [
+    "app.models.user"
+  ],
+  "app.models.vehicle": [
+    "app.models.user"
+  ],
+  "app.models.vendor": [
+    "app.models.location"
+  ],
+  "app.models.video_kyc": [],
+  "app.models.warehouse": [
+    "app.models.branch",
+    "app.models.stock",
+    "app.models.user"
+  ],
+  "app.repositories": [
+    "app.repositories.base_repository"
+  ],
+  "app.repositories.analytics_dashboard_repository": [
+    "app.models.analytics_dashboard",
+    "app.models.battery",
+    "app.models.inventory",
+    "app.models.order",
+    "app.models.station"
+  ],
+  "app.repositories.base": [],
+  "app.repositories.base_repository": [],
+  "app.repositories.battery_repository": [
+    "app.models.battery",
+    "app.repositories.base_repository"
+  ],
+  "app.repositories.branch": [
+    "app.models.branch",
+    "app.repositories.base_repository",
+    "app.schemas.branch"
+  ],
+  "app.repositories.dealer": [
+    "app.models.dealer",
+    "app.models.dealer_inventory",
+    "app.models.dealer_promotion",
+    "app.repositories.base_repository",
+    "app.schemas.dealer"
+  ],
+  "app.repositories.notification_repository": [
+    "app.models.notification",
+    "app.repositories.base_repository"
+  ],
+  "app.repositories.organization": [
+    "app.models.organization",
+    "app.repositories.base_repository",
+    "app.schemas.organization"
+  ],
+  "app.repositories.payment_repository": [
+    "app.models.financial",
+    "app.repositories.base_repository"
+  ],
+  "app.repositories.rental_repository": [
+    "app.models.rental",
+    "app.repositories.base_repository"
+  ],
+  "app.repositories.station_repository": [
+    "app.models.station",
+    "app.repositories.base_repository"
+  ],
+  "app.repositories.stock": [
+    "app.models.stock",
+    "app.models.stock_movement",
+    "app.repositories.base_repository",
+    "app.schemas.stock"
+  ],
+  "app.repositories.user_repository": [
+    "app.models.user",
+    "app.repositories.base"
+  ],
+  "app.repositories.wallet_repository": [
+    "app.models.financial",
+    "app.repositories.base_repository"
+  ],
+  "app.repositories.warehouse": [
+    "app.models.warehouse",
+    "app.repositories.base_repository",
+    "app.schemas.warehouse"
+  ],
+  "app.schemas.admin_group": [],
+  "app.schemas.admin_user": [],
+  "app.schemas.alert": [],
+  "app.schemas.analytics": [],
+  "app.schemas.analytics.admin": [
+    "app.schemas.analytics.base"
+  ],
+  "app.schemas.analytics.base": [],
+  "app.schemas.analytics.customer": [
+    "app.schemas.analytics.base"
+  ],
+  "app.schemas.analytics.dealer": [
+    "app.schemas.analytics.base"
+  ],
+  "app.schemas.analytics.logistics": [
+    "app.schemas.analytics.base"
+  ],
+  "app.schemas.audit_log": [],
+  "app.schemas.auth": [],
+  "app.schemas.banner": [],
+  "app.schemas.battery": [
+    "app.schemas.battery_catalog",
+    "app.schemas.iot"
+  ],
+  "app.schemas.battery_catalog": [],
+  "app.schemas.battery_health": [],
+  "app.schemas.bess": [],
+  "app.schemas.blog": [],
+  "app.schemas.booking": [],
+  "app.schemas.branch": [],
+  "app.schemas.catalog": [
+    "app.models.catalog"
+  ],
+  "app.schemas.commission": [],
+  "app.schemas.common": [],
+  "app.schemas.dashboard": [],
+  "app.schemas.dealer": [],
+  "app.schemas.dealer_inventory": [],
+  "app.schemas.dealer_kyc": [],
+  "app.schemas.dealer_ledger": [],
+  "app.schemas.dealer_promotion": [],
+  "app.schemas.dealer_user": [],
+  "app.schemas.delivery": [],
+  "app.schemas.device": [],
+  "app.schemas.ecommerce": [],
+  "app.schemas.faq": [],
+  "app.schemas.feedback": [],
+  "app.schemas.finance_ops": [],
+  "app.schemas.financial": [],
+  "app.schemas.fraud": [],
+  "app.schemas.input_contracts": [],
+  "app.schemas.inventory": [],
+  "app.schemas.invoice": [],
+  "app.schemas.iot": [],
+  "app.schemas.job": [],
+  "app.schemas.kyc": [],
+  "app.schemas.kyc_admin": [],
+  "app.schemas.legal": [],
+  "app.schemas.location": [],
+  "app.schemas.logistics": [],
+  "app.schemas.maintenance": [],
+  "app.schemas.manifest": [],
+  "app.schemas.media": [],
+  "app.schemas.menu": [],
+  "app.schemas.notification": [],
+  "app.schemas.notification_admin": [],
+  "app.schemas.notification_preference": [],
+  "app.schemas.order": [
+    "app.core.public_url"
+  ],
+  "app.schemas.organization": [
+    "app.models.organization"
+  ],
+  "app.schemas.payment": [
+    "app.models.financial"
+  ],
+  "app.schemas.promo": [],
+  "app.schemas.rbac": [],
+  "app.schemas.rental": [
+    "app.schemas.battery",
+    "app.schemas.station"
+  ],
+  "app.schemas.rental_event": [],
+  "app.schemas.review": [],
+  "app.schemas.role": [],
+  "app.schemas.role_right": [],
+  "app.schemas.route": [],
+  "app.schemas.session": [],
+  "app.schemas.settlement": [],
+  "app.schemas.settlement_dispute": [],
+  "app.schemas.staff": [],
+  "app.schemas.station": [],
+  "app.schemas.station_monitoring": [],
+  "app.schemas.station_stock": [],
+  "app.schemas.stock": [
+    "app.models.stock_movement"
+  ],
+  "app.schemas.support": [],
+  "app.schemas.swap": [],
+  "app.schemas.system": [],
+  "app.schemas.telematics": [],
+  "app.schemas.ui_config": [],
+  "app.schemas.user": [
+    "app.models.user",
+    "app.schemas.rbac"
+  ],
+  "app.schemas.user_extended": [],
+  "app.schemas.vehicle": [],
+  "app.schemas.vendor": [],
+  "app.schemas.video_kyc": [],
+  "app.schemas.wallet": [],
+  "app.schemas.warehouse": [],
+  "app.schemas.warehouse_structure": [],
+  "app.services.admin_analytics_service": [
+    "app.models.battery",
+    "app.models.dealer",
+    "app.models.rental",
+    "app.models.station",
+    "app.models.support",
+    "app.models.user"
+  ],
+  "app.services.alert_service": [
+    "app.models.alert",
+    "app.models.station",
+    "app.services.notification_service"
+  ],
+  "app.services.analytics": [],
+  "app.services.analytics.admin_service": [
+    "app.models.battery",
+    "app.models.dealer",
+    "app.models.logistics",
+    "app.models.rbac",
+    "app.models.rental",
+    "app.models.station",
+    "app.models.support",
+    "app.models.user",
+    "app.schemas.analytics.admin",
+    "app.schemas.analytics.base",
+    "app.services.analytics.base",
+    "app.utils.constants"
+  ],
+  "app.services.analytics.base": [],
+  "app.services.analytics.customer_service": [
+    "app.models.battery",
+    "app.models.financial",
+    "app.models.rental",
+    "app.models.user",
+    "app.schemas.analytics.base",
+    "app.schemas.analytics.customer",
+    "app.services.analytics.base",
+    "app.utils.constants"
+  ],
+  "app.services.analytics.dealer_service": [
+    "app.models.battery",
+    "app.models.dealer_promotion",
+    "app.models.kyc",
+    "app.models.rental",
+    "app.models.review",
+    "app.models.station",
+    "app.models.swap",
+    "app.schemas.analytics.base",
+    "app.schemas.analytics.dealer",
+    "app.services.analytics.base",
+    "app.utils.constants"
+  ],
+  "app.services.analytics.logger": [],
+  "app.services.analytics.logistics_service": [
+    "app.models.battery",
+    "app.models.logistics",
+    "app.models.user",
+    "app.schemas.analytics.base",
+    "app.schemas.analytics.logistics",
+    "app.services.analytics.base"
+  ],
+  "app.services.analytics_dashboard_service": [
+    "app.core.config",
+    "app.models.analytics_dashboard",
+    "app.models.battery",
+    "app.models.inventory",
+    "app.models.order",
+    "app.repositories.analytics_dashboard_repository",
+    "app.services.distributed_cache_service",
+    "app.services.redis_service"
+  ],
+  "app.services.analytics_report_service": [
+    "app.core.config",
+    "app.core.database",
+    "app.core.public_url",
+    "app.models.analytics_dashboard",
+    "app.repositories.analytics_dashboard_repository",
+    "app.services.analytics_dashboard_service"
+  ],
+  "app.services.analytics_service": [
+    "app.core.config",
+    "app.models.battery",
+    "app.models.battery_health",
+    "app.models.dealer",
+    "app.models.financial",
+    "app.models.kyc",
+    "app.models.membership",
+    "app.models.rental",
+    "app.models.station",
+    "app.models.support",
+    "app.models.user"
+  ],
+  "app.services.apple_auth_service": [
+    "app.core.config"
+  ],
+  "app.services.audit_service": [
+    "app.core.database",
+    "app.models.audit_log"
+  ],
+  "app.services.auth_service": [
+    "app.api.deps",
+    "app.core.config",
+    "app.core.proxy",
+    "app.models.biometric",
+    "app.models.menu",
+    "app.models.rbac",
+    "app.models.role_right",
+    "app.models.session",
+    "app.models.user"
+  ],
+  "app.services.background_runtime_service": [
+    "app.core.config",
+    "app.services.redis_service"
+  ],
+  "app.services.battery_batch_service": [
+    "app.models.battery",
+    "app.models.battery_catalog"
+  ],
+  "app.services.battery_consistency": [
+    "app.models.battery",
+    "app.models.inventory",
+    "app.models.order",
+    "app.models.station",
+    "app.models.warehouse"
+  ],
+  "app.services.battery_service": [
+    "app.models.alert",
+    "app.models.battery",
+    "app.models.battery_catalog",
+    "app.models.battery_health_log",
+    "app.models.rental",
+    "app.models.telemetry",
+    "app.schemas.battery",
+    "app.schemas.station_monitoring",
+    "app.services.qr_service"
+  ],
+  "app.services.booking_service": [
+    "app.models.battery",
+    "app.models.battery_reservation",
+    "app.models.station",
+    "app.services.gps_service",
+    "app.services.notification_service"
+  ],
+  "app.services.bootstrap_service": [
+    "app.core.config",
+    "app.models.battery",
+    "app.models.driver_profile",
+    "app.models.inventory",
+    "app.models.order",
+    "app.models.station",
+    "app.models.warehouse",
+    "app.services.analytics_dashboard_service",
+    "app.services.redis_service"
+  ],
+  "app.services.branch": [
+    "app.models.branch",
+    "app.repositories.branch",
+    "app.schemas.branch"
+  ],
+  "app.services.campaign_service": [
+    "app.models.dealer_promotion",
+    "app.models.station"
+  ],
+  "app.services.cart_service": [
+    "app.models.cart",
+    "app.models.catalog"
+  ],
+  "app.services.catalog_service": [
+    "app.models.catalog",
+    "app.schemas.catalog"
+  ],
+  "app.services.charging_service": [
+    "app.models.battery",
+    "app.models.battery_reservation",
+    "app.models.station",
+    "app.schemas.station_monitoring",
+    "app.services.demand_predictor"
+  ],
+  "app.services.chat_service": [
+    "app.models.support"
+  ],
+  "app.services.commission_service": [
+    "app.models.commission",
+    "app.models.financial"
+  ],
+  "app.services.dealer_analytics_service": [
+    "app.models.battery",
+    "app.models.commission",
+    "app.models.dealer",
+    "app.models.rental",
+    "app.models.review",
+    "app.models.station",
+    "app.models.swap",
+    "app.services.email_service",
+    "app.services.pdf_service"
+  ],
+  "app.services.dealer_kyc_service": [
+    "app.core.config",
+    "app.models.dealer_kyc"
+  ],
+  "app.services.dealer_ledger_service": [
+    "app.models.commission",
+    "app.models.financial",
+    "app.models.rental",
+    "app.models.station",
+    "app.models.user",
+    "app.schemas.dealer_ledger"
+  ],
+  "app.services.dealer_service": [
+    "app.models.commission",
+    "app.models.dealer",
+    "app.models.dealer_inventory",
+    "app.models.dealer_promotion",
+    "app.models.rbac",
+    "app.models.rental",
+    "app.models.station",
+    "app.models.user",
+    "app.repositories.dealer"
+  ],
+  "app.services.dealer_station_service": [
+    "app.models.battery",
+    "app.models.dealer_inventory",
+    "app.models.maintenance",
+    "app.models.station"
+  ],
+  "app.services.demand_predictor": [
+    "app.models.battery_reservation"
+  ],
+  "app.services.dispute_service": [
+    "app.models.settlement",
+    "app.models.settlement_dispute"
+  ],
+  "app.services.distributed_cache_service": [
+    "app.services.redis_service"
+  ],
+  "app.services.driver_service": [
+    "app.models.driver_profile",
+    "app.models.logistics"
+  ],
+  "app.services.ecommerce_service": [
+    "app.models.ecommerce",
+    "app.models.user"
+  ],
+  "app.services.email_service": [
+    "app.core.config"
+  ],
+  "app.services.event_stream_service": [
+    "app.core.config",
+    "app.services.redis_service"
+  ],
+  "app.services.fcm_service": [
+    "app.core.config"
+  ],
+  "app.services.feature_flag_service": [
+    "app.models.system"
+  ],
+  "app.services.financial_report_service": [
+    "app.models.financial",
+    "app.models.revenue_report"
+  ],
+  "app.services.financial_service": [
+    "app.models.commission",
+    "app.models.financial",
+    "app.models.invoice",
+    "app.models.settlement"
+  ],
+  "app.services.forecasting_service": [
+    "app.models.analytics",
+    "app.models.station",
+    "app.models.swap"
+  ],
+  "app.services.fraud_compute_service": [
+    "app.core.config"
+  ],
+  "app.services.fraud_service": [
+    "app.models.device_fingerprint",
+    "app.models.fraud",
+    "app.models.otp",
+    "app.models.user"
+  ],
+  "app.services.geofence_service": [
+    "app.models.geofence",
+    "app.services.maps_service"
+  ],
+  "app.services.gps_service": [
+    "app.models.geofence",
+    "app.models.gps_log",
+    "app.models.rental",
+    "app.services.geofence_service"
+  ],
+  "app.services.i18n_service": [
+    "app.core.database",
+    "app.models.i18n"
+  ],
+  "app.services.idempotency_service": [
+    "app.models.idempotency"
+  ],
+  "app.services.inventory_service": [
+    "app.models.battery",
+    "app.models.inventory_audit",
+    "app.models.logistics",
+    "app.schemas.inventory"
+  ],
+  "app.services.invoice_service": [
+    "app.models.catalog",
+    "app.models.rental",
+    "app.models.user"
+  ],
+  "app.services.iot_service": [
+    "app.core.config",
+    "app.core.database",
+    "app.models.battery",
+    "app.models.battery_health_log",
+    "app.models.gps_log",
+    "app.models.iot",
+    "app.models.rental"
+  ],
+  "app.services.kyc_service": [
+    "app.core.config",
+    "app.core.logging",
+    "app.models.kyc",
+    "app.models.user"
+  ],
+  "app.services.late_fee_service": [
+    "app.core.config",
+    "app.models.financial",
+    "app.models.late_fee",
+    "app.models.rental",
+    "app.services.wallet_service"
+  ],
+  "app.services.logistics_service": [
+    "app.core.database",
+    "app.models.battery",
+    "app.models.delivery_assignment",
+    "app.models.delivery_route",
+    "app.models.driver_profile",
+    "app.models.ecommerce",
+    "app.models.logistics",
+    "app.models.return_request",
+    "app.models.station",
+    "app.models.warehouse",
+    "app.services.notification_service"
+  ],
+  "app.services.maintenance_service": [
+    "app.core.database",
+    "app.models.battery",
+    "app.models.maintenance",
+    "app.models.maintenance_checklist",
+    "app.models.station",
+    "app.services.battery_consistency",
+    "app.services.workflow_automation_service"
+  ],
+  "app.services.maps_service": [
+    "app.core.config"
+  ],
+  "app.services.membership_service": [
+    "app.models.membership"
+  ],
+  "app.services.menu_service": [
+    "app.models.menu",
+    "app.schemas.menu"
+  ],
+  "app.services.ml_fraud_service": [
+    "app.ml.feature_store",
+    "app.models.device_fingerprint",
+    "app.models.kyc_verification",
+    "app.models.rental",
+    "app.models.station",
+    "app.models.user"
+  ],
+  "app.services.ml_service": [
+    "app.ml.feature_store",
+    "app.ml.models.battery_health",
+    "app.ml.registry",
+    "app.models.swap"
+  ],
+  "app.services.mqtt_service": [
+    "app.core.config",
+    "app.core.database",
+    "app.models.battery",
+    "app.schemas.telematics",
+    "app.services.event_stream_service",
+    "app.services.telematics_ingest_service"
+  ],
+  "app.services.notification_outbox_service": [
+    "app.core.config",
+    "app.core.database",
+    "app.models.notification",
+    "app.models.notification_outbox",
+    "app.models.user",
+    "app.services.notification_service"
+  ],
+  "app.services.notification_service": [
+    "app.core.config",
+    "app.core.logging",
+    "app.models.device",
+    "app.models.notification",
+    "app.models.user",
+    "app.services.email_service",
+    "app.services.event_stream_service",
+    "app.services.fcm_service",
+    "app.services.notification_outbox_service",
+    "app.services.sms_service"
+  ],
+  "app.services.order_realtime_outbox_service": [
+    "app.core.config",
+    "app.core.database",
+    "app.models.order_realtime_outbox",
+    "app.services.redis_service"
+  ],
+  "app.services.order_service": [
+    "app.models.catalog",
+    "app.services.catalog_service",
+    "app.services.wallet_service"
+  ],
+  "app.services.organization": [
+    "app.models.organization",
+    "app.repositories.organization",
+    "app.schemas.organization",
+    "app.services.storage_service"
+  ],
+  "app.services.otp_service": [
+    "app.core.config",
+    "app.integrations.twilio",
+    "app.models.otp"
+  ],
+  "app.services.passkey_service": [
+    "app.core.config",
+    "app.models.passkey",
+    "app.models.user"
+  ],
+  "app.services.password_service": [
+    "app.core.security",
+    "app.models.password_history",
+    "app.models.user"
+  ],
+  "app.services.payment_method_service": [
+    "app.models.payment_method"
+  ],
+  "app.services.payment_service": [
+    "app.core.config",
+    "app.core.logging"
+  ],
+  "app.services.pdf_service": [],
+  "app.services.promo_service": [
+    "app.models.promo_code"
+  ],
+  "app.services.qr_service": [
+    "app.core.config",
+    "app.models.battery",
+    "app.services.battery_consistency"
+  ],
+  "app.services.razorpay_webhook_service": [
+    "app.core.config",
+    "app.models.financial",
+    "app.models.refund",
+    "app.services.event_stream_service",
+    "app.services.redis_service",
+    "app.services.wallet_service"
+  ],
+  "app.services.rbac_service": [
+    "app.models.menu",
+    "app.models.rbac",
+    "app.models.role_right",
+    "app.models.user"
+  ],
+  "app.services.receipt_service": [],
+  "app.services.redis_service": [
+    "app.core.config"
+  ],
+  "app.services.referral_service": [
+    "app.models.referral",
+    "app.models.user",
+    "app.utils.helpers"
+  ],
+  "app.services.rental_alert_service": [
+    "app.models.rental"
+  ],
+  "app.services.rental_service": [
+    "app.core.config",
+    "app.core.logging",
+    "app.models.battery",
+    "app.models.battery_catalog",
+    "app.models.late_fee",
+    "app.models.payment",
+    "app.models.promo_code",
+    "app.models.rental",
+    "app.models.rental_event",
+    "app.models.rental_modification",
+    "app.schemas.rental",
+    "app.services.battery_consistency",
+    "app.services.payment_service"
+  ],
+  "app.services.request_audit_queue": [
+    "app.core.config",
+    "app.core.database",
+    "app.models.audit_log"
+  ],
+  "app.services.review_service": [
+    "app.models.review",
+    "app.schemas.review"
+  ],
+  "app.services.role_right_service": [
+    "app.models.role_right",
+    "app.schemas.role_right"
+  ],
+  "app.services.role_service": [
+    "app.models.rbac",
+    "app.schemas.role"
+  ],
+  "app.services.route_service": [
+    "app.integrations.google_maps",
+    "app.models.driver_profile",
+    "app.models.order"
+  ],
+  "app.services.security_service": [
+    "app.core.security",
+    "app.models.audit_log",
+    "app.models.user"
+  ],
+  "app.services.settlement_service": [
+    "app.core.config",
+    "app.core.logging",
+    "app.models.chargeback",
+    "app.models.commission",
+    "app.models.dealer",
+    "app.models.settlement",
+    "app.models.station",
+    "app.models.swap",
+    "app.services.commission_service",
+    "app.services.pdf_service"
+  ],
+  "app.services.sms_service": [
+    "app.core.config",
+    "app.integrations.twilio"
+  ],
+  "app.services.startup_diagnostics_service": [
+    "app.core.config",
+    "app.core.database",
+    "app.services.background_runtime_service",
+    "app.services.notification_outbox_service",
+    "app.services.redis_service",
+    "app.workers"
+  ],
+  "app.services.station_metrics_service": [
+    "app.models.rental",
+    "app.models.station",
+    "app.models.station_metrics"
+  ],
+  "app.services.station_service": [
+    "app.models.alert",
+    "app.models.battery",
+    "app.models.battery_catalog",
+    "app.models.rental",
+    "app.models.station",
+    "app.models.station_heartbeat",
+    "app.schemas.station",
+    "app.services.qr_service"
+  ],
+  "app.services.stock": [
+    "app.models.battery",
+    "app.models.stock",
+    "app.models.stock_movement",
+    "app.repositories.stock",
+    "app.schemas.stock"
+  ],
+  "app.services.storage_service": [
+    "app.core.config",
+    "app.core.public_url"
+  ],
+  "app.services.support_service": [
+    "app.models.rbac",
+    "app.models.support",
+    "app.models.user"
+  ],
+  "app.services.swap_service": [
+    "app.core.logging",
+    "app.models.battery",
+    "app.models.rental",
+    "app.models.rental_event",
+    "app.models.station",
+    "app.services.battery_consistency",
+    "app.services.gps_service"
+  ],
+  "app.services.telematics_ingest_service": [
+    "app.models.battery",
+    "app.models.battery_health_log",
+    "app.models.telematics",
+    "app.schemas.telematics",
+    "app.services.telematics_service"
+  ],
+  "app.services.telematics_service": [
+    "app.models.battery",
+    "app.models.telemetry",
+    "app.services.geofence_service"
+  ],
+  "app.services.timescale_service": [
+    "app.core.database"
+  ],
+  "app.services.token_service": [
+    "app.core.config",
+    "app.models.oauth"
+  ],
+  "app.services.user_service": [
+    "app.core.security",
+    "app.models.address",
+    "app.models.session",
+    "app.models.user",
+    "app.models.user_history",
+    "app.schemas.user",
+    "app.services.auth_service"
+  ],
+  "app.services.user_state_service": [
+    "app.core.audit",
+    "app.models.user",
+    "app.services.auth_service"
+  ],
+  "app.services.video_kyc_service": [
+    "app.core.database",
+    "app.models.user",
+    "app.models.video_kyc"
+  ],
+  "app.services.wallet_service": [
+    "app.core.logging",
+    "app.core.observability",
+    "app.models.financial",
+    "app.models.refund",
+    "app.models.user",
+    "app.services.security_service",
+    "app.services.workflow_automation_service"
+  ],
+  "app.services.warehouse": [
+    "app.models.warehouse",
+    "app.repositories.warehouse",
+    "app.schemas.warehouse"
+  ],
+  "app.services.websocket_service": [
+    "app.core.config",
+    "app.services.order_realtime_outbox_service",
+    "app.services.redis_service"
+  ],
+  "app.services.workflow_automation_service": [
+    "app.core.config",
+    "app.models.notification",
+    "app.models.rbac",
+    "app.models.user",
+    "app.services.notification_service"
+  ],
+  "app.tasks.analytics_tasks": [],
+  "app.tasks.battery_health_monitor": [
+    "app.core.database",
+    "app.models.battery",
+    "app.services.battery_service"
+  ],
+  "app.tasks.charging_optimizer": [
+    "app.core.database",
+    "app.models.battery",
+    "app.models.charging_queue",
+    "app.models.station",
+    "app.schemas.station_monitoring",
+    "app.services.charging_service"
+  ],
+  "app.tasks.station_monitor": [
+    "app.core.database",
+    "app.models.station",
+    "app.services.alert_service"
+  ],
+  "app.tests.test_stock_manual": [
+    "app.api.deps",
+    "app.main"
+  ],
+  "app.utils.audit_decorator": [
+    "app.core.database",
+    "app.core.proxy",
+    "app.models.audit_log"
+  ],
+  "app.utils.cache": [
+    "app.configs.logger"
+  ],
+  "app.utils.constants": [],
+  "app.utils.cors": [
+    "app.core.config"
+  ],
+  "app.utils.exceptions": [],
+  "app.utils.helpers": [],
+  "app.utils.logger": [],
+  "app.utils.runtime_cache": [
+    "app.core.config"
+  ],
+  "app.utils.validators": [],
+  "app.workers": [
+    "app.workers.scheduler"
+  ],
+  "app.workers.daily_jobs": [
+    "app.core.database",
+    "app.models.batch_job",
+    "app.models.battery",
+    "app.models.commission",
+    "app.models.dealer",
+    "app.models.dealer_inventory",
+    "app.models.financial",
+    "app.models.fraud",
+    "app.models.rental",
+    "app.models.station",
+    "app.models.user",
+    "app.services.late_fee_service"
+  ],
+  "app.workers.event_runner": [
+    "app.core.config",
+    "app.core.logging",
+    "app.workers.event_stream_worker"
+  ],
+  "app.workers.event_stream_worker": [
+    "app.core.config",
+    "app.core.database",
+    "app.services.event_stream_service",
+    "app.services.notification_outbox_service",
+    "app.services.razorpay_webhook_service",
+    "app.services.redis_service",
+    "app.services.telematics_ingest_service"
+  ],
+  "app.workers.hourly_jobs": [
+    "app.core.database",
+    "app.models.battery",
+    "app.models.battery_health_log",
+    "app.models.dealer",
+    "app.models.dealer_inventory",
+    "app.models.geofence",
+    "app.models.gps_log",
+    "app.models.iot",
+    "app.models.rental",
+    "app.services.geofence_service",
+    "app.services.notification_service",
+    "app.workers.daily_jobs"
+  ],
+  "app.workers.monthly_jobs": [
+    "app.core.database",
+    "app.models.audit_log",
+    "app.models.battery_health_log",
+    "app.models.dealer",
+    "app.models.financial",
+    "app.models.gps_log",
+    "app.models.payment",
+    "app.models.rental_event",
+    "app.services.audit_service",
+    "app.services.settlement_service",
+    "app.workers.daily_jobs"
+  ],
+  "app.workers.realtime_jobs": [
+    "app.core.database",
+    "app.models.battery",
+    "app.models.battery_health_log",
+    "app.models.device",
+    "app.models.gps_log",
+    "app.models.iot",
+    "app.models.notification",
+    "app.models.payment",
+    "app.models.rental",
+    "app.services.notification_service",
+    "app.workers.hourly_jobs"
+  ],
+  "app.workers.rental_worker": [
+    "app.core.database",
+    "app.models.rental",
+    "app.services.late_fee_service",
+    "app.workers.daily_jobs"
+  ],
+  "app.workers.runner": [
+    "app.core.config",
+    "app.core.logging",
+    "app.db.logistics_schema_guard",
+    "app.db.session",
+    "app.services.startup_diagnostics_service",
+    "app.workers.scheduler"
+  ],
+  "app.workers.scheduler": [
+    "app.tasks.battery_health_monitor",
+    "app.tasks.charging_optimizer",
+    "app.tasks.station_monitor",
+    "app.workers.daily_jobs",
+    "app.workers.hourly_jobs",
+    "app.workers.monthly_jobs",
+    "app.workers.rental_worker"
+  ]
+}

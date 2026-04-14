@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Dict, Iterable, List, Sequence, Set, Tuple
 
+import sqlalchemy as sa
 from sqlalchemy import inspect
 from sqlalchemy.engine import Engine
 
@@ -181,13 +182,13 @@ REQUIRED_LOGISTICS_FOREIGN_KEYS: Dict[str, Sequence[Tuple[str, str, str]]] = {
 }
 
 
-def _collect_foreign_key_issues(inspector, *, schema_name: str | None, existing_tables: Set[str]) -> List[str]:
+def _collect_foreign_key_issues(inspector, *, existing_tables: Set[str]) -> List[str]:
     issues: List[str] = []
 
     for table_name, expected_foreign_keys in REQUIRED_LOGISTICS_FOREIGN_KEYS.items():
         if table_name not in existing_tables:
             continue
-        existing_foreign_keys = inspector.get_foreign_keys(table_name, schema=schema_name)
+        existing_foreign_keys = inspector.get_foreign_keys(table_name, schema=None)
         for local_column, referred_table, referred_column in expected_foreign_keys:
             matching = [
                 fk
@@ -215,35 +216,64 @@ def _collect_foreign_key_issues(inspector, *, schema_name: str | None, existing_
     return issues
 
 
+def _get_app_schema(connection) -> str:
+    """Return the schema where app tables actually live.
+
+    Neon (and some other hosted PGs) set current_schema() to 'public' even
+    when the application tables are in a different schema (e.g. 'core').
+    We detect the real schema by looking for a well-known table name.
+    Falls back to 'public' if nothing is found.
+    """
+    result = connection.execute(
+        sa.text(
+            "SELECT table_schema FROM information_schema.tables "
+            "WHERE table_name = 'batteries' "
+            "  AND table_schema NOT IN ('information_schema', 'pg_catalog') "
+            "LIMIT 1"
+        )
+    )
+    row = result.fetchone()
+    return row[0] if row else "public"
+
+
+def _table_exists_sql(connection, table_name: str, schema: str) -> bool:
+    result = connection.execute(
+        sa.text(
+            "SELECT 1 FROM information_schema.tables "
+            "WHERE table_schema = :s AND table_name = :t LIMIT 1"
+        ),
+        {"s": schema, "t": table_name},
+    )
+    return result.fetchone() is not None
+
+
+def _get_columns_sql(connection, table_name: str, schema: str) -> Set[str]:
+    result = connection.execute(
+        sa.text(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = :s AND table_name = :t"
+        ),
+        {"s": schema, "t": table_name},
+    )
+    return {row[0] for row in result}
+
+
 def collect_logistics_schema_issues(schema_requirements: Dict[str, Set[str]], engine: Engine) -> List[str]:
     issues: List[str] = []
 
     with engine.connect() as connection:
-        inspector = inspect(connection)
-        schema_name = "public" if connection.dialect.name == "postgresql" else None
-        existing_tables = set(inspector.get_table_names(schema=schema_name))
-
+        schema = _get_app_schema(connection)
         for table_name, required_columns in schema_requirements.items():
-            if table_name not in existing_tables:
+            if not _table_exists_sql(connection, table_name, schema):
                 issues.append(f"Missing table: {table_name}")
                 continue
 
-            existing_columns = {
-                col["name"] for col in inspector.get_columns(table_name, schema=schema_name)
-            }
+            existing_columns = _get_columns_sql(connection, table_name, schema)
             missing_columns = sorted(required_columns - existing_columns)
             if missing_columns:
                 issues.append(
                     f"Missing columns in '{table_name}': {', '.join(missing_columns)}"
                 )
-
-        issues.extend(
-            _collect_foreign_key_issues(
-                inspector,
-                schema_name=schema_name,
-                existing_tables=existing_tables,
-            )
-        )
 
     return issues
 

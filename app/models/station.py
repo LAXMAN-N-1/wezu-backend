@@ -71,6 +71,7 @@ class Station(SQLModel, table=True):
     
     # Soft Delete
     is_deleted: bool = Field(default=False)
+    deleted_at: Optional[datetime] = None
 
     # Timestamps
     last_heartbeat: Optional[datetime] = None

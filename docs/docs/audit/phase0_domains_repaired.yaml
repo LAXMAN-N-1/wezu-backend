@@ -1,0 +1,539 @@
+# Repaired domain ownership map
+# Generated: 2026-04-10 11:14:15Z
+# Authoritative for modernization phases
+domains:
+  identity_access:
+    description: Identity, auth, sessions, role resolution, passkeys, token verification.
+    models:
+      - app/models/api_key.py
+      - app/models/biometric.py
+      - app/models/device.py
+      - app/models/device_fingerprint.py
+      - app/models/driver_profile.py
+      - app/models/login_history.py
+      - app/models/menu.py
+      - app/models/oauth.py
+      - app/models/otp.py
+      - app/models/passkey.py
+      - app/models/password_history.py
+      - app/models/rbac.py
+      - app/models/role_right.py
+      - app/models/roles.py
+      - app/models/security_question.py
+      - app/models/session.py
+      - app/models/staff.py
+      - app/models/token.py
+      - app/models/two_factor_auth.py
+      - app/models/user.py
+      - app/models/user_history.py
+      - app/models/user_profile.py
+    services:
+      - app/services/apple_auth_service.py
+      - app/services/auth_service.py
+      - app/services/menu_service.py
+      - app/services/otp_service.py
+      - app/services/passkey_service.py
+      - app/services/password_service.py
+      - app/services/rbac_service.py
+      - app/services/role_right_service.py
+      - app/services/role_service.py
+      - app/services/token_service.py
+      - app/services/user_service.py
+      - app/services/user_state_service.py
+    repositories:
+      - app/repositories/user_repository.py
+    schemas:
+      - app/schemas/auth.py
+      - app/schemas/device.py
+      - app/schemas/menu.py
+      - app/schemas/rbac.py
+      - app/schemas/role.py
+      - app/schemas/role_right.py
+      - app/schemas/session.py
+      - app/schemas/staff.py
+      - app/schemas/user.py
+      - app/schemas/user_extended.py
+    routers:
+      - app/api/v1/auth.py
+      - app/api/v1/customer_auth.py
+      - app/api/v1/menus.py
+      - app/api/v1/passkeys.py
+      - app/api/v1/profile.py
+      - app/api/v1/role_rights.py
+      - app/api/v1/roles.py
+      - app/api/v1/sessions.py
+      - app/api/v1/users.py
+  kyc_fraud_compliance:
+    description: KYC, fraud analysis, verification workflows, compliance records.
+    models:
+      - app/models/dealer_kyc.py
+      - app/models/fraud.py
+      - app/models/kyc.py
+      - app/models/kyc_verification.py
+      - app/models/video_kyc.py
+    services:
+      - app/services/dealer_kyc_service.py
+      - app/services/fraud_compute_service.py
+      - app/services/fraud_service.py
+      - app/services/kyc_service.py
+      - app/services/ml_fraud_service.py
+      - app/services/video_kyc_service.py
+    repositories:
+      []
+    schemas:
+      - app/schemas/fraud.py
+      - app/schemas/kyc.py
+      - app/schemas/kyc_admin.py
+      - app/schemas/video_kyc.py
+    routers:
+      - app/api/v1/fraud.py
+      - app/api/v1/kyc.py
+  customer_rental_swap:
+    description: Customer rental lifecycle, booking, active rentals, swaps, returns.
+    models:
+      - app/models/battery_reservation.py
+      - app/models/cart.py
+      - app/models/late_fee.py
+      - app/models/membership.py
+      - app/models/rental.py
+      - app/models/rental_event.py
+      - app/models/rental_modification.py
+      - app/models/return_request.py
+      - app/models/swap.py
+      - app/models/swap_suggestion.py
+    services:
+      - app/services/booking_service.py
+      - app/services/cart_service.py
+      - app/services/late_fee_service.py
+      - app/services/membership_service.py
+      - app/services/rental_alert_service.py
+      - app/services/rental_service.py
+      - app/services/swap_service.py
+    repositories:
+      - app/repositories/rental_repository.py
+    schemas:
+      - app/schemas/booking.py
+      - app/schemas/rental.py
+      - app/schemas/rental_event.py
+      - app/schemas/swap.py
+    routers:
+      - app/api/v1/bookings.py
+      - app/api/v1/rentals.py
+      - app/api/v1/rentals_enhanced.py
+      - app/api/v1/swaps.py
+  finance_wallet_payments:
+    description: Wallet balances, payment orders, settlements, refunds, ledgers.
+    models:
+      - app/models/chargeback.py
+      - app/models/commission.py
+      - app/models/financial.py
+      - app/models/invoice.py
+      - app/models/payment.py
+      - app/models/payment_method.py
+      - app/models/refund.py
+      - app/models/settlement.py
+      - app/models/settlement_dispute.py
+    services:
+      - app/services/commission_service.py
+      - app/services/dispute_service.py
+      - app/services/financial_report_service.py
+      - app/services/financial_service.py
+      - app/services/idempotency_service.py
+      - app/services/invoice_service.py
+      - app/services/payment_method_service.py
+      - app/services/payment_service.py
+      - app/services/razorpay_webhook_service.py
+      - app/services/receipt_service.py
+      - app/services/settlement_service.py
+      - app/services/wallet_service.py
+    repositories:
+      - app/repositories/payment_repository.py
+      - app/repositories/wallet_repository.py
+    schemas:
+      - app/schemas/commission.py
+      - app/schemas/finance_ops.py
+      - app/schemas/financial.py
+      - app/schemas/invoice.py
+      - app/schemas/payment.py
+      - app/schemas/settlement.py
+      - app/schemas/settlement_dispute.py
+      - app/schemas/wallet.py
+    routers:
+      - app/api/v1/payments.py
+      - app/api/v1/payments_enhanced.py
+      - app/api/v1/settlements.py
+      - app/api/v1/transactions.py
+      - app/api/v1/wallet.py
+      - app/api/v1/wallet_enhanced.py
+  dealer_portal:
+    description: Dealer onboarding, dealer station operations, dealer commissions and documents.
+    models:
+      - app/models/branch.py
+      - app/models/dealer.py
+      - app/models/dealer_inventory.py
+      - app/models/dealer_promotion.py
+      - app/models/organization.py
+      - app/models/vendor.py
+    services:
+      - app/services/analytics/dealer_service.py
+      - app/services/branch.py
+      - app/services/dealer_analytics_service.py
+      - app/services/dealer_ledger_service.py
+      - app/services/dealer_service.py
+      - app/services/dealer_station_service.py
+      - app/services/organization.py
+    repositories:
+      - app/repositories/branch.py
+      - app/repositories/dealer.py
+      - app/repositories/organization.py
+    schemas:
+      - app/schemas/branch.py
+      - app/schemas/dealer.py
+      - app/schemas/dealer_inventory.py
+      - app/schemas/dealer_kyc.py
+      - app/schemas/dealer_ledger.py
+      - app/schemas/dealer_promotion.py
+      - app/schemas/dealer_user.py
+      - app/schemas/organization.py
+      - app/schemas/vendor.py
+    routers:
+      - app/api/v1/analytics/dealer.py
+      - app/api/v1/branches.py
+      - app/api/v1/dealer_analytics.py
+      - app/api/v1/dealer_campaigns.py
+      - app/api/v1/dealer_commission.py
+      - app/api/v1/dealer_documents.py
+      - app/api/v1/dealer_kyc.py
+      - app/api/v1/dealer_onboarding.py
+      - app/api/v1/dealer_portal_auth.py
+      - app/api/v1/dealer_portal_customers.py
+      - app/api/v1/dealer_portal_dashboard.py
+      - app/api/v1/dealer_portal_roles.py
+      - app/api/v1/dealer_portal_settings.py
+      - app/api/v1/dealer_portal_tickets.py
+      - app/api/v1/dealer_portal_users.py
+      - app/api/v1/dealer_stations.py
+      - app/api/v1/dealers.py
+      - app/api/v1/organizations.py
+      - app/api/v1/vendors.py
+  logistics_supply:
+    description: Driver, route, dispatch, manifests, transfer logistics, inventory movement.
+    models:
+      - app/models/delivery_assignment.py
+      - app/models/delivery_route.py
+      - app/models/ecommerce.py
+      - app/models/geofence.py
+      - app/models/gps_log.py
+      - app/models/inventory.py
+      - app/models/inventory_audit.py
+      - app/models/logistics.py
+      - app/models/manifest.py
+      - app/models/order.py
+      - app/models/order_realtime_outbox.py
+      - app/models/station_stock.py
+      - app/models/stock.py
+      - app/models/stock_movement.py
+      - app/models/vehicle.py
+      - app/models/warehouse.py
+    services:
+      - app/services/analytics/logistics_service.py
+      - app/services/driver_service.py
+      - app/services/forecasting_service.py
+      - app/services/geofence_service.py
+      - app/services/gps_service.py
+      - app/services/inventory_service.py
+      - app/services/logistics_service.py
+      - app/services/order_realtime_outbox_service.py
+      - app/services/order_service.py
+      - app/services/route_service.py
+      - app/services/stock.py
+      - app/services/warehouse.py
+    repositories:
+      - app/repositories/stock.py
+      - app/repositories/warehouse.py
+    schemas:
+      - app/schemas/delivery.py
+      - app/schemas/inventory.py
+      - app/schemas/logistics.py
+      - app/schemas/manifest.py
+      - app/schemas/order.py
+      - app/schemas/route.py
+      - app/schemas/station_stock.py
+      - app/schemas/stock.py
+      - app/schemas/vehicle.py
+      - app/schemas/warehouse.py
+      - app/schemas/warehouse_structure.py
+    routers:
+      - app/api/v1/analytics/logistics.py
+      - app/api/v1/drivers.py
+      - app/api/v1/endpoints/warehouse.py
+      - app/api/v1/inventory.py
+      - app/api/v1/logistics.py
+      - app/api/v1/manifests.py
+      - app/api/v1/orders.py
+      - app/api/v1/orders_realtime.py
+      - app/api/v1/routes.py
+      - app/api/v1/stock.py
+      - app/api/v1/vehicles.py
+      - app/api/v1/warehouse_structure.py
+      - app/api/v1/warehouses.py
+  iot_telematics_system:
+    description: Battery/station state, telemetry ingestion, maintenance, health tracking.
+    models:
+      - app/models/battery.py
+      - app/models/battery_catalog.py
+      - app/models/battery_health.py
+      - app/models/battery_health_log.py
+      - app/models/bess.py
+      - app/models/charging_queue.py
+      - app/models/iot.py
+      - app/models/location.py
+      - app/models/maintenance.py
+      - app/models/maintenance_checklist.py
+      - app/models/station.py
+      - app/models/station_heartbeat.py
+      - app/models/station_metrics.py
+      - app/models/telematics.py
+      - app/models/telemetry.py
+    services:
+      - app/services/battery_batch_service.py
+      - app/services/battery_consistency.py
+      - app/services/battery_service.py
+      - app/services/catalog_service.py
+      - app/services/charging_service.py
+      - app/services/demand_predictor.py
+      - app/services/iot_service.py
+      - app/services/maintenance_service.py
+      - app/services/station_metrics_service.py
+      - app/services/station_service.py
+      - app/services/telematics_ingest_service.py
+      - app/services/telematics_service.py
+    repositories:
+      - app/repositories/battery_repository.py
+      - app/repositories/station_repository.py
+    schemas:
+      - app/schemas/battery.py
+      - app/schemas/battery_catalog.py
+      - app/schemas/battery_health.py
+      - app/schemas/bess.py
+      - app/schemas/iot.py
+      - app/schemas/location.py
+      - app/schemas/maintenance.py
+      - app/schemas/station.py
+      - app/schemas/station_monitoring.py
+      - app/schemas/telematics.py
+    routers:
+      - app/api/v1/batteries.py
+      - app/api/v1/battery_catalog.py
+      - app/api/v1/iot.py
+      - app/api/v1/location.py
+      - app/api/v1/locations.py
+      - app/api/v1/maintenance.py
+      - app/api/v1/station_monitoring.py
+      - app/api/v1/stations.py
+      - app/api/v1/telematics.py
+      - app/api/v1/telemetry.py
+  comms_content_engagement:
+    description: Notifications, support, FAQs, content/campaign/promo engagement.
+    models:
+      - app/models/banner.py
+      - app/models/blog.py
+      - app/models/catalog.py
+      - app/models/faq.py
+      - app/models/favorite.py
+      - app/models/feedback.py
+      - app/models/i18n.py
+      - app/models/legal.py
+      - app/models/media.py
+      - app/models/notification.py
+      - app/models/notification_admin.py
+      - app/models/notification_outbox.py
+      - app/models/notification_preference.py
+      - app/models/promo_code.py
+      - app/models/referral.py
+      - app/models/review.py
+      - app/models/search_history.py
+      - app/models/support.py
+    services:
+      - app/services/campaign_service.py
+      - app/services/chat_service.py
+      - app/services/ecommerce_service.py
+      - app/services/fcm_service.py
+      - app/services/i18n_service.py
+      - app/services/notification_outbox_service.py
+      - app/services/notification_service.py
+      - app/services/pdf_service.py
+      - app/services/promo_service.py
+      - app/services/qr_service.py
+      - app/services/referral_service.py
+      - app/services/review_service.py
+      - app/services/support_service.py
+    repositories:
+      - app/repositories/notification_repository.py
+    schemas:
+      - app/schemas/banner.py
+      - app/schemas/blog.py
+      - app/schemas/catalog.py
+      - app/schemas/ecommerce.py
+      - app/schemas/faq.py
+      - app/schemas/feedback.py
+      - app/schemas/legal.py
+      - app/schemas/media.py
+      - app/schemas/notification.py
+      - app/schemas/notification_admin.py
+      - app/schemas/notification_preference.py
+      - app/schemas/promo.py
+      - app/schemas/review.py
+      - app/schemas/support.py
+    routers:
+      - app/api/v1/catalog.py
+      - app/api/v1/faqs.py
+      - app/api/v1/favorites.py
+      - app/api/v1/i18n.py
+      - app/api/v1/notifications.py
+      - app/api/v1/notifications_enhanced.py
+      - app/api/v1/promo.py
+      - app/api/v1/support.py
+      - app/api/v1/support_enhanced.py
+  admin_platform_ops:
+    description: Admin console APIs, analytics aggregation, audit and operational controls.
+    models:
+      - app/models/admin_group.py
+      - app/models/admin_user.py
+      - app/models/alert.py
+      - app/models/analytics.py
+      - app/models/analytics_dashboard.py
+      - app/models/audit_log.py
+      - app/models/batch_job.py
+      - app/models/revenue_report.py
+      - app/models/system.py
+    services:
+      - app/services/admin_analytics_service.py
+      - app/services/analytics/admin_service.py
+      - app/services/analytics/base.py
+      - app/services/analytics/customer_service.py
+      - app/services/analytics/logger.py
+      - app/services/analytics_dashboard_service.py
+      - app/services/analytics_report_service.py
+      - app/services/analytics_service.py
+      - app/services/audit_service.py
+      - app/services/ml_service.py
+    repositories:
+      - app/repositories/analytics_dashboard_repository.py
+    schemas:
+      - app/schemas/admin_group.py
+      - app/schemas/admin_user.py
+      - app/schemas/alert.py
+      - app/schemas/analytics.py
+      - app/schemas/analytics/__init__.py
+      - app/schemas/analytics/admin.py
+      - app/schemas/analytics/base.py
+      - app/schemas/analytics/customer.py
+      - app/schemas/analytics/dealer.py
+      - app/schemas/analytics/logistics.py
+      - app/schemas/audit_log.py
+      - app/schemas/dashboard.py
+      - app/schemas/job.py
+      - app/schemas/system.py
+      - app/schemas/ui_config.py
+    routers:
+      - app/api/admin/__init__.py
+      - app/api/admin/admin_groups.py
+      - app/api/admin/analytics.py
+      - app/api/admin/audit_trails.py
+      - app/api/admin/batteries.py
+      - app/api/admin/bess.py
+      - app/api/admin/cms.py
+      - app/api/admin/dealers.py
+      - app/api/admin/finance.py
+      - app/api/admin/fraud.py
+      - app/api/admin/health.py
+      - app/api/admin/iot.py
+      - app/api/admin/jobs.py
+      - app/api/admin/kyc_admin.py
+      - app/api/admin/logistics.py
+      - app/api/admin/main.py
+      - app/api/admin/monitoring.py
+      - app/api/admin/notifications.py
+      - app/api/admin/rbac_admin.py
+      - app/api/admin/rentals.py
+      - app/api/admin/security.py
+      - app/api/admin/settings.py
+      - app/api/admin/stations.py
+      - app/api/admin/stock.py
+      - app/api/admin/support.py
+      - app/api/admin/users.py
+      - app/api/v1/admin/analytics.py
+      - app/api/v1/admin/banners.py
+      - app/api/v1/admin/blogs.py
+      - app/api/v1/admin/dealers.py
+      - app/api/v1/admin/faqs.py
+      - app/api/v1/admin/legal.py
+      - app/api/v1/admin/media.py
+      - app/api/v1/admin/promo.py
+      - app/api/v1/admin/reviews.py
+      - app/api/v1/admin/roles.py
+      - app/api/v1/admin/support.py
+      - app/api/v1/admin/users.py
+      - app/api/v1/admin_alerts.py
+      - app/api/v1/admin_analytics.py
+      - app/api/v1/admin_audit.py
+      - app/api/v1/admin_dealers.py
+      - app/api/v1/admin_financial_reports.py
+      - app/api/v1/admin_invoices.py
+      - app/api/v1/admin_kyc.py
+      - app/api/v1/admin_rbac.py
+      - app/api/v1/admin_roles.py
+      - app/api/v1/admin_stations.py
+      - app/api/v1/admin_user_bulk.py
+      - app/api/v1/admin_users.py
+      - app/api/v1/analytics.py
+      - app/api/v1/analytics/__init__.py
+      - app/api/v1/analytics/admin.py
+      - app/api/v1/analytics/customer.py
+      - app/api/v1/analytics_enhanced.py
+      - app/api/v1/audit.py
+      - app/api/v1/dashboard.py
+      - app/api/v1/ml.py
+      - app/api/v1/purchases_enhanced.py
+      - app/api/v1/screens.py
+      - app/api/v1/security.py
+      - app/api/v1/system.py
+      - app/api/v1/utils.py
+  platform_core:
+    description: Core/shared infrastructure and cross-cutting primitives with no business ownership.
+    models:
+      - app/models/__init__.py
+      - app/models/address.py
+      - app/models/all.py
+      - app/models/enums.py
+      - app/models/idempotency.py
+    services:
+      - app/services/alert_service.py
+      - app/services/analytics/__init__.py
+      - app/services/background_runtime_service.py
+      - app/services/bootstrap_service.py
+      - app/services/distributed_cache_service.py
+      - app/services/email_service.py
+      - app/services/event_stream_service.py
+      - app/services/feature_flag_service.py
+      - app/services/maps_service.py
+      - app/services/mqtt_service.py
+      - app/services/redis_service.py
+      - app/services/request_audit_queue.py
+      - app/services/security_service.py
+      - app/services/sms_service.py
+      - app/services/startup_diagnostics_service.py
+      - app/services/storage_service.py
+      - app/services/timescale_service.py
+      - app/services/websocket_service.py
+      - app/services/workflow_automation_service.py
+    repositories:
+      - app/repositories/__init__.py
+      - app/repositories/base.py
+      - app/repositories/base_repository.py
+    schemas:
+      - app/schemas/common.py
+      - app/schemas/input_contracts.py
+    routers:
+      []

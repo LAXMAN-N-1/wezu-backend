@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+data:
+  ENVIRONMENT: "production"
+  DATABASE_URL: "postgresql://wezu_user:pass@db-service:5432/wezu_db"
+  REDIS_URL: "redis://redis-service:6379/0"
+  MQTT_BROKER_URL: "mqtt://mqtt-service:1883"
+  PROJECT_NAME: "WEZU Energy"
+  API_V1_STR: "/api/v1"

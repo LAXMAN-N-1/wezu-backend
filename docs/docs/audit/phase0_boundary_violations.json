@@ -1,0 +1,36 @@
+{
+  "generated_at": "2026-04-10T11:14:15.856136+00:00",
+  "violation_count": 5,
+  "violations": [
+    {
+      "router_file": "app/api/v1/auth.py",
+      "imports": [
+        "app.repositories.user_repository"
+      ]
+    },
+    {
+      "router_file": "app/api/v1/customer_auth.py",
+      "imports": [
+        "app.repositories.user_repository"
+      ]
+    },
+    {
+      "router_file": "app/api/v1/dealer_portal_auth.py",
+      "imports": [
+        "app.repositories.user_repository"
+      ]
+    },
+    {
+      "router_file": "app/api/v1/notifications_enhanced.py",
+      "imports": [
+        "app.repositories.notification_repository"
+      ]
+    },
+    {
+      "router_file": "app/api/v1/wallet_enhanced.py",
+      "imports": [
+        "app.repositories.wallet_repository"
+      ]
+    }
+  ]
+}

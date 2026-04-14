@@ -14,6 +14,7 @@ sys.path.append(parent_dir)
 
 from sqlmodel import Session, select, func
 from app.db.session import engine
+import app.models.all
 from app.models.user import User, UserStatus, UserType
 from app.models.dealer import DealerProfile, DealerDocument
 from app.models.station import Station, StationStatus, StationSlot
@@ -53,7 +54,7 @@ def seed_all():
                 email="dealer@wezu.com",
                 phone_number="8888888888",
                 full_name="Laxman Kumar",
-                hashed_password=get_password_hash(_SEED_PASSWORD),
+                hashed_password=get_password_hash("laxman123"),
                 user_type=UserType.DEALER,
                 status=UserStatus.ACTIVE,
             )
@@ -62,7 +63,10 @@ def seed_all():
             db.refresh(dealer_user)
             print(f"  ✓ Created dealer user id={dealer_user.id}")
         else:
-            print(f"  ✓ Dealer user exists id={dealer_user.id}")
+            dealer_user.hashed_password = get_password_hash("laxman123")
+            db.add(dealer_user)
+            db.commit()
+            print(f"  ✓ Updated dealer user password id={dealer_user.id}")
 
         dealer = db.exec(select(DealerProfile).where(DealerProfile.user_id == dealer_user.id)).first()
         if not dealer:
@@ -213,8 +217,13 @@ def seed_all():
         # ── 5. Seed rentals (from dealer stations) ────────────────
         print("\n[5/10] Seeding rentals...")
         station_ids = [s.id for s in stations]
+        all_batteries = db.exec(select(Battery)).all()
+        if not all_batteries:
+            print("  ⚠ No batteries found — skipping rentals")
         rental_count = 0
         for i in range(35):
+            if not all_batteries:
+                break
             user = random.choice(customers)
             start_st = random.choice(stations)
             is_active = random.random() < 0.3
@@ -222,7 +231,7 @@ def seed_all():
 
             r = Rental(
                 user_id=user.id,
-                battery_id=None,
+                battery_id=random.choice(all_batteries).id,
                 start_station_id=start_st.id,
                 start_time=start_time,
                 expected_end_time=start_time + timedelta(hours=24),

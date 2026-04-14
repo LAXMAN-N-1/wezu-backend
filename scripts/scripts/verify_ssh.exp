@@ -1,0 +1,24 @@
+#!/usr/bin/expect -f
+set password [lindex $argv 0]
+set host [lindex $argv 1]
+set user [lindex $argv 2]
+
+spawn ssh -o StrictHostKeyChecking=no $user@$host "echo 'Login Successful'"
+expect {
+    "password:" {
+        send "$password\r"
+        exp_continue
+    }
+    "Login Successful" {
+        puts "VERIFIED"
+        exit 0
+    }
+    "Permission denied" {
+        puts "FAILED"
+        exit 1
+    }
+    timeout {
+        puts "TIMEOUT"
+        exit 2
+    }
+}

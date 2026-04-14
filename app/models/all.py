@@ -118,4 +118,5 @@ from app.models.system import SystemConfig, FeatureFlag
 from app.models.bess import BessUnit, BessEnergyLog, BessGridEvent, BessReport
 from app.models.notification_admin import PushCampaign, AutomatedTrigger, NotificationLog, NotificationConfig
 from app.models.api_key import ApiKeyConfig
+from app.models.dealer_stock_request import DealerStockRequest
 

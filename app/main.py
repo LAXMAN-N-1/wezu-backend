@@ -70,6 +70,7 @@ from app.api.v1 import (
     analytics_enhanced, payments_enhanced, wallet_enhanced,
     notifications_enhanced, support_enhanced, rentals_enhanced,
     purchases_enhanced,
+    customer_reservations, customer_dashboard, dealer_portal_inventory,
 )
 from app.api.v1.admin import (
     support as admin_support, faqs as admin_faqs, analytics as admin_analytics,
@@ -553,6 +554,8 @@ v1_str = settings.API_V1_STR
 # ── Customer Auth ──────────────────────────────────────────────────────────
 app.include_router(auth.router, prefix=f"{v1_str}/auth", tags=["Auth"])
 app.include_router(customer_auth.router, prefix=f"{v1_str}/customer/auth", tags=["Customer Auth"])
+app.include_router(customer_dashboard.router, prefix=f"{v1_str}/customer/dashboard", tags=["Customer Dashboard"])
+app.include_router(customer_reservations.router, prefix=f"{v1_str}", tags=["Customer Reservations"])
 app.include_router(passkeys.router, prefix=f"{v1_str}/auth", tags=["Auth Passkeys"])
 app.include_router(sessions.router, prefix=f"{v1_str}/sessions", tags=["Sessions"])
 
@@ -641,6 +644,7 @@ app.include_router(dealer_portal_customers.router, prefix=f"{dealer_api}/analyti
 app.include_router(dealer_analytics.router, prefix=f"{dealer_api}/analytics", tags=["Dealer: Analytics"], dependencies=dealer_deps)
 app.include_router(dealer_campaigns.router, prefix=f"{dealer_api}/campaigns", tags=["Dealer: Campaigns"], dependencies=dealer_deps)
 app.include_router(dealer_onboarding.router, prefix=f"{dealer_api}/onboarding", tags=["Dealer: Onboarding"], dependencies=dealer_deps)
+app.include_router(dealer_portal_inventory.router, prefix=f"{dealer_api}/portal", tags=["Dealer: Inventory"], dependencies=dealer_deps)
 
 # ── Logistics ──────────────────────────────────────────────────────────────
 app.include_router(logistics.router, prefix=f"{v1_str}/logistics", tags=["Logistics"])

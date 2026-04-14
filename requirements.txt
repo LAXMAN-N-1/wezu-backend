@@ -240,7 +240,6 @@ multidict==6.1.0
 multitasking==0.0.11
 multivolumefile==0.2.3
 murmurhash==1.0.12
-my-awesome-package-laxman-2025==0.1.0
 mypy-extensions==1.0.0
 namex==0.0.8
 nbformat==5.10.4
