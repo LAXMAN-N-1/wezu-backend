@@ -1,7 +1,7 @@
 import re
 import time
 
-from sqlalchemy import event, pool
+from sqlalchemy import event, inspect, pool, text
 from sqlalchemy.engine import make_url
 from sqlmodel import Session, create_engine
 
@@ -48,6 +48,60 @@ def _build_engine():
 engine = _build_engine()
 
 
+# ── Compatibility schema patching ──────────────────────────────────────────
+
+def _ensure_roles_schema_compatibility() -> None:
+    """
+    Backfill RBAC role columns if migrations were skipped.
+    This keeps auth endpoints alive on partially-migrated databases.
+    """
+    parsed_url = make_url(settings.DATABASE_URL)
+    driver = parsed_url.drivername
+    if not (driver.startswith("postgresql") or driver.startswith("sqlite")):
+        return
+
+    with engine.begin() as conn:
+        inspector = inspect(conn)
+        if not inspector.has_table("roles"):
+            return
+
+        cols = {col["name"] for col in inspector.get_columns("roles")}
+        statements: list[str] = []
+        patched_columns: list[str] = []
+
+        if driver.startswith("postgresql"):
+            if "is_custom_role" not in cols:
+                statements.append(
+                    "ALTER TABLE roles ADD COLUMN IF NOT EXISTS is_custom_role BOOLEAN NOT NULL DEFAULT FALSE"
+                )
+                patched_columns.append("is_custom_role")
+            if "scope_owner" not in cols:
+                statements.append(
+                    "ALTER TABLE roles ADD COLUMN IF NOT EXISTS scope_owner VARCHAR NOT NULL DEFAULT 'global'"
+                )
+                patched_columns.append("scope_owner")
+        else:  # sqlite
+            if "is_custom_role" not in cols:
+                statements.append(
+                    "ALTER TABLE roles ADD COLUMN is_custom_role BOOLEAN NOT NULL DEFAULT 0"
+                )
+                patched_columns.append("is_custom_role")
+            if "scope_owner" not in cols:
+                statements.append(
+                    "ALTER TABLE roles ADD COLUMN scope_owner VARCHAR NOT NULL DEFAULT 'global'"
+                )
+                patched_columns.append("scope_owner")
+
+        for statement in statements:
+            conn.execute(text(statement))
+
+        if statements:
+            logger.info(
+                "schema.roles_compatibility_patch_applied",
+                patched_columns=patched_columns,
+            )
+
+
 # ── Connection-level hooks ─────────────────────────────────────────────────
 
 @event.listens_for(engine, "connect")
@@ -81,6 +135,10 @@ def _on_connect(dbapi_connection, connection_record):
             cursor.execute(f"SET search_path TO {app_schema}, public")
         finally:
             cursor.close()
+
+
+# Ensure compatibility before first auth/role query executes.
+_ensure_roles_schema_compatibility()
 
 
 # ── SQL observability (slow queries + suspicious no-op mutations) ───────────
