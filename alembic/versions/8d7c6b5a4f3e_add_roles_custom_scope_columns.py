@@ -1,7 +1,7 @@
 """add missing rbac role columns for multi-role rollout
 
 Revision ID: 8d7c6b5a4f3e
-Revises: 3f9b2a1c4d5e
+Revises: d1e2f3a4b5c6
 Create Date: 2026-04-15 01:00:00.000000
 """
 
@@ -14,7 +14,7 @@ from sqlalchemy import inspect
 
 # revision identifiers, used by Alembic.
 revision: str = "8d7c6b5a4f3e"
-down_revision: Union[str, None] = "3f9b2a1c4d5e"
+down_revision: Union[str, None] = "d1e2f3a4b5c6"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

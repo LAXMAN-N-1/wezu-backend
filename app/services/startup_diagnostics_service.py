@@ -10,6 +10,7 @@ from sqlalchemy import text
 from sqlmodel import Session
 
 from app.core.config import settings
+from app.db.migration_graph_guard import validate_migration_graph
 from app.core.database import engine
 from app.services.background_runtime_service import BackgroundRuntimeService
 from app.services.notification_outbox_service import NotificationOutboxService
@@ -28,6 +29,7 @@ class StartupDiagnosticsService:
     def _build_report() -> dict[str, Any]:
         components = {
             "database": StartupDiagnosticsService._database_component(),
+            "migration_graph": StartupDiagnosticsService._migration_graph_component(),
             "redis": StartupDiagnosticsService._redis_component(),
             "payment_gateway": StartupDiagnosticsService._payment_component(),
             "sms": StartupDiagnosticsService._sms_component(),
@@ -69,6 +71,34 @@ class StartupDiagnosticsService:
                 "required": database_required,
                 "details": f"Database check failed: {exc}",
             }
+
+    @staticmethod
+    def _migration_graph_component() -> dict[str, Any]:
+        required = bool(getattr(settings, "MIGRATION_GRAPH_STRICT", True))
+        report = validate_migration_graph(
+            require_single_head=bool(getattr(settings, "MIGRATION_GRAPH_REQUIRE_SINGLE_HEAD", True)),
+            require_db_at_head=bool(getattr(settings, "MIGRATION_GRAPH_REQUIRE_DB_AT_HEAD", True)),
+        )
+        if report.valid:
+            return {
+                "status": "ready",
+                "required": required,
+                "details": {
+                    "heads": list(report.heads),
+                    "revision_count": report.revision_count,
+                    "current_db_revisions": list(report.current_db_revisions),
+                },
+            }
+        return {
+            "status": "invalid",
+            "required": required,
+            "details": {
+                "issues": list(report.issues),
+                "heads": list(report.heads),
+                "revision_count": report.revision_count,
+                "current_db_revisions": list(report.current_db_revisions),
+            },
+        }
 
     @staticmethod
     def _redis_component() -> dict[str, Any]:

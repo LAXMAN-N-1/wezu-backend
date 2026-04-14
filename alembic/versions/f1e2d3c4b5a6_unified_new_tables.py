@@ -18,7 +18,7 @@ in the previous local backend schema:
   - kyc_verifications
 
 Revision ID: f1e2d3c4b5a6
-Revises: perf_indexes_ph11
+Revises: c1d2e3f4a5b6
 Create Date: 2026-04-14
 """
 from typing import Union
@@ -27,7 +27,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision: str = "f1e2d3c4b5a6"
-down_revision: Union[str, None] = "perf_indexes_ph11"
+down_revision: Union[str, None] = "c1d2e3f4a5b6"
 branch_labels = None
 depends_on = None
 
