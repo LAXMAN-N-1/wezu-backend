@@ -10,20 +10,16 @@ import logging
 from app.db.session import get_session
 
 logger = logging.getLogger(__name__)
+from app.api import deps
 from app.api.deps import get_current_user
 from app.models.user import User
-from app.models.dealer import DealerProfile
 from app.models.station import Station
 
 router = APIRouter()
 
 
 def _get_dealer_station_ids(db: Session, user_id: int) -> list:
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == user_id)
-    ).first()
-    if not dealer:
-        raise HTTPException(status_code=403, detail="Not a dealer")
+    dealer = deps.get_dealer_profile_or_403(db, user_id, detail="Not a dealer")
     # Select only IDs — avoids loading full Station objects
     ids = db.exec(
         select(Station.id).where(Station.dealer_id == dealer.id)

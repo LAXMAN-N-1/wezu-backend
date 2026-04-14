@@ -630,21 +630,22 @@ app.include_router(admin_financial_reports.router, prefix=f"{admin_api}/financia
 
 # ── Dealer ─────────────────────────────────────────────────────────────────
 dealer_api = f"{v1_str}/dealer"
-dealer_deps = [Depends(deps.get_current_user)]
+dealer_profile_deps = [Depends(deps.get_current_user)]
+dealer_scope_deps = [Depends(deps.get_current_dealer_scope_user)]
 
 app.include_router(dealer_portal_auth.router, prefix=f"{dealer_api}/auth", tags=["Dealer: Auth"])
-app.include_router(dealers.router, prefix=f"{v1_str}/dealers", tags=["Dealer: Profile"], dependencies=dealer_deps)
-app.include_router(dealer_stations.router, prefix=f"{v1_str}/dealer-stations", tags=["Dealer: Stations"], dependencies=dealer_deps)
-app.include_router(dealer_portal_dashboard.router, prefix=f"{dealer_api}/portal", tags=["Dealer: Dashboard"], dependencies=dealer_deps)
-app.include_router(dealer_portal_tickets.router, prefix=f"{dealer_api}/portal/tickets", tags=["Dealer: Tickets"], dependencies=dealer_deps)
-app.include_router(dealer_portal_roles.router, prefix=f"{dealer_api}/portal/roles", tags=["Dealer: Roles"], dependencies=dealer_deps)
-app.include_router(dealer_portal_users.router, prefix=f"{dealer_api}/portal/users", tags=["Dealer: Users"], dependencies=dealer_deps)
-app.include_router(dealer_portal_settings.router, prefix=f"{dealer_api}/portal/settings", tags=["Dealer: Settings"], dependencies=dealer_deps)
-app.include_router(dealer_portal_customers.router, prefix=f"{dealer_api}/analytics", tags=["Dealer: Customers"], dependencies=dealer_deps)
-app.include_router(dealer_analytics.router, prefix=f"{dealer_api}/analytics", tags=["Dealer: Analytics"], dependencies=dealer_deps)
-app.include_router(dealer_campaigns.router, prefix=f"{dealer_api}/campaigns", tags=["Dealer: Campaigns"], dependencies=dealer_deps)
-app.include_router(dealer_onboarding.router, prefix=f"{dealer_api}/onboarding", tags=["Dealer: Onboarding"], dependencies=dealer_deps)
-app.include_router(dealer_portal_inventory.router, prefix=f"{dealer_api}/portal", tags=["Dealer: Inventory"], dependencies=dealer_deps)
+app.include_router(dealers.router, prefix=f"{v1_str}/dealers", tags=["Dealer: Profile"], dependencies=dealer_profile_deps)
+app.include_router(dealer_stations.router, prefix=f"{v1_str}/dealer-stations", tags=["Dealer: Stations"], dependencies=dealer_scope_deps)
+app.include_router(dealer_portal_dashboard.router, prefix=f"{dealer_api}/portal", tags=["Dealer: Dashboard"], dependencies=dealer_scope_deps)
+app.include_router(dealer_portal_tickets.router, prefix=f"{dealer_api}/portal/tickets", tags=["Dealer: Tickets"], dependencies=dealer_scope_deps)
+app.include_router(dealer_portal_roles.router, prefix=f"{dealer_api}/portal/roles", tags=["Dealer: Roles"], dependencies=dealer_scope_deps)
+app.include_router(dealer_portal_users.router, prefix=f"{dealer_api}/portal/users", tags=["Dealer: Users"], dependencies=dealer_scope_deps)
+app.include_router(dealer_portal_settings.router, prefix=f"{dealer_api}/portal/settings", tags=["Dealer: Settings"], dependencies=dealer_scope_deps)
+app.include_router(dealer_portal_customers.router, prefix=f"{dealer_api}/analytics", tags=["Dealer: Customers"], dependencies=dealer_scope_deps)
+app.include_router(dealer_analytics.router, prefix=f"{dealer_api}/analytics", tags=["Dealer: Analytics"], dependencies=dealer_scope_deps)
+app.include_router(dealer_campaigns.router, prefix=f"{dealer_api}/campaigns", tags=["Dealer: Campaigns"], dependencies=dealer_scope_deps)
+app.include_router(dealer_onboarding.router, prefix=f"{dealer_api}/onboarding", tags=["Dealer: Onboarding"], dependencies=dealer_scope_deps)
+app.include_router(dealer_portal_inventory.router, prefix=f"{dealer_api}/portal", tags=["Dealer: Inventory"], dependencies=dealer_scope_deps)
 
 # ── Logistics ──────────────────────────────────────────────────────────────
 app.include_router(logistics.router, prefix=f"{v1_str}/logistics", tags=["Logistics"])

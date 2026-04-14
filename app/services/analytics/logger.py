@@ -1,7 +1,8 @@
-import logging
 from typing import Dict, Any, Optional
 
-logger = logging.getLogger("analytics_event_logger")
+from app.core.logging import get_logger
+
+logger = get_logger("analytics_event_logger")
 
 class AnalyticsLogger:
     """
@@ -10,10 +11,10 @@ class AnalyticsLogger:
     """
     @staticmethod
     async def log_event(event_type: str, user_id: Optional[int] = None, metadata: Optional[Dict[str, Any]] = None):
-        log_data = {
-            "event_type": event_type,
-            "user_id": user_id,
-            "metadata": metadata or {}
-        }
-        logger.info(f"ANALYTICS_EVENT: {log_data}")
+        logger.info(
+            "analytics.event",
+            event_type=event_type,
+            user_id=user_id,
+            metadata=metadata or {},
+        )
         # Next steps for production: write 'log_data' reliably to Redis Streams or a specialized event table.

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Any, List
+from sqlmodel import Session
 from app.api import deps
 from app.models.user import User
 from app.schemas.ui_config import ScreenConfig, ScreenColumn, ScreenAction
@@ -12,6 +13,7 @@ router = APIRouter()
 def get_screen_config(
     screen_id: str,
     current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
 ) -> Any:
     """
     Get dynamic configuration for a specific screen based on user permissions.
@@ -25,13 +27,25 @@ def get_screen_config(
         )
 
     # 2. Get User Permissions
-    user_roles = [r.name for r in current_user.roles] if current_user.roles else []
-    current_role = user_roles[0] if user_roles else None
+    current_role = current_user.role.name if current_user.role else None
+    if not current_role:
+        ordered_roles = [
+            "super_admin",
+            "admin",
+            "logistics",
+            "dealer",
+            "vendor_owner",
+            "dealer_staff",
+            "driver",
+            "customer",
+        ]
+        role_names = deps.get_user_role_names(current_user)
+        current_role = next((role for role in ordered_roles if role in role_names), None)
     
     # In a real scenario, we'd merge permissions from all roles, but sticking to existing pattern
     permissions_list = []
     if current_role:
-        permissions_list = AuthService.get_permissions_for_role(current_role)
+        permissions_list = AuthService.get_permissions_for_role(db, current_role)
     
     user_permissions = set(permissions_list)
     has_all_access = "all" in user_permissions

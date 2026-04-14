@@ -8,6 +8,7 @@ from datetime import datetime, UTC, timedelta
 from sqlalchemy import case
 
 from app.db.session import get_session
+from app.api import deps
 from app.api.deps import get_current_user
 from app.core.config import settings
 from app.models.user import User
@@ -25,12 +26,7 @@ router = APIRouter()
 
 
 def _get_dealer(db: Session, user_id: int) -> DealerProfile:
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == user_id)
-    ).first()
-    if not dealer:
-        raise HTTPException(status_code=403, detail="Not a dealer")
-    return dealer
+    return deps.get_dealer_profile_or_403(db, user_id, detail="Not a dealer")
 
 
 def _dealer_dashboard_cache(user_id: int, cache_key: str, call, *parts: Any) -> Any:

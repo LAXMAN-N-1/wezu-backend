@@ -860,7 +860,7 @@ def assign_roles_to_user(
         for p in r.permissions:
             active_perms.add(p.slug)
             
-    menu = AuthService.get_menu_for_role(role.name)
+    menu = AuthService.get_menu_for_role(db, role.name)
     
     return rbac_schema.UserRoleAssignmentResponse(
         success=True,
@@ -967,7 +967,7 @@ def remove_role_from_user(
     # Fallback for menu if roles exist (which they should)
     menu = []
     if first_role_name:
-         menu = AuthService.get_menu_for_role(first_role_name)
+         menu = AuthService.get_menu_for_role(db, first_role_name)
     
     return rbac_schema.UserRoleAssignmentResponse(
         success=True,

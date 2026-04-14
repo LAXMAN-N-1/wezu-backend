@@ -165,8 +165,8 @@ def verify_authentication(
         ip_address=_extract_client_ip(request),
     )
 
-    permissions = AuthService.get_permissions_for_role(selected_role)
-    menu_data = AuthService.get_menu_for_role(selected_role)
+    permissions = AuthService.get_permissions_for_role(db, selected_role)
+    menu_data = AuthService.get_menu_for_role(db, selected_role)
 
     return LoginResponse(
         success=True,

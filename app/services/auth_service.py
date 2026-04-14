@@ -1,15 +1,31 @@
+import logging
+from threading import Lock
+from time import monotonic
+from typing import Any
+
+import httpx
 from google.oauth2 import id_token
 from google.auth.transport import requests
+from jose import jwt as jose_jwt, JWTError, ExpiredSignatureError
 from app.core.config import settings
 from app.core.proxy import get_client_ip
 from fastapi import HTTPException, status, Request
 from sqlmodel import Session, select
 
-import logging
-
 logger = logging.getLogger(__name__)
 
+
+class SupabaseTokenValidationError(Exception):
+    def __init__(self, code: str, message: str = "") -> None:
+        super().__init__(message or code)
+        self.code = code
+
+
 class AuthService:
+    _supabase_jwks_cache: list[dict[str, Any]] | None = None
+    _supabase_jwks_cache_expiry: float = 0.0
+    _supabase_jwks_lock = Lock()
+
     @staticmethod
     async def verify_google_token(token: str):
         from fastapi.concurrency import run_in_threadpool
@@ -68,8 +84,6 @@ class AuthService:
     @staticmethod
     async def verify_facebook_token(token: str):
         try:
-            import httpx
-            
             # Verify token via Graph API
             # Fields: id, name, email, picture
             url = f"https://graph.facebook.com/me?access_token={token}&fields=id,name,email,picture"
@@ -86,6 +100,122 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=f"Invalid Facebook token: {str(e)}",
             )
+
+    @classmethod
+    def _resolve_supabase_jwks_url(cls) -> str:
+        if settings.SUPABASE_JWKS_URL:
+            return settings.SUPABASE_JWKS_URL
+        if settings.SUPABASE_URL:
+            return f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json"
+        raise SupabaseTokenValidationError("token_invalid", "Supabase JWKS URL is not configured")
+
+    @classmethod
+    def _resolve_supabase_issuer(cls) -> str:
+        if settings.SUPABASE_JWT_ISSUER:
+            return settings.SUPABASE_JWT_ISSUER
+        if settings.SUPABASE_URL:
+            return f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1"
+        raise SupabaseTokenValidationError("token_invalid", "Supabase issuer is not configured")
+
+    @classmethod
+    def clear_supabase_jwks_cache(cls) -> None:
+        with cls._supabase_jwks_lock:
+            cls._supabase_jwks_cache = None
+            cls._supabase_jwks_cache_expiry = 0.0
+
+    @classmethod
+    def _fetch_supabase_jwks(cls) -> list[dict[str, Any]]:
+        jwks_url = cls._resolve_supabase_jwks_url()
+        timeout = settings.SUPABASE_JWKS_TIMEOUT_SECONDS
+        try:
+            with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+                response = client.get(jwks_url, headers={"Accept": "application/json"})
+            response.raise_for_status()
+            payload = response.json()
+        except (httpx.HTTPError, ValueError) as exc:
+            logger.warning("supabase.jwks_fetch_failed", extra={"error": str(exc)})
+            raise SupabaseTokenValidationError("token_invalid", "Unable to fetch Supabase JWKS") from exc
+
+        keys = payload.get("keys") if isinstance(payload, dict) else None
+        if not isinstance(keys, list) or not keys:
+            raise SupabaseTokenValidationError("token_invalid", "Supabase JWKS response has no keys")
+
+        filtered = [key for key in keys if isinstance(key, dict)]
+        if not filtered:
+            raise SupabaseTokenValidationError("token_invalid", "Supabase JWKS response has no usable keys")
+        return filtered
+
+    @classmethod
+    def _get_supabase_jwks(cls) -> list[dict[str, Any]]:
+        now = monotonic()
+        with cls._supabase_jwks_lock:
+            if cls._supabase_jwks_cache and now < cls._supabase_jwks_cache_expiry:
+                return cls._supabase_jwks_cache
+
+        keys = cls._fetch_supabase_jwks()
+        ttl = max(settings.SUPABASE_JWKS_CACHE_TTL_SECONDS, 0)
+        with cls._supabase_jwks_lock:
+            cls._supabase_jwks_cache = keys
+            cls._supabase_jwks_cache_expiry = monotonic() + ttl if ttl else 0.0
+        return keys
+
+    @classmethod
+    def _resolve_supabase_signing_keys(cls, kid: str) -> dict[str, Any]:
+        for key in cls._get_supabase_jwks():
+            if str(key.get("kid") or "") == kid:
+                return {"keys": [key]}
+
+        # Key rotation fallback: refresh cache once and retry.
+        cls.clear_supabase_jwks_cache()
+        for key in cls._get_supabase_jwks():
+            if str(key.get("kid") or "") == kid:
+                return {"keys": [key]}
+        raise SupabaseTokenValidationError("token_invalid", "Supabase signing key not found")
+
+    @classmethod
+    def verify_supabase_access_token(cls, token: str) -> dict[str, Any]:
+        if not token:
+            raise SupabaseTokenValidationError("token_invalid", "Missing access token")
+        try:
+            header = jose_jwt.get_unverified_header(token)
+        except JWTError as exc:
+            raise SupabaseTokenValidationError("token_invalid", "Malformed token header") from exc
+
+        algorithm = str(header.get("alg") or "").upper()
+        allowed_algorithms = settings.SUPABASE_ALLOWED_ALGORITHMS
+        if algorithm not in allowed_algorithms:
+            raise SupabaseTokenValidationError("token_invalid", "Unexpected token signing algorithm")
+
+        kid = str(header.get("kid") or "").strip()
+        if not kid:
+            raise SupabaseTokenValidationError("token_invalid", "Missing Supabase token key identifier")
+
+        signing_keys = cls._resolve_supabase_signing_keys(kid)
+        audience = (settings.SUPABASE_JWT_AUDIENCE or "").strip() or None
+        issuer = cls._resolve_supabase_issuer()
+        decode_options = {
+            "verify_aud": bool(audience),
+            "verify_sub": True,
+            "verify_exp": True,
+        }
+        try:
+            payload = jose_jwt.decode(
+                token,
+                signing_keys,
+                algorithms=allowed_algorithms,
+                issuer=issuer,
+                audience=audience,
+                options=decode_options,
+            )
+        except ExpiredSignatureError as exc:
+            raise SupabaseTokenValidationError("token_expired", "Supabase access token expired") from exc
+        except JWTError as exc:
+            raise SupabaseTokenValidationError("token_invalid", "Supabase token validation failed") from exc
+
+        role = str(payload.get("role") or "").strip().lower()
+        if role == "anon" and not settings.SUPABASE_ALLOW_ANON_ROLE:
+            raise SupabaseTokenValidationError("token_invalid", "Anonymous role tokens are not allowed")
+        return payload
 
     @staticmethod
     def get_permissions_for_role(
@@ -114,8 +244,8 @@ class AuthService:
 
             perms = list(db.exec(statement).all())
 
-        # Fallbacks for empty DB states or legacy callers without a DB session.
-        if not perms and isinstance(role_identifier, str):
+        # Legacy fallback for callers without a DB session.
+        if db is None and isinstance(role_identifier, str):
             fallback = {
                 "customer": ["profile:read:own", "stations:view:all", "rentals:create:own", "rentals:view:own", "wallet:view:own"],
                 "vendor_owner": ["dashboard:view:own", "stations:manage:own", "staff:manage:own", "finance:view:own"],
@@ -152,7 +282,7 @@ class AuthService:
 
             menus = list(db.exec(statement).all())
 
-        if not menus and isinstance(role_identifier, str):
+        if db is None and isinstance(role_identifier, str):
             # Fallback
             if role_identifier == "customer":
                 return [

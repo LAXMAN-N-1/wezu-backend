@@ -1,33 +1,11 @@
-import logging
-import sys
-import json
-from datetime import datetime, UTC
+from typing import Any
 
-class JSONFormatter(logging.Formatter):
-    def format(self, record):
-        log_record = {
-            "timestamp": datetime.now(UTC).isoformat() + "Z",
-            "level": record.levelname,
-            "name": record.name,
-            "message": record.getMessage(),
-            "module": record.module,
-            "filename": record.filename,
-            "line_no": record.lineno,
-        }
-        if record.exc_info:
-            log_record["exception"] = self.formatException(record.exc_info)
-        return json.dumps(log_record)
+from app.core.logging import get_logger
 
-def setup_logger(name: str) -> logging.Logger:
-    logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
-    
-    # Prevent duplicate handlers
-    if not logger.handlers:
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setFormatter(JSONFormatter())
-        logger.addHandler(handler)
-        
-    return logger
+
+def setup_logger(name: str) -> Any:
+    # Backward-compatible shim: route legacy imports into unified logging stack.
+    return get_logger(name)
+
 
 app_logger = setup_logger("wezu_platform")

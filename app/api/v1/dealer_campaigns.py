@@ -5,13 +5,13 @@ validate codes at checkout, track analytics, and perform bulk operations.
 
 from typing import Any, List
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
-from sqlmodel import Session, select
+from fastapi import APIRouter, Depends, Query, UploadFile, File
+from sqlmodel import Session
 
 from app.db.session import get_session
+from app.api import deps
 from app.api.deps import get_current_user
 from app.models.user import User
-from app.models.dealer import DealerProfile
 from app.services.campaign_service import CampaignService
 from pydantic import BaseModel
 
@@ -19,11 +19,7 @@ router = APIRouter()
 
 def _get_dealer_id(db: Session, user_id: int) -> int:
     """Resolve dealer_id from current user, or raise 403."""
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == user_id)
-    ).first()
-    if not dealer:
-        raise HTTPException(status_code=403, detail="Not a dealer")
+    dealer = deps.get_dealer_profile_or_403(db, user_id, detail="Not a dealer")
     return dealer.id
 
 

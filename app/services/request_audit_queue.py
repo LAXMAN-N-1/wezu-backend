@@ -7,6 +7,7 @@ from sqlmodel import Session
 
 from app.core.config import settings
 from app.core.database import engine
+from app.core.logging import sanitize_for_logging
 from app.models.audit_log import AuditLog
 
 logger = logging.getLogger(__name__)
@@ -95,11 +96,11 @@ class RequestAuditQueueService:
             "user_id": user_id,
             "action": action,
             "resource_type": resource_type,
-            "resource_id": resource_id,
-            "details": details,
-            "meta_data": metadata,
+            "resource_id": str(resource_id)[:255],
+            "details": str(details)[:512],
+            "meta_data": sanitize_for_logging(metadata),
             "ip_address": ip_address,
-            "user_agent": user_agent,
+            "user_agent": str(user_agent or "")[:512] if user_agent else None,
             "timestamp": datetime.now(UTC),
         }
 

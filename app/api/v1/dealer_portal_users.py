@@ -36,10 +36,7 @@ INVITE_TOKEN_EXPIRY_HOURS = 72
 # ── Helpers ──────────────────────────────────────────────
 
 def _get_dealer(db: Session, user_id: int) -> DealerProfile:
-    dealer = db.exec(select(DealerProfile).where(DealerProfile.user_id == user_id)).first()
-    if not dealer:
-        raise HTTPException(status_code=403, detail="Not a dealer account")
-    return dealer
+    return deps.get_dealer_profile_or_403(db, user_id, detail="Not a dealer account")
 
 
 def _user_to_read(user: User, db: Session) -> DealerUserRead:

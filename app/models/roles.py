@@ -5,3 +5,6 @@ class RoleEnum(str, Enum):
     DEALER = "dealer"
     DRIVER = "driver"
     CUSTOMER = "customer"
+    SUPER_ADMIN = "super_admin"
+    SUPPORT_AGENT = "support_agent"
+    LOGISTICS = "logistics"

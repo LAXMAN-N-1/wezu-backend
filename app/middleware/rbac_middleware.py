@@ -1,6 +1,5 @@
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from app.models.roles import RoleEnum
 from jose import jwt, JWTError, ExpiredSignatureError
 from app.core.config import settings
 from app.schemas.user import TokenPayload
@@ -36,7 +35,7 @@ class RBACMiddleware(BaseHTTPMiddleware):
         # get_current_user (deps.py) which runs once per request in the
         # FastAPI dependency layer — avoiding a redundant DB round-trip here.
         auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
+        if auth_header and auth_header.startswith("Bearer ") and settings.AUTH_PROVIDER in {"local", "hybrid"}:
             token = auth_header.split(" ")[1]
             try:
                 payload = jwt.decode(
@@ -48,17 +47,21 @@ class RBACMiddleware(BaseHTTPMiddleware):
                     request.state.user_id = int(token_data.sub)
                                 
             except ExpiredSignatureError:
-                request.state.auth_error = "token_expired"
-                logger.warning("rbac.token_decode_failed", extra={"auth_error": "token_expired"})
+                if settings.AUTH_PROVIDER == "local":
+                    request.state.auth_error = "token_expired"
+                    logger.warning("rbac.token_decode_failed", extra={"auth_error": "token_expired"})
             except JWTError:
-                request.state.auth_error = "token_invalid"
-                logger.warning("rbac.token_decode_failed", extra={"auth_error": "token_invalid"})
+                # In hybrid mode, this can be an external provider token (e.g. Supabase).
+                if settings.AUTH_PROVIDER == "local":
+                    request.state.auth_error = "token_invalid"
+                    logger.warning("rbac.token_decode_failed", extra={"auth_error": "token_invalid"})
             except Exception as e:
-                request.state.auth_error = "token_invalid"
-                logger.warning(
-                    "rbac.token_decode_failed",
-                    extra={"auth_error": "token_invalid", "error": str(e)},
-                )
+                if settings.AUTH_PROVIDER == "local":
+                    request.state.auth_error = "token_invalid"
+                    logger.warning(
+                        "rbac.token_decode_failed",
+                        extra={"auth_error": "token_invalid", "error": str(e)},
+                    )
                 
         response = await call_next(request)
         return response

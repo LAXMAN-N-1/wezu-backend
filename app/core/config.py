@@ -1,6 +1,6 @@
 import json
 import re
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from urllib.parse import parse_qsl, urlencode, urlparse, urlsplit, urlunsplit
 
 from pydantic import field_validator, model_validator
@@ -73,6 +73,18 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    AUTH_PROVIDER: Literal["local", "supabase", "hybrid"] = "local"
+    SUPABASE_URL: Optional[str] = None
+    SUPABASE_JWKS_URL: Optional[str] = None
+    SUPABASE_JWT_ISSUER: Optional[str] = None
+    SUPABASE_JWT_AUDIENCE: Optional[str] = "authenticated"
+    SUPABASE_ALLOWED_ALGORITHMS: list[str] = ["RS256"]
+    SUPABASE_JWKS_CACHE_TTL_SECONDS: int = 300
+    SUPABASE_JWKS_TIMEOUT_SECONDS: float = 5.0
+    SUPABASE_ALLOW_ANON_ROLE: bool = False
+    SUPABASE_ENFORCE_EMAIL_VERIFIED: bool = True
+    SUPABASE_AUTO_PROVISION_USERS: bool = False
+    SUPABASE_DEFAULT_ROLE_NAME: str = "customer"
 
     # ── Customer Authentication ────────────────────────────────────────────
     GOOGLE_OAUTH_CLIENT_ID: Optional[str] = None
@@ -256,6 +268,10 @@ class Settings(BaseSettings):
     LOG_REQUESTS: bool = True
     LOG_HEALTHCHECKS: bool = False
     LOG_SLOW_REQUEST_THRESHOLD_MS: int = 2000
+    LOG_REDACT_SENSITIVE_FIELDS: bool = True
+    LOG_MAX_FIELD_LENGTH: int = 2048
+    LOG_MAX_COLLECTION_ITEMS: int = 50
+    LOG_EXCLUDE_PATHS: list[str] = ["/health", "/ready", "/live"]
     AUTH_TOKEN_CACHE_TTL_SECONDS: int = 5
     ANALYTICS_CACHE_TTL_SECONDS: int = 30
     DEALER_PORTAL_CACHE_TTL_SECONDS: int = 30
@@ -382,7 +398,23 @@ class Settings(BaseSettings):
             return None
         return key
 
-    @field_validator("MEDIA_BASE_URL", "API_PUBLIC_BASE_URL", mode="before")
+    @field_validator("AUTH_PROVIDER", mode="before")
+    @classmethod
+    def _normalize_auth_provider(cls, value: Any) -> str:
+        if value is None:
+            return "local"
+        provider = str(value).strip().lower()
+        return provider or "local"
+
+    @field_validator("SUPABASE_DEFAULT_ROLE_NAME", mode="before")
+    @classmethod
+    def _normalize_supabase_default_role(cls, value: Any) -> str:
+        if value is None:
+            return "customer"
+        role_name = str(value).strip().lower()
+        return role_name or "customer"
+
+    @field_validator("MEDIA_BASE_URL", "API_PUBLIC_BASE_URL", "SUPABASE_URL", "SUPABASE_JWKS_URL", mode="before")
     @classmethod
     def _normalize_base_url(cls, value: Any) -> Optional[str]:
         if value is None:
@@ -396,6 +428,7 @@ class Settings(BaseSettings):
         "CORS_ORIGINS", "ALLOWED_HOSTS", "FORWARDED_ALLOW_IPS",
         "TRUSTED_PROXY_CIDRS", "PASSKEY_ORIGINS",
         "PASSKEY_ANDROID_RELATIONS", "PASSKEY_ANDROID_SHA256_CERT_FINGERPRINTS",
+        "SUPABASE_ALLOWED_ALGORITHMS", "LOG_EXCLUDE_PATHS",
         mode="before",
     )
     @classmethod
@@ -463,6 +496,30 @@ class Settings(BaseSettings):
                     self.ALLOWED_HOSTS.append(host)
         if not self.MEDIA_BASE_URL and self.API_PUBLIC_BASE_URL:
             self.MEDIA_BASE_URL = f"{self.API_PUBLIC_BASE_URL.rstrip('/')}/uploads"
+        return self
+
+    @field_validator("SUPABASE_ALLOWED_ALGORITHMS", mode="after")
+    @classmethod
+    def _normalize_supabase_algorithms(cls, value: list[str]) -> list[str]:
+        normalized = [item.strip().upper() for item in value if item and item.strip()]
+        if not normalized:
+            return ["RS256"]
+        if "NONE" in normalized:
+            raise ValueError("SUPABASE_ALLOWED_ALGORITHMS cannot include 'none'")
+        return normalized
+
+    @model_validator(mode="after")
+    def _validate_supabase_auth(self) -> "Settings":
+        if self.AUTH_PROVIDER not in {"supabase", "hybrid"}:
+            return self
+        if not self.SUPABASE_URL and not self.SUPABASE_JWKS_URL:
+            raise ValueError(
+                "AUTH_PROVIDER is set to supabase/hybrid but SUPABASE_URL or SUPABASE_JWKS_URL is missing"
+            )
+        if self.SUPABASE_JWKS_TIMEOUT_SECONDS <= 0:
+            raise ValueError("SUPABASE_JWKS_TIMEOUT_SECONDS must be > 0")
+        if self.SUPABASE_JWKS_CACHE_TTL_SECONDS < 0:
+            raise ValueError("SUPABASE_JWKS_CACHE_TTL_SECONDS must be >= 0")
         return self
 
     def is_origin_allowed(self, origin: str) -> bool:

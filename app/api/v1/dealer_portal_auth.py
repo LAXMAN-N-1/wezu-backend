@@ -105,9 +105,7 @@ class RefreshTokenRequest(BaseModel):
 
 def _build_dealer_auth_user(user: User, db: Session) -> DealerAuthUser:
     """Build auth response user object with dealer-specific fields."""
-    dealer_profile = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == user.id)
-    ).first()
+    dealer_profile = deps.get_dealer_profile_for_user(db, user)
 
     application_stage = None
     is_approved = False
@@ -132,7 +130,7 @@ def _build_dealer_auth_user(user: User, db: Session) -> DealerAuthUser:
         email=user.email,
         phone_number=user.phone_number,
         full_name=user.full_name,
-        user_type="dealer",
+        user_type=str(getattr(user.user_type, "value", user.user_type)) if user.user_type else "dealer",
         profile_picture=user.profile_picture,
         dealer_id=dealer_id,
         business_name=business_name,
@@ -188,6 +186,10 @@ async def dealer_login(
         if user.status == UserStatus.PENDING:
             raise HTTPException(status_code=403, detail="Account is pending activation. Check your email for the invite link.")
         raise HTTPException(status_code=403, detail="Account is inactive or suspended")
+
+    dealer_profile = deps.get_dealer_profile_for_user(db, user)
+    if not dealer_profile:
+        raise HTTPException(status_code=403, detail="Dealer portal access denied")
 
     # Reset failed attempts on success
     user.failed_login_attempts = 0
@@ -334,9 +336,7 @@ def registration_status(
     db: Session = Depends(deps.get_db),
 ):
     """Get dealer's registration/onboarding status."""
-    profile = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == current_user.id)
-    ).first()
+    profile = deps.get_dealer_profile_for_user(db, current_user)
     if not profile:
         raise HTTPException(status_code=404, detail="Dealer profile not found")
 

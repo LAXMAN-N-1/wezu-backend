@@ -1,5 +1,6 @@
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import Request
+from app.core.config import settings
 from app.services.request_audit_queue import request_audit_queue
 from app.core.proxy import get_client_ip
 import time
@@ -7,7 +8,9 @@ import time
 class AuditMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # 1. Skip non-API requests or health checks if needed
-        if request.url.path in ["/live", "/health", "/", "/docs", "/openapi.json"]:
+        excluded_paths = set(settings.LOG_EXCLUDE_PATHS or [])
+        excluded_paths.update({"/", "/docs", "/openapi.json"})
+        if request.url.path in excluded_paths:
             return await call_next(request)
 
         start_time = time.time()
@@ -29,7 +32,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
         # 5. Enqueue request audit event without blocking the response path.
         metadata = {
             "method": request.method,
-            "url": str(request.url),
+            "path": request.url.path,
+            "query_keys": sorted(request.query_params.keys()),
             "process_time_ms": int(process_time * 1000),
             "status_code": response.status_code,
             "user_agent": request.headers.get("user-agent"),

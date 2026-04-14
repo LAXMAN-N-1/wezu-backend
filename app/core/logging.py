@@ -1,6 +1,10 @@
+import json
 import logging
-import logging.config
+import os
 import sys
+from datetime import date, datetime, time
+from decimal import Decimal
+from enum import Enum
 from typing import Any
 
 try:
@@ -10,19 +14,116 @@ except ModuleNotFoundError:  # pragma: no cover - environment fallback
 
 from app.core.config import settings
 
+_LOGGING_CONFIGURED = False
+
+_SENSITIVE_KEY_MARKERS = {
+    "password",
+    "secret",
+    "token",
+    "authorization",
+    "cookie",
+    "apikey",
+    "api_key",
+    "access_key",
+    "private_key",
+    "refresh",
+    "otp",
+    "pin",
+    "passcode",
+    "signature",
+}
+_REDACTED = "***REDACTED***"
+
+
+def _truncate_string(value: str, max_len: int) -> str:
+    if max_len <= 0:
+        return value
+    if len(value) <= max_len:
+        return value
+    return f"{value[:max_len]}...(truncated:{len(value) - max_len})"
+
+
+def _is_sensitive_key(key: str) -> bool:
+    normalized = key.lower().replace("-", "_")
+    return any(marker in normalized for marker in _SENSITIVE_KEY_MARKERS)
+
+
+def sanitize_for_logging(value: Any, *, _depth: int = 0) -> Any:
+    """Convert arbitrary objects into JSON-safe, bounded logging payloads."""
+    max_items = max(1, int(settings.LOG_MAX_COLLECTION_ITEMS or 50))
+    max_field_len = max(32, int(settings.LOG_MAX_FIELD_LENGTH or 2048))
+    redact = bool(settings.LOG_REDACT_SENSITIVE_FIELDS)
+
+    if _depth > 5:
+        return "<max_depth>"
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, Enum):
+        return str(value.value)
+    if isinstance(value, (datetime, date, time)):
+        return value.isoformat()
+    if isinstance(value, bytes):
+        decoded = value.decode("utf-8", errors="replace")
+        return _truncate_string(decoded, max_field_len)
+    if isinstance(value, str):
+        return _truncate_string(value, max_field_len)
+
+    if isinstance(value, dict):
+        out: dict[str, Any] = {}
+        for idx, (raw_key, raw_val) in enumerate(value.items()):
+            if idx >= max_items:
+                out["__truncated_items__"] = len(value) - max_items
+                break
+            key = _truncate_string(str(raw_key), 128)
+            if redact and _is_sensitive_key(key):
+                out[key] = _REDACTED
+                continue
+            out[key] = sanitize_for_logging(raw_val, _depth=_depth + 1)
+        return out
+
+    if isinstance(value, (list, tuple, set, frozenset)):
+        normalized = list(value)
+        result = [sanitize_for_logging(item, _depth=_depth + 1) for item in normalized[:max_items]]
+        if len(normalized) > max_items:
+            result.append(f"...(truncated:{len(normalized) - max_items})")
+        return result
+
+    if hasattr(value, "model_dump"):
+        try:
+            return sanitize_for_logging(value.model_dump(), _depth=_depth + 1)
+        except Exception:
+            return _truncate_string(repr(value), max_field_len)
+    if hasattr(value, "dict"):
+        try:
+            return sanitize_for_logging(value.dict(), _depth=_depth + 1)
+        except Exception:
+            return _truncate_string(repr(value), max_field_len)
+
+    try:
+        json.dumps(value)
+        return value
+    except Exception:
+        return _truncate_string(repr(value), max_field_len)
+
 
 class _FallbackBoundLogger:
     """Minimal structlog-like adapter for environments without structlog."""
 
-    def __init__(self, logger: logging.Logger):
+    def __init__(self, logger: logging.Logger, context: dict[str, Any] | None = None):
         self._logger = logger
+        self._context = context or {}
 
     def bind(self, **kwargs: Any) -> "_FallbackBoundLogger":
-        return self
+        merged = dict(self._context)
+        merged.update(kwargs)
+        return _FallbackBoundLogger(self._logger, merged)
 
     def _emit(self, level: int, event: str, **kwargs: Any) -> None:
-        if kwargs:
-            self._logger.log(level, "%s | %s", event, kwargs)
+        payload = sanitize_for_logging({**self._context, **kwargs})
+        if payload:
+            self._logger.log(level, "%s %s", event, json.dumps(payload, ensure_ascii=False))
         else:
             self._logger.log(level, "%s", event)
 
@@ -39,7 +140,11 @@ class _FallbackBoundLogger:
         self._emit(logging.ERROR, event, **kwargs)
 
     def exception(self, event: str, **kwargs: Any) -> None:
-        self._emit(logging.ERROR, event, **kwargs)
+        payload = sanitize_for_logging({**self._context, **kwargs})
+        if payload:
+            self._logger.exception("%s %s", event, json.dumps(payload, ensure_ascii=False))
+        else:
+            self._logger.exception("%s", event)
 
 
 class _HealthcheckAccessFilter(logging.Filter):
@@ -49,13 +154,18 @@ class _HealthcheckAccessFilter(logging.Filter):
         if record.name not in {"uvicorn.access", "gunicorn.access"}:
             return True
 
+        excluded_paths = tuple(p for p in settings.LOG_EXCLUDE_PATHS if p)
         path_hint = ""
         args = getattr(record, "args", None)
         if isinstance(args, tuple) and len(args) >= 3:
             path_hint = str(args[2])
 
         message = path_hint or record.getMessage()
-        return "/health" not in message and "/ready" not in message
+        return not any(path in message for path in excluded_paths)
+
+
+def _sanitize_event_processor(_: Any, __: str, event_dict: dict[str, Any]) -> dict[str, Any]:
+    return sanitize_for_logging(event_dict)
 
 
 def _shared_processors() -> list[Any]:
@@ -69,15 +179,29 @@ def _shared_processors() -> list[Any]:
         structlog.processors.TimeStamper(fmt="iso", utc=False),
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
+        _sanitize_event_processor,
     ]
 
 
+def bind_contextvars(**kwargs: Any) -> None:
+    if structlog is None:
+        return
+    structlog.contextvars.bind_contextvars(**sanitize_for_logging(kwargs))
+
+
+def clear_contextvars() -> None:
+    if structlog is None:
+        return
+    structlog.contextvars.clear_contextvars()
+
+
 def setup_logging() -> None:
-    """
-    Configure stdlib logging and structlog so all logs end up on stdout/stderr
-    with request context attached. This is the only logging bootstrap path the
-    API should use.
-    """
+    """Configure stdlib logging and structlog output for production."""
+    global _LOGGING_CONFIGURED
+    if _LOGGING_CONFIGURED:
+        return
+
+    log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
     if structlog is None:
         handler = logging.StreamHandler(sys.stdout)
         handler.addFilter(_HealthcheckAccessFilter())
@@ -90,15 +214,15 @@ def setup_logging() -> None:
         root_logger = logging.getLogger()
         root_logger.handlers.clear()
         root_logger.addHandler(handler)
-        root_logger.setLevel(getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO))
+        root_logger.setLevel(log_level)
         logging.captureWarnings(True)
     else:
         shared_processors = _shared_processors()
-        renderer: Any
-        if settings.ENVIRONMENT == "production":
-            renderer = structlog.processors.JSONRenderer()
-        else:
-            renderer = structlog.dev.ConsoleRenderer()
+        renderer: Any = (
+            structlog.processors.JSONRenderer()
+            if settings.ENVIRONMENT == "production"
+            else structlog.dev.ConsoleRenderer()
+        )
 
         formatter = structlog.stdlib.ProcessorFormatter(
             foreign_pre_chain=shared_processors,
@@ -112,8 +236,7 @@ def setup_logging() -> None:
         root_logger = logging.getLogger()
         root_logger.handlers.clear()
         root_logger.addHandler(handler)
-        root_logger.setLevel(getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO))
-
+        root_logger.setLevel(log_level)
         logging.captureWarnings(True)
 
         structlog.configure(
@@ -140,6 +263,14 @@ def setup_logging() -> None:
         library_logger.handlers.clear()
         library_logger.propagate = True
         library_logger.setLevel(level)
+
+    _LOGGING_CONFIGURED = True
+    logging.getLogger(__name__).info(
+        "logging.setup.complete environment=%s pid=%s level=%s",
+        settings.ENVIRONMENT,
+        os.getpid(),
+        settings.LOG_LEVEL.upper(),
+    )
 
 
 def get_logger(name: str) -> Any:

@@ -9,6 +9,7 @@ from pydantic import BaseModel, EmailStr
 from datetime import datetime, UTC
 
 from app.db.session import get_session
+from app.api import deps
 from app.api.deps import get_current_user
 from app.core.config import settings
 from app.models.user import User
@@ -82,9 +83,7 @@ class RentalSettingsRequest(BaseModel):
 
 
 def _get_dealer_profile_or_404(db: Session, user_id: int) -> DealerProfile:
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == user_id)
-    ).first()
+    dealer = deps.get_dealer_profile_for_user_id(db, user_id)
     if not dealer:
         raise HTTPException(status_code=404, detail="Dealer profile not found")
     return dealer

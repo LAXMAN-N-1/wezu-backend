@@ -417,14 +417,14 @@ async def social_login(
     
     # 1. Verify Token based on Provider
     if auth_data.provider == "google":
-        idinfo = AuthService.verify_google_token(auth_data.token)
+        idinfo = await AuthService.verify_google_token(auth_data.token)
         email = idinfo.get("email")
         social_id = idinfo.get("sub")
         name = idinfo.get("name")
         picture = idinfo.get("picture")
         
     elif auth_data.provider == "facebook":
-        data = AuthService.verify_facebook_token(auth_data.token)
+        data = await AuthService.verify_facebook_token(auth_data.token)
         email = data.get("email")
         social_id = data.get("id")
         name = data.get("name")
@@ -433,7 +433,7 @@ async def social_login(
              picture = data["picture"]["data"]["url"]
              
     elif auth_data.provider == "apple":
-        payload = AuthService.verify_apple_token(auth_data.token)
+        payload = await AuthService.verify_apple_token(auth_data.token)
         email = payload.get("email")
         social_id = payload.get("sub")
         # Apple only sends name on first login, so we might not have it here
@@ -543,8 +543,8 @@ async def social_login(
     # Let's check social_login signature again. It does NOT have request.
     # I will skip social_login in this multi_replace and do it separately.
     
-    permissions = AuthService.get_permissions_for_role(selected_role_name)
-    menu_data = AuthService.get_menu_for_role(selected_role_name)
+    permissions = AuthService.get_permissions_for_role(db, selected_role_name)
+    menu_data = AuthService.get_menu_for_role(db, selected_role_name)
     
     return LoginResponse(
         success=True,
