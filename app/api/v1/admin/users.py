@@ -11,7 +11,9 @@ from app.api import deps
 from app.services.user_service import UserService
 from app.services.email_service import EmailService
 from app.core.security import get_password_hash
+from app.core.rbac import canonical_role_name
 from app.models.rbac import Role
+from app.models.rbac import UserRole
 from app.schemas.admin_user import (
     UserSuspensionRequest, 
     UserRoleUpdateRequest, 
@@ -137,13 +139,15 @@ def _resolve_role(db: Session, role_name: str) -> Role:
 
 
 def _derive_user_type(role_name: str) -> UserType:
-    role_value = role_name.strip().lower()
-    if role_value in {"admin", "super_admin", "superadmin", "manager", "support_agent", "support"}:
+    role_value = canonical_role_name(role_name)
+    if role_value in {"super_admin", "operations_admin", "security_admin", "finance_admin", "support_manager", "support_agent"}:
         return UserType.ADMIN
-    if role_value == "dealer":
+    if role_value == "dealer_owner":
         return UserType.DEALER
-    if role_value in {"logistics", "driver"}:
+    if role_value in {"logistics_manager", "dispatcher", "fleet_manager", "warehouse_manager", "driver"}:
         return UserType.LOGISTICS
+    if role_value in {"dealer_manager", "dealer_inventory_staff", "dealer_finance_staff", "dealer_support_staff"}:
+        return UserType.DEALER_STAFF
     return UserType.CUSTOMER
 
 
@@ -166,6 +170,22 @@ def _issue_invite(
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    existing_link = db.exec(
+        select(UserRole).where(
+            UserRole.user_id == user.id,
+            UserRole.role_id == role.id,
+        )
+    ).first()
+    if not existing_link:
+        db.add(
+            UserRole(
+                user_id=user.id,
+                role_id=role.id,
+                effective_from=datetime.now(UTC),
+            )
+        )
+        db.commit()
 
     subject = "You've Been Invited to Wezu!"
     content = f"""

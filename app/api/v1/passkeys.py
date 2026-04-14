@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -9,6 +9,7 @@ from sqlmodel import Session
 from app.api import deps
 from app.core.config import settings
 from app.core.proxy import extract_forwarded_client_ip
+from app.core.rbac import canonical_role_name, role_sort_key
 from app.core.security import create_access_token, create_refresh_token
 from app.db.session import get_session
 from app.models.user import User
@@ -53,18 +54,30 @@ def _to_credential_info(item) -> PasskeyCredentialInfo:
     )
 
 
-def _resolve_selected_role(user: User, requested_role: Optional[str]) -> tuple[Optional[str], list[str], bool]:
-    user_roles = [role.name for role in (user.roles or []) if getattr(role, "name", None)]
+def _resolve_selected_role(db: Session, user: User, requested_role: Optional[str]) -> tuple[Optional[str], list[str], bool]:
+    role_objects = deps.get_active_roles_for_user_id(db, user.id)
+    if not role_objects and user.role:
+        role_objects = [user.role]
+    unique_role_names = {
+        canonical_role_name(role.name)
+        for role in role_objects
+        if getattr(role, "name", None)
+    }
+    user_roles = sorted(
+        [role_name for role_name in unique_role_names if role_name],
+        key=lambda value: role_sort_key(value),
+    )
     if not user_roles:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No roles assigned to user")
 
     if requested_role:
-        if requested_role not in user_roles:
+        canonical_requested_role = canonical_role_name(requested_role)
+        if canonical_requested_role not in user_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"User does not have role: {requested_role}",
             )
-        return requested_role, user_roles, False
+        return canonical_requested_role, user_roles, False
 
     if len(user_roles) == 1:
         return user_roles[0], user_roles, False
@@ -136,7 +149,7 @@ def verify_authentication(
         credential=payload.credential,
     )
 
-    selected_role, user_roles, needs_selection = _resolve_selected_role(user, payload.role)
+    selected_role, user_roles, needs_selection = _resolve_selected_role(db, user, payload.role)
     if needs_selection:
         return LoginResponse(
             success=False,
@@ -148,7 +161,7 @@ def verify_authentication(
 
     assert selected_role is not None
 
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(UTC)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -165,8 +178,16 @@ def verify_authentication(
         ip_address=_extract_client_ip(request),
     )
 
-    permissions = AuthService.get_permissions_for_role(db, selected_role)
-    menu_data = AuthService.get_menu_for_role(db, selected_role)
+    selected_role_obj = next((role for role in deps.get_active_roles_for_user_id(db, user.id) if canonical_role_name(role.name) == selected_role), None)
+    role_identifier = selected_role_obj.id if selected_role_obj else selected_role
+    if selected_role_obj and user.role_id != selected_role_obj.id:
+        user.role_id = selected_role_obj.id
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    permissions = AuthService.get_permissions_for_role(db, role_identifier)
+    menu_data = AuthService.get_menu_for_role(db, role_identifier)
 
     return LoginResponse(
         success=True,

@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Form
-from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from sqlmodel import Session, select
@@ -19,7 +18,6 @@ from app.core.config import settings
 from app.api import deps
 from app.core.audit import AuditLogger, audit_log
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
-from fastapi.security import OAuth2PasswordRequestForm
 import logging
 import re
 from typing import Any, List, Optional
@@ -29,6 +27,7 @@ import uuid
 from app.middleware.rate_limit import limiter
 from app.repositories.user_repository import user_repository
 from app.services.security_service import SecurityService
+from app.core.rbac import canonical_role_name, role_sort_key
 from app.schemas.auth import (
     VerifyEmailRequest, ChangePasswordRequest, TwoFASetupResponse, 
     TwoFAVerifyRequest, TwoFADisableRequest, BiometricRegisterRequest, 
@@ -38,6 +37,67 @@ from app.schemas.auth import (
 
 router = APIRouter()
 logger = logging.getLogger("wezu_auth")
+
+
+def _active_roles_for_user(db: Session, user: User) -> list:
+    roles = deps.get_active_roles_for_user_id(db, user.id)
+    if roles:
+        return roles
+    return [user.role] if user.role else []
+
+
+def _resolve_selected_role(
+    db: Session,
+    user: User,
+    requested_role: Optional[str] = None,
+):
+    active_roles = _active_roles_for_user(db, user)
+    if not active_roles:
+        raise HTTPException(status_code=403, detail="No roles assigned to user")
+
+    unique_role_names = {
+        canonical_role_name(role.name)
+        for role in active_roles
+        if getattr(role, "name", None)
+    }
+    available_role_names = sorted(
+        [role_name for role_name in unique_role_names if role_name],
+        key=lambda value: role_sort_key(value),
+    )
+    role_by_name = {canonical_role_name(role.name): role for role in active_roles if getattr(role, "name", None)}
+
+    selected_name = canonical_role_name(requested_role) if requested_role else None
+    if selected_name:
+        selected_role = role_by_name.get(selected_name)
+        if not selected_role:
+            raise HTTPException(status_code=403, detail=f"User does not have role: {requested_role}")
+    else:
+        if user.role_id:
+            selected_role = next((role for role in active_roles if role.id == user.role_id), None)
+        else:
+            selected_role = None
+        if not selected_role:
+            selected_role = active_roles[0]
+
+    return selected_role, available_role_names
+
+
+def _assign_primary_role(db: Session, user: User, role) -> None:
+    from app.models.rbac import UserRole
+
+    user.role_id = role.id
+    db.add(user)
+
+    existing = db.exec(
+        select(UserRole).where(
+            UserRole.user_id == user.id,
+            UserRole.role_id == role.id,
+        )
+    ).first()
+    if not existing:
+        db.add(UserRole(user_id=user.id, role_id=role.id, effective_from=datetime.now(UTC)))
+    db.commit()
+    db.refresh(user)
 
 class UserCreate(BaseModel):
     email: Optional[EmailStr] = None
@@ -112,13 +172,9 @@ async def register(
     
     # Assign default role
     from app.models.rbac import Role
-    from sqlalchemy.orm import selectinload
     customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
     if customer_role:
-        user.role_id = customer_role.id
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+        _assign_primary_role(db, user, customer_role)
 
     # Audit log
     AuditLogger.log_event(db, user.id, "REGISTER", "AUTH", resource_id=user.id)
@@ -336,11 +392,7 @@ async def verify_registration_otp(
         # Assign Default Role: Customer
         customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
         if customer_role:
-            # Single role assignment
-            user.role = customer_role
-            db.add(user)
-            db.commit()
-            db.refresh(user)
+            _assign_primary_role(db, user, customer_role)
         
         # Check Fraud Risk
         FraudService.calculate_risk_score(db, user.id)
@@ -491,11 +543,7 @@ async def social_login(
         # Assign Default Role: Customer
         customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
         if customer_role:
-            # Single role assignment
-            user.role = customer_role
-            db.add(user)
-            db.commit()
-            db.refresh(user)
+            _assign_primary_role(db, user, customer_role)
             
         # Check Fraud Risk
         FraudService.calculate_risk_score(db, user.id)
@@ -522,11 +570,10 @@ async def social_login(
 
     # 3. Generate Tokens & Response (Using same logic as Login)
     
-    # Updated: Single role handling
-    selected_role_name = user.role.name if user.role else None
-    
-    # Maintain compatibility with List expectation if any, but logic is single
-    user_roles = [selected_role_name] if selected_role_name else []
+    selected_role, user_roles = _resolve_selected_role(db, user, None)
+    selected_role_name = canonical_role_name(selected_role.name)
+    if user.role_id != selected_role.id:
+        _assign_primary_role(db, user, selected_role)
         
     access_token = create_access_token(subject=user.id)
     refresh_token = create_refresh_token(subject=user.id)
@@ -534,17 +581,8 @@ async def social_login(
     # Create Session
     AuthService.create_user_session(db, user.id, refresh_token, request)
     
-    # Create Session
-    # Note: social_login endpoint uses `request`? It does NOT have Request in signature!
-    # I need to add request to social_login signature first?
-    # Wait, simple replace won't work if I need to change signature.
-    # I will skip social_login for now or add Request to it in a separate step?
-    # I'll rely on separate step or context based replace.
-    # Let's check social_login signature again. It does NOT have request.
-    # I will skip social_login in this multi_replace and do it separately.
-    
-    permissions = AuthService.get_permissions_for_role(db, selected_role_name)
-    menu_data = AuthService.get_menu_for_role(db, selected_role_name)
+    permissions = AuthService.get_permissions_for_role(db, selected_role.id)
+    menu_data = AuthService.get_menu_for_role(db, selected_role.id)
     
     return LoginResponse(
         success=True,
@@ -598,10 +636,7 @@ async def register_with_password(
     # Assign default role (added missing logic)
     customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
     if customer_role:
-        new_user.role = customer_role
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
+        _assign_primary_role(db, new_user, customer_role)
     
     # Check Fraud Risk
     FraudService.calculate_risk_score(db, new_user.id)
@@ -746,17 +781,11 @@ async def login(
          AuditLogger.log_event(db, user.id, "FAILED_LOGIN", "AUTH", metadata={"reason": "inactive_account"})
          raise HTTPException(status_code=403, detail="Account is inactive")
 
-    # 2. Determine Role (single-role model)
-    selected_role_name = user.role.name if user.role else None
-    user_roles = [selected_role_name] if selected_role_name else []
-    
-    if not user_roles:
-         raise HTTPException(status_code=403, detail="No roles assigned to user")
-
-    if login_data.role:
-        if login_data.role != selected_role_name:
-            raise HTTPException(status_code=403, detail=f"User does not have role: {login_data.role}")
-        selected_role_name = login_data.role
+    # 2. Determine active role from multi-role assignments.
+    selected_role, user_roles = _resolve_selected_role(db, user, login_data.role)
+    selected_role_name = canonical_role_name(selected_role.name)
+    if user.role_id != selected_role.id:
+        _assign_primary_role(db, user, selected_role)
             
     # Update Last Login
     user.last_login = datetime.now(UTC)
@@ -773,8 +802,8 @@ async def login(
     AuthService.create_user_session(db, user.id, refresh_token, request, token_jti=token_jti)
     
     # Get Permissions & Menu from AuthService
-    permissions = AuthService.get_permissions_for_role(db, selected_role_name)
-    menu_data = AuthService.get_menu_for_role(db, selected_role_name)
+    permissions = AuthService.get_permissions_for_role(db, selected_role.id)
+    menu_data = AuthService.get_menu_for_role(db, selected_role.id)
     
     # Audit: successful login
     AuditLogger.log_event(db, user.id, "LOGIN", "AUTH", metadata={"role": selected_role_name})
@@ -798,42 +827,29 @@ async def select_role(
 ):
     """
     Select/Switch active role for the current user.
-    Note: As of latest schema, User has single role. This endpoint validates the user has the requested role 
-    and returns fresh tokens permissions.
     """
-    # 1. Validate User has the role
-    # Refactored for single role
-    
-    current_role_name = current_user.role.name if current_user.role else None
-    
-    if role_data.role != current_role_name:
-         raise HTTPException(
-             status_code=status.HTTP_403_FORBIDDEN,
-             detail=f"User does not have role: {role_data.role}"
-         )
-         
+    selected_role, available_roles = _resolve_selected_role(db, current_user, role_data.role)
+    selected_role_name = canonical_role_name(selected_role.name)
+    if current_user.role_id != selected_role.id:
+        _assign_primary_role(db, current_user, selected_role)
+
     # 2. Generate new tokens
     token_jti = str(uuid.uuid4())
     access_token = create_access_token(subject=current_user.id, extra_claims={"sid": token_jti})
     refresh_token = create_refresh_token(subject=current_user.id, jti=token_jti)
     
     # 3. Get Permissions & Menu
-    from app.models.rbac import Role
-    selected_role = db.exec(select(Role).where(Role.name == role_data.role)).first()
-    if not selected_role:
-         raise HTTPException(status_code=404, detail="Role not found")
-
     permissions = AuthService.get_permissions_for_role(db, selected_role.id)
     menu_data = AuthService.get_menu_for_role(db, selected_role.id)
     
     return LoginResponse(
         success=True,
-        message=f"Switched to role: {role_data.role}",
+        message=f"Switched to role: {selected_role_name}",
         access_token=access_token,
         refresh_token=refresh_token,
         user=current_user.model_dump(exclude={"hashed_password"}),
-        role=role_data.role,
-        available_roles=[current_role_name] if current_role_name else [],
+        role=selected_role_name,
+        available_roles=available_roles,
         permissions=permissions,
         menu=menu_data
     )

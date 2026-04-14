@@ -13,6 +13,7 @@ from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime, UTC
 from enum import Enum
 import sqlalchemy as sa
+from app.core.rbac import canonicalize_permission_set, canonicalize_permission_slug
 
 if TYPE_CHECKING:
     from app.models.session import UserSession
@@ -180,7 +181,14 @@ class User(SQLModel, table=True):
 
     @property
     def roles(self) -> List["Role"]:
-        """Backward compatibility for legacy Many-to-Many role checks."""
+        """
+        Runtime active roles.
+        `_active_roles_cache` is populated by auth dependencies from `user_roles`
+        and falls back to primary `role_id` when unavailable.
+        """
+        cached_roles = getattr(self, "_active_roles_cache", None)
+        if cached_roles is not None:
+            return cached_roles
         return [self.role] if self.role else []
 
     # --- Granular RBAC Helpers ---
@@ -191,10 +199,10 @@ class User(SQLModel, table=True):
         for role in self.roles:
             for perm in role.permissions:
                 perms.add(perm.slug)
-        return perms
+        return canonicalize_permission_set(perms)
 
     def has_permission(self, slug: str) -> bool:
         """Check if user has a specific permission (superusers always pass)."""
         if self.is_superuser:
             return True
-        return slug in self.all_permissions
+        return canonicalize_permission_slug(slug) in self.all_permissions

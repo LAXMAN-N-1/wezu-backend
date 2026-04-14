@@ -8,10 +8,12 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError, ExpiredSignatureError
 from pydantic import ValidationError
 from sqlmodel import Session, select
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import joinedload
 from app.core.config import settings
+from app.core.rbac import canonical_role_name
 from app.core.database import get_db
+from app.models.rbac import Role, UserRole
 from app.models.user import User
 from app.schemas.user import TokenPayload
 from app.models.oauth import BlacklistedToken
@@ -20,13 +22,20 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-ADMIN_ROLE_NAMES = {"admin", "super_admin"}
-DEALER_OWNER_ROLE_NAMES = {"dealer", "vendor_owner"}
-DEALER_SCOPE_ROLE_NAMES = DEALER_OWNER_ROLE_NAMES | {"dealer_staff"}
+ADMIN_ROLE_NAMES = {"super_admin", "operations_admin", "security_admin", "finance_admin"}
+SUPPORT_ROLE_NAMES = {"support_manager", "support_agent"}
+DEALER_OWNER_ROLE_NAMES = {"dealer_owner"}
+DEALER_SCOPE_ROLE_NAMES = {
+    "dealer_owner",
+    "dealer_manager",
+    "dealer_inventory_staff",
+    "dealer_finance_staff",
+    "dealer_support_staff",
+}
 DRIVER_ROLE_NAMES = {"driver"}
 CUSTOMER_ROLE_NAMES = {"customer"}
-LOGISTICS_ROLE_NAMES = {"logistics", "warehouse_manager", "operator", "dispatch", "fleet_manager"}
-INTERNAL_OPERATOR_ROLE_NAMES = ADMIN_ROLE_NAMES | LOGISTICS_ROLE_NAMES
+LOGISTICS_ROLE_NAMES = {"logistics_manager", "dispatcher", "fleet_manager", "warehouse_manager"}
+INTERNAL_OPERATOR_ROLE_NAMES = ADMIN_ROLE_NAMES | LOGISTICS_ROLE_NAMES | SUPPORT_ROLE_NAMES
 
 
 @dataclass
@@ -192,8 +201,6 @@ def _find_user_by_email(db: Session, email: str) -> Optional[User]:
 
 
 def _provision_supabase_user(db: Session, payload: dict[str, Any]) -> User:
-    from app.models.rbac import Role
-
     email = str(payload.get("email") or "").strip().lower()
     if not email:
         raise _auth_unauthorized("token_invalid")
@@ -217,7 +224,7 @@ def _provision_supabase_user(db: Session, payload: dict[str, Any]) -> User:
     db.commit()
     db.refresh(new_user)
 
-    default_role_name = settings.SUPABASE_DEFAULT_ROLE_NAME.strip().lower()
+    default_role_name = canonical_role_name(settings.SUPABASE_DEFAULT_ROLE_NAME)
     if default_role_name:
         role = db.exec(
             select(Role).where(func.lower(Role.name) == default_role_name)
@@ -225,6 +232,12 @@ def _provision_supabase_user(db: Session, payload: dict[str, Any]) -> User:
         if role:
             new_user.role_id = role.id
             db.add(new_user)
+            db.add(
+                UserRole(
+                    user_id=new_user.id,
+                    role_id=role.id,
+                )
+            )
             db.commit()
             db.refresh(new_user)
 
@@ -284,6 +297,27 @@ def _validate_access_token_by_mode(db: Session, token: str) -> _ValidatedToken:
     raise _auth_unauthorized("token_invalid")
 
 
+def get_active_roles_for_user_id(
+    db: Session,
+    user_id: int,
+) -> list[Role]:
+    from datetime import UTC, datetime
+
+    now = datetime.now(UTC)
+    active_roles = db.exec(
+        select(Role)
+        .join(UserRole, UserRole.role_id == Role.id)
+        .where(
+            UserRole.user_id == user_id,
+            Role.is_active == True,  # noqa: E712
+            UserRole.effective_from <= now,
+            or_(UserRole.expires_at == None, UserRole.expires_at >= now),  # noqa: E711
+        )
+        .order_by(Role.level.desc(), Role.name.asc())
+    ).all()
+    return active_roles
+
+
 def get_user_from_token(
     db: Session,
     token: Optional[str],
@@ -325,22 +359,40 @@ def get_user_from_token(
             if token_issued_at < user.last_global_logout_at:
                 raise _auth_unauthorized("token_invalid")
 
+    active_roles = get_active_roles_for_user_id(db, user.id)
+    setattr(user, "_active_roles_cache", active_roles)
+
+    if not active_roles and user.role:
+        setattr(user, "_active_roles_cache", [user.role])
+        active_roles = [user.role]
+
+    # Keep active role pointer deterministic and in-sync with active assignments.
+    active_role_ids = {role.id for role in active_roles if role.id is not None}
+    if active_role_ids and user.role_id not in active_role_ids:
+        best_role = active_roles[0]
+        if best_role.id is not None:
+            user.role_id = best_role.id
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+            setattr(user, "_active_roles_cache", active_roles)
+
     if request is not None:
         request.state.user = user
         request.state.user_id = user.id
         from app.models.roles import RoleEnum
         role_names = get_user_role_names(user)
-        if RoleEnum.SUPER_ADMIN.value in role_names:
+        if canonical_role_name(RoleEnum.SUPER_ADMIN.value) in role_names:
             request.state.user_role = RoleEnum.SUPER_ADMIN
-        elif RoleEnum.ADMIN.value in role_names:
+        elif role_names & ADMIN_ROLE_NAMES:
             request.state.user_role = RoleEnum.ADMIN
         elif role_names & LOGISTICS_ROLE_NAMES:
             request.state.user_role = RoleEnum.LOGISTICS
         elif role_names & DEALER_SCOPE_ROLE_NAMES:
             request.state.user_role = RoleEnum.DEALER
-        elif RoleEnum.DRIVER.value in role_names:
+        elif canonical_role_name(RoleEnum.DRIVER.value) in role_names:
             request.state.user_role = RoleEnum.DRIVER
-        elif RoleEnum.CUSTOMER.value in role_names:
+        elif canonical_role_name(RoleEnum.CUSTOMER.value) in role_names:
             request.state.user_role = RoleEnum.CUSTOMER
 
     return user
@@ -350,21 +402,21 @@ def get_user_role_names(user: User) -> set[str]:
     role_names: set[str] = set()
 
     for role in getattr(user, "roles", []) or []:
-        role_name = (getattr(role, "name", "") or "").strip().lower()
+        role_name = canonical_role_name((getattr(role, "name", "") or "").strip().lower())
         if role_name:
             role_names.add(role_name)
 
     primary_role = getattr(user, "role", None)
-    primary_role_name = (getattr(primary_role, "name", "") or "").strip().lower()
+    primary_role_name = canonical_role_name((getattr(primary_role, "name", "") or "").strip().lower())
     if primary_role_name:
         role_names.add(primary_role_name)
 
     user_type = getattr(user, "user_type", None)
     if user_type:
-        role_names.add(str(getattr(user_type, "value", user_type)).strip().lower())
+        role_names.add(canonical_role_name(str(getattr(user_type, "value", user_type)).strip().lower()))
 
     if getattr(user, "is_superuser", False):
-        role_names.update({"super_admin", "admin"})
+        role_names.add("super_admin")
 
     return role_names
 
@@ -410,7 +462,7 @@ def get_current_user(
 def get_current_active_superuser(
     current_user: User = Depends(get_current_user),
 ) -> User:
-    if not current_user.is_superuser:
+    if not (current_user.is_superuser or "super_admin" in get_user_role_names(current_user)):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="insufficient_permissions",
@@ -445,15 +497,22 @@ def check_permission(menu_name: str, permission_type: str = "view"):
         # Superuser always has access
         if current_user.is_superuser:
             return current_user
-        
-        if not current_user.role_id:
+
+        role_ids = [r.id for r in getattr(current_user, "roles", []) if getattr(r, "id", None) is not None]
+        if not role_ids and current_user.role_id:
+            role_ids = [current_user.role_id]
+        if not role_ids:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User has no role assigned"
             )
 
         from app.services.rbac_service import rbac_service
-        if not rbac_service.check_menu_access(db, current_user.role_id, menu_name, permission_type):
+        has_access = any(
+            rbac_service.check_menu_access(db, role_id, menu_name, permission_type)
+            for role_id in role_ids
+        )
+        if not has_access:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="insufficient_permissions",
@@ -478,9 +537,10 @@ def require_role(role_name: str):
     ) -> User:
         if current_user.is_superuser:
             return current_user
-        
-        user_role_names = [r.name for r in current_user.roles]
-        if role_name not in user_role_names:
+
+        required = canonical_role_name(role_name)
+        user_role_names = get_user_role_names(current_user)
+        if required not in user_role_names:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="insufficient_permissions",
@@ -493,7 +553,7 @@ def require_role(role_name: str):
 def require_permission(permission_slug: str):
     """
     Dependency: Verify current user has a specific permission.
-    Usage: current_user: User = Depends(require_permission("battery:read"))
+    Usage: current_user: User = Depends(require_permission("battery:view:global"))
     """
     def permission_checker(
         current_user: User = Depends(get_current_user)

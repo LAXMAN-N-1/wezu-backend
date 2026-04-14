@@ -155,14 +155,23 @@ ORG_BLUEPRINTS = [
 ]
 
 ROLE_BLUEPRINTS = [
-    {"name": "Super Admin", "description": "Full access to all operational modules.", "category": "SYSTEM", "level": 100, "is_system_role": True},
-    {"name": "Operations Admin", "description": "Administrative operations across customers, rentals, and support.", "category": "SYSTEM", "level": 90, "is_system_role": True},
-    {"name": "Customer", "description": "End customer using rentals, swaps, and purchases.", "category": "CUSTOMER", "level": 10, "is_system_role": False},
-    {"name": "Dealer", "description": "Dealer account responsible for local business operations.", "category": "PARTNER", "level": 50, "is_system_role": False},
-    {"name": "Support Agent", "description": "Customer support and ticket handling.", "category": "STAFF", "level": 40, "is_system_role": False},
-    {"name": "Logistics Executive", "description": "Logistics and delivery execution.", "category": "STAFF", "level": 35, "is_system_role": False},
-    {"name": "Finance Manager", "description": "Finance and settlement oversight.", "category": "STAFF", "level": 60, "is_system_role": False},
-    {"name": "Station Manager", "description": "Station operations and inventory supervision.", "category": "STAFF", "level": 45, "is_system_role": False},
+    {"name": "super_admin", "description": "Full access to all modules.", "category": "platform", "level": 100, "is_system_role": True, "is_custom_role": False, "scope_owner": "global"},
+    {"name": "operations_admin", "description": "Administrative operations across users, rentals, and support.", "category": "platform", "level": 90, "is_system_role": True, "is_custom_role": False, "scope_owner": "global"},
+    {"name": "security_admin", "description": "Security controls, audits, and access governance.", "category": "platform", "level": 85, "is_system_role": True, "is_custom_role": False, "scope_owner": "global"},
+    {"name": "finance_admin", "description": "Finance and settlement oversight.", "category": "platform", "level": 85, "is_system_role": True, "is_custom_role": False, "scope_owner": "global"},
+    {"name": "support_manager", "description": "Support operations manager.", "category": "support", "level": 70, "is_system_role": True, "is_custom_role": False, "scope_owner": "global"},
+    {"name": "support_agent", "description": "Customer support and ticket handling.", "category": "support", "level": 60, "is_system_role": True, "is_custom_role": False, "scope_owner": "global"},
+    {"name": "logistics_manager", "description": "Logistics planning and execution management.", "category": "logistics", "level": 70, "is_system_role": True, "is_custom_role": False, "scope_owner": "global"},
+    {"name": "dispatcher", "description": "Dispatch and assignments operations.", "category": "logistics", "level": 60, "is_system_role": True, "is_custom_role": False, "scope_owner": "global"},
+    {"name": "fleet_manager", "description": "Fleet and driver oversight.", "category": "logistics", "level": 60, "is_system_role": True, "is_custom_role": False, "scope_owner": "global"},
+    {"name": "warehouse_manager", "description": "Warehouse operations supervision.", "category": "logistics", "level": 55, "is_system_role": True, "is_custom_role": False, "scope_owner": "global"},
+    {"name": "driver", "description": "Driver execution role.", "category": "logistics", "level": 40, "is_system_role": True, "is_custom_role": False, "scope_owner": "global"},
+    {"name": "dealer_owner", "description": "Dealer owner template role.", "category": "dealer", "level": 60, "is_system_role": True, "is_custom_role": False, "scope_owner": "global"},
+    {"name": "dealer_manager", "description": "Dealer manager template role.", "category": "dealer", "level": 55, "is_system_role": True, "is_custom_role": False, "scope_owner": "global"},
+    {"name": "dealer_inventory_staff", "description": "Dealer inventory template role.", "category": "dealer", "level": 45, "is_system_role": True, "is_custom_role": False, "scope_owner": "global"},
+    {"name": "dealer_finance_staff", "description": "Dealer finance template role.", "category": "dealer", "level": 45, "is_system_role": True, "is_custom_role": False, "scope_owner": "global"},
+    {"name": "dealer_support_staff", "description": "Dealer support template role.", "category": "dealer", "level": 45, "is_system_role": True, "is_custom_role": False, "scope_owner": "global"},
+    {"name": "customer", "description": "End customer role.", "category": "customer", "level": 10, "is_system_role": True, "is_custom_role": False, "scope_owner": "global"},
 ]
 
 PERMISSION_MODULES = [
@@ -178,14 +187,15 @@ PERMISSION_MODULES = [
     "logistics",
     "analytics",
 ]
-PERMISSION_ACTIONS = ["view", "create", "update", "delete"]
+PERMISSION_ACTIONS = ["view", "create", "update", "delete", "assign", "approve", "export", "override"]
+PERMISSION_SCOPES = ["own", "dealer", "region", "global"]
 
 ADMIN_BLUEPRINTS = [
-    {"email": "murari.admin@seed.wezu.energy", "name": "Murari Reddy", "role": "Super Admin", "city": "Hyderabad"},
-    {"email": "srilaxmi.ops@seed.wezu.energy", "name": "Srilaxmi Ravi", "role": "Operations Admin", "city": "Bengaluru"},
-    {"email": "priya.ops@seed.wezu.energy", "name": "Priya Sharma", "role": "Operations Admin", "city": "Chennai"},
-    {"email": "amit.finance@seed.wezu.energy", "name": "Amit Singh", "role": "Finance Manager", "city": "Mumbai"},
-    {"email": "rajesh.station@seed.wezu.energy", "name": "Rajesh Kumar", "role": "Station Manager", "city": "Pune"},
+    {"email": "murari.admin@seed.wezu.energy", "name": "Murari Reddy", "role": "super_admin", "city": "Hyderabad"},
+    {"email": "srilaxmi.ops@seed.wezu.energy", "name": "Srilaxmi Ravi", "role": "operations_admin", "city": "Bengaluru"},
+    {"email": "priya.ops@seed.wezu.energy", "name": "Priya Sharma", "role": "operations_admin", "city": "Chennai"},
+    {"email": "amit.finance@seed.wezu.energy", "name": "Amit Singh", "role": "finance_admin", "city": "Mumbai"},
+    {"email": "rajesh.station@seed.wezu.energy", "name": "Rajesh Kumar", "role": "operations_admin", "city": "Pune"},
 ]
 
 CUSTOMER_BLUEPRINTS = [
@@ -828,16 +838,17 @@ def seed_access_control(runtime: SeedRuntime, conn: Connection, resolver: Resolv
     permission_rows = []
     for module in PERMISSION_MODULES:
         for action in PERMISSION_ACTIONS:
-            permission_rows.append(
-                {
-                    "slug": f"{module}:{action}:all",
-                    "module": module,
-                    "resource_type": module,
-                    "action": action,
-                    "scope": "global",
-                    "description": f"{action.title()} access for {module}.",
-                }
-            )
+            for scope in PERMISSION_SCOPES:
+                permission_rows.append(
+                    {
+                        "slug": f"{module}:{action}:{scope}",
+                        "module": module,
+                        "resource_type": module,
+                        "action": action,
+                        "scope": scope,
+                        "description": f"{action.title()} access for {module} ({scope}).",
+                    }
+                )
     runtime.ensure_rows(conn, permissions_schema, "permissions", ("slug",), permission_rows)
 
     role_ids = runtime.fetch_map(conn, roles_schema, "roles", "name") if roles_schema else {}
@@ -845,9 +856,11 @@ def seed_access_control(runtime: SeedRuntime, conn: Connection, resolver: Resolv
 
     role_permission_rows = []
     for slug, permission_id in permission_ids.items():
-        role_permission_rows.append({"role_id": role_ids.get("Super Admin"), "permission_id": permission_id})
-        if slug.split(":")[0] not in {"finance"}:
-            role_permission_rows.append({"role_id": role_ids.get("Operations Admin"), "permission_id": permission_id})
+        role_permission_rows.append({"role_id": role_ids.get("super_admin"), "permission_id": permission_id})
+        if slug.split(":")[0] not in {"security", "finance"}:
+            role_permission_rows.append({"role_id": role_ids.get("operations_admin"), "permission_id": permission_id})
+        if slug.split(":")[0] in {"finance", "settlements", "transactions"}:
+            role_permission_rows.append({"role_id": role_ids.get("finance_admin"), "permission_id": permission_id})
     runtime.ensure_rows(conn, role_permissions_schema, "role_permissions", ("role_id", "permission_id"), role_permission_rows)
 
     ctx["role_ids"] = role_ids
@@ -938,7 +951,7 @@ def seed_users(runtime: SeedRuntime, conn: Connection, resolver: Resolver, ctx: 
                 "hashed_password": PASSWORD_HASH,
                 "user_type": "ADMIN",
                 "status": "ACTIVE",
-                "is_superuser": blueprint["role"] == "Super Admin",
+                "is_superuser": blueprint["role"] == "super_admin",
                 "role_id": ctx["role_ids"].get(blueprint["role"]),
                 "kyc_status": "APPROVED",
                 "two_factor_enabled": index <= 2,
@@ -963,7 +976,7 @@ def seed_users(runtime: SeedRuntime, conn: Connection, resolver: Resolver, ctx: 
                 "user_type": "CUSTOMER",
                 "status": "ACTIVE",
                 "is_superuser": False,
-                "role_id": ctx["role_ids"].get("Customer"),
+                "role_id": ctx["role_ids"].get("customer"),
                 "kyc_status": "APPROVED" if index <= 14 else "PENDING",
                 "two_factor_enabled": False,
                 "is_email_verified": True,
@@ -983,7 +996,7 @@ def seed_users(runtime: SeedRuntime, conn: Connection, resolver: Resolver, ctx: 
                 "hashed_password": PASSWORD_HASH,
                 "user_type": "DEALER",
                 "status": "ACTIVE",
-                "role_id": ctx["role_ids"].get("Dealer"),
+                "role_id": ctx["role_ids"].get("dealer_owner"),
                 "kyc_status": "APPROVED",
                 "is_email_verified": True,
                 "created_at": dt(days=-75 + index),
@@ -1000,7 +1013,7 @@ def seed_users(runtime: SeedRuntime, conn: Connection, resolver: Resolver, ctx: 
                 "hashed_password": PASSWORD_HASH,
                 "user_type": "SUPPORT_AGENT",
                 "status": "ACTIVE",
-                "role_id": ctx["role_ids"].get("Support Agent"),
+                "role_id": ctx["role_ids"].get("support_agent"),
                 "kyc_status": "APPROVED",
                 "is_email_verified": True,
                 "created_at": dt(days=-60 + index),
@@ -1017,7 +1030,7 @@ def seed_users(runtime: SeedRuntime, conn: Connection, resolver: Resolver, ctx: 
                 "hashed_password": PASSWORD_HASH,
                 "user_type": "LOGISTICS",
                 "status": "ACTIVE",
-                "role_id": ctx["role_ids"].get("Logistics Executive"),
+                "role_id": ctx["role_ids"].get("logistics_manager"),
                 "kyc_status": "APPROVED",
                 "is_email_verified": True,
                 "created_at": dt(days=-50 + index),

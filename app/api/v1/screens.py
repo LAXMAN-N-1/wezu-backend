@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import Any, List
 from sqlmodel import Session
 from app.api import deps
+from app.core.rbac import canonical_role_name, role_sort_key
 from app.models.user import User
 from app.schemas.ui_config import ScreenConfig, ScreenColumn, ScreenAction
 from app.core.screen_config import MASTER_SCREEN_CONFIG
@@ -27,20 +28,10 @@ def get_screen_config(
         )
 
     # 2. Get User Permissions
-    current_role = current_user.role.name if current_user.role else None
+    current_role = canonical_role_name(current_user.role.name) if current_user.role else None
     if not current_role:
-        ordered_roles = [
-            "super_admin",
-            "admin",
-            "logistics",
-            "dealer",
-            "vendor_owner",
-            "dealer_staff",
-            "driver",
-            "customer",
-        ]
-        role_names = deps.get_user_role_names(current_user)
-        current_role = next((role for role in ordered_roles if role in role_names), None)
+        role_names = sorted(deps.get_user_role_names(current_user), key=lambda value: role_sort_key(value))
+        current_role = role_names[0] if role_names else None
     
     # In a real scenario, we'd merge permissions from all roles, but sticking to existing pattern
     permissions_list = []
