@@ -4,6 +4,7 @@ Dedicated auth endpoints for the dealer portal frontend.
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session, select
+from sqlalchemy import update as sa_update
 from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
 from typing import Optional
 import logging
@@ -167,18 +168,35 @@ async def dealer_login(
         )
 
     if not verify_password(login_data.password, user.hashed_password):
-        # Increment failed attempts
-        user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
-        if user.failed_login_attempts >= MAX_LOGIN_ATTEMPTS:
-            user.locked_until = datetime.now(UTC) + timedelta(minutes=LOCKOUT_MINUTES)
-            user.failed_login_attempts = 0
-            db.add(user)
+        # Atomic increment — SQL-level to avoid the read-modify-write race
+        # between concurrent failed logins against the same account.
+        result = db.execute(
+            sa_update(User)
+            .where(User.id == user.id)
+            .values(failed_login_attempts=User.failed_login_attempts + 1)
+            .returning(User.failed_login_attempts)
+        )
+        new_count = int(result.scalar_one() or 0)
+
+        if new_count >= MAX_LOGIN_ATTEMPTS:
+            # Compare-and-set lockout: only the losing request whose
+            # increment actually crossed the threshold flips the lock.
+            db.execute(
+                sa_update(User)
+                .where(
+                    User.id == user.id,
+                    User.failed_login_attempts >= MAX_LOGIN_ATTEMPTS,
+                )
+                .values(
+                    failed_login_attempts=0,
+                    locked_until=datetime.now(UTC) + timedelta(minutes=LOCKOUT_MINUTES),
+                )
+            )
             db.commit()
             raise HTTPException(
                 status_code=423,
                 detail=f"Account locked for {LOCKOUT_MINUTES} minutes after {MAX_LOGIN_ATTEMPTS} failed attempts."
             )
-        db.add(user)
         db.commit()
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
@@ -191,18 +209,29 @@ async def dealer_login(
     if not dealer_profile:
         raise HTTPException(status_code=403, detail="Dealer portal access denied")
 
-    # Reset failed attempts on success
-    user.failed_login_attempts = 0
-    user.locked_until = None
-
     # Generate tokens
     token_jti = str(uuid.uuid4())
     access_token = create_access_token(subject=user.id, extra_claims={"sid": token_jti})
     refresh_token = create_refresh_token(subject=user.id, jti=token_jti)
 
-    user.last_login = datetime.now(UTC)
-    db.add(user)
+    # Atomic reset of counters + last_login — avoids clobbering any
+    # concurrent failed-login increments that may have landed between the
+    # password check and this write.
+    now = datetime.now(UTC)
+    db.execute(
+        sa_update(User)
+        .where(User.id == user.id)
+        .values(
+            failed_login_attempts=0,
+            locked_until=None,
+            last_login=now,
+        )
+    )
     db.commit()
+    # Refresh the in-memory user object so downstream code sees the reset.
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    user.last_login = now
 
     # Session
     try:

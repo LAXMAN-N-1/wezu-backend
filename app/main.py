@@ -27,6 +27,7 @@ import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 
 from app.core.config import settings
+from app.core.database import ensure_roles_schema_compatibility
 from app.db.session import engine
 from app.api import deps
 import app.models.all  # noqa: F401  Ensure all SQLModel classes registered
@@ -236,8 +237,23 @@ async def lifespan(app: FastAPI):
                 startup_without_db = True
                 logger.exception("schema.validation_failed.degraded_mode", error=str(exc))
 
+        # RBAC compatibility backfill
+        if not startup_without_db:
+            try:
+                ensure_roles_schema_compatibility()
+            except SQLAlchemyError as exc:
+                if not allow_start_without_db:
+                    raise
+                startup_without_db = True
+                logger.exception("schema.roles_compatibility_failed.degraded_mode", error=str(exc))
+
         # Startup diagnostics enforcement
-        StartupDiagnosticsService.enforce_required_dependencies()
+        if not startup_without_db:
+            StartupDiagnosticsService.enforce_required_dependencies()
+        else:
+            logger.warning(
+                "Skipping strict startup dependency enforcement because app is in DB-degraded mode."
+            )
 
         # Background runtime (leader election)
         background_runtime = await BackgroundRuntimeService.initialize()

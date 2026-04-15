@@ -1,9 +1,14 @@
 from typing import Any, List, Dict
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlmodel import Session, select, func
 import sqlalchemy as sa
 from datetime import datetime, UTC
 
+from app.core.dealer_scope import (
+    log_scope_violation,
+    role_in_dealer_scope,
+    user_in_dealer_scope,
+)
 from app.db.session import get_session
 from app.api import deps
 from app.models.user import User
@@ -324,12 +329,21 @@ def delete_role(
 @router.get("/{role_id}/users")
 def get_role_users(
     role_id: int,
+    request: Request,
     db: Session = Depends(get_session),
     current_user: User = Depends(deps.get_current_user),
 ):
     dealer = _get_dealer(db, current_user.id)
-    role = db.get(Role, role_id)
-    if not role or (role.dealer_id and role.dealer_id != dealer.id):
+    role = role_in_dealer_scope(db, dealer, role_id)
+    if not role:
+        log_scope_violation(
+            actor_id=current_user.id,
+            dealer_id=dealer.id,
+            target_id=role_id,
+            endpoint="GET /dealer/portal/roles/{role_id}/users",
+            reason="role_not_in_dealer_scope",
+            request=request,
+        )
         raise HTTPException(status_code=404, detail="Role not found")
 
     users = db.exec(
@@ -338,26 +352,47 @@ def get_role_users(
         .where(UserRole.role_id == role_id)
         .distinct()
     ).all()
+    # Strict dealer-only scope: surface only users that are actually in the
+    # caller's tenant. System-role linkage alone is not sufficient to expose
+    # a user across dealers.
+    scoped = [u for u in users if user_in_dealer_scope(db, dealer, u.id)]
     return [
         {"id": u.id, "name": u.full_name, "email": u.email, "status": u.status}
-        for u in users
+        for u in scoped
     ]
 
 @router.post("/{role_id}/users")
 def assign_user_to_role(
     role_id: int,
     payload: Dict[str, int],
+    request: Request,
     db: Session = Depends(get_session),
     current_user: User = Depends(deps.get_current_user),
 ):
     user_id = payload.get("user_id")
     dealer = _get_dealer(db, current_user.id)
-    role = db.get(Role, role_id)
-    if not role or (role.dealer_id and role.dealer_id != dealer.id):
+    role = role_in_dealer_scope(db, dealer, role_id)
+    if not role:
+        log_scope_violation(
+            actor_id=current_user.id,
+            dealer_id=dealer.id,
+            target_id=role_id,
+            endpoint="POST /dealer/portal/roles/{role_id}/users",
+            reason="role_not_in_dealer_scope",
+            request=request,
+        )
         raise HTTPException(status_code=404, detail="Role not found")
-        
-    target_user = db.get(User, user_id)
-    if not target_user:
+
+    target_user = db.get(User, user_id) if user_id else None
+    if not target_user or not user_in_dealer_scope(db, dealer, target_user.id):
+        log_scope_violation(
+            actor_id=current_user.id,
+            dealer_id=dealer.id,
+            target_id=user_id,
+            endpoint="POST /dealer/portal/roles/{role_id}/users",
+            reason="target_user_not_in_dealer_scope",
+            request=request,
+        )
         raise HTTPException(status_code=404, detail="User not found")
         
     existing_link = db.exec(
@@ -384,13 +419,33 @@ def assign_user_to_role(
 def remove_user_from_role(
     role_id: int,
     user_id: int,
+    request: Request,
     db: Session = Depends(get_session),
     current_user: User = Depends(deps.get_current_user),
 ):
     dealer = _get_dealer(db, current_user.id)
-    role = db.get(Role, role_id)
-    if not role or (role.dealer_id and role.dealer_id != dealer.id):
+    role = role_in_dealer_scope(db, dealer, role_id)
+    if not role:
+        log_scope_violation(
+            actor_id=current_user.id,
+            dealer_id=dealer.id,
+            target_id=role_id,
+            endpoint="DELETE /dealer/portal/roles/{role_id}/users/{user_id}",
+            reason="role_not_in_dealer_scope",
+            request=request,
+        )
         raise HTTPException(status_code=404, detail="Role not found")
+
+    if not user_in_dealer_scope(db, dealer, user_id):
+        log_scope_violation(
+            actor_id=current_user.id,
+            dealer_id=dealer.id,
+            target_id=user_id,
+            endpoint="DELETE /dealer/portal/roles/{role_id}/users/{user_id}",
+            reason="target_user_not_in_dealer_scope",
+            request=request,
+        )
+        raise HTTPException(status_code=404, detail="User not assigned to this role")
 
     target_user = db.get(User, user_id)
     link = db.exec(
@@ -474,9 +529,23 @@ def invite_user(
 @router.get("/{role_id}/audit-log", response_model=List[RoleAuditLog])
 def get_role_audit_log(
     role_id: int,
+    request: Request,
     db: Session = Depends(get_session),
     current_user: User = Depends(deps.get_current_user),
 ):
+    dealer = _get_dealer(db, current_user.id)
+    role = role_in_dealer_scope(db, dealer, role_id)
+    if not role:
+        log_scope_violation(
+            actor_id=current_user.id,
+            dealer_id=dealer.id,
+            target_id=role_id,
+            endpoint="GET /dealer/portal/roles/{role_id}/audit-log",
+            reason="role_not_in_dealer_scope",
+            request=request,
+        )
+        raise HTTPException(status_code=404, detail="Role not found")
+
     logs = db.exec(
         select(AuditLog).where(
             AuditLog.resource_type == "ROLE",

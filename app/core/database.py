@@ -50,7 +50,7 @@ engine = _build_engine()
 
 # ── Compatibility schema patching ──────────────────────────────────────────
 
-def _ensure_roles_schema_compatibility() -> None:
+def ensure_roles_schema_compatibility() -> None:
     """
     Backfill RBAC role columns if migrations were skipped.
     This keeps auth endpoints alive on partially-migrated databases.
@@ -123,22 +123,34 @@ def _on_connect(dbapi_connection, connection_record):
     elif parsed_url.drivername.startswith("postgresql"):
         cursor = dbapi_connection.cursor()
         try:
-            # Detect actual schema where app tables live; fall back to public.
-            cursor.execute(
-                "SELECT table_schema FROM information_schema.tables "
-                "WHERE table_name = 'users' "
-                "  AND table_schema NOT IN ('information_schema', 'pg_catalog') "
-                "LIMIT 1"
-            )
-            row = cursor.fetchone()
-            app_schema = row[0] if row else "public"
-            cursor.execute(f"SET search_path TO {app_schema}, public")
+            # Prefer public (Supabase-safe), then detect app schema from known app tables.
+            app_schema = "public"
+            try:
+                cursor.execute(
+                    "SELECT table_schema FROM information_schema.tables "
+                    "WHERE table_name IN ('roles', 'users', 'stations', 'batteries') "
+                    "  AND table_schema NOT IN "
+                    "      ('information_schema', 'pg_catalog', 'auth', 'storage', 'graphql', 'realtime') "
+                    "ORDER BY CASE WHEN table_schema = 'public' THEN 0 ELSE 1 END, table_schema "
+                    "LIMIT 1"
+                )
+                row = cursor.fetchone()
+                if row and row[0]:
+                    app_schema = _safe_schema_name(row[0], default="public")
+            except Exception as exc:
+                logger.warning("db.search_path.detect_failed", error=str(exc))
+
+            try:
+                cursor.execute(f"SET search_path TO {app_schema}, public")
+            except Exception as exc:
+                logger.warning(
+                    "db.search_path.set_failed",
+                    schema=app_schema,
+                    error=str(exc),
+                )
+                cursor.execute("SET search_path TO public")
         finally:
             cursor.close()
-
-
-# Ensure compatibility before first auth/role query executes.
-_ensure_roles_schema_compatibility()
 
 
 # ── SQL observability (slow queries + suspicious no-op mutations) ───────────
@@ -146,6 +158,14 @@ _ensure_roles_schema_compatibility()
 _UPDATE_TABLE_RE = re.compile(r"^\s*UPDATE\s+([a-zA-Z0-9_\.\"`]+)", re.IGNORECASE)
 _DELETE_TABLE_RE = re.compile(r"^\s*DELETE\s+FROM\s+([a-zA-Z0-9_\.\"`]+)", re.IGNORECASE)
 _INSERT_TABLE_RE = re.compile(r"^\s*INSERT\s+INTO\s+([a-zA-Z0-9_\.\"`]+)", re.IGNORECASE)
+_SQL_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _safe_schema_name(value: object, default: str = "public") -> str:
+    schema = str(value or "").strip()
+    if _SQL_IDENTIFIER_RE.match(schema):
+        return schema
+    return default
 
 
 def _compact_sql(statement: object, *, max_len: int = 400) -> str:
