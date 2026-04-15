@@ -1,7 +1,7 @@
 import json
 import re
 from typing import Any, Literal, Optional
-from urllib.parse import parse_qsl, urlencode, urlparse, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urlparse, urlsplit, urlunsplit
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     DB_POOL_USE_LIFO: bool = True
     DATABASE_CONNECT_TIMEOUT_SECONDS: int = 10
     DATABASE_SSL_MODE: Optional[str] = None
+    DATABASE_PREFER_IPV4: bool = True
+    DATABASE_HOSTADDR: Optional[str] = None
     SQL_SLOW_QUERY_LOG_MS: int = 0
     SQL_SLOW_QUERY_WARN_COOLDOWN_SECONDS: int = 60
     SQL_SLOW_QUERY_IGNORE_PATTERNS: list[str] = ["from order_realtime_outbox"]
@@ -379,20 +381,36 @@ class Settings(BaseSettings):
         normalized = value.strip()
         if normalized.startswith("postgres://"):
             normalized = "postgresql://" + normalized[len("postgres://"):]
+
         split_url = urlsplit(normalized)
-        if not split_url.query:
-            return normalized
-        query_pairs = parse_qsl(split_url.query, keep_blank_values=True)
+        netloc = split_url.netloc
+
+        if split_url.hostname:
+            host = split_url.hostname
+            if ":" in host and not host.startswith("["):
+                host = f"[{host}]"
+            port = f":{split_url.port}" if split_url.port else ""
+
+            auth_prefix = ""
+            if split_url.username is not None:
+                username = quote(unquote(split_url.username), safe="")
+                auth_prefix = username
+                if split_url.password is not None:
+                    password = quote(unquote(split_url.password), safe="")
+                    auth_prefix = f"{auth_prefix}:{password}"
+                auth_prefix = f"{auth_prefix}@"
+
+            netloc = f"{auth_prefix}{host}{port}"
+
+        query_pairs = parse_qsl(split_url.query, keep_blank_values=True) if split_url.query else []
         sanitized_pairs = [
             (key, raw_value)
             for key, raw_value in query_pairs
             if not (key.lower() == "options" and "search_path" in raw_value.lower())
         ]
-        if sanitized_pairs == query_pairs:
-            return normalized
-        sanitized_query = urlencode(sanitized_pairs, doseq=True)
+        sanitized_query = urlencode(sanitized_pairs, doseq=True) if sanitized_pairs else ""
         return urlunsplit((
-            split_url.scheme, split_url.netloc, split_url.path,
+            split_url.scheme, netloc, split_url.path,
             sanitized_query, split_url.fragment,
         ))
 

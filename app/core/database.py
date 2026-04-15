@@ -1,4 +1,5 @@
 import re
+import socket
 import time
 
 from sqlalchemy import event, inspect, pool, text
@@ -9,6 +10,29 @@ from app.core.config import settings
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def _resolve_ipv4_hostaddr(database_url: str) -> str | None:
+    parsed_url = make_url(database_url)
+    host = parsed_url.host
+    if not host:
+        return None
+    port = parsed_url.port or 5432
+    try:
+        candidates = socket.getaddrinfo(
+            host,
+            port,
+            family=socket.AF_INET,
+            type=socket.SOCK_STREAM,
+        )
+    except Exception as exc:
+        logger.warning("db.hostaddr.resolve_failed", host=host, error=str(exc))
+        return None
+
+    for _, _, _, _, sockaddr in candidates:
+        if sockaddr and sockaddr[0]:
+            return str(sockaddr[0])
+    return None
 
 
 def _build_engine():
@@ -32,6 +56,15 @@ def _build_engine():
         }
         if settings.DATABASE_SSL_MODE:
             connect_args["sslmode"] = settings.DATABASE_SSL_MODE
+        parsed_url = make_url(database_url)
+        if parsed_url.drivername.startswith("postgresql"):
+            configured_hostaddr = (settings.DATABASE_HOSTADDR or "").strip()
+            if configured_hostaddr:
+                connect_args["hostaddr"] = configured_hostaddr
+            elif settings.DATABASE_PREFER_IPV4:
+                resolved_hostaddr = _resolve_ipv4_hostaddr(database_url)
+                if resolved_hostaddr:
+                    connect_args["hostaddr"] = resolved_hostaddr
 
         engine_kwargs.update({
             "pool_size": settings.DB_POOL_SIZE,
