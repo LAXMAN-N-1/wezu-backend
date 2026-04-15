@@ -239,6 +239,11 @@ class AnomalyLoggingMiddleware(BaseHTTPMiddleware):
                 )
             else:
                 raw_body = await request.body()
+                # BaseHTTPMiddleware can consume the request stream. Re-inject the
+                # buffered body so downstream handlers/dependencies can read it.
+                async def _replay_body():
+                    return {"type": "http.request", "body": raw_body, "more_body": False}
+                request._receive = _replay_body
                 if len(raw_body) > max_body_bytes:
                     logger.warning(
                         "anomaly.request.body_too_large_for_inspection",
