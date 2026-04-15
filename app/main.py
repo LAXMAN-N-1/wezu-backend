@@ -113,10 +113,7 @@ logger.info(
 from app.utils.cors import cors_headers_for_origin
 
 CORS_ALLOWED_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
-CORS_ALLOWED_HEADERS = [
-    "Authorization", "Content-Type", "Accept", "Origin",
-    "X-Requested-With", "X-Request-ID", "X-Correlation-ID",
-]
+CORS_ALLOWED_HEADERS = ["*"]
 
 
 class CORSErrorMiddleware(BaseHTTPMiddleware):
