@@ -2,28 +2,25 @@
 Dealer Portal Customers — Customer list, detail, and active rentals.
 """
 from typing import Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session, select, func
 from datetime import datetime, UTC
 import logging
 
+from app.core.dealer_scope import log_scope_violation
 from app.db.session import get_session
 
 logger = logging.getLogger(__name__)
+from app.api import deps
 from app.api.deps import get_current_user
 from app.models.user import User
-from app.models.dealer import DealerProfile
 from app.models.station import Station
 
 router = APIRouter()
 
 
 def _get_dealer_station_ids(db: Session, user_id: int) -> list:
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == user_id)
-    ).first()
-    if not dealer:
-        raise HTTPException(status_code=403, detail="Not a dealer")
+    dealer = deps.get_dealer_profile_or_403(db, user_id, detail="Not a dealer")
     # Select only IDs — avoids loading full Station objects
     ids = db.exec(
         select(Station.id).where(Station.dealer_id == dealer.id)
@@ -161,18 +158,47 @@ def list_customers(
 @router.get("/{customer_id}")
 def get_customer_detail(
     customer_id: int,
+    request: Request,
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    """Customer detail with rental history at this dealer's stations."""
+    """Customer detail with rental history at this dealer's stations.
+
+    Strict dealer-scope enforcement: the caller may only read a customer
+    when that customer has at least one rental at one of the caller's
+    stations. Cross-tenant probes return 404 (non-disclosive).
+    """
     station_ids = _get_dealer_station_ids(db, current_user.id)
+
+    from app.models.rental import Rental
+
+    # Prove dealer<->customer relationship BEFORE fetching any PII. Using
+    # a lightweight existence check keeps this cheap for large tenants.
+    proof = None
+    if station_ids:
+        proof = db.exec(
+            select(Rental.id).where(
+                Rental.user_id == customer_id,
+                Rental.start_station_id.in_(station_ids),
+            ).limit(1)
+        ).first()
+
+    if not proof:
+        log_scope_violation(
+            actor_id=current_user.id,
+            dealer_id=None,
+            target_id=customer_id,
+            endpoint="GET /dealer/portal/customers/{customer_id}",
+            reason="customer_not_in_dealer_scope",
+            request=request,
+        )
+        raise HTTPException(status_code=404, detail="Customer not found")
+
     customer = db.get(User, customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
 
     try:
-        from app.models.rental import Rental
-
         rentals = db.exec(
             select(Rental).where(
                 Rental.user_id == customer_id,

@@ -38,9 +38,11 @@ class StationService:
     ) -> List['NearbyStationResponse']:
         from app.schemas.station import NearbyStationResponse, StationImageResponse
         from app.models.battery_catalog import BatteryCatalog
-        
-        # 1. Base Query
-        query = select(Station)
+        from sqlalchemy.orm import selectinload
+
+        # 1. Base Query — eager-load images to avoid N+1 in the loop below
+        # (station.images is accessed per-station during response construction).
+        query = select(Station).options(selectinload(Station.images))
         if status:
             query = query.where(Station.status == status)
         if min_rating:

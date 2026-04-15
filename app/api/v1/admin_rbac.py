@@ -70,6 +70,7 @@ def read_roles(
     # Batch count users for these roles to avoid N+1 and slow relationship loading
     role_ids = [r.id for r in roles]
     user_counts = {}
+    active_user_counts = {}
     if role_ids:
         from app.models.rbac import UserRole
         # Efficient count query grouping by role_id
@@ -79,6 +80,17 @@ def read_roles(
             .group_by(UserRole.role_id)
         ).all()
         user_counts = {rid: count for rid, count in count_data}
+        now = datetime.now(UTC)
+        active_count_data = db.exec(
+            select(UserRole.role_id, func.count(UserRole.user_id))
+            .where(
+                col(UserRole.role_id).in_(role_ids),
+                UserRole.effective_from <= now,
+                ((UserRole.expires_at == None) | (UserRole.expires_at >= now)),
+            )
+            .group_by(UserRole.role_id)
+        ).all()
+        active_user_counts = {rid: count for rid, count in active_count_data}
 
     for role in roles:
         # Use pre-fetched permissions
@@ -89,6 +101,7 @@ def read_roles(
         
         # Use batch-fetched user count
         role_data.user_count = user_counts.get(role.id, 0)
+        role_data.active_user_count = active_user_counts.get(role.id, 0)
             
         if not include_permissions:
             role_data.permissions = None
@@ -117,11 +130,30 @@ def create_role(
     # 2. Inheritance Logic
     permissions_to_assign = set(role_in.permissions or [])
     
-    parent_id = role_in.parent_role_id or role_in.parent_id
+    parent_id = role_in.parent_role_id or getattr(role_in, "parent_id", None)
     if parent_id:
         parent_role = db.get(Role, parent_id)
         if not parent_role:
              raise HTTPException(status_code=404, detail="Parent role not found")
+        allowed_dealer_templates = {
+            "dealer_owner",
+            "dealer_manager",
+            "dealer_inventory_staff",
+            "dealer_finance_staff",
+            "dealer_support_staff",
+        }
+        if (parent_role.name or "").strip().lower() not in allowed_dealer_templates:
+            raise HTTPException(
+                status_code=400,
+                detail="Custom role parent must be a dealer template role",
+            )
+        if not role_in.dealer_id:
+            raise HTTPException(
+                status_code=400,
+                detail="dealer_id is required for custom role creation",
+            )
+        role_data["is_custom_role"] = True
+        role_data["scope_owner"] = "dealer"
         
         # Load parent permissions
         # Note: SQLModel relationship access might require eager load or session attached
@@ -130,6 +162,12 @@ def create_role(
         permissions_to_assign.update(parent_perms)
         
         role_data["parent_id"] = parent_id
+    else:
+        # Preset global roles are managed by migration/seed only.
+        raise HTTPException(
+            status_code=400,
+            detail="Global custom role creation is disabled; create dealer child roles only",
+        )
 
     role = Role(**role_data)
     db.add(role)
@@ -204,8 +242,11 @@ def read_permissions(
             grouped[perm.module] = []
             
         # Transform to Item
-        # Infer properties if not present
-        label = perm.slug.split(":")[-1].replace("_", " ").title() if ":" in perm.slug else perm.slug
+        parts = perm.slug.split(":")
+        if len(parts) >= 3:
+            label = f"{parts[1].replace('_', ' ').title()} ({parts[2]})"
+        else:
+            label = perm.slug
         if perm.description:
              desc = perm.description
         else:
@@ -217,7 +258,7 @@ def read_permissions(
             description=desc,
             resource=perm.module,
             action=perm.action,
-            scope="all" # Default as requested
+            scope=perm.scope or "global"
         )
         grouped[perm.module].append(item)
         
@@ -860,7 +901,7 @@ def assign_roles_to_user(
         for p in r.permissions:
             active_perms.add(p.slug)
             
-    menu = AuthService.get_menu_for_role(role.name)
+    menu = AuthService.get_menu_for_role(db, role.name)
     
     return rbac_schema.UserRoleAssignmentResponse(
         success=True,
@@ -967,7 +1008,7 @@ def remove_role_from_user(
     # Fallback for menu if roles exist (which they should)
     menu = []
     if first_role_name:
-         menu = AuthService.get_menu_for_role(first_role_name)
+         menu = AuthService.get_menu_for_role(db, first_role_name)
     
     return rbac_schema.UserRoleAssignmentResponse(
         success=True,

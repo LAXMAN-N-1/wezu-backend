@@ -7,7 +7,7 @@ types (customer, transit, shelf).  Add lifecycle milestone columns to batteries.
 Also fixes RentalService.return_battery referencing drop_station_id (now uses
 end_station_id which already exists in the model).
 
-Revision ID: c1d2e3f4a5b6
+Revision ID: a1b2c3d4e5f7
 Revises: 3f9b2a1c4d5e
 Create Date: 2026-04-07 00:20:00.000000
 
@@ -18,7 +18,7 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision: str = "c1d2e3f4a5b6"
+revision: str = "a1b2c3d4e5f7"
 down_revision: Union[str, None] = "3f9b2a1c4d5e"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -34,6 +34,8 @@ NEW_LOCATION_TYPES = ["customer", "transit", "shelf"]
 def upgrade() -> None:
     bind = op.get_bind()
     dialect = bind.dialect.name
+    inspector = sa.inspect(bind)
+    existing_columns = {col["name"] for col in inspector.get_columns("batteries")}
 
     # ── 1. Expand BatteryStatus enum ────────────────────────────────────
     if dialect == "postgresql":
@@ -51,23 +53,27 @@ def upgrade() -> None:
 
     # ── 3. Add lifecycle milestone columns to batteries ─────────────────
     with op.batch_alter_table("batteries", schema=None) as batch_op:
-        batch_op.add_column(
-            sa.Column("retirement_date", sa.DateTime(), nullable=True)
-        )
-        batch_op.add_column(
-            sa.Column("decommissioned_at", sa.DateTime(), nullable=True)
-        )
-        batch_op.add_column(
-            sa.Column(
-                "decommissioned_by",
-                sa.Integer(),
-                sa.ForeignKey("users.id"),
-                nullable=True,
+        if "retirement_date" not in existing_columns:
+            batch_op.add_column(
+                sa.Column("retirement_date", sa.DateTime(), nullable=True)
             )
-        )
-        batch_op.add_column(
-            sa.Column("decommission_reason", sa.String(), nullable=True)
-        )
+        if "decommissioned_at" not in existing_columns:
+            batch_op.add_column(
+                sa.Column("decommissioned_at", sa.DateTime(), nullable=True)
+            )
+        if "decommissioned_by" not in existing_columns:
+            batch_op.add_column(
+                sa.Column(
+                    "decommissioned_by",
+                    sa.Integer(),
+                    sa.ForeignKey("users.id"),
+                    nullable=True,
+                )
+            )
+        if "decommission_reason" not in existing_columns:
+            batch_op.add_column(
+                sa.Column("decommission_reason", sa.String(), nullable=True)
+            )
 
 
 def downgrade() -> None:

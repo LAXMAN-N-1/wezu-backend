@@ -10,7 +10,8 @@ from app.schemas.user import UserResponse
 from app.core.database import get_db
 from app.core.config import settings
 from app.core.security import get_password_hash
-from app.models.rbac import Role
+from app.models.rbac import Role, UserRole
+from app.core.rbac import canonical_role_name
 from app.utils.runtime_cache import cached_call, invalidate_cache
 
 
@@ -61,19 +62,17 @@ def admin_create_user(
     # 3. Derive user_type from role if possible, otherwise use payload
     user_type = payload.user_type or UserType.CUSTOMER
     if resolved_role:
-        role_lower = resolved_role.name.lower()
-        # Any organizational role that is NOT 'customer' or 'driver' should be an ADMIN type for the portal
-        if role_lower in ('admin', 'super_admin', 'superadmin', 'fleet_manager', 'manager', 'support_agent', 'support'):
+        role_lower = canonical_role_name(resolved_role.name)
+        if role_lower in ("super_admin", "operations_admin", "security_admin", "finance_admin", "support_manager", "support_agent"):
             user_type = UserType.ADMIN
-        elif role_lower == 'dealer':
+        elif role_lower == "dealer_owner":
             user_type = UserType.DEALER
-        elif role_lower == 'customer':
+        elif role_lower == "customer":
             user_type = UserType.CUSTOMER
-        elif role_lower in ('station_manager', 'technician', 'logistics_manager',
-                            'driver', 'warehouse_manager', 'support_agent',
-                            'finance_manager', 'inspector', 'franchise_owner',
-                            'marketing_manager', 'analyst'):
-            user_type = UserType.ADMIN  # operational staff roles
+        elif role_lower in {"dealer_manager", "dealer_inventory_staff", "dealer_finance_staff", "dealer_support_staff"}:
+            user_type = UserType.DEALER_STAFF
+        elif role_lower in {"logistics_manager", "dispatcher", "fleet_manager", "warehouse_manager", "driver"}:
+            user_type = UserType.LOGISTICS
 
     # 4. Create
     new_user = User(
@@ -90,6 +89,22 @@ def admin_create_user(
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    if role_id:
+        existing_link = db.exec(
+            select(UserRole).where(
+                UserRole.user_id == new_user.id,
+                UserRole.role_id == role_id,
+            )
+        ).first()
+        if not existing_link:
+            db.add(
+                UserRole(
+                    user_id=new_user.id,
+                    role_id=role_id,
+                    effective_from=datetime.now(UTC),
+                )
+            )
+            db.commit()
     _invalidate_admin_user_cache()
 
     return {

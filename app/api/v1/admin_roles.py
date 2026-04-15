@@ -1,14 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select, func
+import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from app.api import deps
 from app.models.rbac import Role, Permission, UserRole
 from app.models.user import User
+from app.core.rbac import canonical_role_name, canonicalize_permission_set
 from typing import List, Any, Optional
 from pydantic import BaseModel
 from datetime import datetime, UTC, timedelta
 
 router = APIRouter()
+
+PLATFORM_ADMIN_ROLES = {"super_admin", "operations_admin", "security_admin", "finance_admin"}
 
 
 @router.post("/roles")
@@ -98,9 +102,9 @@ async def get_role_distribution(
     - Underutilized roles
     """
     # 1. Authorization
-    current_user_roles = [r.name for r in current_user.roles] if current_user.roles else []
+    current_user_roles = [canonical_role_name(r.name) for r in current_user.roles] if current_user.roles else []
     is_super_admin = "super_admin" in current_user_roles or current_user.is_superuser
-    is_admin = "admin" in current_user_roles
+    is_admin = bool(set(current_user_roles) & PLATFORM_ADMIN_ROLES)
     
     if not any([is_super_admin, is_admin]):
         raise HTTPException(
@@ -271,9 +275,9 @@ async def test_role_configuration(
     - Data visibility settings
     """
     # 1. Authorization
-    current_user_roles = [r.name for r in current_user.roles] if current_user.roles else []
+    current_user_roles = [canonical_role_name(r.name) for r in current_user.roles] if current_user.roles else []
     is_super_admin = "super_admin" in current_user_roles or current_user.is_superuser
-    is_admin = "admin" in current_user_roles
+    is_admin = bool(set(current_user_roles) & PLATFORM_ADMIN_ROLES)
     
     if not any([is_super_admin, is_admin]):
         raise HTTPException(
@@ -291,7 +295,11 @@ async def test_role_configuration(
     
     # 3. Get role permissions
     permissions = role.permissions if role.permissions else []
-    permission_names = [p.name for p in permissions]
+    permission_names = sorted(
+        canonicalize_permission_set(
+            [p.slug for p in permissions if getattr(p, "slug", None)]
+        )
+    )
     
     # 4. Build menu structure based on role
     menu_structure = []
@@ -311,7 +319,7 @@ async def test_role_configuration(
             {"id": "admin_analytics", "label": "Analytics", "path": "/admin/analytics", "icon": "chart"},
             {"id": "admin_audit", "label": "Audit Logs", "path": "/admin/audit", "icon": "history"},
         ],
-        "admin": [
+        "operations_admin": [
             {"id": "admin_users", "label": "User Management", "path": "/admin/users", "icon": "users"},
             {"id": "admin_analytics", "label": "Analytics", "path": "/admin/analytics", "icon": "chart"},
             {"id": "admin_kyc", "label": "KYC Queue", "path": "/admin/kyc", "icon": "id-card"},
@@ -321,10 +329,15 @@ async def test_role_configuration(
             {"id": "wallet", "label": "Wallet", "path": "/wallet", "icon": "wallet"},
             {"id": "history", "label": "History", "path": "/history", "icon": "clock"},
         ],
-        "vendor_owner": [
-            {"id": "stations", "label": "My Stations", "path": "/vendor/stations", "icon": "store"},
-            {"id": "inventory", "label": "Inventory", "path": "/vendor/inventory", "icon": "box"},
-            {"id": "earnings", "label": "Earnings", "path": "/vendor/earnings", "icon": "dollar"},
+        "dealer_owner": [
+            {"id": "stations", "label": "My Stations", "path": "/dealer/stations", "icon": "store"},
+            {"id": "inventory", "label": "Inventory", "path": "/dealer/inventory", "icon": "box"},
+            {"id": "earnings", "label": "Earnings", "path": "/dealer/earnings", "icon": "dollar"},
+        ],
+        "dealer_manager": [
+            {"id": "stations", "label": "My Stations", "path": "/dealer/stations", "icon": "store"},
+            {"id": "inventory", "label": "Inventory", "path": "/dealer/inventory", "icon": "box"},
+            {"id": "team", "label": "Team", "path": "/dealer/team", "icon": "users"},
         ],
     }
     
@@ -338,14 +351,14 @@ async def test_role_configuration(
     screen_definitions = [
         {"id": "dashboard", "name": "Dashboard", "required_perm": None},
         {"id": "profile", "name": "User Profile", "required_perm": None},
-        {"id": "users_list", "name": "Users List", "required_perm": "users:read"},
-        {"id": "users_edit", "name": "Edit User", "required_perm": "users:write"},
-        {"id": "roles_manage", "name": "Role Management", "required_perm": "roles:admin"},
-        {"id": "kyc_queue", "name": "KYC Queue", "required_perm": "kyc:review"},
-        {"id": "analytics", "name": "Analytics Dashboard", "required_perm": "analytics:read"},
-        {"id": "audit_logs", "name": "Audit Logs", "required_perm": "audit:read"},
-        {"id": "rentals", "name": "Rentals", "required_perm": "rentals:read"},
-        {"id": "wallet", "name": "Wallet", "required_perm": "wallet:read"},
+        {"id": "users_list", "name": "Users List", "required_perm": "users:view:global"},
+        {"id": "users_edit", "name": "Edit User", "required_perm": "users:update:global"},
+        {"id": "roles_manage", "name": "Role Management", "required_perm": "roles:override:global"},
+        {"id": "kyc_queue", "name": "KYC Queue", "required_perm": "kyc:approve:global"},
+        {"id": "analytics", "name": "Analytics Dashboard", "required_perm": "analytics:view:global"},
+        {"id": "audit_logs", "name": "Audit Logs", "required_perm": "audit:view:global"},
+        {"id": "rentals", "name": "Rentals", "required_perm": "rentals:view:global"},
+        {"id": "wallet", "name": "Wallet", "required_perm": "wallet:view:global"},
     ]
     
     available_screens = []
@@ -353,10 +366,11 @@ async def test_role_configuration(
         accessible = screen["required_perm"] is None or screen["required_perm"] in permission_names
         actions = []
         if accessible:
-            if "write" in (screen["required_perm"] or ""):
-                actions = ["view", "edit", "create"]
-            elif "admin" in (screen["required_perm"] or ""):
+            required_perm = screen["required_perm"] or ""
+            if ":override:" in required_perm:
                 actions = ["view", "edit", "create", "delete", "configure"]
+            elif ":update:" in required_perm or ":create:" in required_perm:
+                actions = ["view", "edit", "create"]
             else:
                 actions = ["view"]
         
@@ -369,15 +383,15 @@ async def test_role_configuration(
     
     # 6. Actions enabled
     action_definitions = [
-        {"name": "Create User", "perm": "users:create", "resource": "users"},
-        {"name": "Edit User", "perm": "users:write", "resource": "users"},
-        {"name": "Delete User", "perm": "users:delete", "resource": "users"},
-        {"name": "Approve KYC", "perm": "kyc:approve", "resource": "kyc"},
-        {"name": "Reject KYC", "perm": "kyc:reject", "resource": "kyc"},
-        {"name": "Manage Roles", "perm": "roles:admin", "resource": "roles"},
-        {"name": "View Analytics", "perm": "analytics:read", "resource": "analytics"},
-        {"name": "Export Data", "perm": "data:export", "resource": "data"},
-        {"name": "Impersonate User", "perm": "users:impersonate", "resource": "users"},
+        {"name": "Create User", "perm": "users:create:global", "resource": "users"},
+        {"name": "Edit User", "perm": "users:update:global", "resource": "users"},
+        {"name": "Delete User", "perm": "users:delete:global", "resource": "users"},
+        {"name": "Approve KYC", "perm": "kyc:approve:global", "resource": "kyc"},
+        {"name": "Reject KYC", "perm": "kyc:override:global", "resource": "kyc"},
+        {"name": "Manage Roles", "perm": "roles:override:global", "resource": "roles"},
+        {"name": "View Analytics", "perm": "analytics:view:global", "resource": "analytics"},
+        {"name": "Export Data", "perm": "analytics:export:global", "resource": "analytics"},
+        {"name": "Impersonate User", "perm": "users:override:global", "resource": "users"},
     ]
     
     actions_enabled = []
@@ -393,25 +407,45 @@ async def test_role_configuration(
     data_visibility = []
     
     # User data
-    if "users:admin" in permission_names or is_super_admin:
+    perm_set = set(permission_names)
+
+    if is_super_admin or any(
+        p.startswith("users:override:") or p.startswith("users:delete:") or p.startswith("users:assign:")
+        for p in perm_set
+    ):
         data_visibility.append(DataVisibility(data_type="User Data", visibility_level="full"))
-    elif "users:read" in permission_names:
+    elif any(
+        p.startswith("users:view:") or p.startswith("users:update:")
+        for p in perm_set
+    ):
         data_visibility.append(DataVisibility(data_type="User Data", visibility_level="partial", filters=["own_data", "assigned_users"]))
     else:
         data_visibility.append(DataVisibility(data_type="User Data", visibility_level="none"))
     
     # Financial data
-    if "finance:admin" in permission_names:
+    if any(
+        p.startswith("finance:override:") or p.startswith("finance:delete:") or p.startswith("finance:approve:")
+        for p in perm_set
+    ):
         data_visibility.append(DataVisibility(data_type="Financial Data", visibility_level="full"))
-    elif "finance:read" in permission_names:
+    elif any(
+        p.startswith("finance:view:") or p.startswith("finance:update:")
+        for p in perm_set
+    ):
         data_visibility.append(DataVisibility(data_type="Financial Data", visibility_level="partial", filters=["own_transactions"]))
     else:
         data_visibility.append(DataVisibility(data_type="Financial Data", visibility_level="none"))
     
     # Analytics data
-    if "analytics:admin" in permission_names:
+    if any(
+        p.startswith("analytics:override:") or p.startswith("analytics:delete:") or p.startswith("analytics:export:")
+        for p in perm_set
+    ):
         data_visibility.append(DataVisibility(data_type="Analytics", visibility_level="full"))
-    elif "analytics:read" in permission_names:
+    elif any(
+        p.startswith("analytics:view:") or p.startswith("analytics:update:")
+        for p in perm_set
+    ):
         data_visibility.append(DataVisibility(data_type="Analytics", visibility_level="partial", filters=["aggregated_only"]))
     else:
         data_visibility.append(DataVisibility(data_type="Analytics", visibility_level="none"))
@@ -478,9 +512,9 @@ async def bulk_assign_role(
     - If false (default), adds the role to user's existing roles
     """
     # 1. Authorization
-    current_user_roles = [r.name for r in current_user.roles] if current_user.roles else []
+    current_user_roles = [canonical_role_name(r.name) for r in current_user.roles] if current_user.roles else []
     is_super_admin = "super_admin" in current_user_roles or current_user.is_superuser
-    is_admin = "admin" in current_user_roles
+    is_admin = bool(set(current_user_roles) & PLATFORM_ADMIN_ROLES)
     
     if not any([is_super_admin, is_admin]):
         raise HTTPException(
@@ -524,20 +558,32 @@ async def bulk_assign_role(
                 continue
             
             if request.replace_existing:
-                # Clear existing roles
+                db.exec(sa.delete(UserRole).where(UserRole.user_id == user.id))
+                db.add(
+                    UserRole(
+                        user_id=user.id,
+                        role_id=role.id,
+                        effective_from=datetime.now(UTC),
+                    )
+                )
                 user.role_id = role.id
             else:
-                # Add role if not already assigned
-                if role not in user.roles:
-                    # Double check with direct query to avoid stale relationship / identity issues
-                    existing_link = db.exec(
-                        select(UserRole).where(
-                            UserRole.user_id == user.id,
-                            UserRole.role_id == role.id
+                existing_link = db.exec(
+                    select(UserRole).where(
+                        UserRole.user_id == user.id,
+                        UserRole.role_id == role.id
+                    )
+                ).first()
+                if not existing_link:
+                    db.add(
+                        UserRole(
+                            user_id=user.id,
+                            role_id=role.id,
+                            effective_from=datetime.now(UTC),
                         )
-                    ).first()
-                    if not existing_link:
-                        user.role_id = role.id
+                    )
+                if not user.role_id:
+                    user.role_id = role.id
             
             db.add(user)
             try:

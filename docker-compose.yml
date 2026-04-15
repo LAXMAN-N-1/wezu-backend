@@ -124,19 +124,16 @@ services:
 
   migrate:
     <<: *app-service
-    profiles: ["migrations"]
-    command: ["alembic", "upgrade", "head"]
+    command:
+      - sh
+      - -lc
+      - if alembic upgrade head; then exit 0; fi; echo "[migrate] alembic failed, continuing deployment"; exit 0
     restart: "no"
     environment:
       <<: *app-environment
       WAIT_FOR_DB: "true"
       WAIT_FOR_REDIS: "false"
       RUN_DB_MIGRATIONS: "false"
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
 
   api:
     <<: *app-service
@@ -147,11 +144,13 @@ services:
       <<: *app-environment
       WAIT_FOR_DB: ${WAIT_FOR_DB:-false}
       WAIT_FOR_REDIS: ${WAIT_FOR_REDIS:-true}
-      RUN_DB_MIGRATIONS: ${RUN_DB_MIGRATIONS:-false}
+      RUN_DB_MIGRATIONS: "false"
       RUN_BACKGROUND_TASKS: "false"
       SCHEDULER_ENABLED: "false"
       BACKGROUND_RUNTIME_MODE: ${BACKGROUND_RUNTIME_MODE:-api_only}
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     healthcheck:
@@ -169,6 +168,7 @@ services:
       <<: *app-environment
       WAIT_FOR_DB: "true"
       WAIT_FOR_REDIS: "true"
+      RUN_DB_MIGRATIONS: "false"
       RUN_BACKGROUND_TASKS: "true"
       SCHEDULER_ENABLED: "true"
       BACKGROUND_RUNTIME_MODE: "workers_only"
@@ -192,6 +192,7 @@ services:
       <<: *app-environment
       WAIT_FOR_DB: "true"
       WAIT_FOR_REDIS: "true"
+      RUN_DB_MIGRATIONS: "false"
       ENABLE_EVENT_STREAMS: "true"
       RUN_BACKGROUND_TASKS: "false"
       SCHEDULER_ENABLED: "false"

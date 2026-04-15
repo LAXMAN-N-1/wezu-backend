@@ -22,10 +22,13 @@ _client = None
 if settings.RAZORPAY_KEY_ID and settings.RAZORPAY_KEY_SECRET:
     _client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
 elif not PAYMENT_MOCK_MODE:
-    logger.warning("payment.razorpay_keys_missing")
+    if settings.REQUIRE_PAYMENT_AT_STARTUP:
+        logger.warning("payment.razorpay_keys_missing")
+    else:
+        logger.info("payment.razorpay_keys_missing_optional")
 
 if PAYMENT_MOCK_MODE:
-    logger.warning(
+    logger.info(
         "payment.mock_mode_active",
         environment=getattr(settings, "ENVIRONMENT", "unknown"),
     )
@@ -137,4 +140,3 @@ class PaymentService:
             return True
         except Exception:
             return False
-

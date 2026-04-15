@@ -42,6 +42,7 @@ class RoleBase(BaseModel):
     category: str = "system"
     level: int = 0
     is_active: bool = True
+    dealer_id: Optional[int] = None
 
 class RoleCreate(RoleBase):
     permissions: List[str] = []
@@ -69,6 +70,8 @@ class RoleRead(RoleBase):
     id: int
     parent_role_id: Optional[int] = None
     is_system_role: bool = False
+    is_custom_role: bool = False
+    scope_owner: str = "global"
     icon: Optional[str] = None
     color: Optional[str] = None
     created_at: Optional[datetime] = None
@@ -76,6 +79,7 @@ class RoleRead(RoleBase):
     permissions: Optional[List[PermissionResponse]] = []
     permission_count: Optional[int] = 0
     user_count: Optional[int] = 0
+    active_user_count: Optional[int] = 0
     model_config = ConfigDict(from_attributes=True)
 
 RoleResponse = RoleRead

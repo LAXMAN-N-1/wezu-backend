@@ -22,50 +22,65 @@ class BatteryService:
     def get_by_serial(db: Session, serial: str) -> Optional[Battery]:
         return db.exec(select(Battery).where(Battery.serial_number == serial)).first()
 
+    @staticmethod
     def create_battery(db: Session, battery_in: BatteryCreate, current_user_id: Optional[int] = None) -> Battery:
+        """Register a new battery atomically.
+
+        All initial side-effects (QR code, health history, lifecycle event,
+        audit log) are staged into the session and committed together. The
+        previous implementation committed the Battery row first and then
+        added dependent rows with separate commits, which could orphan a
+        Battery on any downstream failure.
+        """
         data = battery_in.model_dump()
         # Map spec_id to sku_id if present
         if 'spec_id' in data and data['spec_id'] is not None:
             data['sku_id'] = data.pop('spec_id')
-        
-        # Remove deprecated model field if it conflicts or use it
-        if 'model' in data: data.pop('model')
-            
-        battery = Battery(**data)
-        db.add(battery)
-        db.commit()
-        db.refresh(battery)
-        
-        # 1. Generate QR Code Data
-        battery.qr_code_data = f"wezu://battery/{battery.id}"
-        db.add(battery)
-        
-        # 2. Record Health History initial entry
-        health_history = BatteryHealthHistory(
-            battery_id=battery.id,
-            health_percentage=battery.health_percentage,
-            recorded_at=datetime.now(UTC)
-        )
-        db.add(health_history)
 
-        # 3. Log initial lifecycle event
-        BatteryService.log_lifecycle_event(
-            db, battery.id, "created", "Battery initialized in system"
-        )
-        
-        # 4. Record Audit Log for Creation
-        audit = BatteryAuditLog(
-            battery_id=battery.id,
-            changed_by=current_user_id,
-            field_changed="id",
-            old_value=None,
-            new_value=str(battery.id),
-            reason="Initial registration",
-            timestamp=datetime.now(UTC)
-        )
-        db.add(audit)
-        
-        db.commit()
+        # Remove deprecated model field if it conflicts or use it
+        if 'model' in data:
+            data.pop('model')
+
+        try:
+            battery = Battery(**data)
+            db.add(battery)
+            db.flush()  # assign battery.id without committing
+
+            # 1. QR Code (depends on battery.id)
+            battery.qr_code_data = f"wezu://battery/{battery.id}"
+
+            # 2. Initial health history entry
+            db.add(BatteryHealthHistory(
+                battery_id=battery.id,
+                health_percentage=battery.health_percentage,
+                recorded_at=datetime.now(UTC),
+            ))
+
+            # 3. Initial lifecycle event (inlined — calling the shared helper
+            #    would commit mid-transaction and break atomicity)
+            db.add(BatteryLifecycleEvent(
+                battery_id=battery.id,
+                event_type="created",
+                description="Battery initialized in system",
+                timestamp=datetime.now(UTC),
+            ))
+
+            # 4. Audit log
+            db.add(BatteryAuditLog(
+                battery_id=battery.id,
+                changed_by=current_user_id,
+                field_changed="id",
+                old_value=None,
+                new_value=str(battery.id),
+                reason="Initial registration",
+                timestamp=datetime.now(UTC),
+            ))
+
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+
         db.refresh(battery)
         return battery
 

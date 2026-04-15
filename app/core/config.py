@@ -1,7 +1,7 @@
 import json
 import re
-from typing import Any, Optional
-from urllib.parse import parse_qsl, urlencode, urlparse, urlsplit, urlunsplit
+from typing import Any, Literal, Optional
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urlparse, urlsplit, urlunsplit
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     PROJECT_NAME: str = "WEZU Energy"
     API_V1_STR: str = "/api/v1"
-    APP_VERSION: str = "1.0.0"
+    APP_VERSION: str = "2.0.3"
 
     # ── Database ───────────────────────────────────────────────────────────
     DATABASE_URL: str  # No default — must be provided in env
@@ -23,7 +23,11 @@ class Settings(BaseSettings):
     DB_POOL_USE_LIFO: bool = True
     DATABASE_CONNECT_TIMEOUT_SECONDS: int = 10
     DATABASE_SSL_MODE: Optional[str] = None
+    DATABASE_PREFER_IPV4: bool = True
+    DATABASE_HOSTADDR: Optional[str] = None
     SQL_SLOW_QUERY_LOG_MS: int = 0
+    SQL_SLOW_QUERY_WARN_COOLDOWN_SECONDS: int = 60
+    SQL_SLOW_QUERY_IGNORE_PATTERNS: list[str] = ["from order_realtime_outbox"]
     STARTUP_DIAGNOSTICS_CACHE_TTL_SECONDS: float = 5.0
 
     # ── Redis (Sessions & Caching) ─────────────────────────────────────────
@@ -73,6 +77,18 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    AUTH_PROVIDER: Literal["local", "supabase", "hybrid"] = "local"
+    SUPABASE_URL: Optional[str] = None
+    SUPABASE_JWKS_URL: Optional[str] = None
+    SUPABASE_JWT_ISSUER: Optional[str] = None
+    SUPABASE_JWT_AUDIENCE: Optional[str] = "authenticated"
+    SUPABASE_ALLOWED_ALGORITHMS: list[str] = ["RS256"]
+    SUPABASE_JWKS_CACHE_TTL_SECONDS: int = 300
+    SUPABASE_JWKS_TIMEOUT_SECONDS: float = 5.0
+    SUPABASE_ALLOW_ANON_ROLE: bool = False
+    SUPABASE_ENFORCE_EMAIL_VERIFIED: bool = True
+    SUPABASE_AUTO_PROVISION_USERS: bool = False
+    SUPABASE_DEFAULT_ROLE_NAME: str = "customer"
 
     # ── Customer Authentication ────────────────────────────────────────────
     GOOGLE_OAUTH_CLIENT_ID: Optional[str] = None
@@ -256,6 +272,18 @@ class Settings(BaseSettings):
     LOG_REQUESTS: bool = True
     LOG_HEALTHCHECKS: bool = False
     LOG_SLOW_REQUEST_THRESHOLD_MS: int = 2000
+    LOG_SERVICE_NAME: str = "wezu-backend"
+    LOG_SCHEMA_VERSION: str = "1.0"
+    LOG_REDACT_SENSITIVE_FIELDS: bool = True
+    LOG_MAX_FIELD_LENGTH: int = 2048
+    LOG_MAX_COLLECTION_ITEMS: int = 50
+    LOG_EXCLUDE_PATHS: list[str] = ["/health", "/ready", "/live"]
+    LOG_ANOMALY_DETECTION_ENABLED: bool = True
+    LOG_ANOMALY_MAX_UNKNOWN_FIELDS: int = 25
+    LOG_ANOMALY_MAX_BODY_BYTES: int = 262144
+    LOG_ANOMALY_EMPTY_SUCCESS_RESPONSE: bool = True
+    DB_LOG_NOOP_MUTATIONS: bool = True
+    DB_NOOP_MUTATION_IGNORE_TABLES: list[str] = ["alembic_version"]
     AUTH_TOKEN_CACHE_TTL_SECONDS: int = 5
     ANALYTICS_CACHE_TTL_SECONDS: int = 30
     DEALER_PORTAL_CACHE_TTL_SECONDS: int = 30
@@ -326,6 +354,10 @@ class Settings(BaseSettings):
     REQUIRE_SMS_AT_STARTUP: bool = False
     ENABLE_REDIS_SECURITY_WORKFLOWS: bool = True
     STRICT_STARTUP_DEPENDENCY_CHECKS: bool = True
+    MIGRATION_GRAPH_STRICT: bool = True
+    MIGRATION_GRAPH_REQUIRE_SINGLE_HEAD: bool = True
+    MIGRATION_GRAPH_REQUIRE_DB_AT_HEAD: bool = True
+    MIGRATION_GRAPH_VERSIONS_DIR: str = "alembic/versions"
     ALLOW_START_WITHOUT_DB: bool = False
     REQUIRE_DISTRIBUTED_2FA_RATE_LIMIT: bool = True
 
@@ -349,20 +381,36 @@ class Settings(BaseSettings):
         normalized = value.strip()
         if normalized.startswith("postgres://"):
             normalized = "postgresql://" + normalized[len("postgres://"):]
+
         split_url = urlsplit(normalized)
-        if not split_url.query:
-            return normalized
-        query_pairs = parse_qsl(split_url.query, keep_blank_values=True)
+        netloc = split_url.netloc
+
+        if split_url.hostname:
+            host = split_url.hostname
+            if ":" in host and not host.startswith("["):
+                host = f"[{host}]"
+            port = f":{split_url.port}" if split_url.port else ""
+
+            auth_prefix = ""
+            if split_url.username is not None:
+                username = quote(unquote(split_url.username), safe="")
+                auth_prefix = username
+                if split_url.password is not None:
+                    password = quote(unquote(split_url.password), safe="")
+                    auth_prefix = f"{auth_prefix}:{password}"
+                auth_prefix = f"{auth_prefix}@"
+
+            netloc = f"{auth_prefix}{host}{port}"
+
+        query_pairs = parse_qsl(split_url.query, keep_blank_values=True) if split_url.query else []
         sanitized_pairs = [
             (key, raw_value)
             for key, raw_value in query_pairs
             if not (key.lower() == "options" and "search_path" in raw_value.lower())
         ]
-        if sanitized_pairs == query_pairs:
-            return normalized
-        sanitized_query = urlencode(sanitized_pairs, doseq=True)
+        sanitized_query = urlencode(sanitized_pairs, doseq=True) if sanitized_pairs else ""
         return urlunsplit((
-            split_url.scheme, split_url.netloc, split_url.path,
+            split_url.scheme, netloc, split_url.path,
             sanitized_query, split_url.fragment,
         ))
 
@@ -382,7 +430,23 @@ class Settings(BaseSettings):
             return None
         return key
 
-    @field_validator("MEDIA_BASE_URL", "API_PUBLIC_BASE_URL", mode="before")
+    @field_validator("AUTH_PROVIDER", mode="before")
+    @classmethod
+    def _normalize_auth_provider(cls, value: Any) -> str:
+        if value is None:
+            return "local"
+        provider = str(value).strip().lower()
+        return provider or "local"
+
+    @field_validator("SUPABASE_DEFAULT_ROLE_NAME", mode="before")
+    @classmethod
+    def _normalize_supabase_default_role(cls, value: Any) -> str:
+        if value is None:
+            return "customer"
+        role_name = str(value).strip().lower()
+        return role_name or "customer"
+
+    @field_validator("MEDIA_BASE_URL", "API_PUBLIC_BASE_URL", "SUPABASE_URL", "SUPABASE_JWKS_URL", mode="before")
     @classmethod
     def _normalize_base_url(cls, value: Any) -> Optional[str]:
         if value is None:
@@ -396,6 +460,9 @@ class Settings(BaseSettings):
         "CORS_ORIGINS", "ALLOWED_HOSTS", "FORWARDED_ALLOW_IPS",
         "TRUSTED_PROXY_CIDRS", "PASSKEY_ORIGINS",
         "PASSKEY_ANDROID_RELATIONS", "PASSKEY_ANDROID_SHA256_CERT_FINGERPRINTS",
+        "SUPABASE_ALLOWED_ALGORITHMS", "LOG_EXCLUDE_PATHS",
+        "SQL_SLOW_QUERY_IGNORE_PATTERNS",
+        "DB_NOOP_MUTATION_IGNORE_TABLES",
         mode="before",
     )
     @classmethod
@@ -463,6 +530,30 @@ class Settings(BaseSettings):
                     self.ALLOWED_HOSTS.append(host)
         if not self.MEDIA_BASE_URL and self.API_PUBLIC_BASE_URL:
             self.MEDIA_BASE_URL = f"{self.API_PUBLIC_BASE_URL.rstrip('/')}/uploads"
+        return self
+
+    @field_validator("SUPABASE_ALLOWED_ALGORITHMS", mode="after")
+    @classmethod
+    def _normalize_supabase_algorithms(cls, value: list[str]) -> list[str]:
+        normalized = [item.strip().upper() for item in value if item and item.strip()]
+        if not normalized:
+            return ["RS256"]
+        if "NONE" in normalized:
+            raise ValueError("SUPABASE_ALLOWED_ALGORITHMS cannot include 'none'")
+        return normalized
+
+    @model_validator(mode="after")
+    def _validate_supabase_auth(self) -> "Settings":
+        if self.AUTH_PROVIDER not in {"supabase", "hybrid"}:
+            return self
+        if not self.SUPABASE_URL and not self.SUPABASE_JWKS_URL:
+            raise ValueError(
+                "AUTH_PROVIDER is set to supabase/hybrid but SUPABASE_URL or SUPABASE_JWKS_URL is missing"
+            )
+        if self.SUPABASE_JWKS_TIMEOUT_SECONDS <= 0:
+            raise ValueError("SUPABASE_JWKS_TIMEOUT_SECONDS must be > 0")
+        if self.SUPABASE_JWKS_CACHE_TTL_SECONDS < 0:
+            raise ValueError("SUPABASE_JWKS_CACHE_TTL_SECONDS must be >= 0")
         return self
 
     def is_origin_allowed(self, origin: str) -> bool:

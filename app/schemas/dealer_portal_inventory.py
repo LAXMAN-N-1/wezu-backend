@@ -56,6 +56,7 @@ class BatteryCreateRequest(BaseModel):
     iot_device_id: Optional[str] = None
     battery_type: Optional[str] = "48V/30Ah"
     notes: Optional[str] = None
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class BulkStatusUpdateRequest(BaseModel):
@@ -75,6 +76,7 @@ class StockRequestCreate(BaseModel):
     priority: str = "normal"
     reason: Optional[str] = None
     notes: Optional[str] = None
+    model_config = ConfigDict(protected_namespaces=())
 
 
 # ──────────────────────────────────────────────────
@@ -158,7 +160,7 @@ class BatteryItemResponse(BaseModel):
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
 
 class PaginationResponse(BaseModel):
@@ -326,6 +328,7 @@ class SearchResultItem(BaseModel):
     status: str = ""
     location: str = ""
     match_score: float = 1.0
+    model_config = ConfigDict(protected_namespaces=())
 
 
 class InventorySearchResponse(BaseModel):

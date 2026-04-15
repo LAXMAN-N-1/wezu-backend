@@ -196,13 +196,36 @@ class DealerLedgerService:
 
     @staticmethod
     def get_ledger_detail(db: Session, dealer_id: int, entry_id: str) -> LedgerDetailResponse:
-        prefix, db_id = entry_id.split("-")
-        
+        try:
+            prefix, db_id_str = entry_id.split("-", 1)
+            db_id = int(db_id_str)
+        except (ValueError, AttributeError):
+            # Non-disclosive: malformed IDs look identical to not-found.
+            raise ValueError("Not found")
+
+        # Strict tenant isolation: reject any ledger entry that does not
+        # belong to a station owned by the caller dealer. Fails closed with
+        # the same error as "not found" so callers cannot probe for IDs.
+        dealer_station_ids = set(
+            db.exec(select(Station.id).where(Station.dealer_id == dealer_id)).all()
+        )
+
         if prefix == "RENTAL":
-            r = db.get(Rental, int(db_id))
+            r = db.get(Rental, db_id)
             if not r:
-                raise ValueError("Rental not found")
-            
+                raise ValueError("Not found")
+            if not dealer_station_ids or r.start_station_id not in dealer_station_ids:
+                logger.warning(
+                    "security.scope_violation",
+                    extra={
+                        "dealer_id": dealer_id,
+                        "target_id": entry_id,
+                        "endpoint": "GET /dealers/me/transactions/{txn_id}",
+                        "reason": "rental_not_in_dealer_scope",
+                    },
+                )
+                raise ValueError("Not found")
+
             user = db.get(User, r.user_id)
             station = db.get(Station, r.start_station_id)
             
@@ -253,5 +276,28 @@ class DealerLedgerService:
                 status="Completed" if r.status == "completed" else r.status.name,
                 events=events
             )
-        else:
+        elif prefix == "COMM":
+            from app.models.commission import CommissionLog
+
+            entry = db.get(CommissionLog, db_id)
+            if not entry:
+                raise ValueError("Not found")
+            # CommissionLog.dealer_id references users.id (dealer owner user id).
+            # Map to dealer profile and enforce ownership.
+            from app.models.dealer import DealerProfile
+            profile = db.get(DealerProfile, dealer_id)
+            owner_user_id = profile.user_id if profile else None
+            if entry.dealer_id != owner_user_id:
+                logger.warning(
+                    "security.scope_violation",
+                    extra={
+                        "dealer_id": dealer_id,
+                        "target_id": entry_id,
+                        "endpoint": "GET /dealers/me/transactions/{txn_id}",
+                        "reason": "commission_not_in_dealer_scope",
+                    },
+                )
+                raise ValueError("Not found")
             raise ValueError("Unsupported detail view for this type")
+        else:
+            raise ValueError("Not found")

@@ -21,13 +21,13 @@ MASTER_MENU: List[Dict[str, Any]] = [
         "route": "/batteries",
         "order": 2,
         "enabled": True,
-        "permission": "battery:view", # Parent permission
+        "permission": "battery:view:global", # Parent permission
         "submenu": [
             {
                 "id": "batteries_list",
                 "label": "All Batteries",
                 "route": "/batteries/list",
-                "permission": "battery:view:all",
+                "permission": "battery:view:global",
                 "enabled": True,
                 "order": 1
             },
@@ -35,7 +35,7 @@ MASTER_MENU: List[Dict[str, Any]] = [
                 "id": "batteries_map",
                 "label": "Battery Map",
                 "route": "/batteries/map",
-                "permission": "battery:view:map", 
+                "permission": "battery:view:global",
                 "enabled": True,
                 "order": 2
             }
@@ -48,13 +48,13 @@ MASTER_MENU: List[Dict[str, Any]] = [
         "route": "/stations",
         "order": 3,
         "enabled": True,
-        "permission": "station:view",
+        "permission": "station:view:global",
         "submenu": [
             {
                 "id": "stations_list",
                 "label": "All Stations",
                 "route": "/stations/list",
-                "permission": "station:view:all",
+                "permission": "station:view:global",
                 "enabled": True,
                 "order": 1
             },
@@ -62,7 +62,7 @@ MASTER_MENU: List[Dict[str, Any]] = [
                 "id": "stations_map",
                 "label": "Station Map",
                 "route": "/stations/map",
-                "permission": "station:view:map",
+                "permission": "station:view:global",
                 "enabled": True,
                 "order": 2
             }
@@ -75,13 +75,13 @@ MASTER_MENU: List[Dict[str, Any]] = [
         "route": "/finance",
         "order": 4,
         "enabled": True,
-        "permission": "finance:view",
+        "permission": "finance:view:global",
         "submenu": [
              {
                 "id": "transactions",
                 "label": "Transactions",
                 "route": "/finance/transactions",
-                "permission": "finance:view:transactions",
+                "permission": "finance:view:global",
                 "enabled": True,
                  "order": 1
             },
@@ -89,7 +89,7 @@ MASTER_MENU: List[Dict[str, Any]] = [
                 "id": "invoices",
                 "label": "Invoices",
                 "route": "/finance/invoices",
-                "permission": "finance:view:invoices",
+                "permission": "finance:view:global",
                 "enabled": True,
                  "order": 2
             }
@@ -102,13 +102,13 @@ MASTER_MENU: List[Dict[str, Any]] = [
         "route": "/admin/users",
         "order": 5,
         "enabled": True,
-        "permission": "user:view", # Typically admin only
+        "permission": "users:view:global", # Typically admin only
          "submenu": [
              {
                 "id": "users_list",
                 "label": "All Users",
                 "route": "/admin/users/list",
-                "permission": "user:view:all",
+                "permission": "users:view:global",
                 "enabled": True,
                  "order": 1
             },
@@ -116,7 +116,7 @@ MASTER_MENU: List[Dict[str, Any]] = [
                 "id": "roles_list",
                 "label": "Roles",
                 "route": "/admin/roles",
-                "permission": "role:view",
+                "permission": "roles:view:global",
                 "enabled": True,
                  "order": 2
             }
@@ -129,6 +129,6 @@ MASTER_MENU: List[Dict[str, Any]] = [
         "route": "/settings",
         "order": 99,
         "enabled": True,
-        "permission": "settings:view"
+        "permission": "settings:view:global"
     }
 ]

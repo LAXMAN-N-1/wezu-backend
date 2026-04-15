@@ -55,7 +55,9 @@ class Role(SQLModel, table=True):
     level: int = Field(default=0) # Hierarchy level (e.g. 100=Admin, 10=User)
     parent_id: Optional[int] = Field(default=None, foreign_key="roles.id")
     is_system_role: bool = Field(default=False)  # If True, cannot be deleted (e.g., Super Admin)
+    is_custom_role: bool = Field(default=False)  # True for dealer-scoped runtime custom roles
     is_active: bool = Field(default=True)
+    scope_owner: str = Field(default="global")  # global | dealer
     
     # Dealer Scoping (Phases 5/6)
     dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id", index=True)

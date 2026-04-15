@@ -6,7 +6,8 @@ from math import ceil
 from typing import List, Optional
 
 from fastapi import HTTPException
-from sqlalchemy import func
+from sqlalchemy import func, or_
+from sqlalchemy import update as sa_update
 from sqlmodel import Session, select
 
 from app.core.config import settings
@@ -219,6 +220,36 @@ class RentalService:
             rental_in.promo_code,
         )
 
+        # Atomic promo-code reservation: bump usage_count only if we are
+        # still under the configured limit. This runs as a single SQL
+        # statement and relies on the Postgres row lock we already hold
+        # via calculate_price()'s SELECT ... FOR UPDATE. Concurrent rentals
+        # contend at the DB layer, so the limit is respected.
+        #
+        # Known leak: if this rental is later cancelled (timeout, failed
+        # payment), the usage slot is not released. This is a conscious
+        # trade-off — previously the counter was never incremented at all,
+        # so the limit was silently ignored. A follow-up can add a promo
+        # reservation/release pair keyed on rental_id when a Rental.promo_id
+        # column is introduced.
+        promo_code_id = price_details.get("promo_code_id")
+        if promo_code_id:
+            result = db.execute(
+                sa_update(PromoCode)
+                .where(
+                    PromoCode.id == promo_code_id,
+                    or_(
+                        PromoCode.usage_limit == 0,
+                        PromoCode.usage_count < PromoCode.usage_limit,
+                    ),
+                )
+                .values(usage_count=PromoCode.usage_count + 1)
+            )
+            if result.rowcount == 0:
+                # A concurrent rental claimed the last slot between our
+                # validation read and this CAS — fail closed.
+                raise HTTPException(status_code=400, detail="Promo code usage limit reached")
+
         rental = Rental(
             user_id=user_id,
             battery_id=rental_in.battery_id,
@@ -417,8 +448,8 @@ class RentalService:
             )
         )
 
-        # Note: Promo code usage count was already incremented during calculate_price()
-        # in initiate_rental(). No phantom promo_code_id field needed.
+        # Note: promo usage_count is incremented atomically in initiate_rental()
+        # via a CAS UPDATE. We do not need to touch it here.
 
         battery = db.exec(select(Battery).where(Battery.id == rental.battery_id).with_for_update()).first()
         if not battery:

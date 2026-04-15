@@ -10,9 +10,9 @@ from sqlmodel import Session, select, func
 from datetime import datetime, UTC
 
 from app.db.session import get_session
+from app.api import deps
 from app.api.deps import get_current_user
 from app.models.user import User
-from app.models.dealer import DealerProfile
 from app.models.station import Station, StationSlot
 from app.models.rental import Rental
 from app.models.maintenance import MaintenanceRecord
@@ -23,11 +23,7 @@ router = APIRouter()
 
 def _get_dealer_id(db: Session, user_id: int) -> int:
     """Resolve dealer_id from current user, or raise 403."""
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == user_id)
-    ).first()
-    if not dealer:
-        raise HTTPException(status_code=403, detail="Not a dealer")
+    dealer = deps.get_dealer_profile_or_403(db, user_id, detail="Not a dealer")
     return dealer.id
 
 
@@ -368,8 +364,6 @@ def fetch_inventory_alerts(
     """Fetch low-inventory alerts across all dealer stations based on custom thresholds."""
     dealer_id = _get_dealer_id(db, current_user.id)
     return DealerStationService.get_low_inventory_alerts(db, dealer_id)
-
-
 # ─── Newly Added Dealer Portal Aggregation Routes ───
 
 @router.get("/stats")
@@ -441,4 +435,3 @@ def get_station_transactions(
 ):
     dealer_id = _get_dealer_id(db, current_user.id)
     return []
-

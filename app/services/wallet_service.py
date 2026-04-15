@@ -10,7 +10,9 @@ from sqlmodel import Session, select
 from app.core.logging import get_logger
 from app.core.observability import SLOTimer
 from app.models.financial import Transaction, Wallet, WalletWithdrawalRequest
+from app.models.notification import Notification, NotificationStatus
 from app.models.refund import Refund
+from app.services.notification_outbox_service import NotificationOutboxService
 from app.services.security_service import SecurityService
 from app.services.workflow_automation_service import WorkflowAutomationService
 
@@ -31,8 +33,18 @@ class WalletService:
         db: Session,
         user_id: int,
         for_update: bool = False,
-        auto_commit_if_created: bool = True,
+        auto_commit_if_created: bool = False,
     ) -> Wallet:
+        """Fetch (or lazily create) a user's wallet.
+
+        Atomicity: default is ``auto_commit_if_created=False`` so the caller
+        owns the transaction boundary. Committing here mid-request would
+        publish a zero-balance wallet even if the caller's follow-up work
+        (balance mutation + transaction row) later failed, leaving orphaned
+        state. Callers that only need to read and do not intend to commit
+        can still safely call this — the just-created wallet lives inside
+        the session and will be persisted on the caller's commit.
+        """
         query = select(Wallet).where(Wallet.user_id == user_id)
         if for_update:
             query = query.with_for_update()
@@ -43,12 +55,10 @@ class WalletService:
 
         wallet = Wallet(user_id=user_id, balance=Decimal("0.00"))
         db.add(wallet)
-        db.flush()
+        db.flush()  # populate wallet.id within the open transaction
         if auto_commit_if_created:
             db.commit()
-        db.refresh(wallet)
-        if for_update and auto_commit_if_created:
-            wallet = db.exec(select(Wallet).where(Wallet.user_id == user_id).with_for_update()).first()
+            db.refresh(wallet)
         return wallet
 
     @staticmethod
@@ -236,15 +246,62 @@ class WalletService:
             intent.description = f"Wallet recharge captured ({payment_id})"
             db.add(intent)
 
-            db.commit()
-            db.refresh(intent)
-            WorkflowAutomationService.notify_wallet_recharge_captured(
+            # ── Transactional outbox for the success notification ──────────
+            # Previously we called WorkflowAutomationService *after* commit,
+            # which meant a crash between commit and the notification call
+            # would silently drop the user notification. We now stage a
+            # Notification + NotificationOutbox row per channel inside the
+            # same transaction, so the outbox dispatcher is guaranteed to
+            # see them iff the wallet credit is committed.
+            WalletService._stage_recharge_success_notifications(
                 db,
                 user_id=wallet.user_id,
                 amount=amount_value,
                 payment_id=payment_id,
             )
+
+            db.commit()
+            db.refresh(intent)
             return intent
+
+    @staticmethod
+    def _stage_recharge_success_notifications(
+        db: Session,
+        *,
+        user_id: int,
+        amount: Decimal,
+        payment_id: str,
+    ) -> None:
+        """Stage (do not commit) recharge-success notifications + outbox rows.
+
+        Must be called inside an open transaction that the caller will
+        commit. Each channel gets its own idempotency key derived from the
+        payment_id so webhook retries converge on the same outbox entries.
+        """
+        title = "Wallet Recharge Successful"
+        message = (
+            f"We have credited INR {amount} to your wallet. "
+            f"Payment reference: {payment_id}."
+        )
+        now = datetime.utcnow()
+        for channel in ("push", "email", "sms"):
+            notif = Notification(
+                user_id=user_id,
+                title=title,
+                message=message,
+                type="wallet_recharge_success",
+                channel=channel,
+                status=NotificationStatus.QUEUED,
+                scheduled_at=now,
+            )
+            db.add(notif)
+            db.flush()  # populate notif.id for the outbox row
+            NotificationOutboxService.enqueue(
+                db,
+                notification=notif,
+                scheduled_at=now,
+                idempotency_key=f"wallet_recharge_captured:{payment_id}:{channel}",
+            )
 
     @staticmethod
     def mark_recharge_intent_failed(db: Session, *, order_id: str, payment_id: Optional[str] = None) -> Optional[Transaction]:

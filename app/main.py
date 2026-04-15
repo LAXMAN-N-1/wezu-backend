@@ -27,6 +27,7 @@ import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 
 from app.core.config import settings
+from app.core.database import ensure_roles_schema_compatibility
 from app.db.session import engine
 from app.api import deps
 import app.models.all  # noqa: F401  Ensure all SQLModel classes registered
@@ -36,6 +37,7 @@ from app.middleware.security import SecureHeadersMiddleware
 from app.middleware.proxy_headers import TrustedProxyHeadersMiddleware
 from app.middleware.proxy_host import ProxyHostRewriteMiddleware
 from app.middleware.request_logging import RequestLoggingMiddleware
+from app.middleware.anomaly_logging import AnomalyLoggingMiddleware
 from app.middleware.rbac_middleware import RBACMiddleware
 from app.middleware.server_timing import ServerTimingMiddleware
 from app.api.errors.handlers import add_exception_handlers
@@ -171,13 +173,12 @@ async def lifespan(app: FastAPI):
 
     try:
         logger.info(
-            "Startup settings: env=%s db_pool=%s db_overflow=%s audit_logging=%s "
-            "gunicorn_workers=%s",
-            settings.ENVIRONMENT,
-            settings.DB_POOL_SIZE,
-            settings.DB_MAX_OVERFLOW,
-            settings.AUDIT_REQUEST_LOGGING_ENABLED,
-            os.getenv("GUNICORN_WORKERS", "1"),
+            "startup.settings",
+            environment=settings.ENVIRONMENT,
+            db_pool=settings.DB_POOL_SIZE,
+            db_overflow=settings.DB_MAX_OVERFLOW,
+            audit_logging=settings.AUDIT_REQUEST_LOGGING_ENABLED,
+            gunicorn_workers=os.getenv("GUNICORN_WORKERS", "1"),
         )
 
         if settings.ENVIRONMENT == "test":
@@ -193,7 +194,6 @@ async def lifespan(app: FastAPI):
                 from alembic.config import Config as AlembicConfig
                 from alembic import command as alembic_command
                 alembic_cfg = AlembicConfig("alembic.ini")
-                alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
                 alembic_command.upgrade(alembic_cfg, "head")
                 logger.info("Alembic migrations complete.")
             except Exception:
@@ -208,7 +208,7 @@ async def lifespan(app: FastAPI):
                     if not allow_start_without_db:
                         raise
                     startup_without_db = True
-                    logger.exception("DB unavailable; degraded mode: %s", exc)
+                    logger.exception("db.unavailable.degraded_mode", error=str(exc))
         else:
             try:
                 from app.db.session import init_db
@@ -220,7 +220,7 @@ async def lifespan(app: FastAPI):
                 if not allow_start_without_db:
                     raise
                 startup_without_db = True
-                logger.exception("DB unavailable during init; degraded mode: %s", exc)
+                logger.exception("db.unavailable_during_init.degraded_mode", error=str(exc))
 
         # Logistics schema validation
         if settings.LOGISTICS_SCHEMA_CHECK_ENABLED and not startup_without_db:
@@ -231,10 +231,25 @@ async def lifespan(app: FastAPI):
                 if not allow_start_without_db:
                     raise
                 startup_without_db = True
-                logger.exception("Schema validation failed; degraded mode: %s", exc)
+                logger.exception("schema.validation_failed.degraded_mode", error=str(exc))
+
+        # RBAC compatibility backfill
+        if not startup_without_db:
+            try:
+                ensure_roles_schema_compatibility()
+            except SQLAlchemyError as exc:
+                if not allow_start_without_db:
+                    raise
+                startup_without_db = True
+                logger.exception("schema.roles_compatibility_failed.degraded_mode", error=str(exc))
 
         # Startup diagnostics enforcement
-        StartupDiagnosticsService.enforce_required_dependencies()
+        if not startup_without_db:
+            StartupDiagnosticsService.enforce_required_dependencies()
+        else:
+            logger.warning(
+                "Skipping strict startup dependency enforcement because app is in DB-degraded mode."
+            )
 
         # Background runtime (leader election)
         background_runtime = await BackgroundRuntimeService.initialize()
@@ -251,9 +266,9 @@ async def lifespan(app: FastAPI):
                     logger.exception("Scheduler startup failed")
             else:
                 logger.info(
-                    "Scheduler disabled for this process mode=%s reason=%s",
-                    background_runtime.mode,
-                    background_runtime.reason,
+                    "scheduler.disabled_for_process",
+                    mode=background_runtime.mode,
+                    reason=background_runtime.reason,
                 )
 
         # MQTT
@@ -330,7 +345,7 @@ add_exception_handlers(app)
 
 @app.exception_handler(OperationalError)
 async def operational_db_error_handler(_request, exc: OperationalError):
-    logger.warning("Database operational error: %s", exc)
+    logger.warning("database.operational_error", error=str(exc))
     return JSONResponse(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
         content={"detail": "Database is temporarily unavailable"},
@@ -362,6 +377,7 @@ trusted_host_allowlist = sorted(
 if settings.ENABLE_TRUSTED_HOST_MIDDLEWARE:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=trusted_host_allowlist)
 
+app.add_middleware(AnomalyLoggingMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(TrustedProxyHeadersMiddleware)
 app.add_middleware(ProxyHostRewriteMiddleware)
@@ -415,7 +431,7 @@ def _readiness_payload() -> tuple[dict[str, str], bool]:
             db.execute(text("SELECT 1"))
             db_ok = True
     except Exception as e:
-        logger.error("Readiness DB failure: %s", e)
+        logger.error("readiness.db_failure", error=str(e))
     try:
         import redis as _redis
         # Reuse a module-level connection pool so /health doesn't create
@@ -433,7 +449,7 @@ def _readiness_payload() -> tuple[dict[str, str], bool]:
         r.ping()
         redis_ok = True
     except Exception as e:
-        logger.error("Readiness Redis failure: %s", e)
+        logger.error("readiness.redis_failure", error=str(e))
     if mongo_configured:
         try:
             from pymongo import MongoClient
@@ -446,7 +462,7 @@ def _readiness_payload() -> tuple[dict[str, str], bool]:
             client.admin.command("ping")
             mongo_ok = True
         except Exception as e:
-            logger.error("Readiness MongoDB failure: %s", e)
+            logger.error("readiness.mongodb_failure", error=str(e))
 
     dependencies = {
         "database": "online" if db_ok else "offline",
@@ -627,21 +643,22 @@ app.include_router(admin_financial_reports.router, prefix=f"{admin_api}/financia
 
 # ── Dealer ─────────────────────────────────────────────────────────────────
 dealer_api = f"{v1_str}/dealer"
-dealer_deps = [Depends(deps.get_current_user)]
+dealer_profile_deps = [Depends(deps.get_current_user)]
+dealer_scope_deps = [Depends(deps.get_current_dealer_scope_user)]
 
 app.include_router(dealer_portal_auth.router, prefix=f"{dealer_api}/auth", tags=["Dealer: Auth"])
-app.include_router(dealers.router, prefix=f"{v1_str}/dealers", tags=["Dealer: Profile"], dependencies=dealer_deps)
-app.include_router(dealer_stations.router, prefix=f"{v1_str}/dealer-stations", tags=["Dealer: Stations"], dependencies=dealer_deps)
-app.include_router(dealer_portal_dashboard.router, prefix=f"{dealer_api}/portal", tags=["Dealer: Dashboard"], dependencies=dealer_deps)
-app.include_router(dealer_portal_tickets.router, prefix=f"{dealer_api}/portal/tickets", tags=["Dealer: Tickets"], dependencies=dealer_deps)
-app.include_router(dealer_portal_roles.router, prefix=f"{dealer_api}/portal/roles", tags=["Dealer: Roles"], dependencies=dealer_deps)
-app.include_router(dealer_portal_users.router, prefix=f"{dealer_api}/portal/users", tags=["Dealer: Users"], dependencies=dealer_deps)
-app.include_router(dealer_portal_settings.router, prefix=f"{dealer_api}/portal/settings", tags=["Dealer: Settings"], dependencies=dealer_deps)
-app.include_router(dealer_portal_customers.router, prefix=f"{dealer_api}/analytics", tags=["Dealer: Customers"], dependencies=dealer_deps)
-app.include_router(dealer_analytics.router, prefix=f"{dealer_api}/analytics", tags=["Dealer: Analytics"], dependencies=dealer_deps)
-app.include_router(dealer_campaigns.router, prefix=f"{dealer_api}/campaigns", tags=["Dealer: Campaigns"], dependencies=dealer_deps)
-app.include_router(dealer_onboarding.router, prefix=f"{dealer_api}/onboarding", tags=["Dealer: Onboarding"], dependencies=dealer_deps)
-app.include_router(dealer_portal_inventory.router, prefix=f"{dealer_api}/portal", tags=["Dealer: Inventory"], dependencies=dealer_deps)
+app.include_router(dealers.router, prefix=f"{v1_str}/dealers", tags=["Dealer: Profile"], dependencies=dealer_profile_deps)
+app.include_router(dealer_stations.router, prefix=f"{v1_str}/dealer-stations", tags=["Dealer: Stations"], dependencies=dealer_scope_deps)
+app.include_router(dealer_portal_dashboard.router, prefix=f"{dealer_api}/portal", tags=["Dealer: Dashboard"], dependencies=dealer_scope_deps)
+app.include_router(dealer_portal_tickets.router, prefix=f"{dealer_api}/portal/tickets", tags=["Dealer: Tickets"], dependencies=dealer_scope_deps)
+app.include_router(dealer_portal_roles.router, prefix=f"{dealer_api}/portal/roles", tags=["Dealer: Roles"], dependencies=dealer_scope_deps)
+app.include_router(dealer_portal_users.router, prefix=f"{dealer_api}/portal/users", tags=["Dealer: Users"], dependencies=dealer_scope_deps)
+app.include_router(dealer_portal_settings.router, prefix=f"{dealer_api}/portal/settings", tags=["Dealer: Settings"], dependencies=dealer_scope_deps)
+app.include_router(dealer_portal_customers.router, prefix=f"{dealer_api}/analytics", tags=["Dealer: Customers"], dependencies=dealer_scope_deps)
+app.include_router(dealer_analytics.router, prefix=f"{dealer_api}/analytics", tags=["Dealer: Analytics"], dependencies=dealer_scope_deps)
+app.include_router(dealer_campaigns.router, prefix=f"{dealer_api}/campaigns", tags=["Dealer: Campaigns"], dependencies=dealer_scope_deps)
+app.include_router(dealer_onboarding.router, prefix=f"{dealer_api}/onboarding", tags=["Dealer: Onboarding"], dependencies=dealer_scope_deps)
+app.include_router(dealer_portal_inventory.router, prefix=f"{dealer_api}/portal", tags=["Dealer: Inventory"], dependencies=dealer_scope_deps)
 
 # ── Logistics ──────────────────────────────────────────────────────────────
 app.include_router(logistics.router, prefix=f"{v1_str}/logistics", tags=["Logistics"])

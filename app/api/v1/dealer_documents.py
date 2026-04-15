@@ -4,18 +4,15 @@ from typing import Any, List
 from datetime import datetime
 
 from app.db.session import get_session
+from app.api import deps
 from app.api.deps import get_current_user
 from app.models.user import User
-from app.models.dealer import DealerProfile, DealerDocument
+from app.models.dealer import DealerDocument
 
 router = APIRouter()
 
 def _get_dealer_id(db: Session, user_id: int) -> int:
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == user_id)
-    ).first()
-    if not dealer:
-        raise HTTPException(status_code=403, detail="Not a dealer")
+    dealer = deps.get_dealer_profile_or_403(db, user_id, detail="Not a dealer")
     return dealer.id
 
 @router.get("")

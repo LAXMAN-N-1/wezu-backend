@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -1 /Users/mohithavala/Documents/wezu-backend-unified/app/models/*.py)",
+      "Bash(grep -r \"CHECK\\\\|CREATE.*INDEX.*WHERE\\\\|sa.CheckConstraint\" /Users/mohithavala/Documents/wezu-backend-unified/alembic/versions/*.py)",
+      "Bash(grep -A 2 \"create_index\" /Users/mohithavala/Documents/wezu-backend-unified/alembic/versions/*.py)",
+      "Bash(grep -i \"extension\\\\|enable_extension\\\\|pgcrypto\\\\|uuid-ossp\\\\|pg_trgm\" /Users/mohithavala/Documents/wezu-backend-unified/alembic/versions/*.py)",
+      "Bash(grep -n \"down_revision\\\\|revision =\" /Users/mohithavala/Documents/wezu-backend-unified/alembic/versions/*.py)",
+      "Bash(python -c \"from app.models.all import DemandForecast, ChurnPrediction, PricingRecommendation, BatteryReservation, BiometricCredential, CartItem, InventoryAuditLog, SecurityQuestion, UserSecurityQuestion, UserStatusLog; print\\('OK'\\)\")",
+      "Bash(python3 -c \"from app.models.all import DemandForecast, ChurnPrediction, PricingRecommendation, BatteryReservation, BiometricCredential, CartItem, InventoryAuditLog, SecurityQuestion, UserSecurityQuestion, UserStatusLog; print\\('OK'\\)\")",
+      "Bash(python3 -c \"import ast; ast.parse\\(open\\('app/models/all.py'\\).read\\(\\)\\); ast.parse\\(open\\('alembic/versions/add_perf_indexes_phase11.py'\\).read\\(\\)\\); print\\('syntax OK'\\)\")",
+      "Bash(wc -l /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/*.py)",
+      "Bash(grep -l \"rental_service\\\\|RentalService\" /Users/mohithavala/Documents/wezu-backend-unified/app/services/*.py)",
+      "Bash(grep -E \"index\\\\s*=\\\\s*True\" /Users/mohithavala/Documents/wezu-backend-unified/app/models/*.py)",
+      "Bash(grep -rn \"status.*order_by\\\\|ORDER BY\" /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/*.py)",
+      "Bash(grep -rn \"created_at.*order_by\\\\|ORDER BY.*created\" /Users/mohithavala/Documents/wezu-backend-unified/app/models/*.py)",
+      "Bash(python3 -c ':*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(git push:*)",
+      "Bash(git fetch:*)",
+      "Bash(git log:*)",
+      "Bash(python -c ':*)",
+      "Bash(grep -rn \"db.commit\\(\\)\" app/services/*.py)"
+    ]
+  }
+}

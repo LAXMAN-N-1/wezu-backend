@@ -51,6 +51,29 @@ def _user_self_cache(user_id: int, key: str, call):
 def _invalidate_user_self_cache(user_id: int) -> None:
     invalidate_cache("user-self", user_id)
 
+
+def _resolve_primary_role_name(user: User, default: str = "customer") -> str:
+    if user.role and user.role.name:
+        return user.role.name
+
+    ordered_fallback_roles = [
+        "super_admin",
+        "admin",
+        "logistics",
+        "dealer",
+        "vendor_owner",
+        "dealer_staff",
+        "driver",
+        "customer",
+    ]
+    role_names = deps.get_user_role_names(user)
+    for role_name in ordered_fallback_roles:
+        if role_name in role_names:
+            return role_name
+
+    return default
+
+
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 @audit_log("CREATE_USER", "USER")
 async def create_user(
@@ -157,7 +180,7 @@ def _build_user_profile_response(user: User, db: Session = None) -> UserProfileR
     """Helper to build consistent UserProfileResponse"""
     
     # Handle Single Role
-    current_role = user.role.name if user.role else "customer"
+    current_role = _resolve_primary_role_name(user)
     user_roles = [current_role]
     
     # Get permissions and menu for current role
@@ -462,14 +485,15 @@ def _filter_menu_items(items: List[dict], permissions: set, has_all_access: bool
 @router.get("/me/menu-config", response_model=MenuConfigResponse)
 def get_user_menu_config(
     current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Generate dynamic menu configuration based on user permissions.
     """
     # 1. Get User Permissions
-    current_role = current_user.role.name if current_user.role else "customer"
+    current_role = _resolve_primary_role_name(current_user)
     
-    permissions_list = AuthService.get_permissions_for_role(current_role)
+    permissions_list = AuthService.get_permissions_for_role(db, current_role)
     
     user_permissions = set(permissions_list)
     has_all_access = "all" in user_permissions
@@ -678,11 +702,12 @@ def get_user_feature_flags(
     """
     Get feature flags status for the current user based on their role.
     """
-    current_role = current_user.role.name if current_user.role else "customer"
+    current_role = _resolve_primary_role_name(current_user)
+    role_key = current_role.lower()
     
     # Permission checks
-    is_admin = current_role in ["admin", "super_admin", "regional_manager"]
-    is_vendor = current_role == "vendor_owner"
+    is_admin = role_key in ["admin", "super_admin", "regional_manager", "logistics"]
+    is_vendor = role_key in ["vendor_owner", "dealer", "dealer_staff"]
     
     # Default flags
     features = {
@@ -713,16 +738,17 @@ def get_user_dashboard_config(
     from app.core.dashboard_config import MASTER_DASHBOARD_CONFIG
     from app.schemas.dashboard import DashboardWidget
 
-    current_role = current_user.role.name if current_user.role else "customer"
+    current_role = _resolve_primary_role_name(current_user)
+    role_key = current_role.lower()
     
     # Determine primary role for dashboard layout
     layout_key = "default"
     
-    if current_role in ["admin", "super_admin", "regional_manager"]:
+    if role_key in ["admin", "super_admin", "regional_manager", "logistics"]:
         layout_key = "admin"
-    elif current_role == "vendor_owner":
+    elif role_key in ["vendor_owner", "dealer", "dealer_staff"]:
         layout_key = "vendor_owner"
-    elif current_role == "customer":
+    elif role_key == "customer":
         layout_key = "customer"
         
     widgets_data = MASTER_DASHBOARD_CONFIG.get(layout_key, MASTER_DASHBOARD_CONFIG["default"])
@@ -1313,9 +1339,8 @@ async def get_user_by_id(
             )
     
     # Get roles and permissions
-    user_roles = [r.name for r in target_user.roles] if target_user.roles else []
-    primary_role = user_roles[0] if user_roles else None
-    permissions = AuthService.get_permissions_for_role(primary_role) if primary_role else []
+    primary_role = _resolve_primary_role_name(target_user, default="")
+    permissions = AuthService.get_permissions_for_role(db, primary_role) if primary_role else []
     
     # Get wallet balance
     wallet_balance = target_user.wallet.balance if target_user.wallet else 0.0

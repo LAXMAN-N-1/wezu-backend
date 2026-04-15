@@ -40,7 +40,7 @@ def create_dealer_profile(
 def read_dealers(
     skip: int = 0,
     limit: int = 100,
-    current_user: User = Depends(deps.get_current_user), # Should be Admin only
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(deps.get_db)
 ):
     """Retrieve all dealers."""
@@ -82,7 +82,7 @@ def get_dealer_dashboard(
 def update_stage(
     app_id: int, 
     update_in: DealerApplicationUpdate,
-    current_user: User = Depends(get_current_user), # Check Is Admin
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     try:
@@ -94,7 +94,7 @@ def update_stage(
 @router.post("/visits/schedule", response_model=DataResponse[FieldVisit])
 def schedule_visit(
     visit_in: FieldVisitSchedule,
-    current_user: User = Depends(get_current_user), # Check Is Admin
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     visit = DealerService.schedule_field_visit(session, visit_in.application_id, visit_in.officer_id, visit_in.date)
@@ -111,7 +111,7 @@ class SettlementRequest(BaseModel):
 @router.post("/settlements/generate", response_model=DataResponse[Settlement])
 def generate_settlement(
     req: SettlementRequest,
-    current_user: User = Depends(get_current_user), # Admin check
+    current_user: User = Depends(deps.get_current_active_admin),
 ):
     # In real app verify admin
     settlement = FinancialService.generate_settlement(req.dealer_id, req.start_date, req.end_date)
@@ -270,7 +270,7 @@ def get_dealer_commissions(
 @router.get("/{id}", response_model=DataResponse[DealerProfileResponse])
 def read_dealer(
     id: int,
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(deps.get_db)
 ):
     """Get dealer by ID."""
@@ -297,7 +297,7 @@ def update_my_profile(
 def update_dealer(
     id: int,
     profile_in: DealerProfileUpdate,
-    current_user: User = Depends(deps.get_current_user), # Should be Admin
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(deps.get_db)
 ):
     """Update a specific dealer profile (Admin)."""

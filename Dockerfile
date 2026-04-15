@@ -74,7 +74,7 @@ USER wezu
 
 EXPOSE 8000
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/app/docker/entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/tini", "-s", "--", "/app/docker/entrypoint.sh"]
 CMD ["gunicorn", "app.main:app", "-c", "gunicorn_conf.py"]
 
 FROM runtime AS dev-runtime

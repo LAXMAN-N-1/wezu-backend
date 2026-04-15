@@ -29,7 +29,7 @@ def _authenticate_internal_operator(token: str):
     if not normalized:
         raise ValueError("Missing token")
     with Session(engine) as db:
-        user = deps.get_current_user(db=db, token=normalized)
+        user = deps.get_user_from_token(db=db, token=normalized)
         deps.require_internal_operator(db=db, current_user=user)
         return user
 

@@ -48,7 +48,14 @@ async def read_rentals(
 ):
     """Admin: paginated list of all rentals with filters."""
     from sqlmodel import select
-    statement = select(Rental)
+    from sqlalchemy.orm import selectinload
+    # Eager-load relationships referenced by RentalResponse to avoid N+1:
+    # battery (required) and events (list). start_station/end_station are
+    # rendered as IDs only, so no eager-load needed for them.
+    statement = select(Rental).options(
+        selectinload(Rental.battery),
+        selectinload(Rental.events),
+    )
     if status:
         statement = statement.where(Rental.status == status)
     if user_id:
@@ -57,7 +64,7 @@ async def read_rentals(
         statement = statement.where(Rental.start_station_id == station_id)
     if start_date:
         statement = statement.where(Rental.start_time >= start_date)
-        
+
     return db.exec(statement.offset(skip).limit(limit)).all()
 
 @router.get("/my", response_model=List[RentalResponse])

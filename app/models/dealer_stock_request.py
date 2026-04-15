@@ -25,6 +25,7 @@ class StockRequestPriority(str, Enum):
 
 class DealerStockRequest(SQLModel, table=True):
     __tablename__ = "dealer_stock_requests"
+    model_config = {"protected_namespaces": ()}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     dealer_id: int = Field(foreign_key="dealer_profiles.id", index=True)

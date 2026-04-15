@@ -1,12 +1,11 @@
 from time import perf_counter
 from uuid import uuid4
 
-import structlog
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.config import settings
-from app.core.logging import get_logger
+from app.core.logging import bind_contextvars, clear_contextvars, get_logger
 from app.core.proxy import get_client_ip
 
 logger = get_logger(__name__)
@@ -23,8 +22,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         request.state.correlation_id = correlation_id
         request.state.client_ip = client_ip
 
-        structlog.contextvars.clear_contextvars()
-        structlog.contextvars.bind_contextvars(
+        clear_contextvars()
+        bind_contextvars(
             request_id=request_id,
             correlation_id=correlation_id,
             method=request.method,
@@ -43,7 +42,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 auth_error=getattr(request.state, "auth_error", None),
                 user_id=getattr(getattr(request.state, "user", None), "id", None),
             )
-            structlog.contextvars.clear_contextvars()
+            clear_contextvars()
             raise
 
         duration_ms = round((perf_counter() - start) * 1000, 2)
@@ -54,8 +53,14 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             request.state, "user_id", None
         )
         auth_error = getattr(request.state, "auth_error", None)
+        route = request.scope.get("route")
+        route_name = getattr(route, "name", None)
+        excluded_paths = set(settings.LOG_EXCLUDE_PATHS or [])
+        should_log = settings.LOG_REQUESTS and (
+            settings.LOG_HEALTHCHECKS or request.url.path not in excluded_paths
+        )
 
-        if settings.LOG_REQUESTS and (settings.LOG_HEALTHCHECKS or request.url.path != "/health"):
+        if should_log:
             log_fn = logger.info
             event_name = "request.completed"
             if response.status_code >= 500:
@@ -71,8 +76,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 duration_ms=duration_ms,
                 user_id=user_id,
                 auth_error=auth_error,
+                route_name=route_name,
                 query_keys=sorted(request.query_params.keys()),
             )
 
-        structlog.contextvars.clear_contextvars()
+        clear_contextvars()
         return response

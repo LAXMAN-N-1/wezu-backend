@@ -4,6 +4,7 @@ from typing import Any, Dict, List
 from datetime import datetime, UTC
 
 from app.db.session import get_session
+from app.api import deps
 from app.api.deps import get_current_user
 from app.models.user import User
 from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
@@ -11,11 +12,7 @@ from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
 router = APIRouter()
 
 def _get_dealer_id(db: Session, user_id: int) -> int:
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == user_id)
-    ).first()
-    if not dealer:
-        raise HTTPException(status_code=403, detail="Not a dealer")
+    dealer = deps.get_dealer_profile_or_403(db, user_id, detail="Not a dealer")
     return dealer.id
 
 def _get_application(db: Session, dealer_id: int) -> DealerApplication:
@@ -99,7 +96,7 @@ def admin_manual_review(
     approve: bool = Body(..., embed=True),
     notes: str = Body("", embed=True),
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(deps.get_current_active_admin),
 ) -> Any:
     """Stage 4: Admin reviews application and KYC."""
     # Assuming current_user is admin. Ideally add an RBAC check here.
@@ -122,7 +119,7 @@ def admin_schedule_visit(
     scheduled_date: datetime = Body(..., embed=True),
     officer_id: int = Body(..., embed=True),
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(deps.get_current_active_admin),
 ) -> Any:
     """Stage 5a: Admin schedules a field visit."""
     app = db.get(DealerApplication, application_id)
@@ -146,7 +143,7 @@ def admin_complete_visit(
     visit_id: int = Body(..., embed=True),
     report_data: Dict = Body(..., embed=True),
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(deps.get_current_active_admin),
 ) -> Any:
     """Stage 5b: Field officer completes the visit."""
     app = db.get(DealerApplication, application_id)
@@ -166,7 +163,7 @@ def admin_complete_visit(
 def admin_final_approve(
     application_id: int,
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(deps.get_current_active_admin),
 ) -> Any:
     """Stage 6: Final Admin Approval."""
     app = db.get(DealerApplication, application_id)
@@ -181,7 +178,7 @@ def admin_final_approve(
 def admin_handover_inventory(
     application_id: int,
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(deps.get_current_active_admin),
 ) -> Any:
     """Stage 8: Admin hands over initial inventory and marks active."""
     app = db.get(DealerApplication, application_id)
