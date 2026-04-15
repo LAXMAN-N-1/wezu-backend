@@ -11,6 +11,7 @@ Revision ID: c1d2e3f4a5b6
 Revises: perf_indexes_ph11
 """
 from alembic import op
+from sqlalchemy import inspect
 
 
 revision = "c1d2e3f4a5b6"
@@ -20,38 +21,49 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.create_index(
-        "ix_logistics_orders_status",
-        "logistics_orders",
-        ["status"],
-        unique=False,
-        if_not_exists=True,
-    )
-    op.create_index(
-        "ix_logistics_orders_priority",
-        "logistics_orders",
-        ["priority"],
-        unique=False,
-        if_not_exists=True,
-    )
-    op.create_index(
-        "ix_logistics_orders_order_date",
-        "logistics_orders",
-        ["order_date"],
-        unique=False,
-        if_not_exists=True,
-    )
-    op.create_index(
-        "ix_logistics_orders_assigned_driver_id",
-        "logistics_orders",
-        ["assigned_driver_id"],
-        unique=False,
-        if_not_exists=True,
-    )
+    bind = op.get_bind()
+    inspector = inspect(bind)
+
+    if not inspector.has_table("logistics_orders"):
+        return
+
+    existing_columns = {
+        column["name"] for column in inspector.get_columns("logistics_orders")
+    }
+    candidates = [
+        ("ix_logistics_orders_status", "status"),
+        ("ix_logistics_orders_priority", "priority"),
+        ("ix_logistics_orders_order_date", "order_date"),
+        ("ix_logistics_orders_assigned_driver_id", "assigned_driver_id"),
+    ]
+    for index_name, column_name in candidates:
+        if column_name not in existing_columns:
+            continue
+        op.create_index(
+            index_name,
+            "logistics_orders",
+            [column_name],
+            unique=False,
+            if_not_exists=True,
+        )
 
 
 def downgrade() -> None:
-    op.drop_index("ix_logistics_orders_assigned_driver_id", table_name="logistics_orders")
-    op.drop_index("ix_logistics_orders_order_date", table_name="logistics_orders")
-    op.drop_index("ix_logistics_orders_priority", table_name="logistics_orders")
-    op.drop_index("ix_logistics_orders_status", table_name="logistics_orders")
+    bind = op.get_bind()
+    inspector = inspect(bind)
+
+    if not inspector.has_table("logistics_orders"):
+        return
+
+    existing_indexes = {
+        index["name"] for index in inspector.get_indexes("logistics_orders")
+    }
+    for index_name in (
+        "ix_logistics_orders_assigned_driver_id",
+        "ix_logistics_orders_order_date",
+        "ix_logistics_orders_priority",
+        "ix_logistics_orders_status",
+    ):
+        if index_name not in existing_indexes:
+            continue
+        op.drop_index(index_name, table_name="logistics_orders")
