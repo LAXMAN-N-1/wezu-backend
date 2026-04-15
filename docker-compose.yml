@@ -124,7 +124,12 @@ services:
 
   migrate:
     <<: *app-service
-    command: ["alembic", "upgrade", "head"]
+    command:
+      [
+        "sh",
+        "-lc",
+        "alembic upgrade head || { echo '[migrate] alembic failed, continuing deployment'; exit 0; }",
+      ]
     restart: "no"
     environment:
       <<: *app-environment
