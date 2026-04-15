@@ -197,7 +197,8 @@ async def lifespan(app: FastAPI):
                 from alembic.config import Config as AlembicConfig
                 from alembic import command as alembic_command
                 alembic_cfg = AlembicConfig("alembic.ini")
-                alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+                # configparser interpolation requires % to be escaped.
+                alembic_cfg.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%"))
                 alembic_command.upgrade(alembic_cfg, "head")
                 logger.info("Alembic migrations complete.")
             except Exception:

@@ -14,8 +14,14 @@ from app.models.all import *
 # Alembic Config object
 config = context.config
 
-# ✅ FORCE Alembic to always use Neon DB URL
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+def _alembic_safe_url(url: str) -> str:
+    # configparser interpolation treats % as special. Percent-encoded secrets
+    # (for example %26) must be escaped for Alembic config values.
+    return url.replace("%", "%%")
+
+
+# Ensure Alembic accepts URL-encoded credentials.
+config.set_main_option("sqlalchemy.url", _alembic_safe_url(settings.DATABASE_URL))
 
 # Setup logging
 if config.config_file_name is not None:
@@ -49,7 +55,7 @@ def include_object(object, name, type_, reflected, compare_to):
 
 def run_migrations_offline() -> None:
     """Run migrations in offline mode."""
-    url = settings.DATABASE_URL
+    url = _alembic_safe_url(settings.DATABASE_URL)
 
     context.configure(
         url=url,
@@ -70,7 +76,7 @@ def run_migrations_online() -> None:
 
     # ✅ FIX: Override sqlalchemy.url properly
     configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = settings.DATABASE_URL
+    configuration["sqlalchemy.url"] = _alembic_safe_url(settings.DATABASE_URL)
 
     connectable = engine_from_config(
         configuration,
