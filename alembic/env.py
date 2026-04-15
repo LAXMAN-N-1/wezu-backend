@@ -1,6 +1,6 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
+from sqlalchemy import create_engine
 from sqlalchemy import pool
 
 from alembic import context
@@ -13,15 +13,6 @@ from app.models.all import *
 
 # Alembic Config object
 config = context.config
-
-def _alembic_safe_url(url: str) -> str:
-    # configparser interpolation treats % as special. Percent-encoded secrets
-    # (for example %26) must be escaped for Alembic config values.
-    return url.replace("%", "%%")
-
-
-# Ensure Alembic accepts URL-encoded credentials.
-config.set_main_option("sqlalchemy.url", _alembic_safe_url(settings.DATABASE_URL))
 
 # Setup logging
 if config.config_file_name is not None:
@@ -55,7 +46,7 @@ def include_object(object, name, type_, reflected, compare_to):
 
 def run_migrations_offline() -> None:
     """Run migrations in offline mode."""
-    url = _alembic_safe_url(settings.DATABASE_URL)
+    url = settings.DATABASE_URL
 
     context.configure(
         url=url,
@@ -73,14 +64,8 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in online mode."""
-
-    # ✅ FIX: Override sqlalchemy.url properly
-    configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = _alembic_safe_url(settings.DATABASE_URL)
-
-    connectable = engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
+    connectable = create_engine(
+        settings.DATABASE_URL,
         poolclass=pool.NullPool,
     )
 
