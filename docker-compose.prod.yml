@@ -46,7 +46,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required for production}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       DB_INIT_ON_STARTUP: "false"
-      RUN_DB_MIGRATIONS: ${RUN_DB_MIGRATIONS:-false}
+      RUN_DB_MIGRATIONS: "false"
       RUN_BACKGROUND_TASKS: "false"
       SCHEDULER_ENABLED: "false"
       MQTT_ENABLED: ${MQTT_ENABLED:-false}
@@ -56,6 +56,8 @@ services:
       WAIT_FOR_DB: ${WAIT_FOR_DB:-false}
       WAIT_FOR_REDIS: ${WAIT_FOR_REDIS:-false}
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
 
@@ -74,6 +76,7 @@ services:
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required for production}
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required for production}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      RUN_DB_MIGRATIONS: "false"
       RUN_BACKGROUND_TASKS: "true"
       SCHEDULER_ENABLED: "true"
       BACKGROUND_RUNTIME_MODE: "workers_only"
@@ -95,6 +98,7 @@ services:
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required for production}
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required for production}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      RUN_DB_MIGRATIONS: "false"
       RUN_BACKGROUND_TASKS: "false"
       SCHEDULER_ENABLED: "false"
       ENABLE_EVENT_STREAMS: "true"
