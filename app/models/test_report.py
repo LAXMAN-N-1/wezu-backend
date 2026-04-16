@@ -24,13 +24,14 @@ class TestReport(SQLModel, table=True):
     total_tests: int
     passed: int
     failed: int
+    skipped: int = Field(default=0)
 
     # JSON columns for failures/errors detail
     failures: Optional[Any] = Field(default=None, sa_column=Column(JSON, nullable=True))
     errors: Optional[Any] = Field(default=None, sa_column=Column(JSON, nullable=True))
 
-    # Execution info
-    execution_time: str = Field(max_length=50)
+    # Execution info — e.g. "12.34s"
+    execution_time: str = Field(max_length=100)
     environment: str = Field(default="local", max_length=50)
 
     # Timestamps — recorded in IST (Asia/Kolkata, UTC+5:30)

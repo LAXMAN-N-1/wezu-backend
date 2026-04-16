@@ -1,5 +1,5 @@
 import pytest
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, UTC
 from sqlmodel import Session, select
 
 from app.models.user import User

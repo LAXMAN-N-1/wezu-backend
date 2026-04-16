@@ -48,11 +48,14 @@ class RBACMiddleware(BaseHTTPMiddleware):
                     # on schema differences (e.g., UndefinedTable in Postgres).
                     try:
                         with Session(engine) as db:
-                            user = db.query(User).filter(User.id == int(token_data.sub)).options(selectinload(User.roles)).first()
+                            from sqlmodel import select
+                            user = db.exec(select(User).where(User.id == int(token_data.sub)).options(selectinload(User.roles), selectinload(User.role))).first()
                             if user and user.is_active:
                                 request.state.user = user
                                 # Find the highest priority role or the primary role
                                 role_names = [r.name.lower() for r in user.roles]
+                                if user.role:
+                                    role_names.append(user.role.name.lower())
                                 
                                 if RoleEnum.ADMIN.value in role_names:
                                     request.state.user_role = RoleEnum.ADMIN

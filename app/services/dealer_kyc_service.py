@@ -37,7 +37,9 @@ class DealerKYCService:
         unique_filename = f"{prefix}_{uuid.uuid4().hex[:8]}.{ext}"
         
         bucket = getattr(settings, "AWS_BUCKET_NAME", None)
-        if bucket and settings.AWS_ACCESS_KEY_ID:
+        is_test_env = getattr(settings, "ENVIRONMENT", "development") == "test"
+        
+        if not is_test_env and bucket and settings.AWS_ACCESS_KEY_ID:
             try:
                 s3_client = boto3.client(
                     's3',

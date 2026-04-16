@@ -6,20 +6,28 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, SQLModel, create_engine, select
 from sqlmodel.pool import StaticPool
 from unittest.mock import MagicMock
-from app.services.test_report_service import test_report_service
-from app.db.session import engine as prod_engine
 
 # --- MOCK FIREBASE BEFORE APP IMPORTS ---
-# Prevents "Firebase Init Error" from top-level module code
 mock_firebase = MagicMock()
 sys.modules["firebase_admin"] = mock_firebase
 sys.modules["firebase_admin.credentials"] = MagicMock()
 sys.modules["firebase_admin.messaging"] = MagicMock()
 
+# --- CONFIG OVERRIDE BEFORE APP IMPORTS ---
+from app.core.config import settings
+_PROD_DATABASE_URL: str = settings.DATABASE_URL
+settings.ENVIRONMENT = "test"
+settings.DATABASE_URL = "sqlite://"
+
+# --- NOW IMPORT APP MODULES ---
 from app.main import app
 from app.api import deps
-from app.core.config import settings
 from app.core import database
+from app.db import session as db_session
+from app.middleware.rate_limit import limiter
+from app.services.test_report_service import test_report_service
+limiter.enabled = False
+
 from app.core.security import get_password_hash
 from app.models.rbac import Role, Permission
 from app.models.role_right import RoleRight
@@ -45,6 +53,10 @@ engine = create_engine(
     connect_args={"check_same_thread": False},
     poolclass=StaticPool,
 )
+
+# Patch global engines
+database.engine = engine
+db_session.engine = engine
 
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
@@ -206,6 +218,32 @@ def normal_user_fixture(session: Session):
     return user
 
 
+@pytest.fixture(name="admin_token_headers")
+def admin_token_headers_fixture(client: TestClient):
+    login_data = {
+        "username": "admin@test.com",
+        "password": "password",
+    }
+    r = client.post("/api/v1/auth/token", data=login_data)
+    tokens = r.json()
+    a_token = tokens["access_token"]
+    headers = {"Authorization": f"Bearer {a_token}"}
+    return headers
+
+
+@pytest.fixture(name="normal_user_token_headers")
+def normal_user_token_headers_fixture(client: TestClient, normal_user: User):
+    login_data = {
+        "username": "normal_user@example.com",
+        "password": "password",
+    }
+    r = client.post("/api/v1/auth/token", data=login_data)
+    tokens = r.json()
+    a_token = tokens["access_token"]
+    headers = {"Authorization": f"Bearer {a_token}"}
+    return headers
+
+
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
     """
     Hook to capture test results and save them to the production database,
@@ -260,18 +298,22 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
             "total_tests": total_mod,
             "passed": data["passed"],
             "failed": data["failed"] + data["error"],
+            "skipped": data["skipped"],
             "failures": data["failures"],
             "errors": data["errors"],
             "execution_time": f"{round(duration, 2)}s",
             "environment": os.getenv("ENVIRONMENT", "local_test"),
-            "created_by": os.getenv("USER", "dev")
+            "created_by": os.getenv("USER", os.getenv("USERNAME", "dev"))
         }
 
     print(f"\n[REPORT] Saving results for {len(report_data)} module(s) to production database...")
-    
+
     try:
         from sqlmodel import Session
-        with Session(prod_engine) as db:
+        from sqlalchemy import create_engine as _create_engine
+        # Use the original prod URL (captured before settings override to sqlite://)
+        _prod_engine = _create_engine(_PROD_DATABASE_URL)
+        with Session(_prod_engine) as db:
             test_report_service.save_from_dict(db, report_data)
             print("[REPORT] Success: Test results stored in 'test_reports' table.")
     except Exception as e:

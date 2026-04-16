@@ -35,7 +35,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\venv"
+VIRTUAL_ENV="C:\Users\kamboja Srilaxmi\OneDrive\Desktop\wezu\wezu-backend\venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"

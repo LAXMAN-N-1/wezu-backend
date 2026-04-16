@@ -5,7 +5,7 @@ from datetime import datetime
 
 from app.db.session import get_session
 from app.api.deps import get_current_user
-from app.models.user import User
+from app.models.user import User, UserType
 from app.models.roles import RoleEnum
 from app.models.dealer_kyc import DealerKYCApplication, KYCStateConfig, KYCStateTransition
 from app.schemas.common import DataResponse
@@ -71,9 +71,7 @@ def get_pending_dealers(
     """
     Admin checks manual review required items.
     """
-    # Quick dirty RBAC - you have a proper one now. 
-    # Just checking RoleEnum.ADMIN
-    if RoleEnum.ADMIN.value not in [r.name for r in current_user.roles]:
+    if current_user.user_type != UserType.ADMIN:
          raise HTTPException(status_code=403, detail="Admin only")
          
     dealers = db.exec(
@@ -88,7 +86,7 @@ def review_dealer(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_session)
 ):
-    if RoleEnum.ADMIN.value not in [r.name for r in current_user.roles]:
+    if current_user.user_type != UserType.ADMIN:
          raise HTTPException(status_code=403, detail="Admin only")
         
     try:

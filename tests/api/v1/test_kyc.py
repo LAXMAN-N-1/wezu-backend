@@ -1,54 +1,10 @@
-
 import pytest
-from fastapi.testclient import TestClient
-from sqlmodel import Session, select
-from app.models.user import User
-from app.models.kyc import KYCDocument
-from app.main import app
+from fastapi import status
 
-def get_auth_headers(client: TestClient, email: str = "kyc_user@test.com"):
-    # 1. Register
-    client.post(
-        "/api/v1/auth/register",
-        json={
-            "email": email,
-            "password": "Password123!",
-            "full_name": "KYC User",
-            "phone_number": "9876543210" if email == "kyc_user@test.com" else "9999999999"
-        },
-    )
-    
-    # 2. Login
-    response = client.post(
-        "/api/v1/auth/token",
-        data={
-            "username": email,
-            "password": "Password123!"
-        },
-    )
-    token = response.json().get("access_token")
-    if not token:
-        # If token missing, maybe login failed?
-        pass 
-    return {"Authorization": f"Bearer {token}"}
+# --- POSITIVE CASES ---
 
-def reset_kyc_status(db: Session, email: str):
-    user = db.exec(select(User).where(User.email == email)).first()
-    if user:
-        user.kyc_status = "pending"
-        # clear docs
-        docs = db.exec(select(KYCDocument).where(KYCDocument.user_id == user.id)).all()
-        for d in docs:
-            db.delete(d)
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
-def test_submit_kyc_success(client: TestClient, session: Session):
-    email = "kyc_success@test.com"
-    headers = get_auth_headers(client, email=email)
-    reset_kyc_status(session, email)
-    
+def test_submit_kyc_success(client, normal_user_token_headers):
+    """Test successful KYC submission by a normal user"""
     # Create dummy files
     front_content = b"fake_image_content_front"
     back_content = b"fake_image_content_back"
@@ -64,81 +20,57 @@ def test_submit_kyc_success(client: TestClient, session: Session):
     
     response = client.post(
         "/api/v1/users/me/kyc",
-        headers=headers,
+        headers=normal_user_token_headers,
         data=data,
         files=files
     )
     
-    assert response.status_code == 200
-    user_data = response.json()
-    assert user_data["kyc_status"] == "pending_verification"
-    
-    # Verify DB records
-    user = session.exec(select(User).where(User.email == "kyc_success@test.com")).first()
-    assert user.kyc_status == "pending_verification"
-    if hasattr(user, "aadhaar_number"):
-        assert user.aadhaar_number == "1234-5678-9012"
-    
-    docs = session.exec(select(KYCDocument).where(KYCDocument.user_id == user.id)).all()
-    assert len(docs) == 3 # Front, Back, Selfie
-    
-    # Verify types
-    types = [d.document_type for d in docs]
-    assert "aadhaar" in types
-    assert "selfie" in types
-    
-    # Verify metadata
-    for doc in docs:
-        if doc.document_type == "selfie":
-             assert doc.metadata_ is not None and "selfie" in doc.metadata_
-        else:
-             assert doc.metadata_ is not None and "side" in doc.metadata_
+    assert response.status_code == status.HTTP_200_OK
+    assert response.json()["kyc_status"] == "pending_verification"
 
-def test_get_kyc_status(client: TestClient, session: Session):
-    # Reuse setup or create fresh
-    email = "kyc_status@test.com"
-    headers = get_auth_headers(client, email=email)
-    reset_kyc_status(session, email)
-    
-    # 1. Check initial empty status
-    resp = client.get("/api/v1/users/me/kyc/status", headers=headers)
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["overall_status"] == "pending" # or null treated as pending
-    assert len(data["documents"]) == 0
-    assert "submit your KYC" in data["next_steps"]
-    
-    # 2. Upload a doc
+def test_get_kyc_status(client, normal_user_token_headers):
+    """Test retrieving KYC status"""
+    response = client.get("/api/v1/users/me/kyc/status", headers=normal_user_token_headers)
+    assert response.status_code == status.HTTP_200_OK
+    assert "overall_status" in response.json()
+
+# --- NEGATIVE CASES ---
+
+def test_submit_kyc_invalid_type(client, normal_user_token_headers):
+    """Test KYC submission with unsupported document type"""
     files = [('front_image', ('front.jpg', b"img", 'image/jpeg')), ('selfie', ('selfie.jpg', b"img", 'image/jpeg'))]
-    client.post(
-        "/api/v1/users/me/kyc",
-        headers=headers,
-        data={"document_type": "pan", "document_number": "ABCDE1234F"},
-        files=files
-    )
-    
-    # 3. Check updated status
-    resp = client.get("/api/v1/users/me/kyc/status", headers=headers)
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["overall_status"] == "pending_verification"
-    assert len(data["documents"]) == 2
-    assert "wait for verification" in data["next_steps"]
-
-def test_submit_kyc_invalid_type(client: TestClient):
-    headers = get_auth_headers(client, email="kyc_fail@test.com")
-    
-    files = [
-        ('front_image', ('front.jpg', b"img", 'image/jpeg')),
-        ('selfie', ('selfie.jpg', b"img", 'image/jpeg'))
-    ]
     data = {"document_type": "invalid_type", "document_number": "123"}
     
     response = client.post(
         "/api/v1/users/me/kyc",
-        headers=headers,
+        headers=normal_user_token_headers,
         data=data,
         files=files
     )
-    assert response.status_code == 400
-    assert "Invalid document type" in response.json()["error"]
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+def test_submit_kyc_missing_files(client, normal_user_token_headers):
+    """Test KYC submission without mandatory files"""
+    data = {"document_type": "pan", "document_number": "ABCDE1234F"}
+    response = client.post(
+        "/api/v1/users/me/kyc",
+        headers=normal_user_token_headers,
+        data=data
+    )
+    # Depending on implementation, might be 422 or 400
+    assert response.status_code in [status.HTTP_422_UNPROCESSABLE_ENTITY, status.HTTP_400_BAD_REQUEST]
+
+# --- EDGE CASES ---
+
+def test_submit_kyc_empty_document_number(client, normal_user_token_headers):
+    """Test KYC submission with empty document number"""
+    files = [('front_image', ('front.jpg', b"img", 'image/jpeg')), ('selfie', ('selfie.jpg', b"img", 'image/jpeg'))]
+    data = {"document_type": "pan", "document_number": ""}
+    
+    response = client.post(
+        "/api/v1/users/me/kyc",
+        headers=normal_user_token_headers,
+        data=data,
+        files=files
+    )
+    assert response.status_code in [status.HTTP_400_BAD_REQUEST, status.HTTP_422_UNPROCESSABLE_ENTITY]

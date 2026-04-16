@@ -52,7 +52,7 @@ from app.api.v1.admin import (
     support as admin_support, 
     faqs as admin_faqs, 
     analytics as admin_analytics, 
-    users as admin_users,
+    users as admin_users_sub,
     promo as admin_coupons,
     reviews as admin_reviews,
     roles as admin_roles,
@@ -195,7 +195,7 @@ app.include_router(bookings.router, prefix=f"{settings.API_V1_STR}/bookings", ta
 app.include_router(battery_alerts.router, prefix=f"{settings.API_V1_STR}/customer/battery-alerts", tags=["Customer: Battery Alerts"])
 app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["Users"])
 from app.api.v1 import admin_users, admin_user_bulk
-app.include_router(admin_users.router, prefix=f"{settings.API_V1_STR}/admin/users", tags=["Admin User Management"])
+app.include_router(admin_users.router, prefix=f"{settings.API_V1_STR}/admin/user-actions", tags=["Admin User Management"])
 app.include_router(admin_user_bulk.router, prefix=f"{settings.API_V1_STR}/admin/users", tags=["Admin User Bulk Operations"])
 app.include_router(kyc.router, prefix=f"{settings.API_V1_STR}", tags=["KYC"])
 app.include_router(stations.router, prefix=f"{settings.API_V1_STR}/stations", tags=["Stations"])
@@ -232,7 +232,7 @@ app.include_router(maintenance.router, prefix=f"{admin_api}/maintenance", tags=[
 app.include_router(vendors.router, prefix=f"{admin_api}/vendors", tags=["Admin: Vendors"], dependencies=admin_deps)
 app.include_router(inventory.router, prefix=f"{admin_api}/inventory", tags=["Admin: Inventory"], dependencies=admin_deps)
 app.include_router(warranty.admin_router, prefix=f"{admin_api}/warranty", tags=["Admin: Warranty"], dependencies=admin_deps)
-app.include_router(admin_users.router, prefix=f"{admin_api}/users", tags=["Admin: Users"], dependencies=admin_deps)
+app.include_router(admin_users_sub.router, prefix=f"{admin_api}/users", tags=["Admin: Users"], dependencies=admin_deps)
 app.include_router(admin_roles.router, prefix=f"{admin_api}/roles", tags=["Admin: Roles"], dependencies=admin_deps)
 app.include_router(admin_kyc.router, prefix=f"{admin_api}/kyc", tags=["Admin: KYC"], dependencies=admin_deps)
 app.include_router(audit.router, prefix=f"{admin_api}/audit", tags=["Admin: Audit"], dependencies=admin_deps)

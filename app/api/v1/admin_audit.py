@@ -24,7 +24,7 @@ router = APIRouter()
 async def list_audit_logs(
     *,
     db: Session = Depends(get_db),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(get_current_active_superuser),
     user_id: Optional[int] = Query(None, description="Filter by user ID"),
     action: Optional[str] = Query(None, description="Filter by action type (e.g. AUTH_LOGIN)"),
     resource_type: Optional[str] = Query(None, description="Filter by resource type (e.g. USER, BATTERY)"),

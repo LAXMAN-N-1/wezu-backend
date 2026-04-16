@@ -1,6 +1,9 @@
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from datetime import datetime, UTC
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 class UserStatusLog(SQLModel, table=True):
     __tablename__ = "user_status_logs"

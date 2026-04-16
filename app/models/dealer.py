@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from app.models.commission import Commission # If it existed
     from app.models.staff import StaffProfile
     from app.models.settlement import Settlement
+    from app.models.user import User
 # from pydantic import EmailStr
 import sqlalchemy as sa
 from sqlalchemy import JSON
@@ -60,13 +61,12 @@ class DealerProfile(SQLModel, table=True):
     is_active: bool = Field(default=False)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
-    # Relationships
-    owner: "User" = Relationship(
-        back_populates="owned_dealer_profile",
+    user: "User" = Relationship(
+        back_populates="dealer_profile",
         sa_relationship_kwargs={
             "primaryjoin": "DealerProfile.user_id == User.id",
             "foreign_keys": "[DealerProfile.user_id]",
-            "overlaps": "dealer_profile,user,owner,owned_dealer_profile,staff_members"
+            "overlaps": "dealer_profile,staff_members"
         }
     )
     stations: List["Station"] = Relationship(back_populates="dealer")

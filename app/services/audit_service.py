@@ -4,11 +4,11 @@ import json
 import logging
 from typing import Optional, Dict, Any
 
-from sqlmodel import Session, select
-from app.core.database import engine
+from sqlmodel import Session, select, func
 from app.models.audit_log import AuditLog, SecurityEvent
 from app.utils.audit_context import log_audit_action
 from datetime import datetime, UTC
+from app.core.database import engine
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,8 @@ class AuditService:
         module: Optional[str] = None
     ):
         """Async version for middleware/events using context-aware logging."""
-        with Session(engine) as db:
+        from app.core.database import engine as current_engine
+        with Session(current_engine) as db:
             try:
                 log_audit_action(
                     db=db,
@@ -135,6 +136,13 @@ class AuditService:
     async def get_logs_advanced(
         self,
         db: Session,
+        user_id: int = None,
+        action: str = None,
+        resource_type: str = None,
+        target_id: int = None,
+        module: str = None,
+        status: str = None,
+        trace_id: str = None,
         date_from: datetime = None,
         date_to: datetime = None,
         page: int = 1,
@@ -182,6 +190,7 @@ class AuditService:
         target_id: int = None,
         date_from: datetime = None,
         date_to: datetime = None,
+        module: str = None,
         status: str = None,
         trace_id: str = None,
         level: str = None,

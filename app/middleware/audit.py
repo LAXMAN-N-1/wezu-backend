@@ -3,6 +3,7 @@ from fastapi import Request
 from app.services.audit_service import audit_service
 from app.core.proxy import get_client_ip
 import time
+import traceback
 
 class AuditMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):

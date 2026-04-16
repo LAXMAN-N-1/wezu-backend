@@ -24,7 +24,7 @@ class StationImageResponse(BaseModel):
 
 class StationBase(BaseModel):
     name: str
-    address: str
+    address: Optional[str] = ""
     city: Optional[str] = None
     latitude: float
     longitude: float

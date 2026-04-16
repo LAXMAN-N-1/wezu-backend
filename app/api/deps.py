@@ -197,6 +197,9 @@ def require_role(role_name: str):
             return current_user
         
         user_role_names = [r.name for r in current_user.roles]
+        if current_user.role:
+            user_role_names.append(current_user.role.name)
+            
         if role_name not in user_role_names:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

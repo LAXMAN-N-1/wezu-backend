@@ -185,11 +185,11 @@ async def _process_login(username: str, password: str, db: Session, request: Req
             ip_address=ip_address,
             user_agent=user_agent
         )
-        raise HTTPException(status_code=400, detail="Incorrect email or password")
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
     
     if user.status != UserStatus.ACTIVE:
         AuditLogger.log_event(db, user.id, "FAILED_LOGIN", "AUTH", metadata={"reason": "inactive_account"})
-        raise HTTPException(status_code=400, detail="Inactive user")
+        raise HTTPException(status_code=403, detail="Inactive user")
         
     token_jti = str(uuid.uuid4())
     access_token = create_access_token(subject=user.id, extra_claims={"sid": token_jti})

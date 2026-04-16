@@ -56,7 +56,7 @@ Mako==1.3.10
 # --- Observability ---
 structlog==23.2.0
 sentry-sdk[fastapi]==1.39.1
-prometheus-fastapi-instrumentator==7.1.0
+prometheus-fastapi-instrumentator==6.1.0
 prometheus_client==0.23.1
 
 # --- Cloud / External Services ---

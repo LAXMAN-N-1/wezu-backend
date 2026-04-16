@@ -110,7 +110,7 @@ class BookingService:
                 db=db,
                 user_id=user_id,
                 title="Reservation Reminder",
-                message="Your battery reservation at " + battery.station_id + " expires in 10 minutes.", # Station name would be better
+                message=f"Your battery reservation at {battery.station_id} expires in 10 minutes.", # Station name would be better
                 scheduled_at=reminder_time
             )
 

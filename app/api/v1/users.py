@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Request, UploadFile, File, Form
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func, and_, or_
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict
@@ -108,8 +108,8 @@ def _build_user_profile_response(user: User, db: Session = None) -> UserProfileR
     user_roles = [current_role]
     
     # Get permissions and menu for current role
-    permissions = AuthService.get_permissions_for_role(current_role) if current_role else []
-    menu = AuthService.get_menu_for_role(current_role) if current_role else []
+    permissions = AuthService.get_permissions_for_role(db, current_role) if current_role and db else []
+    menu = AuthService.get_menu_for_role(db, current_role) if current_role and db else []
     
     # Get wallet balance (handle if wallet relationship not loaded but available in session?)
     # Ideally user.wallet should be loaded.
@@ -390,6 +390,7 @@ def _filter_menu_items(items: List[dict], permissions: set, has_all_access: bool
 @router.get("/me/menu-config", response_model=MenuConfigResponse)
 def get_user_menu_config(
     current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
 ):
     """
     Generate dynamic menu configuration based on user permissions.
@@ -397,7 +398,8 @@ def get_user_menu_config(
     # 1. Get User Permissions
     current_role = current_user.role.name if current_user.role else "customer"
     
-    permissions_list = AuthService.get_permissions_for_role(current_role)
+    permissions_list = AuthService.get_permissions_for_role(db, current_role)
+
     
     user_permissions = set(permissions_list)
     has_all_access = "all" in user_permissions
@@ -957,13 +959,36 @@ async def read_users(
 async def search_users(
     # Query filters
     name: Optional[str] = None,
+    phone: Optional[str] = None,
+    email: Optional[str] = None,
+    role: Optional[str] = None,
+    status: Optional[str] = None,
+    kyc_status: Optional[str] = None,
+    region: Optional[str] = None,
+    created_from: Optional[datetime] = None,
+    created_to: Optional[datetime] = None,
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=100),
     # Dependencies
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db),
 ):
-    # Reusing Read Users logic effectively
-    # ... (skipping generic search implementation for now in this snippet)
-    return UserSearchResponse(users=[], total_count=0, page=1, limit=10, filters_applied={})
+    is_super_admin = current_user.has_permission("manage_all_regions") or current_user.is_superuser
+    is_admin = current_user.user_type == UserType.ADMIN
+    is_regional_manager = current_user.has_permission("manage_regional_operations")
+    is_vendor_owner = current_user.user_type == UserType.DEALER
+
+    query = select(User).options(selectinload(User.role))
+    conditions = []
+    join_addresses = bool(region)
+
+    manager_states = set()
+    if is_regional_manager and not is_super_admin and not is_admin:
+        manager_addresses = db.exec(select(Address).where(Address.user_id == current_user.id)).all()
+        manager_states = {addr.state.lower().strip() for addr in manager_addresses if addr.state}
+        if not manager_states:
+             return UserSearchResponse(users=[], total_count=0, page=page, limit=limit, filters_applied={})
+        join_addresses = True
 
     # Role filter requires join
     if role:

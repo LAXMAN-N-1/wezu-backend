@@ -1,6 +1,9 @@
 from sqlmodel import SQLModel, Field, Relationship
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from datetime import time, datetime, UTC
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 class NotificationPreference(SQLModel, table=True):
     __tablename__ = "notification_preferences"

@@ -4,7 +4,7 @@ from app.models.rbac import UserRole
 from app.models.two_factor_auth import TwoFactorAuth
 
 from typing import Optional, List, TYPE_CHECKING
-from datetime import datetime
+from datetime import datetime, UTC
 from enum import Enum
 import sqlalchemy as sa
 
@@ -23,6 +23,11 @@ if TYPE_CHECKING:
     from app.models.rbac import Role, UserAccessPath
     from app.models.token import SessionToken
     from app.models.user_profile import UserProfile
+    from app.models.notification_preference import NotificationPreference
+    from app.models.financial import Transaction
+    from app.models.membership import UserMembership
+    from app.models.rental import Rental
+    from app.models.logistics import DeliveryOrder
 
 class UserType(str, Enum):
     CUSTOMER = "customer"
@@ -108,8 +113,8 @@ class User(SQLModel, table=True):
     force_password_change: bool = Field(default=False)
 
     # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Soft Delete
     is_deleted: bool = Field(default=False)
@@ -155,12 +160,22 @@ class User(SQLModel, table=True):
     sessions: List["UserSession"] = Relationship(back_populates="user")
     session_tokens: List["SessionToken"] = Relationship(back_populates="user")
     two_factor_auth: Optional["TwoFactorAuth"] = Relationship(back_populates="user")
-    user_profile: Optional["UserProfile"] = Relationship(back_populates="user")
+    notification_preference: Optional["NotificationPreference"] = Relationship(back_populates="user")
 
     @property
     def is_active(self) -> bool:
         """Helper for schema compatibility."""
         return self.status == UserStatus.ACTIVE
+
+    @is_active.setter
+    def is_active(self, value: bool):
+        """Setter to maintain compatibility with legacy code setting is_active directly."""
+        if value:
+            if self.status in [UserStatus.SUSPENDED, UserStatus.INACTIVE, UserStatus.PENDING]:
+                 self.status = UserStatus.ACTIVE
+        else:
+            if self.status == UserStatus.ACTIVE:
+                 self.status = UserStatus.SUSPENDED
 
     # --- Granular RBAC Helpers ---
     @property

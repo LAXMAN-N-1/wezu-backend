@@ -12,7 +12,7 @@ router = APIRouter()
 class KYCAction(BaseModel):
     reason: str = None
 
-import datetime
+from datetime import datetime, UTC
 from app.models.user import User, KYCStatus
 from app.schemas.kyc import KYCDocumentResponse, KYCQueueItem, KYCQueueResponse, KYCVerifyRequest, KYCDashboardResponse
 from app.schemas.kyc_admin import KYCRejectRequest
@@ -350,7 +350,7 @@ def approve_user_kyc(
         raise HTTPException(status_code=404, detail="User not found")
         
     user.kyc_status = KYCStatus.APPROVED
-    user.updated_at = datetime.datetime.now(UTC)
+    user.updated_at = datetime.now(UTC)
     db.add(user)
     db.commit()
     return {"message": "User KYC approved successfully"}
@@ -369,7 +369,7 @@ def reject_user_kyc(
         
     user.kyc_status = KYCStatus.REJECTED
     user.kyc_rejection_reason = request.reason
-    user.updated_at = datetime.datetime.now(UTC)
+    user.updated_at = datetime.now(UTC)
     db.add(user)
     db.commit()
     return {"message": "User KYC rejected successfully", "reason": request.reason}
