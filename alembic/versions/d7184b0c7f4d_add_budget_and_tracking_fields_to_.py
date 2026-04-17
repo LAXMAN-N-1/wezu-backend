@@ -21,34 +21,37 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     conn = op.get_bind()
 
-    # Create new tables (safe)
-    op.create_table('password_history',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('user_id', sa.Integer(), nullable=False),
-    sa.Column('hashed_password', sa.String(), nullable=False),
-    sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index(op.f('ix_password_history_user_id'), 'password_history', ['user_id'], unique=False)
-    op.create_table('revenue_reports',
-    sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('report_type', sa.String(), nullable=False),
-    sa.Column('period_start', sa.Date(), nullable=False),
-    sa.Column('period_end', sa.Date(), nullable=False),
-    sa.Column('total_revenue', sa.Float(), nullable=False),
-    sa.Column('total_transactions', sa.Integer(), nullable=False),
-    sa.Column('avg_transaction_value', sa.Float(), nullable=False),
-    sa.Column('total_refunds', sa.Float(), nullable=False),
-    sa.Column('net_revenue', sa.Float(), nullable=False),
-    sa.Column('growth_percentage', sa.Float(), nullable=True),
-    sa.Column('breakdown_by_dealer', sa.JSON(), nullable=True),
-    sa.Column('breakdown_by_station', sa.JSON(), nullable=True),
-    sa.Column('breakdown_by_category', sa.JSON(), nullable=True),
-    sa.Column('created_at', sa.DateTime(), nullable=False),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index(op.f('ix_revenue_reports_period_start'), 'revenue_reports', ['period_start'], unique=False)
-    op.create_index(op.f('ix_revenue_reports_report_type'), 'revenue_reports', ['report_type'], unique=False)
+    # Create new tables idempotentally
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS password_history (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            hashed_password VARCHAR NOT NULL,
+            created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL
+        );
+    """)
+    op.execute("CREATE INDEX IF NOT EXISTS ix_password_history_user_id ON password_history (user_id);")
+
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS revenue_reports (
+            id SERIAL PRIMARY KEY,
+            report_type VARCHAR NOT NULL,
+            period_start DATE NOT NULL,
+            period_end DATE NOT NULL,
+            total_revenue FLOAT NOT NULL,
+            total_transactions INTEGER NOT NULL,
+            avg_transaction_value FLOAT NOT NULL,
+            total_refunds FLOAT NOT NULL,
+            net_revenue FLOAT NOT NULL,
+            growth_percentage FLOAT,
+            breakdown_by_dealer JSON,
+            breakdown_by_station JSON,
+            breakdown_by_category JSON,
+            created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL
+        );
+    """)
+    op.execute("CREATE INDEX IF NOT EXISTS ix_revenue_reports_period_start ON revenue_reports (period_start);")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_revenue_reports_report_type ON revenue_reports (report_type);")
 
     # Safely add columns using IF NOT EXISTS (no-ops if already present)
     conn.execute(sa.text("ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS target_id INTEGER"))

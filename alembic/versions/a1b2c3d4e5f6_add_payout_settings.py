@@ -12,13 +12,13 @@ import sqlmodel
 
 # revision identifiers, used by Alembic.
 revision: str = 'a1b2c3d4e5f6'
-down_revision: Union[str, None] = '7a8c9d1e2f3a'
+down_revision: Union[str, None] = '7272fc017d9d'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
-    op.add_column('dealer_profiles', sa.Column('payout_interval', sa.String(), server_default='Weekly', nullable=True))
-    op.add_column('dealer_profiles', sa.Column('min_payout_amount', sa.Float(), server_default='0.0', nullable=True))
+    op.execute("ALTER TABLE dealer_profiles ADD COLUMN IF NOT EXISTS payout_interval VARCHAR DEFAULT 'Weekly';")
+    op.execute("ALTER TABLE dealer_profiles ADD COLUMN IF NOT EXISTS min_payout_amount FLOAT DEFAULT 0.0;")
 
 def downgrade() -> None:
     op.drop_column('dealer_profiles', 'min_payout_amount')

@@ -80,6 +80,7 @@ class Station(SQLModel, table=True):
     zone: Optional["Zone"] = Relationship(back_populates="stations")
     dealer: Optional["DealerProfile"] = Relationship(back_populates="stations")
     reviews: List["Review"] = Relationship(back_populates="station")
+    cameras: List["StationCamera"] = Relationship(back_populates="station")
     
     # Foreign Key Relationships
     # Note: Circular imports are handled by string forward references in many cases, 
@@ -94,6 +95,7 @@ class StationImage(SQLModel, table=True):
     is_primary: bool = Field(default=False)
     
     station: Optional["Station"] = Relationship(back_populates="images")
+
 
 class StationSlot(SQLModel, table=True):
     __tablename__ = "station_slots"
@@ -113,3 +115,18 @@ class StationSlot(SQLModel, table=True):
 
     # Relationships
     station: Station = Relationship(back_populates="slots")
+
+class StationCamera(SQLModel, table=True):
+    __tablename__ = "station_cameras"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    station_id: int = Field(foreign_key="stations.id")
+    
+    name: str = Field(description="Name or location of the camera")
+    rtsp_url: str = Field(description="The RTSP stream URL")
+    status: str = Field(default="active", description="active, inactive, offline")
+    
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    # Relationships
+    station: Optional["Station"] = Relationship(back_populates="cameras")

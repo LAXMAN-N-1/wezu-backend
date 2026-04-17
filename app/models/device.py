@@ -1,6 +1,7 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
 from datetime import datetime, UTC
+from app.models.user import User
 
 class Device(SQLModel, table=True):
     __tablename__ = "devices"

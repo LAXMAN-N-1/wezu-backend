@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import PlainTextResponse, JSONResponse
 from sqlmodel import Session, select, func
 
+from app.api import deps
 from app.api.deps import get_current_active_superuser
 from app.core.database import get_db
 from app.models.audit_log import AuditLog

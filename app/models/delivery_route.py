@@ -4,6 +4,9 @@ from datetime import datetime, UTC
 import sqlalchemy as sa
 from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
+from app.models.user import User
+from app.models.delivery_assignment import DeliveryAssignment
+from app.models.driver_profile import DriverProfile
 
 class DeliveryRoute(SQLModel, table=True):
     __tablename__ = "delivery_routes"

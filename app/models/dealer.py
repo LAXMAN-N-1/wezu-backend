@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 import sqlalchemy as sa
 from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
+from app.models.user import User
 
 class DealerProfile(SQLModel, table=True):
     __tablename__ = "dealer_profiles"
@@ -61,8 +62,8 @@ class DealerProfile(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
-    owner: "User" = Relationship(
-        back_populates="owned_dealer_profile",
+    user: "User" = Relationship(
+        back_populates="dealer_profile",
         sa_relationship_kwargs={
             "primaryjoin": "DealerProfile.user_id == User.id",
             "foreign_keys": "[DealerProfile.user_id]",

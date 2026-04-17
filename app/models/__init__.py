@@ -9,7 +9,7 @@ from app.models.device_fingerprint import DeviceFingerprint, DuplicateAccount
 from app.models.login_history import LoginHistory
 
 # Fleet, Inventory & IoT
-from app.models.station import Station, StationImage, StationSlot, StationStatus
+from app.models.station import Station, StationImage, StationSlot, StationStatus, StationCamera
 from app.models.station_heartbeat import StationHeartbeat
 from app.models.battery import Battery, BatteryLifecycleEvent, BatteryStatus, BatteryHealth, LocationType, BatteryAuditLog, BatteryHealthHistory
 from app.models.battery_catalog import BatteryCatalog, BatterySpec, BatteryBatch

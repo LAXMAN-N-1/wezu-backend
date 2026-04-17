@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, UTC
 
 class HeartbeatMetrics(BaseModel):
     temperature: float
@@ -69,3 +69,28 @@ class ChargingQueueResponse(BaseModel):
     station_id: str
     capacity: int
     current_queue: List[OptimizedQueueItem]
+
+
+class StationCameraRead(BaseModel):
+    id: int
+    station_id: int
+    name: str
+    rtsp_url: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class StationCameraCreate(BaseModel):
+    name: str
+    rtsp_url: str
+    status: str = "active"
+
+
+class StationCameraUpdate(BaseModel):
+    name: Optional[str] = None
+    rtsp_url: Optional[str] = None
+    status: Optional[str] = None

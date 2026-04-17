@@ -21,7 +21,7 @@ depends_on: Union[str, Sequence[str], None] = None
 from sqlalchemy.dialects import postgresql
 
 def upgrade() -> None:
-    op.add_column('dealer_profiles', sa.Column('global_rental_settings', postgresql.JSONB(astext_type=sa.Text()), nullable=True))
+    op.execute("ALTER TABLE dealer_profiles ADD COLUMN IF NOT EXISTS global_rental_settings JSONB;")
 
 
 def downgrade() -> None:

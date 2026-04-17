@@ -1,6 +1,7 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
 from datetime import time, datetime, UTC
+from app.models import *
 
 class NotificationPreference(SQLModel, table=True):
     __tablename__ = "notification_preferences"

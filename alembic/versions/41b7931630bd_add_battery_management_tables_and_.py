@@ -24,48 +24,53 @@ def upgrade() -> None:
     location_type = sa.Enum('station', 'warehouse', 'service_center', 'recycling', name='locationtype')
     location_type.create(op.get_bind(), checkfirst=True)
 
-    # 2. Add POOR to BatteryHealth Enum (Public schema or wherever it exists)
-    # We should probably check where batteryhealth type is. Assuming public.
+    # 2. Add POOR to BatteryHealth Enum
     op.execute("ALTER TYPE batteryhealth ADD VALUE IF NOT EXISTS 'POOR'")
 
-    # 3. Add columns to batteries table
-    op.add_column('batteries', sa.Column('manufacturer', sa.String(), nullable=True))
-    op.add_column('batteries', sa.Column('notes', sa.String(), nullable=True))
+    # 3. Add columns to batteries table (Idempotent)
+    op.execute("ALTER TABLE batteries ADD COLUMN IF NOT EXISTS manufacturer VARCHAR;")
+    op.execute("ALTER TABLE batteries ADD COLUMN IF NOT EXISTS notes VARCHAR;")
     
-    # We use a raw string for the enum back-reference in the Column
-    location_type_enum = postgresql.ENUM('station', 'warehouse', 'service_center', 'recycling', name='locationtype')
-    op.add_column('batteries', sa.Column('location_type', location_type_enum, nullable=False, server_default='warehouse'))
+    # Enum column with server default
+    op.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='batteries' AND column_name='location_type') THEN
+                ALTER TABLE batteries ADD COLUMN location_type locationtype NOT NULL DEFAULT 'warehouse';
+            END IF;
+        END
+        $$;
+    """)
     
-    op.add_column('batteries', sa.Column('manufacture_date', sa.DateTime(), nullable=True))
-    op.add_column('batteries', sa.Column('last_charged_at', sa.DateTime(), nullable=True))
+    op.execute("ALTER TABLE batteries ADD COLUMN IF NOT EXISTS manufacture_date TIMESTAMP WITHOUT TIME ZONE;")
+    op.execute("ALTER TABLE batteries ADD COLUMN IF NOT EXISTS last_charged_at TIMESTAMP WITHOUT TIME ZONE;")
 
+    # 4. Create BatteryAuditLog table if not exists
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS battery_audit_logs (
+            id SERIAL PRIMARY KEY,
+            battery_id INTEGER NOT NULL REFERENCES batteries(id),
+            changed_by INTEGER REFERENCES users(id),
+            field_changed VARCHAR NOT NULL,
+            old_value VARCHAR,
+            new_value VARCHAR,
+            reason VARCHAR,
+            timestamp TIMESTAMP WITHOUT TIME ZONE NOT NULL
+        );
+    """)
+    # Index creation if not exists
+    op.execute("CREATE INDEX IF NOT EXISTS ix_inventory_battery_audit_logs_battery_id ON battery_audit_logs (battery_id);")
 
-    # 4. Create BatteryAuditLog table
-    op.create_table('battery_audit_logs',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('battery_id', sa.Integer(), nullable=False),
-        sa.Column('changed_by', sa.Integer(), nullable=True),
-        sa.Column('field_changed', sa.String(), nullable=False),
-        sa.Column('old_value', sa.String(), nullable=True),
-        sa.Column('new_value', sa.String(), nullable=True),
-        sa.Column('reason', sa.String(), nullable=True),
-        sa.Column('timestamp', sa.DateTime(), nullable=False),
-        sa.ForeignKeyConstraint(['battery_id'], ['batteries.id'], ),
-        sa.ForeignKeyConstraint(['changed_by'], ['users.id'], ),
-        sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index(op.f('ix_inventory_battery_audit_logs_battery_id'), 'battery_audit_logs', ['battery_id'], unique=False)
-
-    # 5. Create BatteryHealthHistory table
-    op.create_table('battery_health_history',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('battery_id', sa.Integer(), nullable=False),
-        sa.Column('health_percentage', sa.Float(), nullable=False),
-        sa.Column('recorded_at', sa.DateTime(), nullable=False),
-        sa.ForeignKeyConstraint(['battery_id'], ['batteries.id'], ),
-        sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index(op.f('ix_inventory_battery_health_history_battery_id'), 'battery_health_history', ['battery_id'], unique=False)
+    # 5. Create BatteryHealthHistory table if not exists
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS battery_health_history (
+            id SERIAL PRIMARY KEY,
+            battery_id INTEGER NOT NULL REFERENCES batteries(id),
+            health_percentage FLOAT NOT NULL,
+            recorded_at TIMESTAMP WITHOUT TIME ZONE NOT NULL
+        );
+    """)
+    op.execute("CREATE INDEX IF NOT EXISTS ix_inventory_battery_health_history_battery_id ON battery_health_history (battery_id);")
 
 
 def downgrade() -> None:

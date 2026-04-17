@@ -19,32 +19,36 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        'user_sessions',
-        sa.Column('id', sa.Integer(), primary_key=True),
-        sa.Column('user_id', sa.Integer(), sa.ForeignKey('users.id'), nullable=False),
-        sa.Column('token_id', sa.String(), nullable=False),
-        sa.Column('refresh_token_hash', sa.String(), nullable=True),
-        sa.Column('device_id', sa.String(), nullable=True),
-        sa.Column('device_name', sa.String(), nullable=True),
-        sa.Column('ip_address', sa.String(), nullable=True),
-        sa.Column('user_agent', sa.String(), nullable=True),
-        sa.Column('location', sa.String(), nullable=True),
-        sa.Column('device_type', sa.String(), nullable=False, server_default='unknown'),
-        sa.Column('os_version', sa.String(), nullable=True),
-        sa.Column('app_version', sa.String(), nullable=True),
-        sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'),
-        sa.Column('is_revoked', sa.Boolean(), nullable=False, server_default='false'),
-        sa.Column('revoked_at', sa.DateTime(), nullable=True),
-        sa.Column('last_active_at', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')),
-        sa.Column('issued_at', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')),
-        sa.Column('expires_at', sa.DateTime(), nullable=True),
-        sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP'))
-    )
-    op.create_index(op.f('ix_user_sessions_user_id'), 'user_sessions', ['user_id'], unique=False)
-    op.create_index(op.f('ix_user_sessions_token_id'), 'user_sessions', ['token_id'], unique=False)
-    op.create_index(op.f('ix_user_sessions_device_id'), 'user_sessions', ['device_id'], unique=False)
-    op.create_index(op.f('ix_user_sessions_refresh_token_hash'), 'user_sessions', ['refresh_token_hash'], unique=False)
+    # 1. Create user_sessions table if not exists
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS user_sessions (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            token_id VARCHAR NOT NULL,
+            refresh_token_hash VARCHAR,
+            device_id VARCHAR,
+            device_name VARCHAR,
+            ip_address VARCHAR,
+            user_agent VARCHAR,
+            location VARCHAR,
+            device_type VARCHAR DEFAULT 'unknown' NOT NULL,
+            os_version VARCHAR,
+            app_version VARCHAR,
+            is_active BOOLEAN DEFAULT 'true' NOT NULL,
+            is_revoked BOOLEAN DEFAULT 'false' NOT NULL,
+            revoked_at TIMESTAMP WITHOUT TIME ZONE,
+            last_active_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            issued_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+            expires_at TIMESTAMP WITHOUT TIME ZONE,
+            created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+        );
+    """)
+
+    # 2. Create indexes if they don't exist
+    op.execute("CREATE INDEX IF NOT EXISTS ix_user_sessions_user_id ON user_sessions (user_id);")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_user_sessions_token_id ON user_sessions (token_id);")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_user_sessions_device_id ON user_sessions (device_id);")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_user_sessions_refresh_token_hash ON user_sessions (refresh_token_hash);")
 
 def downgrade() -> None:
     op.drop_table('user_sessions')

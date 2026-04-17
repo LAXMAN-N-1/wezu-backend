@@ -4,6 +4,7 @@ from datetime import datetime, UTC
 import sqlalchemy as sa
 from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
+from app.models.user import User
 
 class DeviceFingerprint(SQLModel, table=True):
     __tablename__ = "device_fingerprints"

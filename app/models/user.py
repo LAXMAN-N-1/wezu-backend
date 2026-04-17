@@ -7,6 +7,7 @@ from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
 from enum import Enum
 import sqlalchemy as sa
+from app.models import *
 
 from app.models.two_factor_auth import TwoFactorAuth
 
@@ -23,6 +24,7 @@ if TYPE_CHECKING:
     from app.models.rbac import Role, UserAccessPath
     from app.models.token import SessionToken
     from app.models.user_profile import UserProfile
+    from app.models.notification_preference import NotificationPreference
 
 class UserType(str, Enum):
     CUSTOMER = "customer"
@@ -155,7 +157,7 @@ class User(SQLModel, table=True):
     sessions: List["UserSession"] = Relationship(back_populates="user")
     session_tokens: List["SessionToken"] = Relationship(back_populates="user")
     two_factor_auth: Optional["TwoFactorAuth"] = Relationship(back_populates="user")
-    user_profile: Optional["UserProfile"] = Relationship(back_populates="user")
+    notification_preference: Optional["NotificationPreference"] = Relationship(back_populates="user")
 
     @property
     def is_active(self) -> bool:

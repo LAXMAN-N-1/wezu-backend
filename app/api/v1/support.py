@@ -1,6 +1,6 @@
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Body, status
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 from app.api.deps import get_current_user
 from app.api import deps
 from app.models.user import User
