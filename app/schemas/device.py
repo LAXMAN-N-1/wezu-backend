@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Device and geofence schemas
 """

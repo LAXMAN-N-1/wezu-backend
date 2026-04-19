@@ -1,8 +1,9 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from app.core.database import engine
 from app.models.battery import Battery
 from app.services.battery_service import BatteryService
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 import logging
 
 logger = logging.getLogger(__name__)

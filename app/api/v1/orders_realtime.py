@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Real-time Logistics Order Updates API
 WebSocket endpoint for push-based order state changes.

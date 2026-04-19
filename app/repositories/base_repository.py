@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Base Repository Pattern
 Provides generic CRUD operations for all models

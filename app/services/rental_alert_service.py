@@ -1,4 +1,5 @@
-from datetime import datetime, UTC, timedelta
+from __future__ import annotations
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from sqlmodel import Session, select
 from app.models.rental import Rental
 from typing import List

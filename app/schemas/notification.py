@@ -1,3 +1,4 @@
+from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime, time
 from typing import Optional

@@ -1,9 +1,10 @@
+from __future__ import annotations
 """
 GPS Tracking Service
 Continuous location tracking and history management
 """
 from sqlmodel import Session, select
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from typing import Optional, List, Dict
 from app.models.gps_log import GPSTrackingLog
 from app.models.rental import Rental

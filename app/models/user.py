@@ -10,7 +10,7 @@ from app.models.dealer import DealerProfile
 from app.models.staff import StaffProfile
 
 from typing import Optional, List, TYPE_CHECKING
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from enum import Enum
 import sqlalchemy as sa
 from app.core.rbac import canonicalize_permission_set, canonicalize_permission_slug
@@ -26,27 +26,27 @@ if TYPE_CHECKING:
     from app.models.notification_preference import NotificationPreference
 
 class UserType(str, Enum):
-    CUSTOMER = "customer"
-    ADMIN = "admin"
-    DEALER = "dealer"
-    DEALER_STAFF = "dealer_staff"
-    SUPPORT_AGENT = "support_agent"
-    LOGISTICS = "logistics"
+    CUSTOMER = "CUSTOMER"
+    ADMIN = "ADMIN"
+    DEALER = "DEALER"
+    DEALER_STAFF = "DEALER_STAFF"
+    SUPPORT_AGENT = "SUPPORT_AGENT"
+    LOGISTICS = "LOGISTICS"
 
 class UserStatus(str, Enum):
-    ACTIVE = "active"
-    SUSPENDED = "suspended"
-    PENDING_VERIFICATION = "pending_verification"
-    PENDING = "pending"
-    INACTIVE = "inactive"
-    VERIFIED = "verified"
-    DELETED = "deleted"
+    ACTIVE = "ACTIVE"
+    SUSPENDED = "SUSPENDED"
+    PENDING_VERIFICATION = "PENDING_VERIFICATION"
+    PENDING = "PENDING"
+    INACTIVE = "INACTIVE"
+    VERIFIED = "VERIFIED"
+    DELETED = "DELETED"
 
 class KYCStatus(str, Enum):
-    NOT_SUBMITTED = "not_submitted"
-    PENDING = "pending"
-    APPROVED = "approved"
-    REJECTED = "rejected"
+    NOT_SUBMITTED = "NOT_SUBMITTED"
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
 
 class User(SQLModel, table=True):
 

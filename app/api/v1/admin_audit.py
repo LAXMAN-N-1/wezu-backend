@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Admin Audit Logs API — Read-only endpoints for Super Admins.
 

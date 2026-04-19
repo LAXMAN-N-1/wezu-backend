@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import List, Dict, Any, Optional
 
 # Define the Master Menu Structure

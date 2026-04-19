@@ -1,8 +1,9 @@
+from __future__ import annotations
 import os
 import sys
 import uuid
 import random
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 
 # We are in backend
 sys.path.insert(0, os.path.abspath("."))

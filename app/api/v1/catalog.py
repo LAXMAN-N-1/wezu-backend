@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Product Catalog API
 Browse, search, and purchase products

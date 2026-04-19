@@ -3,7 +3,7 @@ from typing import Optional, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .user import User
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 class Address(SQLModel, table=True):
     __tablename__ = "addresses"

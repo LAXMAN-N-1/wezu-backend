@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Backward-compatibility alias for KYCVerification.
 The unified codebase uses KYCRecord from app.models.kyc.

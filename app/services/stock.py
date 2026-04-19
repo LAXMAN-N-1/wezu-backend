@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import List, Optional
 from sqlmodel import func, select, Session
 from fastapi import HTTPException

@@ -1,5 +1,6 @@
+from __future__ import annotations
 from sqlmodel import Session, select
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from app.core.database import engine
 from app.models.rental import Rental
 from app.services.late_fee_service import LateFeeService

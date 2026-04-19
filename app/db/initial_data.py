@@ -1,3 +1,4 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from app.models.rbac import Role
 

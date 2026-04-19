@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session

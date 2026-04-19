@@ -1,10 +1,11 @@
+from __future__ import annotations
 """
 Dealer Stock Request model — tracks stock replenishment requests
 from dealers to admin/platform.
 """
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from enum import Enum
 
 

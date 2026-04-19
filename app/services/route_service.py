@@ -1,3 +1,4 @@
+from __future__ import annotations
 from datetime import datetime, timedelta
 from math import asin, cos, radians, sin, sqrt
 import logging

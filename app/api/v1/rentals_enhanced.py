@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Enhanced Rental Endpoints
 Additional rental operations including issue reporting and receipts

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Enhanced Payment and Invoice API
 Invoice generation, refunds, and payment methods
@@ -7,7 +8,7 @@ from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 
 from app.api import deps
 from app.core.audit import audit_log
@@ -318,7 +319,7 @@ def request_refund(
     
     # Create refund transaction
     from app.models.financial import Transaction
-    from datetime import datetime, UTC
+    from datetime import datetime, timezone; UTC = timezone.utc
     
     refund_amount = request.amount or order.total_amount
     

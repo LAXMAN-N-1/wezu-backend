@@ -8,7 +8,7 @@ from __future__ import annotations
 import csv
 import io
 from collections import defaultdict
-from datetime import UTC, date, datetime, time
+from datetime import date, datetime, time, timezone; UTC = timezone.utc
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query

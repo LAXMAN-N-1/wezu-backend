@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Rental event and modification schemas
 """

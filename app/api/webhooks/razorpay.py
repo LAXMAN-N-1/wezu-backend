@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import APIRouter, Request, Header, HTTPException, Depends
 from sqlmodel import Session, select
 from app.api import deps
@@ -77,7 +78,7 @@ async def razorpay_webhook_event(
         gateway_refund_id = refund_entity.get('id')
         
         from app.models.refund import Refund
-        from datetime import datetime, UTC
+        from datetime import datetime, timezone; UTC = timezone.utc
         
         # Find pending refund by gateway payment ID or similar logic
         # Usually we link by payment_id and amount

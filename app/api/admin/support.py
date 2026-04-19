@@ -1,10 +1,11 @@
+from __future__ import annotations
 """
 Support Module — Admin API
 Endpoints: Tickets (CRUD, assign, status, messages, stats), Knowledge Base (CRUD, categories),
            Team Performance (agents, SLA, queue), Customer Satisfaction
 """
 from typing import Any, List, Optional
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func, col
 from pydantic import BaseModel

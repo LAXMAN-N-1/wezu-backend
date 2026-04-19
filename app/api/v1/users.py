@@ -1,9 +1,10 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Request, UploadFile, File, Form
 from sqlmodel import Session, select
 from sqlalchemy.orm import joinedload, selectinload
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from app.api import deps
 from app.core.audit import audit_log
 from app.db.session import get_session
@@ -286,7 +287,7 @@ async def update_user_me(
     Update authenticated user's profile.
     Safely separates User table updates from UserProfile table updates.
     """
-    from datetime import datetime, UTC
+    from datetime import datetime, timezone; UTC = timezone.utc
     
     # Get fresh user with profile
     user = db.exec(
@@ -360,7 +361,7 @@ async def upload_profile_picture(
     Upload profile picture for authenticated user.
     """
     from app.services.storage_service import StorageService
-    from datetime import datetime, UTC
+    from datetime import datetime, timezone; UTC = timezone.utc
     import uuid
     
     # Validate file type
@@ -1250,7 +1251,7 @@ class AdminUserProfileResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from app.models.audit_log import AuditLog
 from app.models.kyc import KYCDocument
 from app.models.session import UserSession

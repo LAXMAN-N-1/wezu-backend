@@ -1,3 +1,4 @@
+from __future__ import annotations
 from sqlmodel import Session, select, func
 from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
 from app.models.dealer_inventory import DealerInventory
@@ -6,7 +7,7 @@ from app.models.user import User
 from app.models.station import Station
 from app.models.commission import CommissionLog
 from typing import List, Optional, Any
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from app.repositories.dealer import (
     dealer_profile_repository,
     dealer_application_repository,
@@ -158,7 +159,7 @@ class DealerService:
         station_ids = [s.id for s in stations]
         
         from app.models.rental import Rental
-        from datetime import datetime, UTC, timedelta
+        from datetime import datetime, timedelta, timezone; UTC = timezone.utc
         
         now = datetime.now(UTC)
         day_ago = now - timedelta(days=1)

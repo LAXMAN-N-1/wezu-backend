@@ -1,9 +1,10 @@
+from __future__ import annotations
 """
 Analytics-related Pydantic schemas
 Advanced analytics, forecasting, and insights
 """
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 from datetime import datetime, date
 
 # Request Models
@@ -11,7 +12,7 @@ class AnalyticsDateRange(BaseModel):
     """Date range for analytics"""
     start_date: date
     end_date: date
-    granularity: str = Field("DAILY", pattern=r'^(HOURLY|DAILY|WEEKLY|MONTHLY)$')
+    granularity: str = Field("DAILY", pattern=r'^(Union[HOURLY, DAILY|WEEKLY|MONTHLY])$')
 
 class DemandForecastRequest(BaseModel):
     """Request demand forecast"""
@@ -24,7 +25,7 @@ class DemandForecastRequest(BaseModel):
 class ChurnPredictionRequest(BaseModel):
     """Request churn prediction"""
     user_ids: Optional[List[int]] = None
-    min_risk_level: str = Field("MEDIUM", pattern=r'^(LOW|MEDIUM|HIGH)$')
+    min_risk_level: str = Field("MEDIUM", pattern=r'^(Union[LOW, MEDIUM|HIGH])$')
     include_recommendations: bool = True
 
 class PricingOptimizationRequest(BaseModel):

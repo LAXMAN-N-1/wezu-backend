@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Shared CORS utilities used by middleware and error handlers.
 Single source of truth to avoid duplication.

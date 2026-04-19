@@ -1,9 +1,10 @@
+from __future__ import annotations
 """
 Password management service — history check (last 5), expiry (90-day), and recording.
 """
 
 import logging
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from typing import Optional
 
 from sqlmodel import Session, select

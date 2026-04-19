@@ -1,4 +1,5 @@
-from datetime import datetime, UTC, timedelta
+from __future__ import annotations
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from sqlmodel import Session, select, func
 from app.models.otp import OTP
 from app.models.fraud import Blacklist

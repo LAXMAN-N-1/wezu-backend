@@ -1,9 +1,10 @@
+from __future__ import annotations
 """
 Payment Repository  
 Data access layer for Transaction model
 """
 from typing import Optional, List
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from sqlmodel import Session, select, func
 from app.models.financial import Transaction
 from app.repositories.base_repository import BaseRepository

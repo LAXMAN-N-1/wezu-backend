@@ -1,8 +1,9 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends
 from typing import List, Dict, Any
 from sqlmodel import Session, select, func
 from sqlalchemy import cast, Date, Integer
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from app.api import deps
 
 from app.models.user import User, UserStatus, KYCStatus
@@ -102,7 +103,7 @@ def get_analytics_trends(
         "swaps": swaps_data
     }
 
-@router.get("/battery-health-distribution")
+@router.get("/battery-health")
 def get_battery_health_distribution(
     current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(deps.get_db)
@@ -120,7 +121,7 @@ def get_battery_health_distribution(
         {"status": "Critical", "count": critical, "color": "#EF4444"}
     ]
 
-@router.get("/revenue/by-region")
+@router.get("/revenue-by-region")
 def get_revenue_by_region(
     current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(deps.get_db)
@@ -141,7 +142,7 @@ def get_revenue_by_region(
         
     return [{"region": r.city or "Unknown", "value": r.swaps_count * 50} for r in results]
 
-@router.get("/revenue/by-station")
+@router.get("/revenue/station")
 def get_revenue_by_station(
     period: str = "30d", 
     current_user: User = Depends(deps.get_current_active_admin),

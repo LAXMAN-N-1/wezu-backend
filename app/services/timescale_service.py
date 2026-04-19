@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 TimescaleDB Service
 Time-series data management for IoT and analytics

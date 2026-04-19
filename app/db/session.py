@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Canonical database session factory for the WEZU backend.
 

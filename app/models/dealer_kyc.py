@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List, Dict
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 import enum
 from sqlalchemy import Column
 from sqlalchemy.dialects.postgresql import JSONB

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Canonical enum definitions for the entire WEZU backend.
 Import enums ONLY from this module to avoid duplicate/conflicting definitions.
@@ -10,30 +11,30 @@ from enum import Enum
 
 # ── User ──────────────────────────────────────────────────────────────
 class UserType(str, Enum):
-    CUSTOMER = "customer"
-    ADMIN = "admin"
-    DEALER = "dealer"
-    DEALER_STAFF = "dealer_staff"
-    SUPPORT_AGENT = "support_agent"
-    LOGISTICS = "logistics"
+    CUSTOMER = "CUSTOMER"
+    ADMIN = "ADMIN"
+    DEALER = "DEALER"
+    DEALER_STAFF = "DEALER_STAFF"
+    SUPPORT_AGENT = "SUPPORT_AGENT"
+    LOGISTICS = "LOGISTICS"
 
 
 class UserStatus(str, Enum):
-    ACTIVE = "active"
-    SUSPENDED = "suspended"
-    PENDING_VERIFICATION = "pending_verification"
-    PENDING = "pending"
-    INACTIVE = "inactive"
-    VERIFIED = "verified"
-    DELETED = "deleted"
+    ACTIVE = "ACTIVE"
+    SUSPENDED = "SUSPENDED"
+    PENDING_VERIFICATION = "PENDING_VERIFICATION"
+    PENDING = "PENDING"
+    INACTIVE = "INACTIVE"
+    VERIFIED = "VERIFIED"
+    DELETED = "DELETED"
 
 
 class KYCStatus(str, Enum):
-    NOT_SUBMITTED = "not_submitted"
-    PENDING = "pending"
-    APPROVED = "approved"
-    REJECTED = "rejected"
-    UPLOADED = "uploaded"  # Compat with legacy constants
+    NOT_SUBMITTED = "NOT_SUBMITTED"
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    UPLOADED = "UPLOADED"  # Compat with legacy constants
 
 
 # ── Roles ─────────────────────────────────────────────────────────────

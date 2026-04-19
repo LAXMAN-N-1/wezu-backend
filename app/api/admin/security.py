@@ -1,8 +1,9 @@
+from __future__ import annotations
 """Security Settings Admin API endpoints."""
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
 from typing import List, Optional
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 
 from app.core.database import get_db
 from app.api.deps import get_current_active_admin

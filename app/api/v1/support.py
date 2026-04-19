@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Body, status
 from sqlmodel import Session, select
@@ -14,7 +15,7 @@ from app.schemas.support import (
 )
 from app.schemas.feedback import FeedbackCreate, FeedbackResponse
 from app.schemas.faq import FAQResponse
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 import os
 import shutil
 

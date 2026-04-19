@@ -1,9 +1,10 @@
+from __future__ import annotations
 """
 Admin: Dealer Management
 Full CRUD + application pipeline + KYC + commission management for admin portal.
 """
 from typing import Any, Optional, List, Dict
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func, or_
 from pydantic import BaseModel

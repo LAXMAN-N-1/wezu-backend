@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Form
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
@@ -21,7 +22,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator, model_validato
 import logging
 import re
 from typing import Any, List, Optional
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from jose import jwt, JWTError, ExpiredSignatureError
 import uuid
 from app.middleware.rate_limit import limiter
@@ -334,7 +335,7 @@ async def request_registration_otp(
     logger.info(f"OTP request for {otp_data.target}. New user: {is_new_user}")
 
     # Generate and send OTP
-    code = OTPService.generate_otp(otp_data.target)
+    code = OTPService.generate_otp(otp_data.target, otp_data.purpose)
     OTPService.create_otp_record(db, otp_data.target, code, otp_data.purpose)
 
     logger.info(f"OTP requested for {otp_data.target} with purpose {otp_data.purpose}")
@@ -527,7 +528,7 @@ async def social_login(
             full_name=name,
             profile_picture=picture,
             status=UserStatus.ACTIVE,
-            kyc_status="verified", # Social login usually implies verified email
+            kyc_status=KYCStatus.APPROVED, # Social login usually implies verified email
         )
         
         # Set specific ID
@@ -567,6 +568,27 @@ async def social_login(
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    # Ensure at least one active role exists for existing social-login users
+    # created before multi-role mappings were enforced.
+    if not _active_roles_for_user(db, user):
+        customer_role = db.exec(select(Role).where(Role.name == "customer")).first()
+        if customer_role is None:
+            customer_role = Role(
+                name="customer",
+                description="Default customer role",
+                category="customer",
+                level=10,
+                is_system_role=True,
+                is_active=True,
+                scope_owner="global",
+            )
+            db.add(customer_role)
+            db.commit()
+            db.refresh(customer_role)
+        if customer_role:
+            _assign_primary_role(db, user, customer_role)
+            db.refresh(user)
 
     # 3. Generate Tokens & Response (Using same logic as Login)
     

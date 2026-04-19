@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Dealer Campaign Service — Manage promotional campaigns, validate at checkout,
 collect analytics, and handle bulk operations.
@@ -8,7 +9,7 @@ import io
 import json
 import logging
 import uuid
-from datetime import datetime, UTC, date
+from datetime import datetime, date, timezone; UTC = timezone.utc
 from typing import Dict, Any, List, Optional
 
 from sqlmodel import Session, select, func, col

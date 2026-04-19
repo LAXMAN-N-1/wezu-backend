@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Enhanced Payment Endpoints
 Secondary payment operations for receipts, invoices, and webhook compatibility.

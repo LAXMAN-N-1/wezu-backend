@@ -1,10 +1,11 @@
+from __future__ import annotations
 from typing import Dict, Any, Optional, Protocol, List
 from app.models.kyc import KYCDocumentType, KYCDocumentStatus
 from app.models.user import User, KYCStatus
 from app.core.config import settings
 from app.core.logging import get_logger
 from sqlmodel import Session, select, func
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 
 logger = get_logger(__name__)
 

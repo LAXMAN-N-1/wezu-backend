@@ -1,8 +1,9 @@
+from __future__ import annotations
 import logging
 import math
 import random
 from collections import defaultdict, Counter
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from time import monotonic
 from typing import Any, Dict, List, Optional
 

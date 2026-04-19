@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 @audit_action decorator — wraps sensitive FastAPI endpoints to auto-log
 the user, action, timestamp, IP, user-agent, and optionally old/new values.

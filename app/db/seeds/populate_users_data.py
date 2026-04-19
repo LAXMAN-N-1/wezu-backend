@@ -1,9 +1,10 @@
+from __future__ import annotations
 import asyncio
 import os
 import random
 import uuid
 import uuid
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 import faker
 from passlib.context import CryptContext
 

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Dealer Portal Settings — Profile update, notification preferences,
 bank account, and notifications list.
@@ -6,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
 from pydantic import BaseModel, EmailStr
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 from app.db.session import get_session
 from app.api import deps

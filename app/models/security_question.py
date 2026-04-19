@@ -1,6 +1,7 @@
+from __future__ import annotations
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List, TYPE_CHECKING
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 if TYPE_CHECKING:
     from app.models.user import User

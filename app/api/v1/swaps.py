@@ -1,6 +1,7 @@
+from __future__ import annotations
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from sqlmodel import Session, select
 from app.api.deps import get_current_user
 from app.core.audit import audit_log

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import APIRouter
 
 from . import main, fraud, jobs, monitoring, users, rentals, finance, iot, batteries, stock, health, stations, kyc_admin, rbac_admin, cms, admin_groups, audit_trails, logistics, support, bess, notifications, settings, security

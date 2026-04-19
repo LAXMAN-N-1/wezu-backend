@@ -1,3 +1,4 @@
+from __future__ import annotations
 """BESS Pydantic schemas."""
 from datetime import datetime
 from typing import Optional, List

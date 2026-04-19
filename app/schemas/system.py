@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 System configuration and feature flag schemas
 """

@@ -1,3 +1,4 @@
+from __future__ import annotations
 import redis
 import time
 from app.core.config import settings

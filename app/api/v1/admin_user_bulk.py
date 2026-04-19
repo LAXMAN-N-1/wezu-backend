@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Admin Bulk User Operations API — CSV import, bulk deactivate, bulk role change.
 """

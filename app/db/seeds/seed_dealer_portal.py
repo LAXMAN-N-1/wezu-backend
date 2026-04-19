@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Comprehensive Dealer Portal Seed Script
 Uses verified actual DB schema - columns, enums, NOT NULL constraints.

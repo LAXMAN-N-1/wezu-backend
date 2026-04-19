@@ -1,8 +1,9 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from app.core.database import get_db
 from app.models.station import Station, StationStatus
 from app.services.alert_service import AlertService
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 import logging
 
 logger = logging.getLogger(__name__)

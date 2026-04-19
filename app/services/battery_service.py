@@ -1,10 +1,11 @@
+from __future__ import annotations
 from app.models.battery import Battery, BatteryLifecycleEvent, BatteryStatus, BatteryAuditLog, BatteryHealthHistory
 from app.models.telemetry import Telemetry
 from app.models.rental import Rental
 from app.schemas.battery import BatteryCreate, BatteryUpdate
 from app.services.qr_service import QRCodeService
 from typing import List, Optional, Dict, Any
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from sqlmodel import Session, select, func
 from sqlalchemy import desc
 from app.models.battery_health_log import BatteryHealthLog as BatteryHealthLogModel

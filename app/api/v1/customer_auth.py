@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Customer-specific authentication endpoints.
 JSON-based login/register for the Flutter customer app.
@@ -9,7 +10,7 @@ from typing import Optional
 import logging
 import uuid
 import re
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 from app.api import deps
 from app.db.session import get_session

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Membership, search history, and user profile schemas
 """

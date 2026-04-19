@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from app.api import deps
 from app.services.storage_service import storage_service

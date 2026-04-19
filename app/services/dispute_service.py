@@ -1,5 +1,6 @@
+from __future__ import annotations
 from sqlmodel import Session, select
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from app.models.settlement_dispute import SettlementDispute
 from app.models.settlement import Settlement
 import logging

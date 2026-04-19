@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Dealer Portal Auth — Login, Register, Refresh, Change Password
 Dedicated auth endpoints for the dealer portal frontend.
@@ -9,7 +10,7 @@ from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
 from typing import Optional
 import logging
 import uuid
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 
 from app.api import deps
 from app.db.session import get_session

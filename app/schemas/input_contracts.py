@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 P4-B: Typed request schemas replacing raw `dict` body parameters.
 
@@ -6,7 +7,7 @@ endpoints that previously accepted untyped `dict` input.
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Union
 from datetime import datetime
 
 
@@ -67,7 +68,7 @@ class DealerPromotionCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = Field(None, max_length=1000)
     promo_code: str = Field(..., min_length=3, max_length=50)
-    discount_type: str = Field(..., description="PERCENTAGE | FIXED_AMOUNT | FREE_DELIVERY")
+    discount_type: str = Field(..., description="PERCENTAGE, FIXED_AMOUNT | FREE_DELIVERY")
     discount_value: float = Field(..., gt=0)
     min_purchase_amount: Optional[float] = Field(None, ge=0)
     max_discount_amount: Optional[float] = Field(None, ge=0)
@@ -75,7 +76,7 @@ class DealerPromotionCreate(BaseModel):
     daily_cap: Optional[int] = Field(None, ge=0)
     usage_limit_total: Optional[int] = Field(None, ge=0)
     usage_limit_per_user: int = Field(1, ge=1)
-    applicable_to: str = Field("ALL", description="ALL | RENTAL | PURCHASE | SPECIFIC_MODELS")
+    applicable_to: str = Field("ALL", description="ALL, RENTAL | PURCHASE | SPECIFIC_MODELS")
     applicable_station_ids: Optional[str] = None
     applicable_models: Optional[str] = None
     start_date: Optional[datetime] = None
@@ -138,5 +139,5 @@ class MaintenanceTaskCreate(BaseModel):
     """Create a station maintenance task."""
     maintenance_type: str = Field(..., min_length=1, max_length=100)
     description: Optional[str] = Field(None, max_length=1000)
-    priority: str = Field("medium", description="low | medium | high | critical")
+    priority: str = Field("medium", description="low, medium | high | critical")
     scheduled_at: Optional[datetime] = None

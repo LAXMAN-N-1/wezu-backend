@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List, Optional
@@ -195,4 +196,4 @@ def handle_duplicate_account(
     
     return {"status": "updated", "action": req.action}
 
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc

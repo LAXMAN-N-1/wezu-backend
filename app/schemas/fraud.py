@@ -1,9 +1,10 @@
+from __future__ import annotations
 """
 Fraud detection and security Pydantic schemas
 Risk scores, verification, and device fingerprinting
 """
 from pydantic import BaseModel, Field, EmailStr, ConfigDict
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 from datetime import datetime
 
 # Request Models
@@ -25,7 +26,7 @@ class DeviceFingerprintSubmit(BaseModel):
     """Submit device fingerprint"""
     device_id: str = Field(..., min_length=10)
     fingerprint_hash: str = Field(..., min_length=32)
-    device_type: str = Field(..., pattern=r'^(MOBILE|TABLET|DESKTOP|OTHER)$')
+    device_type: str = Field(..., pattern=r'^(Union[MOBILE, TABLET|DESKTOP|OTHER])$')
     os_name: str
     os_version: Optional[str] = None
     browser_name: Optional[str] = None
@@ -41,14 +42,14 @@ class DeviceFingerprintSubmit(BaseModel):
 
 class BlacklistAdd(BaseModel):
     """Add to blacklist"""
-    type: str = Field(..., pattern=r'^(PHONE|EMAIL|IP|DEVICE_ID|PAN|GST)$')
+    type: str = Field(..., pattern=r'^(Union[PHONE, EMAIL|IP|DEVICE_ID|PAN|GST])$')
     value: str = Field(..., min_length=3)
     reason: str = Field(..., min_length=10)
-    severity: Optional[str] = Field("MEDIUM", pattern=r'^(LOW|MEDIUM|HIGH|CRITICAL)$')
+    severity: Optional[str] = Field("MEDIUM", pattern=r'^(Union[LOW, MEDIUM|HIGH|CRITICAL])$')
 
 class DuplicateAccountAction(BaseModel):
     """Action on duplicate account"""
-    action: str = Field(..., pattern=r'^(MERGED|BLOCKED|FLAGGED|CLEARED)$')
+    action: str = Field(..., pattern=r'^(Union[MERGED, BLOCKED|FLAGGED|CLEARED])$')
     notes: Optional[str] = None
 
 # Response Models

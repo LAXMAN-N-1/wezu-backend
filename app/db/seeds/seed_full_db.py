@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 from sqlmodel import Session, select
 from app.db.session import engine
@@ -10,7 +11,7 @@ from app.models import (
     TransactionType, TransactionStatus, Device, Vehicle, 
     DealerProfile, DriverProfile, StaffProfile
 )
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

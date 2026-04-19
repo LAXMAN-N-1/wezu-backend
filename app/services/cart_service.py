@@ -1,8 +1,9 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from app.models.cart import CartItem
 from app.models.catalog import CatalogProduct, CatalogProductVariant
 from typing import List, Optional
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 class CartService:
     @staticmethod

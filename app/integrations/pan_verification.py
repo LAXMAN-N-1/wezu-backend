@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 PAN Verification Integration
 Handles PAN card verification

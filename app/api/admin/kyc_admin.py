@@ -1,7 +1,8 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, func
 from typing import Any, List, Optional
-from datetime import datetime, UTC, date
+from datetime import datetime, date, timezone; UTC = timezone.utc
 from pydantic import BaseModel
 from app.api import deps
 from app.models.user import User, KYCStatus

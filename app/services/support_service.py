@@ -1,3 +1,4 @@
+from __future__ import annotations
 from sqlmodel import Session, select, func
 from app.models.support import SupportTicket, TicketMessage, ChatSession, ChatMessage, ChatStatus
 from app.models.user import User
@@ -116,7 +117,7 @@ class SupportService:
     @staticmethod
     def get_queue_stats(db: Session) -> dict:
         """Overview of the support queue"""
-        from datetime import datetime, UTC, timedelta
+        from datetime import datetime, timedelta, timezone; UTC = timezone.utc
         now = datetime.now(UTC)
         overdue_threshold = now - timedelta(hours=24)
         

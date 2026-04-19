@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 from threading import Lock
@@ -224,22 +225,34 @@ def _provision_supabase_user(db: Session, payload: dict[str, Any]) -> User:
     db.commit()
     db.refresh(new_user)
 
-    default_role_name = canonical_role_name(settings.SUPABASE_DEFAULT_ROLE_NAME)
-    if default_role_name:
-        role = db.exec(
-            select(Role).where(func.lower(Role.name) == default_role_name)
-        ).first()
+    configured_role_name = str(settings.SUPABASE_DEFAULT_ROLE_NAME or "").strip().lower()
+    canonical_default_role_name = canonical_role_name(configured_role_name)
+    role_candidates = [
+        candidate
+        for candidate in (
+            canonical_default_role_name,
+            configured_role_name,
+            "customer",
+        )
+        if candidate
+    ]
+    role = None
+    for candidate in role_candidates:
+        role = db.exec(select(Role).where(func.lower(Role.name) == candidate)).first()
         if role:
-            new_user.role_id = role.id
-            db.add(new_user)
-            db.add(
-                UserRole(
-                    user_id=new_user.id,
-                    role_id=role.id,
-                )
+            break
+
+    if role:
+        new_user.role_id = role.id
+        db.add(new_user)
+        db.add(
+            UserRole(
+                user_id=new_user.id,
+                role_id=role.id,
             )
-            db.commit()
-            db.refresh(new_user)
+        )
+        db.commit()
+        db.refresh(new_user)
 
     logger.info(
         "auth.supabase_user_provisioned",
@@ -301,7 +314,7 @@ def get_active_roles_for_user_id(
     db: Session,
     user_id: int,
 ) -> list[Role]:
-    from datetime import UTC, datetime
+    from datetime import datetime, timezone; UTC = timezone.utc
 
     now = datetime.now(UTC)
     active_roles = db.exec(
@@ -354,7 +367,7 @@ def get_user_from_token(
     if getattr(user, "last_global_logout_at", None):
         iat = validated.issued_at
         if iat:
-            from datetime import datetime, UTC
+            from datetime import datetime, timezone; UTC = timezone.utc
             token_issued_at = datetime.fromtimestamp(iat, UTC).replace(tzinfo=None)
             if token_issued_at < user.last_global_logout_at:
                 raise _auth_unauthorized("token_invalid")

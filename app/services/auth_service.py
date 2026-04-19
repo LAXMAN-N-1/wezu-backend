@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 from threading import Lock
 from time import monotonic
@@ -392,7 +393,7 @@ class AuthService:
         from app.models.session import UserSession
         from datetime import datetime, timedelta
         try:
-            from datetime import UTC
+            from datetime import timezone; UTC = timezone.utc
         except ImportError:
             import datetime as dt
             UTC = dt.timezone.utc
@@ -553,7 +554,7 @@ class AuthService:
         from sqlmodel import select
         from datetime import datetime, timedelta
         try:
-            from datetime import UTC
+            from datetime import timezone; UTC = timezone.utc
         except ImportError:
             import datetime as dt
             UTC = dt.timezone.utc
@@ -606,7 +607,7 @@ class AuthService:
         Validate a token against active UserSession records.
         For refresh tokens, also verifies refresh token hash matches stored value.
         """
-        from datetime import datetime, UTC
+        from datetime import datetime, timezone; UTC = timezone.utc
         from jose import jwt, JWTError
         import hashlib
         from app.models.session import UserSession
@@ -659,7 +660,7 @@ class AuthService:
         Revoke a session identified by token jti/sid.
         Returns True if a session was found and revoked.
         """
-        from datetime import datetime, UTC
+        from datetime import datetime, timezone; UTC = timezone.utc
         from jose import jwt, JWTError
         from app.models.session import UserSession
 
@@ -701,7 +702,7 @@ class AuthService:
         from sqlmodel import select
         from datetime import datetime
         try:
-            from datetime import UTC
+            from datetime import timezone; UTC = timezone.utc
         except ImportError:
             import datetime as dt
             UTC = dt.timezone.utc

@@ -24,7 +24,7 @@ class NotificationOutboxStatus:
         )
 
     @classmethod
-    def is_valid(cls, value: str | None) -> bool:
+    def is_valid(cls, value:Optional[str]) -> bool:
         return bool(value) and value in cls.values()
 
 

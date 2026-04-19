@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 class CartItem(SQLModel, table=True):
     """Items in a user's shopping cart"""

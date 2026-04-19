@@ -1,9 +1,10 @@
+from __future__ import annotations
 """
 Dealer-related Pydantic schemas
 Request and response models for dealer operations
 """
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 from enum import Enum
 
@@ -74,7 +75,7 @@ class DealerPromotionCreate(BaseModel):
     """Create dealer promotion"""
     promo_code: str = Field(..., min_length=4, max_length=20)
     description: str
-    discount_type: str = Field(..., pattern=r'^(PERCENTAGE|FIXED_AMOUNT|FREE_DELIVERY)$')
+    discount_type: str = Field(..., pattern=r'^(Union[PERCENTAGE, FIXED_AMOUNT|FREE_DELIVERY])$')
     discount_value: float = Field(..., gt=0)
     start_date: datetime
     end_date: datetime

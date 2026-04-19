@@ -1,10 +1,11 @@
+from __future__ import annotations
 """
 Dealer Portal Inventory Service
 Business logic for the dealer inventory screen endpoints.
 Queries are scoped to the dealer's stations automatically.
 """
 from typing import Optional, List, Dict, Any, Tuple
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from sqlmodel import Session, select, func, or_, and_, col
 from math import ceil
 

@@ -1,8 +1,9 @@
+from __future__ import annotations
 import sys
 import os
 import random
 import uuid
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 
 # Add the current directory to the path so we can import app
 sys.path.insert(0, os.path.abspath("."))

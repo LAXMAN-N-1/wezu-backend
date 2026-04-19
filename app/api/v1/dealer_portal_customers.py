@@ -1,10 +1,11 @@
+from __future__ import annotations
 """
 Dealer Portal Customers — Customer list, detail, and active rentals.
 """
 from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session, select, func
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 import logging
 
 from app.core.dealer_scope import log_scope_violation

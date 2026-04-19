@@ -1,10 +1,11 @@
+from __future__ import annotations
 """
 Order Service
 Order creation, management, and fulfillment
 """
 from sqlmodel import Session, select
 from typing import List, Dict, Optional
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 import uuid
 from app.models.catalog import CatalogOrder, CatalogOrderItem, DeliveryTracking, DeliveryEvent, CatalogProduct, CatalogProductVariant as ProductVariant
 from app.services.catalog_service import CatalogService

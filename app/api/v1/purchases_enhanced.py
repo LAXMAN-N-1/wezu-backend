@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Enhanced Purchase/Catalog Endpoints
 Additional purchase operations including cart management, order cancellation, and warranty

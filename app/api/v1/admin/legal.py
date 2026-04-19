@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List
@@ -6,7 +7,7 @@ from app.models.user import User
 from app.models.legal import LegalDocument
 from app.schemas.legal import LegalDocumentCreate, LegalDocumentUpdate, LegalDocumentRead
 from app.api.deps import get_current_active_admin
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 router = APIRouter()
 

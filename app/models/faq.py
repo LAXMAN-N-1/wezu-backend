@@ -1,6 +1,7 @@
+from __future__ import annotations
 from sqlmodel import SQLModel, Field
 from typing import Optional
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 class FAQ(SQLModel, table=True):
     __tablename__ = "faqs"

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import List, Optional
 from sqlmodel import Session, select, func
 from app.repositories.base_repository import BaseRepository

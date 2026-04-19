@@ -1,10 +1,11 @@
+from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select, func
 from sqlalchemy import inspect as sa_inspect
 from typing import List
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 from app.api import deps
 from app.core.config import settings

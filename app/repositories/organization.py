@@ -1,3 +1,4 @@
+from __future__ import annotations
 from app.models.organization import Organization
 from app.schemas.organization import OrganizationCreate, OrganizationUpdate
 from app.repositories.base_repository import BaseRepository

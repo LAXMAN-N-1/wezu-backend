@@ -1,10 +1,11 @@
+from __future__ import annotations
 """
 Dealer Station Service — Handles dealer operations for stations, inventory, alerts and maintenance.
 """
 
 from sqlmodel import Session, select, func
 from fastapi import HTTPException
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from typing import List, Dict, Any
 
 from app.models.station import Station, StationSlot

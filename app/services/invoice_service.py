@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Invoice Generation Service
 Generate PDF invoices for orders and rentals

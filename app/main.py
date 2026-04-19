@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 WEZU Energy – Unified Backend
 Merged from wezu-backend-laxman (feature-rich) and wezu-backend (hardened).
@@ -27,7 +28,10 @@ import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 
 from app.core.config import settings
-from app.core.database import ensure_roles_schema_compatibility
+from app.core.database import (
+    ensure_roles_schema_compatibility,
+    ensure_warehouses_schema_compatibility,
+)
 from app.db.session import engine
 from app.api import deps
 import app.models.all  # noqa: F401  Ensure all SQLModel classes registered
@@ -242,6 +246,16 @@ async def lifespan(app: FastAPI):
                     raise
                 startup_without_db = True
                 logger.exception("schema.roles_compatibility_failed.degraded_mode", error=str(exc))
+
+        # Warehouse compatibility backfill
+        if not startup_without_db:
+            try:
+                ensure_warehouses_schema_compatibility()
+            except SQLAlchemyError as exc:
+                if not allow_start_without_db:
+                    raise
+                startup_without_db = True
+                logger.exception("schema.warehouses_compatibility_failed.degraded_mode", error=str(exc))
 
         # Startup diagnostics enforcement
         if not startup_without_db:

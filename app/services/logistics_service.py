@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any, List, Optional
 from sqlmodel import Session, select, func
 from app.core.database import engine
@@ -9,7 +10,7 @@ from app.models.ecommerce import EcommerceOrder
 from app.models.station import Station, StationSlot
 from app.models.battery import Battery, LocationType, BatteryStatus
 from app.services.notification_service import NotificationService
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from typing import List, Optional, Any
 
 class LogisticsService:

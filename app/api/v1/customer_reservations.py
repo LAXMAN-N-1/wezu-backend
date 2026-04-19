@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Customer Reservations API
 Matches the Flutter ReservationRepositoryImpl expected paths:
@@ -9,7 +10,7 @@ Matches the Flutter ReservationRepositoryImpl expected paths:
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from typing import Optional
 from pydantic import BaseModel
 

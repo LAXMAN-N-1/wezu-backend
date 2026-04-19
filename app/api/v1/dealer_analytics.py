@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Dealer Analytics API — Performance overview, trends, station metrics,
 customer insights, peak hours, and export.

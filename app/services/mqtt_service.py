@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 MQTT Service for Real-time Battery Monitoring
 Subscribes to IoT device telemetry and processes battery data

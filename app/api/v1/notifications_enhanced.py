@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Enhanced Notification Endpoints
 Additional notification operations including read/unread management and device tokens

@@ -1,5 +1,6 @@
+from __future__ import annotations
 import os
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from fastapi import UploadFile
 from sqlmodel import Session, select
 from typing import List, Optional

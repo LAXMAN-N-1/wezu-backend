@@ -1,9 +1,10 @@
+from __future__ import annotations
 """
 Rental Repository
 Data access layer for Rental model
 """
 from typing import Optional, List
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from sqlmodel import Session, select
 from app.models.rental import Rental
 from app.repositories.base_repository import BaseRepository

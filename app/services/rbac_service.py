@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import List, Optional
 from sqlmodel import Session, select
 import sqlalchemy as sa

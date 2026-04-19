@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Late Fee Service
 Calculate and manage late fees for overdue rentals

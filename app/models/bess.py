@@ -1,5 +1,6 @@
+from __future__ import annotations
 """BESS (Battery Energy Storage System) models."""
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from typing import Optional
 from sqlmodel import SQLModel, Field
 from enum import Enum

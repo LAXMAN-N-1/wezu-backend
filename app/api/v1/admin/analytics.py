@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any, Callable, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status

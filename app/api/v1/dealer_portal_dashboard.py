@@ -1,10 +1,11 @@
+from __future__ import annotations
 """
 Dealer Portal Dashboard — Aggregated KPIs, alerts, and activity feed.
 """
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, func
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from sqlalchemy import case
 
 from app.db.session import get_session

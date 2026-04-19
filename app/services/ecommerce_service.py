@@ -1,3 +1,4 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from app.models.ecommerce import EcommerceProduct, EcommerceOrder, EcommerceOrderItem
 from app.models.user import User

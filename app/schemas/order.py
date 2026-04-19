@@ -1,3 +1,4 @@
+from __future__ import annotations
 from decimal import Decimal
 from datetime import datetime
 from typing import Any, List, Optional

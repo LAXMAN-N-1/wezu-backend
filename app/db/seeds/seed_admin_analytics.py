@@ -1,8 +1,9 @@
+from __future__ import annotations
 import logging
 import random
 import sys
 import os
-from datetime import datetime, UTC, timedelta, date
+from datetime import datetime, timedelta, date, timezone; UTC = timezone.utc
 from sqlmodel import Session, select
 
 # Add backend to path

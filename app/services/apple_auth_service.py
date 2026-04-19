@@ -1,10 +1,11 @@
+from __future__ import annotations
 """
 Apple Sign-In Authentication Service
 Handles Apple OAuth authentication for customer app
 """
 import jwt
 import httpx
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from typing import Optional, Dict
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend

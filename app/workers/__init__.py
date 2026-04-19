@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Background Workers Package
 Handles all scheduled and background tasks

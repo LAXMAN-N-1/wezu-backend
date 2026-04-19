@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 GPS Tracking and Location API
 Endpoints for location updates and history

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Seed the test customer user:
   Email:    test@customer.com

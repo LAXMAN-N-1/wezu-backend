@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Dealer Analytics Service — Performance overview, trends, station metrics,
 customer insights, peak hours, and export.
@@ -6,7 +7,7 @@ customer insights, peak hours, and export.
 import csv
 import io
 import logging
-from datetime import datetime, UTC, timedelta, date
+from datetime import datetime, timedelta, date, timezone; UTC = timezone.utc
 from typing import Dict, Any, List, Optional
 
 from sqlmodel import Session, select, func, col
@@ -498,7 +499,7 @@ class DealerAnalyticsService:
     def export_pdf(data: dict) -> str:
         """Generate PDF using PDFService."""
         from app.services.pdf_service import PDFService
-        from datetime import datetime, UTC
+        from datetime import datetime, timezone; UTC = timezone.utc
         import uuid
         import os
 

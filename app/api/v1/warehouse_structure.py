@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 from typing import List, Optional
 
@@ -140,7 +141,14 @@ def get_warehouse_structure(
         select(Warehouse).where(Warehouse.is_active == True).order_by(Warehouse.id.asc())
     ).all()
     if not active_warehouses:
-        raise HTTPException(status_code=404, detail="No active warehouse configured")
+        fallback = session.exec(select(Warehouse).order_by(Warehouse.id.asc())).first()
+        if fallback:
+            logger.warning(
+                "No active warehouse configured; falling back to warehouse_id=%s",
+                fallback.id,
+            )
+            return WarehouseWrapper(success=True, data=_build_structure_response(fallback))
+        raise HTTPException(status_code=404, detail="No warehouse configured")
     if len(active_warehouses) > 1:
         raise HTTPException(
             status_code=400,

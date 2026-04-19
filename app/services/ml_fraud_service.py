@@ -1,10 +1,11 @@
+from __future__ import annotations
 """
 ML Fraud Detection Service
 Machine learning-based fraud detection and risk scoring
 """
 from sqlmodel import Session, select
 from typing import Dict, List
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from app.models.user import User
 from app.models.rental import Rental
 from app.models.device_fingerprint import DeviceFingerprint

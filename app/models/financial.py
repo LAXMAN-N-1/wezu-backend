@@ -1,4 +1,4 @@
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
@@ -24,11 +24,11 @@ class TransactionType(str, Enum):
     TRANSFER = "TRANSFER"
 
 class TransactionStatus(str, Enum):
-    PENDING = "pending"
-    SUCCESS = "success"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-    REFUNDED = "refunded"
+    PENDING = "PENDING"
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+    REFUNDED = "REFUNDED"
 
 class Transaction(SQLModel, table=True):
     __tablename__ = "transactions"

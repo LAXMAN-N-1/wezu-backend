@@ -1,7 +1,8 @@
+from __future__ import annotations
 # Core Identity & Role
 from app.models.user import User, UserType, UserStatus
 from app.models.user_profile import UserProfile
-from app.models.rbac import Role, Permission, RolePermission, UserRole, UserAccessPath, AdminUserRole
+from app.models.rbac import Role, Permission, RolePermission, UserRole, UserAccessPath
 from app.models.token import SessionToken
 from app.models.two_factor_auth import TwoFactorAuth
 from app.models.session import UserSession
@@ -79,7 +80,6 @@ from app.models.otp import OTP
 from app.models.notification import Notification
 from app.models.notification_preference import NotificationPreference
 from app.models.audit_log import AuditLog, SecurityEvent
-from app.models.admin_user import AdminUser
 from app.models.admin_group import AdminGroup
 from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
 from app.models.driver_profile import DriverProfile

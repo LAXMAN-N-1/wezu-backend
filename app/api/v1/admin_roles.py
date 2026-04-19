@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select, func
 import sqlalchemy as sa
@@ -8,7 +9,7 @@ from app.models.user import User
 from app.core.rbac import canonical_role_name, canonicalize_permission_set
 from typing import List, Any, Optional
 from pydantic import BaseModel
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 
 router = APIRouter()
 

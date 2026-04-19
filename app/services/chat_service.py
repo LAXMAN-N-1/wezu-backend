@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Chat Service
 Live chat and automated responses
@@ -9,7 +10,7 @@ Model reality:
 """
 from sqlmodel import Session, select
 from typing import List, Optional
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from app.models.support import ChatSession, ChatMessage, ChatStatus, AutoResponse
 import logging
 

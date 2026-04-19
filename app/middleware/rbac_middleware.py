@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from jose import jwt, JWTError, ExpiredSignatureError

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Wallet Repository
 Data access layer for Wallet model

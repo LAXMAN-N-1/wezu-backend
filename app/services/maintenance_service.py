@@ -1,3 +1,4 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from app.core.database import engine
 from app.models.maintenance import (

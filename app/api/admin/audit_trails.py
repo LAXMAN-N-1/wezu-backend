@@ -1,7 +1,8 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func, text
 from typing import Any, Optional
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from app.api import deps
 from app.models.inventory_audit import InventoryAuditLog
 from app.models.user import User

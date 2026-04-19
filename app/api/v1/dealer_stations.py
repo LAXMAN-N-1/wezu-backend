@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Dealer Station API — Endpoints for dealers to manage their stations, monitor
 inventory, update rules, and schedule maintenance.
@@ -7,7 +8,7 @@ from typing import Any, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 from app.db.session import get_session
 from app.api import deps

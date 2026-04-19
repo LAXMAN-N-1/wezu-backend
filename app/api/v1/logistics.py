@@ -1,7 +1,8 @@
+from __future__ import annotations
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Body, Query
 from sqlmodel import Session, select
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from app.api import deps
 from app.models.user import User
 from app.services.logistics_service import LogisticsService

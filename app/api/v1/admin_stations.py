@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
 from sqlalchemy import cast, JSON, Float
@@ -6,7 +7,7 @@ from app.models.station import Station
 from app.models.station_heartbeat import StationHeartbeat
 from app.schemas.common import DataResponse
 from typing import List, Any
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 
 router = APIRouter()
 

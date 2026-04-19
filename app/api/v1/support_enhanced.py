@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Enhanced Support Endpoints
 Additional support operations including attachments and FAQ search

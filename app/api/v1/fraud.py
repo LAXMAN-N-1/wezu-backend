@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List, Optional
@@ -177,7 +178,7 @@ def submit_device_fingerprint(
     session: Session = Depends(deps.get_db)
 ):
     """Submit device fingerprint for tracking"""
-    from datetime import datetime, UTC
+    from datetime import datetime, timezone; UTC = timezone.utc
     
     # Check if device already exists
     existing = session.exec(

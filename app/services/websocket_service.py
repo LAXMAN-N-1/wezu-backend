@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 WebSocket Service for Real-time Updates
 Manages WebSocket connections for battery status streaming

@@ -1,6 +1,7 @@
+from __future__ import annotations
 from sqlmodel import Session, select, func, and_
 from sqlalchemy import case, extract, cast, Date
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from typing import Dict, Any, List
 from app.models.rental import Rental
 from app.models.user import User

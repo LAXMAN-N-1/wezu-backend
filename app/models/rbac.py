@@ -3,22 +3,13 @@ from typing import List, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from app.models.user import User
     from app.models.role_right import RoleRight
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 # Link Table for Role <-> Permission
 class RolePermission(SQLModel, table=True):
     __tablename__ = "role_permissions"
     role_id: int = Field(foreign_key="roles.id", primary_key=True)
     permission_id: int = Field(foreign_key="permissions.id", primary_key=True)
-
-# Link Table for AdminUser <-> Role
-class AdminUserRole(SQLModel, table=True):
-    __tablename__ = "admin_user_roles"
-    admin_id: int = Field(foreign_key="admin_users.id", primary_key=True)
-    role_id: int = Field(foreign_key="roles.id", primary_key=True)
-    
-    assigned_by: Optional[int] = Field(default=None, foreign_key="admin_users.id")
-    assigned_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 # Link Table for User <-> Role (Many-to-Many)
@@ -27,7 +18,7 @@ class UserRole(SQLModel, table=True):
     user_id: int = Field(foreign_key="users.id", primary_key=True)
     role_id: int = Field(foreign_key="roles.id", primary_key=True)
     
-    assigned_by: Optional[int] = Field(default=None, foreign_key="admin_users.id")
+    assigned_by: Optional[int] = Field(default=None)
     notes: Optional[str] = None
     effective_from: datetime = Field(default_factory=lambda: datetime.now(UTC))
     expires_at: Optional[datetime] = None
@@ -86,15 +77,6 @@ class Role(SQLModel, table=True):
 
     permissions: List[Permission] = Relationship(back_populates="roles", link_model=RolePermission)
     
-    admin_users: List["AdminUser"] = Relationship(
-        back_populates="roles",
-        link_model=AdminUserRole,
-        sa_relationship_kwargs={
-            "primaryjoin": "Role.id==AdminUserRole.role_id",
-            "secondaryjoin": "AdminUser.id==AdminUserRole.admin_id"
-        }
-    )
-
     # Change to One-to-Many to match User model
     users: List["User"] = Relationship(back_populates="role")
     
@@ -125,7 +107,7 @@ class UserAccessPath(SQLModel, table=True):
     access_level: str = Field(default="view") # view, manage, admin
     
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    created_by: Optional[int] = Field(default=None, foreign_key="admin_users.id")
+    created_by: Optional[int] = Field(default=None)
     
     # Relationships
     user: "User" = Relationship(back_populates="access_paths")

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlmodel import Session, select
 from app.models.user import User
@@ -5,7 +6,7 @@ from app.models.kyc import KYCRecord
 from app.api import deps
 import shutil
 import os
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from typing import Optional, List
 from app.schemas.kyc import RejectionReasonResponse
 

@@ -1,6 +1,7 @@
+from __future__ import annotations
 from app.models.station import Station, StationImage, StationSlot, StationStatus
 from sqlmodel import Session, select, func
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from math import radians, cos, sin, asin, sqrt
 from app.models.alert import Alert
 from app.models.station_heartbeat import StationHeartbeat
@@ -9,7 +10,7 @@ from app.models.battery import Battery
 from app.models.rental import Rental
 from app.schemas.station import StationCreate, StationUpdate
 from typing import List, Optional, Dict, Any
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from sqlmodel import Session, select, func
 
 class StationService:

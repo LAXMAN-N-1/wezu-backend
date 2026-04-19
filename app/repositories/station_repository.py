@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Station Repository
 Data access layer for Station model

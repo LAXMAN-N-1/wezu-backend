@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File
 from sqlmodel import Session, select
 from typing import List, Optional
@@ -17,7 +18,7 @@ from app.services.review_service import ReviewService
 from app.models.station import StationStatus, Station, StationImage
 from app.models.battery import Battery
 from app.models.favorite import Favorite
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from app.schemas.input_contracts import MaintenanceTaskCreate
 
 router = APIRouter()
@@ -25,8 +26,9 @@ router = APIRouter()
 @router.get("/", response_model=List[StationResponse])
 async def read_stations(
     request: Request,
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    include_pagination: bool = Query(False),
     current_user: User = Depends(deps.require_permission("station:read")),
     db: Session = Depends(deps.get_db),
 ):
@@ -35,6 +37,10 @@ async def read_stations(
     """
     from app.models.roles import RoleEnum
     
+    # `include_pagination` is accepted to stay compatible with shared list
+    # clients that always send this query param.
+    _ = include_pagination
+
     query = select(Station)
     
     # Row-level filtering: Dealers only see their own stations using Request Context Role

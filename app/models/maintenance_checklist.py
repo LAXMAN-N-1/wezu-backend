@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+from __future__ import annotations
+from datetime import datetime, timezone; UTC = timezone.utc
 from typing import Any, Dict, List, Optional
 
 import sqlalchemy as sa

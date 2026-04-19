@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Admin Financial Reports API — Revenue reports, trends, reconciliation, and export.
 """

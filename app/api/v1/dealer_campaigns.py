@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Dealer Campaigns API — Endpoints for dealers to manage their promotional campaigns,
 validate codes at checkout, track analytics, and perform bulk operations.

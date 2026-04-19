@@ -1,7 +1,8 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlmodel import Session, select
 from typing import Any, Dict, List
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 from app.db.session import get_session
 from app.api import deps

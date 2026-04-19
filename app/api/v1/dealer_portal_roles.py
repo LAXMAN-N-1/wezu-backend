@@ -1,8 +1,9 @@
+from __future__ import annotations
 from typing import Any, List, Dict
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlmodel import Session, select, func
 import sqlalchemy as sa
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 from app.core.dealer_scope import (
     log_scope_violation,

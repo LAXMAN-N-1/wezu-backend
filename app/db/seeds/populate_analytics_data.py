@@ -1,9 +1,10 @@
+from __future__ import annotations
 """
 Populate transactions + support tickets using raw SQL to bypass enum case issues.
 The ORM sends Python enum names (uppercase) but the DB expects lowercase values.
 """
 import random
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from sqlalchemy import text
 from app.core.database import engine
 from sqlmodel import Session, select

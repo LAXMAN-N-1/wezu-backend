@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import HTTPException, Request
 from sqlmodel import Session
 from app.schemas.auth import LoginRequest, LoginResponse

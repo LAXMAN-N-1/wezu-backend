@@ -1,26 +1,27 @@
+from __future__ import annotations
 """
 Maintenance-related Pydantic schemas
 Maintenance schedules, records, and station downtime
 """
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List
+from typing import Optional, List, Union
 from datetime import datetime
 
 # Request Models
 class MaintenanceScheduleCreate(BaseModel):
     """Create maintenance schedule"""
     battery_id: int
-    maintenance_type: str = Field(..., pattern=r'^(ROUTINE|INSPECTION|REPAIR|REPLACEMENT)$')
+    maintenance_type: str = Field(..., pattern=r'^(Union[ROUTINE, INSPECTION|REPAIR|REPLACEMENT])$')
     scheduled_date: datetime
     assigned_technician_id: Optional[int] = None
-    priority: str = Field("NORMAL", pattern=r'^(LOW|NORMAL|HIGH|URGENT)$')
+    priority: str = Field("NORMAL", pattern=r'^(Union[LOW, NORMAL|HIGH|URGENT])$')
     estimated_duration_minutes: Optional[int] = Field(None, gt=0)
     notes: Optional[str] = None
 
 class MaintenanceRecordCreate(BaseModel):
     """Create maintenance record"""
     battery_id: int
-    maintenance_type: str = Field(..., pattern=r'^(ROUTINE|INSPECTION|REPAIR|REPLACEMENT|EMERGENCY)$')
+    maintenance_type: str = Field(..., pattern=r'^(Union[ROUTINE, INSPECTION|REPAIR|REPLACEMENT|EMERGENCY])$')
     performed_by: int
     issues_found: Optional[str] = None
     actions_taken: str = Field(..., min_length=10)
@@ -32,22 +33,22 @@ class MaintenanceRecordCreate(BaseModel):
 class StationDowntimeCreate(BaseModel):
     """Report station downtime"""
     station_id: int
-    reason: str = Field(..., pattern=r'^(MAINTENANCE|POWER_OUTAGE|EQUIPMENT_FAILURE|NETWORK_ISSUE|OTHER)$')
+    reason: str = Field(..., pattern=r'^(Union[MAINTENANCE, POWER_OUTAGE|EQUIPMENT_FAILURE|NETWORK_ISSUE|OTHER])$')
     description: str = Field(..., min_length=10)
-    severity: str = Field(..., pattern=r'^(LOW|MEDIUM|HIGH|CRITICAL)$')
+    severity: str = Field(..., pattern=r'^(Union[LOW, MEDIUM|HIGH|CRITICAL])$')
     estimated_resolution_time: Optional[datetime] = None
     affected_slots: Optional[int] = None
 
 class StationDowntimeUpdate(BaseModel):
     """Update station downtime"""
-    status: str = Field(..., pattern=r'^(ONGOING|RESOLVED|ESCALATED)$')
+    status: str = Field(..., pattern=r'^(Union[ONGOING, RESOLVED|ESCALATED])$')
     resolution_notes: Optional[str] = None
     actual_resolution_time: Optional[datetime] = None
 
 class BatteryHealthCheckRequest(BaseModel):
     """Request battery health check"""
     battery_ids: List[int] = Field(..., min_items=1)
-    check_type: str = Field("STANDARD", pattern=r'^(QUICK|STANDARD|COMPREHENSIVE)$')
+    check_type: str = Field("STANDARD", pattern=r'^(Union[QUICK, STANDARD|COMPREHENSIVE])$')
 
 # Response Models
 class MaintenanceScheduleResponse(BaseModel):

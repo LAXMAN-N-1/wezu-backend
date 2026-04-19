@@ -1,3 +1,4 @@
+from __future__ import annotations
 import json
 import re
 from typing import Any, Literal, Optional
@@ -15,15 +16,15 @@ class Settings(BaseSettings):
     # ── Database ───────────────────────────────────────────────────────────
     DATABASE_URL: str  # No default — must be provided in env
     SQLALCHEMY_ECHO: bool = False
-    DB_POOL_SIZE: int = 5
-    DB_MAX_OVERFLOW: int = 5
-    DB_POOL_TIMEOUT: int = 30
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 20
+    DB_POOL_TIMEOUT: int = 60
     DB_POOL_RECYCLE: int = 1800
     DB_POOL_PRE_PING: bool = True
     DB_POOL_USE_LIFO: bool = True
-    DATABASE_CONNECT_TIMEOUT_SECONDS: int = 10
+    DATABASE_CONNECT_TIMEOUT_SECONDS: int = 20
     DATABASE_SSL_MODE: Optional[str] = None
-    DATABASE_PREFER_IPV4: bool = True
+    DATABASE_PREFER_IPV4: bool = False
     DATABASE_HOSTADDR: Optional[str] = None
     SQL_SLOW_QUERY_LOG_MS: int = 0
     SQL_SLOW_QUERY_WARN_COOLDOWN_SECONDS: int = 60
@@ -318,6 +319,8 @@ class Settings(BaseSettings):
     AUTO_CREATE_TABLES: bool = False
     AUTO_SEED_ROLES: bool = False
     ALLOW_TEST_OTP_BYPASS: bool = False
+    TEST_OTP_BYPASS_TARGETS: list[str] = []
+    TEST_OTP_BYPASS_CODE: str = ""
     LOGISTICS_SCHEMA_CHECK_ENABLED: bool = True
     LOGISTICS_SCHEMA_STRICT: bool = False
 
@@ -383,6 +386,9 @@ class Settings(BaseSettings):
             normalized = "postgresql://" + normalized[len("postgres://"):]
 
         split_url = urlsplit(normalized)
+        if split_url.scheme.startswith("sqlite"):
+            # Preserve sqlite URI slash semantics (sqlite:///path, sqlite:////abs/path).
+            return normalized
         netloc = split_url.netloc
 
         if split_url.hostname:
@@ -463,6 +469,7 @@ class Settings(BaseSettings):
         "SUPABASE_ALLOWED_ALGORITHMS", "LOG_EXCLUDE_PATHS",
         "SQL_SLOW_QUERY_IGNORE_PATTERNS",
         "DB_NOOP_MUTATION_IGNORE_TABLES",
+        "TEST_OTP_BYPASS_TARGETS",
         mode="before",
     )
     @classmethod

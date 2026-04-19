@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, Response, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select, func
@@ -26,7 +27,7 @@ from app.schemas.admin_user import (
 )
 from app.schemas.user import UserSearchResponse, UserSearchItem
 from app.models.user import User, UserStatus, UserType
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 
 logger = logging.getLogger("wezu_admin")
 
@@ -60,18 +61,24 @@ async def list_users(
         )
     
     if status is not None:
-        if status.lower() == "active":
-            query = query.where(User.status == "active")
-        elif status.lower() == "suspended":
-            query = query.where(User.status == "suspended")
-        elif status.lower() == "pending_verification":
-            query = query.where(User.status == "pending_verification")
+        status_upper = status.strip().upper()
+        if status_upper == "ACTIVE":
+            query = query.where(User.status == UserStatus.ACTIVE)
+        elif status_upper == "SUSPENDED":
+            query = query.where(User.status == UserStatus.SUSPENDED)
+        elif status_upper in ("PENDING_VERIFICATION", "PENDING"):
+            query = query.where(User.status == UserStatus.PENDING_VERIFICATION)
             
     if user_type:
-        query = query.where(User.user_type == user_type)
+        # Normalize: accept lowercase from frontend (e.g. "admin") -> uppercase enum value
+        try:
+            ut = UserType(user_type.strip().upper())
+            query = query.where(User.user_type == ut)
+        except ValueError:
+            pass  # ignore invalid user_type filter
         
     if kyc_status:
-        query = query.where(User.kyc_status == kyc_status)
+        query = query.where(User.kyc_status == kyc_status.strip().upper())
         
     query = query.order_by(User.created_at.desc())
     
@@ -93,7 +100,7 @@ async def list_suspended_users(
     current_user: User = Depends(deps.get_current_active_admin),
 ):
     """Admin: List all suspended users."""
-    query = select(User).where(User.status == "suspended")
+    query = select(User).where(User.status == UserStatus.SUSPENDED)
     
     if search:
         search_term = f"%{search}%"

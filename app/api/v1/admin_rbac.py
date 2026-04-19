@@ -1,15 +1,16 @@
+from __future__ import annotations
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, func, col, update
 from sqlalchemy.orm import selectinload
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 import logging
 
 from app.api import deps
 
 logger = logging.getLogger(__name__)
 from app.models.admin_user import AdminUser
-from app.models.rbac import Role, Permission, RolePermission, AdminUserRole, UserRole
+from app.models.rbac import Role, Permission, RolePermission, UserRole
 from app.models.session import UserSession
 from app.services.auth_service import AuthService
 from app.schemas import rbac as rbac_schema
@@ -1193,10 +1194,7 @@ def delete_role(
     if user_count > 0:
         raise HTTPException(status_code=400, detail="Cannot delete role with assigned active users")
         
-    # Check AdminUserRole table
-    admin_user_count = db.exec(select(func.count()).select_from(AdminUserRole).where(AdminUserRole.role_id == role_id)).one()
-    if admin_user_count > 0:
-        raise HTTPException(status_code=400, detail="Cannot delete role with assigned admin users")
+    # AdminUserRole table removed (legacy); role assignment now uses UserRole only.
 
     # 3. Soft Delete
     role.is_active = False

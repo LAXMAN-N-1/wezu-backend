@@ -1,16 +1,17 @@
+from __future__ import annotations
 """
 Background job-related Pydantic schemas
 Job status, execution history, and monitoring
 """
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 from datetime import datetime
 
 # Request Models
 class JobTriggerRequest(BaseModel):
     """Manually trigger a job"""
     parameters: Optional[Dict] = None
-    priority: str = Field("NORMAL", pattern=r'^(LOW|NORMAL|HIGH|URGENT)$')
+    priority: str = Field("NORMAL", pattern=r'^(Union[LOW, NORMAL|HIGH|URGENT])$')
 
 class JobUpdateRequest(BaseModel):
     """Update job configuration"""
@@ -25,8 +26,8 @@ class JobUpdateRequest(BaseModel):
 class JobExecutionFilter(BaseModel):
     """Filter job executions"""
     job_id: Optional[int] = None
-    status: Optional[str] = Field(None, pattern=r'^(PENDING|RUNNING|COMPLETED|FAILED|CANCELLED|TIMEOUT|RETRYING)$')
-    trigger_type: Optional[str] = Field(None, pattern=r'^(SCHEDULED|MANUAL|API|WEBHOOK)$')
+    status: Optional[str] = Field(None, pattern=r'^(Union[PENDING, RUNNING|COMPLETED|FAILED|CANCELLED|TIMEOUT|RETRYING])$')
+    trigger_type: Optional[str] = Field(None, pattern=r'^(Union[SCHEDULED, MANUAL|API|WEBHOOK])$')
     start_date: Optional[datetime] = None
     end_date: Optional[datetime] = None
     limit: int = Field(50, ge=1, le=500)

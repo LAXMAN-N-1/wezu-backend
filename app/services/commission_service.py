@@ -1,8 +1,9 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from app.models.commission import CommissionConfig, CommissionLog, CommissionTier
 from app.models.financial import Transaction
 from typing import Optional
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 import logging
 
 logger = logging.getLogger("wezu_commissions")

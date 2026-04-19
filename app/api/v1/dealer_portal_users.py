@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Dealer Portal — User Management API
 Full CRUD for dealer staff users, invite flow, sessions, password management.
@@ -5,7 +6,7 @@ Full CRUD for dealer staff users, invite flow, sessions, password management.
 from typing import List, Optional, Dict
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session, select, func, or_
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 import secrets
 import logging
 

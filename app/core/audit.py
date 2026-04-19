@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Audit Logging System — Core Module
 
@@ -10,7 +11,7 @@ Provides:
 import asyncio
 import functools
 import logging
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from typing import Any, Callable, Dict, Optional
 
 from fastapi import Request

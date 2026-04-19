@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Enhanced Wallet Endpoints
 Additional wallet operations including withdraw, cashback, and transfers

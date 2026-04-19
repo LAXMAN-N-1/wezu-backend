@@ -1,9 +1,10 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from app.models.invoice import Invoice
 from app.models.financial import Transaction
 from app.models.commission import CommissionLog
 from app.models.settlement import Settlement
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 import uuid
 
 class FinancialService:

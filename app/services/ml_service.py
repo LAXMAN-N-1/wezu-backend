@@ -1,10 +1,11 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from app.ml.feature_store import FeatureStore
 from app.ml.models.battery_health import BatteryHealthModel, DemandForecastModel
 from typing import Dict, Any
 
 from app.ml.registry import ModelRegistry
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 
 class MLService:
     @staticmethod

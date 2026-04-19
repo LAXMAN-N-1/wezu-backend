@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Customer Dashboard — Aggregated stats for the customer home screen."""
 
 from fastapi import APIRouter, Depends

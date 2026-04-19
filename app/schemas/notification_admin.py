@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Notification Admin schemas."""
 from datetime import datetime
 from typing import Optional, List

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import Request
 import functools
 import json

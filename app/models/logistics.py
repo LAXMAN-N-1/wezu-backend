@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, TYPE_CHECKING, List
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from enum import Enum
 import uuid
 

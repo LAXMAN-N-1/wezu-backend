@@ -1,5 +1,6 @@
+from __future__ import annotations
 """Seed CMS data: blogs, FAQs, banners, legal documents, media assets."""
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from sqlmodel import Session, select
 from app.models.blog import Blog
 from app.models.faq import FAQ

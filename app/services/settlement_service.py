@@ -1,5 +1,6 @@
+from __future__ import annotations
 from sqlmodel import Session, select
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from typing import Optional, List, Dict, Any
 from app.models.settlement import Settlement
 from app.models.commission import CommissionLog

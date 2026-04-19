@@ -1,5 +1,6 @@
+from __future__ import annotations
 """Notification Admin models — Campaigns, Triggers, Logs, Config."""
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from typing import Optional
 from sqlmodel import SQLModel, Field
 from sqlalchemy import Column, JSON

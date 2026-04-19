@@ -1,9 +1,10 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from app.models.battery import Battery
 from app.models.battery_reservation import BatteryReservation
 from app.schemas.station_monitoring import OptimizedQueueItem, OptimizationBattery
 from app.services.demand_predictor import MockDemandPredictor
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from typing import List, Optional
 
 class ChargingService:

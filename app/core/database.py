@@ -1,3 +1,4 @@
+from __future__ import annotations
 import re
 import socket
 import time
@@ -58,6 +59,12 @@ def _build_engine():
             connect_args["sslmode"] = settings.DATABASE_SSL_MODE
         parsed_url = make_url(database_url)
         if parsed_url.drivername.startswith("postgresql"):
+            connect_args.update({
+                "keepalives": 1,
+                "keepalives_idle": 30,
+                "keepalives_interval": 10,
+                "keepalives_count": 5
+            })
             configured_hostaddr = (settings.DATABASE_HOSTADDR or "").strip()
             if configured_hostaddr:
                 connect_args["hostaddr"] = configured_hostaddr
@@ -133,6 +140,46 @@ def ensure_roles_schema_compatibility() -> None:
                 "schema.roles_compatibility_patch_applied",
                 patched_columns=patched_columns,
             )
+
+
+def ensure_warehouses_schema_compatibility() -> None:
+    """
+    Backfill warehouse columns if migrations were skipped.
+    Currently patches `warehouses.capacity` used by logistics endpoints.
+    """
+    parsed_url = make_url(settings.DATABASE_URL)
+    driver = parsed_url.drivername
+    if not (driver.startswith("postgresql") or driver.startswith("sqlite")):
+        return
+
+    with engine.begin() as conn:
+        inspector = inspect(conn)
+        if not inspector.has_table("warehouses"):
+            return
+
+        cols = {col["name"] for col in inspector.get_columns("warehouses")}
+        if "capacity" in cols:
+            return
+
+        if driver.startswith("postgresql"):
+            conn.execute(
+                text(
+                    "ALTER TABLE warehouses "
+                    "ADD COLUMN IF NOT EXISTS capacity INTEGER NOT NULL DEFAULT 100"
+                )
+            )
+        else:  # sqlite
+            conn.execute(
+                text(
+                    "ALTER TABLE warehouses "
+                    "ADD COLUMN capacity INTEGER NOT NULL DEFAULT 100"
+                )
+            )
+
+        logger.info(
+            "schema.warehouses_compatibility_patch_applied",
+            patched_columns=["capacity"],
+        )
 
 
 # ── Connection-level hooks ─────────────────────────────────────────────────

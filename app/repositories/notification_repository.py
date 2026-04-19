@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Notification Repository
 Data access layer for Notification model

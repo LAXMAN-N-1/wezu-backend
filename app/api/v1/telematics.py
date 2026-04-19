@@ -1,7 +1,8 @@
+from __future__ import annotations
 from typing import Any, List
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlmodel import Session, select
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 from app.models.telemetry import Telemetry
 from app.models.battery import Battery, BatteryLifecycleEvent

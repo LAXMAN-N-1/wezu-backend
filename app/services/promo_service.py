@@ -1,9 +1,10 @@
+from __future__ import annotations
 from typing import List
 from sqlmodel import Session, select
 from sqlalchemy import or_
 from sqlalchemy import update as sa_update
 from app.models.promo_code import PromoCode
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from fastapi import HTTPException
 from typing import List
 

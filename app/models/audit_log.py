@@ -1,6 +1,7 @@
+from __future__ import annotations
 from sqlmodel import SQLModel, Field
 from typing import Optional, Dict, Any
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from sqlalchemy import Column, JSON
 from enum import Enum
 

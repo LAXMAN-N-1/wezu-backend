@@ -1,3 +1,4 @@
+from __future__ import annotations
 import random
 import string
 import logging
@@ -24,11 +25,59 @@ def _mask_target(value: str) -> str:
     return f"***{digits[-4:]}" if len(digits) >= 4 else "***"
 
 
+def _normalize_test_target(value: str) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    if "@" in raw:
+        return raw.lower()
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    if len(digits) > 10 and digits.startswith("91"):
+        digits = digits[-10:]
+    return digits
+
+
+def _is_test_bypass_target(target: str) -> bool:
+    configured_targets = getattr(settings, "TEST_OTP_BYPASS_TARGETS", []) or []
+    normalized_target = _normalize_test_target(target)
+    if not normalized_target:
+        return False
+    normalized_allowed = {
+        _normalize_test_target(item)
+        for item in configured_targets
+        if _normalize_test_target(item)
+    }
+    # Backward-compatible behavior:
+    # if bypass is enabled and target list is empty, allow all targets.
+    if not normalized_allowed:
+        return True
+    return normalized_target in normalized_allowed
+
+
+def _configured_test_bypass_code() -> str:
+    return str(getattr(settings, "TEST_OTP_BYPASS_CODE", "") or "").strip()
+
+
+def _configured_seeded_login_otp(target: str, purpose: str) -> str:
+    if purpose != "login":
+        return ""
+    code = _configured_test_bypass_code()
+    if (
+        settings.ALLOW_TEST_OTP_BYPASS
+        and code
+        and _is_test_bypass_target(target)
+    ):
+        return code
+    return ""
+
+
 class OTPService:
     @staticmethod
     def generate_otp(target: str, purpose: str = "registration", length: int = 6) -> str:
-        code = ''.join(random.choices(string.digits, k=length))
-        return code
+        fixed_code = _configured_seeded_login_otp(target, purpose)
+        if fixed_code:
+            return fixed_code
+        return ''.join(random.choices(string.digits, k=length))
 
     @staticmethod
     def create_otp_record(
@@ -40,6 +89,46 @@ class OTPService:
         *,
         auto_commit: bool = True,
     ) -> OTP:
+        fixed_code = _configured_seeded_login_otp(target, purpose)
+        if fixed_code and code == fixed_code:
+            expires_at = datetime.utcnow() + timedelta(minutes=validity_minutes)
+            statement = select(OTP).where(
+                OTP.target == target,
+                OTP.purpose == purpose,
+                OTP.is_active == True,
+            ).order_by(OTP.created_at.desc())
+            active_otps = db.exec(statement).all()
+
+            primary = active_otps[0] if active_otps else None
+            for old_otp in active_otps:
+                if primary is None or old_otp.id != primary.id:
+                    old_otp.is_active = False
+                    db.add(old_otp)
+
+            if primary is None:
+                primary = OTP(
+                    target=target,
+                    code=code,
+                    purpose=purpose,
+                    expires_at=expires_at,
+                    is_active=True,
+                    is_used=False,
+                    attempts=0,
+                )
+            else:
+                primary.code = code
+                primary.expires_at = expires_at
+                primary.is_active = True
+                primary.is_used = False
+                primary.attempts = 0
+            db.add(primary)
+            if auto_commit:
+                db.commit()
+                db.refresh(primary)
+            else:
+                db.flush()
+            return primary
+
         # Rate Limiting Logic
         # 1. Count OTPs in the last 30 minutes
         window_start = datetime.utcnow() - timedelta(minutes=30)
@@ -125,6 +214,20 @@ class OTPService:
     @staticmethod
     async def send_sms_otp(phone: str, code: str):
         from app.integrations.twilio import twilio_integration
+
+        bypass_code = _configured_test_bypass_code()
+        # Controlled bypass for local/dev flows:
+        # when test bypass is explicitly configured for this target we skip SMS.
+        if (
+            settings.ALLOW_TEST_OTP_BYPASS
+            and bypass_code
+            and _is_test_bypass_target(phone)
+        ):
+            logger.info(
+                "DEBUG: [OTP BYPASS] Skipping SMS send for %s",
+                _mask_target(phone),
+            )
+            return True
         
         # Ensure phone is in E.164 format for Twilio (starts with +)
         # Smart formatting for Indian numbers: if 10 digits, prefix +91
@@ -133,8 +236,26 @@ class OTPService:
             formatted_phone = f"+91{clean_phone}"
         else:
             formatted_phone = phone if phone.startswith("+") else f"+{phone}"
+
+        sid = (settings.TWILIO_ACCOUNT_SID or "").strip()
+        token = (settings.TWILIO_AUTH_TOKEN or "").strip()
+        normalized_sid = sid.lower()
+        normalized_token = token.lower()
+        uses_placeholder_twilio = (
+            "xxxx" in normalized_sid
+            or "xxxx" in normalized_token
+            or "your-" in normalized_sid
+            or "your-" in normalized_token
+            or sid == "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            or token == "your-twilio-auth-token"
+        )
         
-        if settings.SMS_PROVIDER == "twilio" and settings.TWILIO_ACCOUNT_SID:
+        if (
+            settings.SMS_PROVIDER == "twilio"
+            and sid
+            and token
+            and not uses_placeholder_twilio
+        ):
             # If Verify Service SID is present, use Twilio Verify API (Recommended)
             if getattr(settings, "TWILIO_VERIFY_SERVICE_SID", None):
                 result = twilio_integration.send_verification_code(formatted_phone)
@@ -154,20 +275,31 @@ class OTPService:
                 # We return True even if SMS fails in dev/debug so the user isn't blocked by provider issues
                 return settings.ENVIRONMENT == "development" or settings.DEBUG
         
+        if settings.SMS_PROVIDER == "twilio" and uses_placeholder_twilio:
+            if settings.ENVIRONMENT == "development" or settings.DEBUG:
+                logger.info(
+                    "DEBUG: [MOCK SMS] Twilio credentials are placeholders; OTP for %s is %s",
+                    _mask_target(formatted_phone),
+                    code,
+                )
+                return True
+            logger.error("Twilio credentials are placeholders in production")
+            return False
+
         # Placeholder for other providers
         if settings.ENVIRONMENT == "production" and not settings.DEBUG:
             logger.error("SMS provider is not configured for production")
             return False
 
-        logger.info("DEBUG: [MOCK SMS] Sending OTP to %s", _mask_target(formatted_phone))
+        logger.info(
+            "DEBUG: [MOCK SMS] Sending OTP to %s with code %s",
+            _mask_target(formatted_phone),
+            code,
+        )
         return True
 
     @staticmethod
     def verify_otp(db: Session, target: str, code: str, purpose: str = "registration") -> bool:
-        # Controlled test bypass for non-production testing only
-        if settings.ALLOW_TEST_OTP_BYPASS and code == "123456":
-            return True
-             
         from app.integrations.twilio import twilio_integration
         
         # Ensure phone is in E.164 if it's a phone number

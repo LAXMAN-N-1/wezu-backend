@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Dealer Portal Inventory API — All endpoints for the dealer inventory screen.
 

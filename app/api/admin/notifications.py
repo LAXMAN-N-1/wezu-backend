@@ -1,8 +1,9 @@
+from __future__ import annotations
 """Notification Admin API endpoints."""
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
 from typing import List, Optional
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 from app.core.database import get_db
 from app.api.deps import get_current_active_admin

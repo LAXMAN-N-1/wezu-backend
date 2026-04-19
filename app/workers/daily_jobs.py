@@ -1,9 +1,10 @@
+from __future__ import annotations
 """
 Daily Scheduled Jobs
 Run at midnight IST (00:00)
 """
 from sqlmodel import Session, select, func
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from app.core.database import engine
 from app.models.batch_job import BatchJob, JobExecution
 import logging

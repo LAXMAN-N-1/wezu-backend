@@ -1,8 +1,9 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select, func, or_, and_
 from typing import List, Optional
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 import csv
 import io
 

@@ -1,8 +1,9 @@
+from __future__ import annotations
 """Settings & System Health Admin API endpoints."""
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 from typing import List, Optional
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 import platform
 import os
 

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 User state machine service — validates and enforces transitions.
 
