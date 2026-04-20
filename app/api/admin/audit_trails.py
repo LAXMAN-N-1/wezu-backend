@@ -1,6 +1,7 @@
 from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func, text
+from sqlalchemy import inspect as sa_inspect
 from typing import Any, Optional
 from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from app.api import deps
@@ -9,6 +10,22 @@ from app.models.user import User
 from app.core.database import get_db
 
 router = APIRouter()
+_inventory_audit_table_supported: bool | None = None
+
+
+def _has_inventory_audit_table(db: Session) -> bool:
+    global _inventory_audit_table_supported
+    if _inventory_audit_table_supported is not None:
+        return _inventory_audit_table_supported
+
+    try:
+        _inventory_audit_table_supported = sa_inspect(db.get_bind()).has_table(
+            "inventory_audit_logs"
+        )
+    except Exception:
+        _inventory_audit_table_supported = False
+
+    return _inventory_audit_table_supported
 
 
 @router.get("/stats")
@@ -17,6 +34,17 @@ def get_audit_stats(
     current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Get summary statistics for inventory audit trail."""
+    if not _has_inventory_audit_table(db):
+        return {
+            "total_entries": 0,
+            "today_count": 0,
+            "week_count": 0,
+            "transfers": 0,
+            "disposals": 0,
+            "status_changes": 0,
+            "manual_entries": 0,
+        }
+
     total = db.exec(select(func.count(InventoryAuditLog.id))).one()
 
     today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -68,6 +96,14 @@ def list_audit_trails(
     current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """List inventory audit logs with filters."""
+    if not _has_inventory_audit_table(db):
+        return {
+            "entries": [],
+            "total_count": 0,
+            "page": skip // limit + 1 if limit > 0 else 1,
+            "page_size": limit,
+        }
+
     statement = select(InventoryAuditLog)
 
     if action_type:
@@ -134,6 +170,9 @@ def get_audit_detail(
     current_user: Any = Depends(deps.get_current_active_admin),
 ):
     """Get a single audit log entry detail."""
+    if not _has_inventory_audit_table(db):
+        raise HTTPException(status_code=404, detail="Audit log entry not found")
+
     log = db.get(InventoryAuditLog, entry_id)
     if not log:
         raise HTTPException(status_code=404, detail="Audit log entry not found")

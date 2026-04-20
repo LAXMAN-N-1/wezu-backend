@@ -182,6 +182,70 @@ def ensure_warehouses_schema_compatibility() -> None:
         )
 
 
+def ensure_transactions_schema_compatibility() -> None:
+    """
+    Backfill newer `transactions` columns when deployments run on
+    partially-migrated databases.
+    """
+    parsed_url = make_url(settings.DATABASE_URL)
+    driver = parsed_url.drivername
+    if not (driver.startswith("postgresql") or driver.startswith("sqlite")):
+        return
+
+    with engine.begin() as conn:
+        inspector = inspect(conn)
+        if not inspector.has_table("transactions"):
+            return
+
+        existing_columns = {
+            column["name"] for column in inspector.get_columns("transactions")
+        }
+
+        column_types_postgres = {
+            "type": "VARCHAR",
+            "category": "VARCHAR",
+            "balance_after": "DOUBLE PRECISION",
+            "reference_type": "VARCHAR",
+            "reference_id": "VARCHAR",
+            "razorpay_payment_id": "VARCHAR",
+        }
+        column_types_sqlite = {
+            "type": "VARCHAR",
+            "category": "VARCHAR",
+            "balance_after": "REAL",
+            "reference_type": "VARCHAR",
+            "reference_id": "VARCHAR",
+            "razorpay_payment_id": "VARCHAR",
+        }
+
+        patched_columns: list[str] = []
+        for column_name, column_type in (
+            column_types_postgres.items()
+            if driver.startswith("postgresql")
+            else column_types_sqlite.items()
+        ):
+            if column_name in existing_columns:
+                continue
+            if driver.startswith("postgresql"):
+                statement = (
+                    "ALTER TABLE transactions "
+                    f'ADD COLUMN IF NOT EXISTS "{column_name}" {column_type}'
+                )
+            else:
+                statement = (
+                    "ALTER TABLE transactions "
+                    f'ADD COLUMN "{column_name}" {column_type}'
+                )
+            conn.execute(text(statement))
+            patched_columns.append(column_name)
+
+        if patched_columns:
+            logger.info(
+                "schema.transactions_compatibility_patch_applied",
+                patched_columns=patched_columns,
+            )
+
+
 # ── Connection-level hooks ─────────────────────────────────────────────────
 
 @event.listens_for(engine, "connect")

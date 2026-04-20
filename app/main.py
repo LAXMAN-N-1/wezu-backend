@@ -30,6 +30,7 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from app.core.config import settings
 from app.core.database import (
     ensure_roles_schema_compatibility,
+    ensure_transactions_schema_compatibility,
     ensure_warehouses_schema_compatibility,
 )
 from app.db.session import engine
@@ -257,6 +258,19 @@ async def lifespan(app: FastAPI):
                 startup_without_db = True
                 logger.exception("schema.warehouses_compatibility_failed.degraded_mode", error=str(exc))
 
+        # Finance transactions compatibility backfill
+        if not startup_without_db:
+            try:
+                ensure_transactions_schema_compatibility()
+            except SQLAlchemyError as exc:
+                if not allow_start_without_db:
+                    raise
+                startup_without_db = True
+                logger.exception(
+                    "schema.transactions_compatibility_failed.degraded_mode",
+                    error=str(exc),
+                )
+
         # Startup diagnostics enforcement
         if not startup_without_db:
             StartupDiagnosticsService.enforce_required_dependencies()
@@ -406,18 +420,6 @@ app.add_middleware(
     allow_headers=CORS_ALLOWED_HEADERS,
     expose_headers=["*"],
 )
-
-
-@app.options("/{full_path:path}", include_in_schema=False)
-async def global_options_handler(full_path: str, request: Request):
-    origin = request.headers.get("origin", "")
-    headers = {
-        "Access-Control-Allow-Methods": ", ".join(CORS_ALLOWED_METHODS),
-        "Access-Control-Allow-Headers": ", ".join(CORS_ALLOWED_HEADERS),
-        "Access-Control-Max-Age": "600",
-    }
-    headers.update(cors_headers_for_origin(origin))
-    return Response(status_code=200, headers=headers)
 
 
 # ── System & Health endpoints ──────────────────────────────────────────────
@@ -652,6 +654,7 @@ app.include_router(admin_rbac.router, prefix=f"{admin_api}/rbac", tags=["Admin: 
 app.include_router(admin_legal.router, prefix=f"{admin_api}/legal", tags=["Admin: Legal"], dependencies=admin_deps)
 app.include_router(admin_banners.router, prefix=f"{admin_api}/banners", tags=["Admin: Banners"], dependencies=admin_deps)
 app.include_router(admin_blogs.router, prefix=f"{admin_api}/blogs", tags=["Admin: Blogs"], dependencies=admin_deps)
+app.include_router(admin_media.router, prefix=f"{admin_api}/media", tags=["Admin: Media"], dependencies=admin_deps)
 app.include_router(admin_dealers.router, prefix=f"{admin_api}/dealers", tags=["Admin: Dealers"], dependencies=admin_deps)
 app.include_router(admin_financial_reports.router, prefix=f"{admin_api}/financial-reports", tags=["Admin: Financial Reports"], dependencies=admin_deps)
 
