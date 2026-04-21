@@ -22,15 +22,33 @@ class AuditActionType(str, Enum):
     FINANCIAL_TRANSACTION = "FINANCIAL_TRANSACTION"
 
 
+AUDIT_MODULES = {
+    "auth", "user", "battery", "station", "wallet", "rental",
+    "dealer", "admin", "logistics", "notification", "payment",
+    "analytics", "system", "security", "support",
+}
+
+
 class AuditLog(SQLModel, table=True):
     __tablename__ = "audit_logs"
     id: Optional[int] = Field(default=None, primary_key=True)
-    user_id: Optional[int] = Field(default=None, index=True)  # Nullable for system actions
-    action: str = Field(index=True)  # AuditActionType value
-    resource_type: str  # USER, BATTERY, STATION, WALLET, AUTH
-    resource_id: Optional[str] = None  # Legacy string FK (backward compat)
-    target_id: Optional[int] = Field(default=None, index=True)  # Typed FK to target entity
-    details: Optional[str] = None  # Legacy text field (backward compat)
+
+    # Trace context (populated by middleware)
+    trace_id: Optional[str] = Field(default=None, index=True)
+    session_id: Optional[str] = Field(default=None, index=True)
+    action_id: Optional[str] = Field(default=None, index=True)
+    role_prefix: Optional[str] = None
+
+    user_id: Optional[int] = Field(default=None, index=True)
+    level: str = Field(default="INFO")          # INFO, WARNING, ERROR, CRITICAL
+    action: str = Field(index=True)             # AuditActionType value
+    module: str = Field(default="system", index=True)
+    status: str = Field(default="success")      # success, failure, error
+    resource_type: Optional[str] = None         # USER, BATTERY, STATION, WALLET, AUTH
+    resource_id: Optional[str] = None           # Legacy string FK (backward compat)
+    target_id: Optional[int] = Field(default=None, index=True)
+    details: Optional[str] = None
+    response_time_ms: Optional[float] = None
     meta_data: Optional[Dict[str, Any]] = Field(
         default=None, sa_column=Column("metadata", JSON, nullable=True)
     )

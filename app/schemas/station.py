@@ -78,6 +78,12 @@ class HeatmapPoint(BaseModel):
     longitude: float
     intensity: float # 0.0 to 1.0 based on demand
 
+class NearbyFilterSchema(BaseModel):
+    battery_type: Optional[str] = None
+    min_capacity: Optional[float] = None
+    max_capacity: Optional[float] = None
+    charger_type: Optional[str] = None
+
 class StationAvailabilityResponse(BaseModel):
     station_id: int
     available_count: int
