@@ -28,24 +28,30 @@ def dealer_env(session: Session):
     session.commit()
 
     # Dealer user
-    dealer_user = User(
-        email="analytics_dealer@test.com", hashed_password="pw",
-        is_active=True, status="active",
-    )
-    session.add(dealer_user)
-    session.commit()
-    session.refresh(dealer_user)
-    session.add(UserRole(user_id=dealer_user.id, role_id=dealer_role.id))
+    dealer_user = session.exec(select(User).where(User.email == "analytics_dealer@test.com")).first()
+    if not dealer_user:
+        dealer_user = User(
+            email="analytics_dealer@test.com", hashed_password="pw",
+            is_active=True, status="active",
+        )
+        session.add(dealer_user)
+        session.commit()
+        session.refresh(dealer_user)
+        session.add(UserRole(user_id=dealer_user.id, role_id=dealer_role.id))
+        session.commit()
 
     # Admin user
-    admin_user = User(
-        email="analytics_admin@test.com", hashed_password="pw",
-        is_active=True, is_superuser=True, status="active",
-    )
-    session.add(admin_user)
-    session.commit()
-    session.refresh(admin_user)
-    session.add(UserRole(user_id=admin_user.id, role_id=admin_role.id))
+    admin_user = session.exec(select(User).where(User.email == "analytics_admin@test.com")).first()
+    if not admin_user:
+        admin_user = User(
+            email="analytics_admin@test.com", hashed_password="pw",
+            is_active=True, is_superuser=True, status="active",
+        )
+        session.add(admin_user)
+        session.commit()
+        session.refresh(admin_user)
+        session.add(UserRole(user_id=admin_user.id, role_id=admin_role.id))
+        session.commit()
 
     # Dealer profile
     dealer_profile = DealerProfile(
@@ -89,22 +95,29 @@ def dealer_env(session: Session):
     session.commit()
 
     # Create swap sessions — various users
-    customer1 = User(email="cust1_da@test.com", hashed_password="pw", is_active=True, status="active")
-    customer2 = User(email="cust2_da@test.com", hashed_password="pw", is_active=True, status="active")
-    session.add_all([customer1, customer2])
+    customer1 = session.exec(select(User).where(User.email == "cust1_da@test.com")).first()
+    if not customer1:
+        customer1 = User(email="cust1_da@test.com", hashed_password="pw", is_active=True, status="active")
+        session.add(customer1)
+    
+    customer2 = session.exec(select(User).where(User.email == "cust2_da@test.com")).first()
+    if not customer2:
+        customer2 = User(email="cust2_da@test.com", hashed_password="pw", is_active=True, status="active")
+        session.add(customer2)
+
     session.commit()
     session.refresh(customer1)
     session.refresh(customer2)
 
     now = datetime.now(UTC)
     swaps = [
-        SwapSession(user_id=customer1.id, station_id=station.id, amount=100.0,
+        SwapSession(user_id=customer1.id, station_id=station.id, swap_amount=100.0,
                      status="completed", created_at=now),
-        SwapSession(user_id=customer1.id, station_id=station.id, amount=120.0,
+        SwapSession(user_id=customer1.id, station_id=station.id, swap_amount=120.0,
                      status="completed", created_at=now - timedelta(hours=2)),
-        SwapSession(user_id=customer2.id, station_id=station.id, amount=80.0,
+        SwapSession(user_id=customer2.id, station_id=station.id, swap_amount=80.0,
                      status="completed", created_at=now - timedelta(days=1)),
-        SwapSession(user_id=customer1.id, station_id=station.id, amount=150.0,
+        SwapSession(user_id=customer1.id, station_id=station.id, swap_amount=150.0,
                      status="completed", created_at=now - timedelta(days=15)),
     ]
     for s in swaps:

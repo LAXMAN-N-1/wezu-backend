@@ -115,6 +115,11 @@ def revenue_aggregation():
         logger.error(f"Revenue aggregation failed: {str(e)}", exc_info=True)
         complete_job_execution(execution.execution_id, "FAILED", error=str(e))
 
+def audit_log_retention():
+    """Hard delete old audit logs"""
+    from app.tasks.log_retention import purge_old_audit_logs
+    purge_old_audit_logs(days=32)
+
 def inventory_sync():
     """Synchronize inventory across all stations"""
     logger.info("Starting inventory synchronization...")

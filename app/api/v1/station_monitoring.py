@@ -44,10 +44,12 @@ def prioritize_charging(
 
 @router.patch("/charging/reprioritize", response_model=DataResponse[OptimizedQueueResponse])
 def reprioritize_charging(
-    station_id: str,
-    urgent_battery_ids: List[str],
+    station_id: str = "",
+    urgent_battery_ids: List[str] = [],
     session: Session = Depends(deps.get_db)
 ):
     """Dynamically re-prioritize charging queue."""
+    if not station_id or not urgent_battery_ids:
+        raise HTTPException(status_code=422, detail="station_id and urgent_battery_ids are required")
     queue = ChargingService.reprioritize_queue(session, int(station_id), urgent_battery_ids)
     return DataResponse(data=OptimizedQueueResponse(optimized_queue=queue), message="Charging queue updated successfully")

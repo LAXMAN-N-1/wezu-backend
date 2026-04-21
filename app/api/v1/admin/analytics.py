@@ -212,6 +212,30 @@ def get_global_inventory_status(
         lambda: AnalyticsService.get_fleet_inventory_status(db),
     )
 
+@router.get("/fraud-risks")
+def get_fraud_risks(
+    current_user: User = Depends(deps.get_current_active_superuser),
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """Admin: Fraud Risk Summary"""
+    return AnalyticsService.get_fraud_risk_summary(db)
+
+@router.get("/suspensions")
+def get_suspensions(
+    current_user: User = Depends(deps.get_current_active_superuser),
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """Admin: Global Suspensions History"""
+    return AnalyticsService.get_suspensions_history(db)
+
+@router.get("/invite-links")
+def get_invite_links(
+    current_user: User = Depends(deps.get_current_active_superuser),
+    db: Session = Depends(deps.get_db)
+) -> Any:
+    """Admin: Invite Link Metrics"""
+    return AnalyticsService.get_invite_link_metrics(db)
+
 @router.get("/export")
 def export_analytics_report(
     report_type: str = Query(..., enum=["overview", "trends", "forecast", "behavior"]),

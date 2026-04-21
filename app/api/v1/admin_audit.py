@@ -22,51 +22,47 @@ router = APIRouter()
 
 
 @router.get("/")
-def list_audit_logs(
+async def list_audit_logs(
     *,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_superuser),
     user_id: Optional[int] = Query(None, description="Filter by user ID"),
     action: Optional[str] = Query(None, description="Filter by action type (e.g. AUTH_LOGIN)"),
     resource_type: Optional[str] = Query(None, description="Filter by resource type (e.g. USER, BATTERY)"),
     target_id: Optional[int] = Query(None, description="Filter by target entity ID"),
     date_from: Optional[datetime] = Query(None, description="Start of date range (UTC)"),
     date_to: Optional[datetime] = Query(None, description="End of date range (UTC)"),
+    level: Optional[str] = Query(None, description="Filter by severity level (INFO, WARNING, CRITICAL)"),
+    is_suspicious: Optional[bool] = Query(None, description="Filter for suspicious events"),
+    ip_address: Optional[str] = Query(None, description="Filter by source IP address"),
     skip: int = Query(0, ge=0, description="Pagination offset"),
     limit: int = Query(50, ge=1, le=200, description="Pagination limit"),
 ):
     """
-    List audit log entries with optional filters and pagination.
+    List audit log entries with advanced forensic filters and pagination.
     Requires Super Admin access.
     """
-    query = select(AuditLog)
-
-    if user_id is not None:
-        query = query.where(AuditLog.user_id == user_id)
-    if action is not None:
-        query = query.where(AuditLog.action == action)
-    if resource_type is not None:
-        query = query.where(AuditLog.resource_type == resource_type)
-    if target_id is not None:
-        query = query.where(AuditLog.target_id == target_id)
-    if date_from is not None:
-        query = query.where(AuditLog.timestamp >= date_from)
-    if date_to is not None:
-        query = query.where(AuditLog.timestamp <= date_to)
-
-    # Total count
-    count_query = select(func.count()).select_from(query.subquery())
-    total = db.exec(count_query).one()
-
-    # Order and paginate
-    query = query.order_by(AuditLog.timestamp.desc()).offset(skip).limit(limit)
-    logs = db.exec(query).all()
+    audit_service = AuditService()
+    result = await audit_service.get_logs_advanced(
+        db=db,
+        user_id=user_id,
+        action=action,
+        resource_type=resource_type,
+        target_id=target_id,
+        date_from=date_from,
+        date_to=date_to,
+        level=level,
+        is_suspicious=is_suspicious,
+        ip_address=ip_address,
+        page=(skip // limit) + 1,
+        limit=limit
+    )
 
     return {
-        "total": total,
+        "total": result["total_count"],
         "skip": skip,
         "limit": limit,
-        "data": logs,
+        "data": result["logs"],
     }
 
 

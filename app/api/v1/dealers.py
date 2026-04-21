@@ -18,6 +18,14 @@ from app.services.dealer_ledger_service import DealerLedgerService
 from pydantic import BaseModel
 from app.schemas.input_contracts import DealerPromotionCreate, DealerPromotionUpdate, BankAccountUpdate
 
+class StageUpdate(BaseModel):
+    stage: str
+    note: str = ""
+
+class VisitSchedule(BaseModel):
+    application_id: int
+    officer_id: int
+    date: datetime
 router = APIRouter()
 
 

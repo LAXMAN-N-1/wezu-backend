@@ -85,6 +85,54 @@ def get_revenue_breakdown(
     return DealerAnalyticsService.get_revenue_breakdown(db, dealer_id, period)
 
 
+@router.get("/revenue-chart")
+def get_revenue_chart(
+    *,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    granularity: str = Query("daily", description="hourly, daily, or weekly"),
+    periods: int = Query(7, ge=1, le=90),
+    compare: bool = Query(False, description="Include previous period for comparison"),
+) -> Any:
+    """Timeseries revenue data for charts; supports hourly/daily/weekly aggregation and period comparison."""
+    if granularity not in ("hourly", "daily", "weekly"):
+        raise HTTPException(status_code=400, detail="granularity must be hourly, daily, or weekly")
+    dealer_id = _get_dealer_id(db, current_user.id)
+    return DealerAnalyticsService.get_revenue_chart_data(
+        db, dealer_id, granularity=granularity, periods=periods, compare=compare
+    )
+
+
+@router.get("/commission-summary")
+def get_commission_summary(
+    *,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    start_date: str = Query(None, description="ISO date, e.g. 2026-01-01"),
+    end_date: str = Query(None, description="ISO date, e.g. 2026-01-31"),
+) -> Any:
+    """Returns Gross Revenue, Platform Fees, Commission Earned, Net Payout with period filtering."""
+    from datetime import datetime as dt
+
+    parsed_start = None
+    parsed_end = None
+    if start_date:
+        try:
+            parsed_start = dt.fromisoformat(start_date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid start_date format. Use ISO 8601.")
+    if end_date:
+        try:
+            parsed_end = dt.fromisoformat(end_date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid end_date format. Use ISO 8601.")
+
+    dealer_id = _get_dealer_id(db, current_user.id)
+    return DealerAnalyticsService.get_commission_summary(
+        db, dealer_id, start_date=parsed_start, end_date=parsed_end
+    )
+
+
 @router.get("/customers")
 def get_customer_insights(
     db: Session = Depends(get_session),
@@ -181,3 +229,56 @@ def email_report(
     """Email the performance report to the dealer."""
     dealer_id = _get_dealer_id(db, current_user.id)
     return DealerAnalyticsService.email_report(db, dealer_id)
+
+@router.get("/commission-summary")
+def get_commission_summary(
+    from_date: str = Query(None),
+    to_date: str = Query(None),
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Aggregates Commission and Settlements for the Settlement Command Center."""
+    from app.models.settlement import Settlement
+    from app.models.commission import CommissionLog
+    from sqlalchemy import func
+    from datetime import datetime
+    
+    dealer_id = _get_dealer_id(db, current_user.id)
+    
+    settlement_q = select(Settlement).where(Settlement.dealer_id == dealer_id)
+    
+    if from_date:
+        try:
+            fd = datetime.fromisoformat(from_date.replace("Z", "+00:00"))
+            settlement_q = settlement_q.where(Settlement.created_at >= fd)
+        except: pass
+    if to_date:
+        try:
+            td = datetime.fromisoformat(to_date.replace("Z", "+00:00"))
+            settlement_q = settlement_q.where(Settlement.created_at <= td)
+        except: pass
+        
+    settlements = db.exec(settlement_q).all()
+    
+    gross_revenue = sum(s.total_revenue for s in settlements)
+    platform_fees = sum(s.platform_fee for s in settlements)
+    net_payout = sum(s.net_payable for s in settlements)
+    commission_earned = sum(s.total_commission for s in settlements)
+    
+    # Determine commission rate from config if possible
+    from app.models.commission import CommissionConfig
+    config = db.exec(
+        select(CommissionConfig)
+        .where(CommissionConfig.dealer_id == current_user.id)
+        .order_by(CommissionConfig.created_at.desc())
+    ).first()
+    
+    current_rate = config.percentage if config else 15.0
+    
+    return {
+        "gross_revenue": gross_revenue,
+        "platform_fees_deducted": platform_fees,
+        "commission_earned": commission_earned,
+        "net_payout": net_payout,
+        "current_commission_rate": current_rate
+    }

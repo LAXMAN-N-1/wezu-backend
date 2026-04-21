@@ -1046,6 +1046,8 @@ async def verify_email(
     db.commit()
     return {"message": "Email verified successfully", "email": user.email}
 
+from app.schemas.auth import ChangePasswordRequest
+
 @router.post("/change-password")
 async def change_password(
     data: ChangePasswordRequest,
@@ -1076,6 +1078,8 @@ async def change_password(
     logger.info(f"Password changed for user {current_user.id}")
     return {"message": "Password changed successfully"}
 
+
+from app.schemas.auth import TwoFASetupResponse, TwoFAVerifyRequest, TwoFADisableRequest
 
 class Verify2FARequest(BaseModel):
     code: str
@@ -1124,6 +1128,8 @@ async def disable_2fa(
     db.commit()
     return {"message": "2FA disabled successfully"}
 
+from app.schemas.auth import BiometricRegisterRequest, BiometricLoginRequest
+
 @router.post("/biometric/register")
 async def biometric_register(
     data: BiometricRegisterRequest,
@@ -1165,6 +1171,8 @@ async def biometric_login(
         return Token(access_token=access_token, refresh_token=refresh_token, user=user)
     
     raise HTTPException(status_code=401, detail="Biometric verification failed")
+
+from app.schemas.auth import SecurityQuestionResponse, SetSecurityQuestionRequest, VerifySecurityQuestionRequest
 
 @router.get("/security-questions", response_model=List[SecurityQuestionResponse])
 async def list_security_questions(

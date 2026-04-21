@@ -22,7 +22,15 @@ class StaffProfile(SQLModel, table=True):
     # Relationships
     user: "User" = Relationship(
         back_populates="staff_profile",
-        sa_relationship_kwargs={"foreign_keys": "StaffProfile.user_id"}
+        sa_relationship_kwargs={
+            "foreign_keys": "StaffProfile.user_id",
+            "overlaps": "user,staff_profile,owner,owned_dealer_profile,staff_members"
+        }
     )
-    dealer: Optional["DealerProfile"] = Relationship(back_populates="staff_members")
+    dealer: Optional["DealerProfile"] = Relationship(
+        back_populates="staff_members",
+        sa_relationship_kwargs={
+            "overlaps": "dealer,staff_members,user,owner,owned_dealer_profile"
+        }
+    )
     # station: Optional["Station"] = Relationship()

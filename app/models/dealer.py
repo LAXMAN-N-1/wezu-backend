@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from app.models.station import Station
     from app.models.commission import Commission # If it existed
     from app.models.staff import StaffProfile
+    from app.models.settlement import Settlement
 # from pydantic import EmailStr
 import sqlalchemy as sa
 from sqlalchemy import JSON
@@ -39,6 +40,10 @@ class DealerProfile(SQLModel, table=True):
     pincode: str
     
     # Financial Details
+    bank_name: Optional[str] = None
+    bank_account_number: Optional[str] = None
+    bank_ifsc_code: Optional[str] = None
+    
     bank_details: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
     # Global Settings Defaults
@@ -47,13 +52,20 @@ class DealerProfile(SQLModel, table=True):
     global_rental_settings: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     holiday_calendar: Optional[List[Dict]] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
     
+    # Portal Settings (Preferences, Localization, Formatting, Rental)
+    settings: Optional[Dict] = Field(default=None, sa_column=sa.Column(JSON().with_variant(JSONB, "postgresql")))
+    
     is_active: bool = Field(default=False)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
-    user: "User" = Relationship(
-        back_populates="dealer_profile",
-        sa_relationship_kwargs={"foreign_keys": "[DealerProfile.user_id]"}
+    owner: "User" = Relationship(
+        back_populates="owned_dealer_profile",
+        sa_relationship_kwargs={
+            "primaryjoin": "DealerProfile.user_id == User.id",
+            "foreign_keys": "[DealerProfile.user_id]",
+            "overlaps": "dealer_profile,user,owner,owned_dealer_profile,staff_members"
+        }
     )
     stations: List["Station"] = Relationship(back_populates="dealer")
     application: Optional["DealerApplication"] = Relationship(back_populates="dealer")

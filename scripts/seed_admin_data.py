@@ -14,6 +14,7 @@ sys.path.append(parent_dir)
 from sqlmodel import Session, select
 from sqlalchemy.orm import selectinload
 from app.db.session import engine
+import app.models.all  # Fix mapper init issues in standalone scripts
 from app.models.user import User, UserStatus, UserType
 from app.models.dealer import DealerProfile
 from app.models.station import Station, StationStatus, StationSlot

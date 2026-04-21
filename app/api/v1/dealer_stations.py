@@ -19,6 +19,8 @@ from app.models.rental import Rental
 from app.models.maintenance import MaintenanceRecord
 from app.services.dealer_station_service import DealerStationService
 from pydantic import BaseModel
+from app.utils.audit_context import log_audit_action
+from app.models.audit_log import AuditActionType
 
 router = APIRouter()
 
@@ -259,6 +261,16 @@ def update_station(
 
     station.updated_at = datetime.now(UTC)
     db.add(station)
+    
+    log_audit_action(
+        db=db,
+        action=AuditActionType.DATA_MODIFICATION,
+        level="INFO",
+        resource_type="STATION",
+        target_id=station.id,
+        details=f"Station updated by dealer user {current_user.id}"
+    )
+    
     db.commit()
     db.refresh(station)
     return {"message": "Station updated", "id": station.id}
@@ -305,7 +317,20 @@ def submit_new_station(
 ) -> Any:
     """Submit a new station. Will be pending active state."""
     dealer_id = _get_dealer_id(db, current_user.id)
-    return DealerStationService.submit_station(db, dealer_id, data.dict())
+    result = DealerStationService.submit_station(db, dealer_id, data.dict())
+    
+    log_audit_action(
+        db=db,
+        action=AuditActionType.DATA_MODIFICATION,
+        level="INFO",
+        resource_type="STATION",
+        target_id=result.get("id") if isinstance(result, dict) else None,
+        details=f"New station submitted by dealer user {current_user.id}"
+    )
+    # Note: Service already commits but we add logic here and commit again (audit is pending transaction)
+    db.commit()
+    
+    return result
 
 
 @router.get("/{station_id}/batteries")

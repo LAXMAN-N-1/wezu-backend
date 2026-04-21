@@ -1,0 +1,543 @@
+On branch sree
+Your branch is ahead of 'origin/sree' by 1 commit.
+  (use "git push" to publish your local commits)
+
+You have unmerged paths.
+  (fix conflicts and run "git commit")
+  (use "git merge --abort" to abort the merge)
+
+Changes to be committed:
+	modified:   .env.example
+	new file:   .git_status.txt
+	modified:   .github/workflows/backend-cicd.yml
+	modified:   .gitignore
+	deleted:    DEPLOY_HOSTINGER_MULTIPROJECT.md
+	modified:   README.md
+	modified:   alembic.ini
+	deleted:    alembic/bad_migrations/6755380a429d_merge_migration_heads.py
+	deleted:    alembic/bad_migrations/b14b45765573_add_station_stock_config_and_reorder_.py
+	deleted:    alembic/bad_migrations/b67ed1cce3f1_add_station_heartbeat_and_alerts.py
+	deleted:    alembic/bad_migrations/b8484e05b8f9_add_device_info_to_audit_logs.py
+	modified:   alembic/env.py
+	new file:   alembic/versions/7272fc017d9d_initial_migration.py
+	new file:   alembic/versions/a1b2c3d4e5f6_add_payout_settings.py
+	deleted:    alembic/versions/a1b2c3d4e5f6_add_user_agent_and_metadata_to_audit_logs.py
+	deleted:    alembic/versions/ab35322d41e6_initial_full_production_schema.py
+	deleted:    alembic/versions/ba316815d31e_add_dealer_auth_fields.py
+	deleted:    alembic/versions/dcde4d26bcfb_placeholder.py
+	deleted:    alembic/versions/e28d617ecb29_.py
+	new file:   alembic/versions/ed574375ad16_add_global_rental_settings.py
+	deleted:    alembic/versions/merge_e28d_f6f6.py
+	deleted:    alembic/versions_backup/001_initial_schema.py
+	deleted:    alembic/versions_backup/002_add_payment_tables.py
+	deleted:    alembic/versions_backup/003_add_ecommerce_tables.py
+	deleted:    alembic/versions_backup/004_add_wallet_system.py
+	deleted:    alembic/versions_backup/005_add_gps_tracking.py
+	deleted:    alembic/versions_backup/006_add_video_kyc.py
+	deleted:    alembic/versions_backup/007_add_audit_logs.py
+	deleted:    alembic/versions_backup/008_add_security_events.py
+	deleted:    alembic/versions_backup/009_add_commission_table.py
+	deleted:    alembic/versions_backup/010_add_performance_indexes.py
+	deleted:    alembic/versions_backup/011_add_triggers.py
+	deleted:    alembic/versions_backup/012_add_views.py
+	deleted:    alembic/versions_backup/013_add_iot_core.py
+	deleted:    alembic/versions_backup/014_add_dealer_system.py
+	deleted:    alembic/versions_backup/015_add_logistics.py
+	deleted:    alembic/versions_backup/016_add_swap_and_fraud.py
+	deleted:    alembic/versions_backup/017_add_financial_features.py
+	deleted:    alembic/versions_backup/018_add_advanced_features.py
+	deleted:    alembic/versions_backup/019_add_customer_app_tables.py
+	deleted:    alembic/versions_backup/019_add_ops_features.py
+	deleted:    alembic/versions_backup/020_add_missing_critical_models.py
+	deleted:    alembic/versions_backup/6c857ba49899_add_branch_model.py
+	deleted:    alembic/versions_backup/8a5ead1ceabde_add_organization_module.py
+	deleted:    alembic/versions_backup/c1771a09c2df_add_warehouse_module.py
+	deleted:    alembic/versions_backup/e7d6e537e5b0_create_role_rbac_table.py
+	modified:   app/api/admin/__init__.py
+	new file:   app/api/admin/admin_groups.py
+	new file:   app/api/admin/analytics.py
+	new file:   app/api/admin/audit_trails.py
+	modified:   app/api/admin/batteries.py
+	new file:   app/api/admin/bess.py
+	modified:   app/api/admin/cms.py
+	modified:   app/api/admin/dealers.py
+	modified:   app/api/admin/finance.py
+	modified:   app/api/admin/fraud.py
+	modified:   app/api/admin/health.py
+	modified:   app/api/admin/iot.py
+	modified:   app/api/admin/jobs.py
+	modified:   app/api/admin/kyc_admin.py
+	new file:   app/api/admin/logistics.py
+	modified:   app/api/admin/main.py
+	modified:   app/api/admin/monitoring.py
+	new file:   app/api/admin/notifications.py
+	modified:   app/api/admin/rentals.py
+	new file:   app/api/admin/security.py
+	new file:   app/api/admin/settings.py
+	modified:   app/api/admin/stations.py
+	modified:   app/api/admin/stock.py
+	new file:   app/api/admin/support.py
+	modified:   app/api/admin/users.py
+	modified:   app/api/deps.py
+	new file:   app/api/errors/handlers.py
+	modified:   app/api/v1/admin/analytics.py
+	modified:   app/api/v1/admin/banners.py
+	modified:   app/api/v1/admin/blogs.py
+	modified:   app/api/v1/admin/dealers.py
+	modified:   app/api/v1/admin/faqs.py
+	modified:   app/api/v1/admin/legal.py
+	modified:   app/api/v1/admin/support.py
+	modified:   app/api/v1/admin/users.py
+	modified:   app/api/v1/admin_audit.py
+	new file:   app/api/v1/admin_audit_analytics.py
+	new file:   app/api/v1/admin_dealers.py
+	new file:   app/api/v1/admin_fraud.py
+	modified:   app/api/v1/admin_kyc.py
+	modified:   app/api/v1/admin_rbac.py
+	modified:   app/api/v1/admin_roles.py
+	new file:   app/api/v1/admin_security_settings.py
+	modified:   app/api/v1/admin_stations.py
+	modified:   app/api/v1/analytics.py
+	modified:   app/api/v1/analytics/dealer.py
+	modified:   app/api/v1/audit.py
+	modified:   app/api/v1/auth.py
+	modified:   app/api/v1/batteries.py
+	modified:   app/api/v1/customer_auth.py
+	modified:   app/api/v1/dashboard.py
+	modified:   app/api/v1/dealer_analytics.py
+	modified:   app/api/v1/dealer_commission.py
+	modified:   app/api/v1/dealer_kyc.py
+	modified:   app/api/v1/dealer_onboarding.py
+	modified:   app/api/v1/dealer_portal_auth.py
+	modified:   app/api/v1/dealer_portal_customers.py
+	modified:   app/api/v1/dealer_portal_dashboard.py
+	new file:   app/api/v1/dealer_portal_inventory.py
+	modified:   app/api/v1/dealer_portal_roles.py
+	modified:   app/api/v1/dealer_portal_tickets.py
+	modified:   app/api/v1/dealer_portal_users.py
+	modified:   app/api/v1/dealer_stations.py
+	modified:   app/api/v1/dealers.py
+	modified:   app/api/v1/fraud.py
+	modified:   app/api/v1/kyc.py
+	modified:   app/api/v1/logistics.py
+	modified:   app/api/v1/payments.py
+	modified:   app/api/v1/profile.py
+	modified:   app/api/v1/rentals.py
+	modified:   app/api/v1/security.py
+	modified:   app/api/v1/settlements.py
+	modified:   app/api/v1/stations.py
+	modified:   app/api/v1/support.py
+	modified:   app/api/v1/swaps.py
+	modified:   app/api/v1/system.py
+	modified:   app/api/v1/telematics.py
+	modified:   app/api/v1/telemetry.py
+	modified:   app/api/v1/transactions.py
+	modified:   app/api/v1/users.py
+	modified:   app/api/webhooks/razorpay.py
+	modified:   app/configs/logger.py
+	modified:   app/controllers/auth_controller.py
+	modified:   app/core/audit.py
+	modified:   app/core/config.py
+	modified:   app/core/database.py
+	new file:   app/core/firebase.py
+	new file:   app/core/logging.py
+	deleted:    app/core/logging_custom.py_bak
+	new file:   app/core/proxy.py
+	modified:   app/core/security.py
+	renamed:    fast_seed_financial.py -> app/db/seeds/fast_seed_financial.py
+	renamed:    populate_analytics_data.py -> app/db/seeds/populate_analytics_data.py
+	renamed:    populate_users_data.py -> app/db/seeds/populate_users_data.py
+	new file:   app/db/seeds/run_seeds.py
+	renamed:    scripts/seed_admin_analytics.py -> app/db/seeds/seed_admin_analytics.py
+	renamed:    seed_all.py -> app/db/seeds/seed_all.py
+	new file:   app/db/seeds/seed_all_admin.py
+	renamed:    scripts/seed_analytics.py -> app/db/seeds/seed_analytics.py
+	renamed:    scripts/seed_analytics_data.py -> app/db/seeds/seed_analytics_data.py
+	renamed:    seed_batteries.py -> app/db/seeds/seed_batteries.py
+	renamed:    scripts/seed_batteries_advanced.py -> app/db/seeds/seed_batteries_advanced.py
+	renamed:    scripts/seed_battery_health.py -> app/db/seeds/seed_battery_health.py
+	renamed:    seed_catalog.py -> app/db/seeds/seed_catalog.py
+	new file:   app/db/seeds/seed_cms.py
+	renamed:    seed_complete_db.py -> app/db/seeds/seed_complete_db.py
+	renamed:    scripts/seed_data.py -> app/db/seeds/seed_data.py
+	renamed:    scripts/seed_dealer_data.py -> app/db/seeds/seed_dealer_data.py
+	new file:   app/db/seeds/seed_dealer_portal.py
+	renamed:    scripts/seed_full_db.py -> app/db/seeds/seed_full_db.py
+	new file:   app/db/seeds/seed_modules.py
+	new file:   app/db/seeds/seed_phase2.py
+	new file:   app/db/seeds/seed_production_data.py
+	renamed:    seed_products.py -> app/db/seeds/seed_products.py
+	renamed:    seed_quick.py -> app/db/seeds/seed_quick.py
+	new file:   app/db/seeds/seed_support.py
+	renamed:    seed_test_customer.py -> app/db/seeds/seed_test_customer.py
+	renamed:    seed_test_dealer.py -> app/db/seeds/seed_test_dealer.py
+	renamed:    sync_and_seed.py -> app/db/seeds/sync_and_seed.py
+	modified:   app/db/session.py
+	modified:   app/integrations/firebase.py
+	modified:   app/middleware/audit.py
+	new file:   app/middleware/audit_interceptor.py
+	modified:   app/middleware/error_handler.py
+	new file:   app/middleware/proxy_headers.py
+	modified:   app/middleware/rate_limit.py
+	modified:   app/middleware/security.py
+	modified:   app/ml/feature_store.py
+	modified:   app/ml/registry.py
+	modified:   app/models/address.py
+	new file:   app/models/admin_group.py
+	modified:   app/models/admin_user.py
+	modified:   app/models/alert.py
+	new file:   app/models/all.py
+	new file:   app/models/api_key.py
+	modified:   app/models/audit_log.py
+	modified:   app/models/banner.py
+	modified:   app/models/batch_job.py
+	modified:   app/models/battery.py
+	modified:   app/models/battery_catalog.py
+	modified:   app/models/battery_health.py
+	modified:   app/models/battery_health_log.py
+	modified:   app/models/battery_reservation.py
+	new file:   app/models/bess.py
+	modified:   app/models/biometric.py
+	modified:   app/models/blog.py
+	modified:   app/models/branch.py
+	modified:   app/models/cart.py
+	modified:   app/models/catalog.py
+	modified:   app/models/chargeback.py
+	modified:   app/models/charging_queue.py
+	modified:   app/models/commission.py
+	modified:   app/models/dealer.py
+	modified:   app/models/dealer_inventory.py
+	modified:   app/models/dealer_kyc.py
+	modified:   app/models/dealer_promotion.py
+	new file:   app/models/dealer_stock_request.py
+	modified:   app/models/delivery_assignment.py
+	modified:   app/models/delivery_route.py
+	modified:   app/models/device.py
+	modified:   app/models/device_fingerprint.py
+	modified:   app/models/driver_profile.py
+	modified:   app/models/ecommerce.py
+	new file:   app/models/enums.py
+	modified:   app/models/faq.py
+	modified:   app/models/favorite.py
+	modified:   app/models/feedback.py
+	modified:   app/models/financial.py
+	modified:   app/models/fraud.py
+	new file:   app/models/fraud_alert.py
+	modified:   app/models/geofence.py
+	modified:   app/models/gps_log.py
+	modified:   app/models/i18n.py
+	modified:   app/models/inventory_audit.py
+	modified:   app/models/invoice.py
+	modified:   app/models/iot.py
+	modified:   app/models/kyc.py
+	modified:   app/models/late_fee.py
+	modified:   app/models/legal.py
+	modified:   app/models/location.py
+	modified:   app/models/login_history.py
+	modified:   app/models/logistics.py
+	modified:   app/models/maintenance.py
+	modified:   app/models/media.py
+	modified:   app/models/membership.py
+	modified:   app/models/menu.py
+	modified:   app/models/notification.py
+	new file:   app/models/notification_admin.py
+	modified:   app/models/notification_preference.py
+	modified:   app/models/oauth.py
+	modified:   app/models/organization.py
+	modified:   app/models/otp.py
+	modified:   app/models/password_history.py
+	modified:   app/models/payment.py
+	modified:   app/models/promo_code.py
+	modified:   app/models/rbac.py
+	modified:   app/models/referral.py
+	modified:   app/models/refund.py
+	modified:   app/models/rental.py
+	modified:   app/models/rental_event.py
+	modified:   app/models/rental_modification.py
+	modified:   app/models/return_request.py
+	modified:   app/models/revenue_report.py
+	modified:   app/models/review.py
+	modified:   app/models/role_right.py
+	modified:   app/models/search_history.py
+	modified:   app/models/security_question.py
+	new file:   app/models/security_settings.py
+	modified:   app/models/session.py
+	modified:   app/models/settlement_dispute.py
+	modified:   app/models/staff.py
+	modified:   app/models/station.py
+	modified:   app/models/station_heartbeat.py
+	modified:   app/models/station_stock.py
+	modified:   app/models/stock.py
+	modified:   app/models/stock_movement.py
+	modified:   app/models/support.py
+	modified:   app/models/swap.py
+	modified:   app/models/swap_suggestion.py
+	modified:   app/models/system.py
+	modified:   app/models/telemetry.py
+	modified:   app/models/token.py
+	modified:   app/models/two_factor_auth.py
+	modified:   app/models/user_history.py
+	modified:   app/models/user_profile.py
+	modified:   app/models/vehicle.py
+	modified:   app/models/vendor.py
+	modified:   app/models/video_kyc.py
+	modified:   app/models/warehouse.py
+	modified:   app/repositories/payment_repository.py
+	modified:   app/repositories/rental_repository.py
+	deleted:    app/routes/auth.py
+	new file:   app/schemas/admin_group.py
+	new file:   app/schemas/alert.py
+	new file:   app/schemas/audit_log.py
+	modified:   app/schemas/auth.py
+	modified:   app/schemas/banner.py
+	modified:   app/schemas/battery_catalog.py
+	new file:   app/schemas/bess.py
+	modified:   app/schemas/blog.py
+	modified:   app/schemas/branch.py
+	new file:   app/schemas/commission.py
+	modified:   app/schemas/dealer.py
+	new file:   app/schemas/dealer_inventory.py
+	new file:   app/schemas/dealer_kyc.py
+	new file:   app/schemas/dealer_ledger.py
+	new file:   app/schemas/dealer_portal_inventory.py
+	new file:   app/schemas/dealer_promotion.py
+	modified:   app/schemas/dealer_user.py
+	new file:   app/schemas/delivery.py
+	new file:   app/schemas/device.py
+	new file:   app/schemas/ecommerce.py
+	new file:   app/schemas/finance_ops.py
+	new file:   app/schemas/financial.py
+	new file:   app/schemas/invoice.py
+	modified:   app/schemas/legal.py
+	modified:   app/schemas/media.py
+	modified:   app/schemas/menu.py
+	modified:   app/schemas/notification.py
+	new file:   app/schemas/notification_admin.py
+	new file:   app/schemas/notification_preference.py
+	modified:   app/schemas/organization.py
+	modified:   app/schemas/rbac.py
+	new file:   app/schemas/rental_event.py
+	modified:   app/schemas/role_right.py
+	new file:   app/schemas/session.py
+	new file:   app/schemas/settlement_dispute.py
+	new file:   app/schemas/staff.py
+	modified:   app/schemas/station.py
+	modified:   app/schemas/station_monitoring.py
+	modified:   app/schemas/stock.py
+	new file:   app/schemas/system.py
+	new file:   app/schemas/user_extended.py
+	modified:   app/schemas/wallet.py
+	modified:   app/schemas/warehouse.py
+	modified:   app/services/admin_analytics_service.py
+	new file:   app/services/admin_fraud_service.py
+	new file:   app/services/admin_security_service.py
+	modified:   app/services/alert_service.py
+	modified:   app/services/analytics/customer_service.py
+	modified:   app/services/analytics/logistics_service.py
+	modified:   app/services/analytics_service.py
+	modified:   app/services/apple_auth_service.py
+	modified:   app/services/audit_service.py
+	modified:   app/services/auth_service.py
+	modified:   app/services/battery_batch_service.py
+	modified:   app/services/battery_service.py
+	modified:   app/services/booking_service.py
+	modified:   app/services/campaign_service.py
+	modified:   app/services/cart_service.py
+	modified:   app/services/catalog_service.py
+	modified:   app/services/charging_service.py
+	modified:   app/services/chat_service.py
+	modified:   app/services/commission_service.py
+	modified:   app/services/dealer_analytics_service.py
+	modified:   app/services/dealer_kyc_service.py
+	new file:   app/services/dealer_ledger_service.py
+	new file:   app/services/dealer_portal_inventory_service.py
+	modified:   app/services/dealer_service.py
+	modified:   app/services/dealer_station_service.py
+	modified:   app/services/dispute_service.py
+	modified:   app/services/driver_service.py
+	modified:   app/services/fcm_service.py
+	modified:   app/services/financial_service.py
+	modified:   app/services/forecasting_service.py
+	modified:   app/services/fraud_service.py
+	modified:   app/services/gps_service.py
+	modified:   app/services/inventory_service.py
+	modified:   app/services/iot_service.py
+	modified:   app/services/kyc_service.py
+	modified:   app/services/late_fee_service.py
+	modified:   app/services/logistics_service.py
+	modified:   app/services/maintenance_service.py
+	modified:   app/services/membership_service.py
+	modified:   app/services/ml_fraud_service.py
+	modified:   app/services/ml_service.py
+	modified:   app/services/mqtt_service.py
+	modified:   app/services/order_service.py
+	modified:   app/services/otp_service.py
+	modified:   app/services/password_service.py
+	modified:   app/services/payment_service.py
+	modified:   app/services/promo_service.py
+	modified:   app/services/rental_alert_service.py
+	modified:   app/services/rental_service.py
+	modified:   app/services/settlement_service.py
+	modified:   app/services/station_service.py
+	modified:   app/services/stock.py
+	modified:   app/services/support_service.py
+	modified:   app/services/telematics_service.py
+	modified:   app/services/token_service.py
+	modified:   app/services/user_service.py
+	modified:   app/services/user_state_service.py
+	modified:   app/services/video_kyc_service.py
+	modified:   app/services/wallet_service.py
+	modified:   app/services/websocket_service.py
+	modified:   app/tasks/battery_health_monitor.py
+	modified:   app/tasks/charging_optimizer.py
+	new file:   app/tasks/log_retention.py
+	modified:   app/tasks/station_monitor.py
+	new file:   app/utils/audit_context.py
+	modified:   app/utils/audit_decorator.py
+	new file:   app/utils/cors.py
+	new file:   app/utils/data_masking.py
+	new file:   app/utils/device_info.py
+	new file:   app/utils/geo_info.py
+	modified:   app/workers/daily_jobs.py
+	modified:   app/workers/hourly_jobs.py
+	modified:   app/workers/monthly_jobs.py
+	modified:   app/workers/realtime_jobs.py
+	modified:   app/workers/rental_worker.py
+	modified:   app/workers/scheduler.py
+	deleted:    create_test_dealer.py
+	new file:   debug_models.py
+	new file:   debug_output.txt
+	modified:   docker-compose.yml
+	renamed:    ARCHITECTURE.md -> docs/ARCHITECTURE.md
+	new file:   docs/DEPLOY_COOLIFY_TRAEFIK.md
+	renamed:    PROJECT_OVERVIEW.md -> docs/PROJECT_OVERVIEW.md
+	new file:   err.txt
+	deleted:    finalize_seeding.py
+	deleted:    fix_enums.sql
+	deleted:    fix_models.py
+	deleted:    force_create_schema.py
+	deleted:    nginx.conf
+	modified:   prod/docker-compose.yml
+	deleted:    prod/nginx/default.conf
+	deleted:    prod/nginx/nginx.conf
+	modified:   requirements.prod.txt
+	deleted:    reset_admin_password.py
+	deleted:    reset_db_neon.py
+	deleted:    scripts/check_db.py
+	new file:   scripts/check_dealer_hash.py
+	deleted:    scripts/copy_ssh_key.exp
+	modified:   scripts/create_admin.py
+	new file:   scripts/create_admin_groups_db.py
+	modified:   scripts/debug/ensure_super_admin_login.py
+	modified:   scripts/debug/verify_login.py
+	new file:   scripts/final_cleanup.py
+	new file:   scripts/find_dealer_id.py
+	new file:   scripts/fix_admin_hash.py
+	new file:   scripts/fix_dealer_hash.py
+	new file:   scripts/fix_dealer_pwd.py
+	new file:   scripts/fix_firebase.py
+	new file:   scripts/fix_imports.py
+	new file:   scripts/fix_role_assignments.py
+	new file:   scripts/fix_utc_imports.py
+	new file:   scripts/hard_init.py
+	new file:   scripts/init_tables.py
+	new file:   scripts/inspect_fk.py
+	new file:   scripts/kill_locks.py
+	new file:   scripts/n1_analyzer.py
+	new file:   scripts/reset_alembic.py
+	modified:   scripts/reset_users.py
+	new file:   scripts/restore_admin.py
+	new file:   scripts/seed_admin_data.py
+	new file:   scripts/seed_admin_portal_presentation.py
+	new file:   scripts/seed_dealer_portal.py
+	new file:   scripts/seed_laxman_data.py
+	modified:   scripts/seed_production_data.py
+	new file:   scripts/seed_stations_dynamic.py
+	new file:   scripts/setup_clean_production.py
+	deleted:    scripts/test_login_api.py
+	deleted:    scripts/verify_setup.py
+	deleted:    scripts/verify_ssh.exp
+	deleted:    sync_backend.sh
+	deleted:    test_catalog2.py
+	deleted:    test_db.py
+	deleted:    test_users_api.py
+	deleted:    test_verification.py
+	deleted:    test_wallet.py
+	renamed:    _run_tests.py -> tests/_run_tests.py
+	modified:   tests/api/v1/analytics/conftest.py
+	modified:   tests/api/v1/test_access_paths.py
+	modified:   tests/api/v1/test_admin_audit_api.py
+	modified:   tests/api/v1/test_admin_kyc.py
+	modified:   tests/api/v1/test_admin_kyc_rejection.py
+	modified:   tests/api/v1/test_admin_user_management.py
+	modified:   tests/api/v1/test_audit_core.py
+	modified:   tests/api/v1/test_audit_integration.py
+	modified:   tests/api/v1/test_battery_health_and_charging.py
+	modified:   tests/api/v1/test_bulk_import.py
+	modified:   tests/api/v1/test_bulk_role_assign.py
+	modified:   tests/api/v1/test_create_user.py
+	modified:   tests/api/v1/test_data_access_audit.py
+	modified:   tests/api/v1/test_dealer_analytics.py
+	modified:   tests/api/v1/test_dealer_analytics_enhanced.py
+	modified:   tests/api/v1/test_dealer_campaigns.py
+	modified:   tests/api/v1/test_dealer_commission.py
+	modified:   tests/api/v1/test_dealer_stations.py
+	modified:   tests/api/v1/test_financial_reports.py
+	modified:   tests/api/v1/test_granular_rbac.py
+	modified:   tests/api/v1/test_kyc.py
+	modified:   tests/api/v1/test_permission_check.py
+	modified:   tests/api/v1/test_permission_create.py
+	modified:   tests/api/v1/test_permissions.py
+	modified:   tests/api/v1/test_rbac_e2e_flow.py
+	modified:   tests/api/v1/test_role_delete.py
+	modified:   tests/api/v1/test_role_details.py
+	modified:   tests/api/v1/test_role_duplicate.py
+	modified:   tests/api/v1/test_role_hierarchy.py
+	modified:   tests/api/v1/test_role_permissions.py
+	modified:   tests/api/v1/test_role_permissions_assign.py
+	modified:   tests/api/v1/test_role_transfer.py
+	modified:   tests/api/v1/test_role_update.py
+	modified:   tests/api/v1/test_role_users_list.py
+	modified:   tests/api/v1/test_roles.py
+	modified:   tests/api/v1/test_roles_list.py
+	modified:   tests/api/v1/test_user_permissions_list.py
+	modified:   tests/api/v1/test_user_role_assignment.py
+	modified:   tests/api/v1/test_user_role_removal.py
+	modified:   tests/api/v1/test_user_roles_list.py
+	modified:   tests/api/v1/test_users_list.py
+	new file:   tests/test_dealer_portal_endpoints.py
+	new file:   tests/test_endpoints.py
+	new file:   tests/test_imports.py
+	new file:   tests/test_jobs.py
+	new file:   tests/test_models.py
+
+Unmerged paths:
+  (use "git add/rm <file>..." as appropriate to mark resolution)
+	deleted by them: .env
+	deleted by them: alembic/versions/11cdc2dd0954_add_missing_battery_fields_manual.py
+	deleted by them: alembic/versions/14b548ec0175_migrate_battery_id_to_uuid_manual.py
+	deleted by them: alembic/versions/2c5038fb67d6_add_device_info_and_token_hash_to_user_.py
+	deleted by them: alembic/versions/41b7931630bd_add_battery_management_tables_and_.py
+	deleted by them: alembic/versions/44f2d5399b8d_convert_iot_device_battery_id_to_uuid.py
+	deleted by them: alembic/versions/d4b0fe593fe7_add_last_global_logout_at_to_core_user.py
+	deleted by them: alembic/versions/d6b338f82335_manual_add_user_fields.py
+	deleted by them: alembic/versions/d7184b0c7f4d_add_budget_and_tracking_fields_to_.py
+	deleted by them: alembic/versions/f6f6cfc2bec7_remove_warehouse_id_from_batteries.py
+	both modified:   app/api/v1/dealer_portal_settings.py
+	both modified:   app/main.py
+	both modified:   app/middleware/rbac_middleware.py
+	both modified:   app/models/__init__.py
+	both modified:   app/models/analytics.py
+	both modified:   app/models/settlement.py
+	both modified:   app/models/user.py
+	both modified:   app/schemas/rental.py
+	both modified:   app/services/analytics/admin_service.py
+	both modified:   app/services/analytics/dealer_service.py
+	deleted by them: openapi.json
+	both modified:   requirements.txt
+	both modified:   tests/conftest.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	git_status.txt
+

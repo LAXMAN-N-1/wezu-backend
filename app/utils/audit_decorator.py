@@ -17,7 +17,7 @@ from typing import Optional
 from fastapi import Request
 from sqlmodel import Session
 
-from app.models.audit_log import AuditLog
+from app.utils.audit_context import log_audit_action
 from app.core.proxy import get_client_ip
 
 logger = logging.getLogger("wezu_audit")
@@ -102,15 +102,12 @@ def _write_log(
             db = Session(engine)
             own_session = True
 
-        log = AuditLog(
-            user_id=user_id,
+        log_audit_action(
+            db=db,
             action=action_type,
             resource_type=resource_type,
             target_id=target_id,
-            ip_address=ip_address,
-            user_agent=user_agent,
         )
-        db.add(log)
         db.commit()
 
         logger.info(
