@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/stations.py
-# hypothesis_version: 6.151.11
-
-[50.0, 100, 404, 500, '/', '/heatmap', '/map', '/nearby', '/{station_id}', '/{station_id}/photos', '/{station_id}/status', 'CREATE_STATION', 'Favorite not found', 'Minimum rating (1-5)', 'Photo not found', 'Review deleted', 'STATION', 'Station deactivated', 'Station not found', 'Task not found', 'already_favorited', 'distance', 'entity_id', 'entity_type', 'favorited', 'message', 'station', 'station:read', 'station_id', 'status', 'success', 'unfavorited', 'user_role']

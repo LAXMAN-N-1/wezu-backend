@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/ml/feature_store.py
-# hypothesis_version: 6.151.11
-
-[0.0, 30.0, 'account_age_days', 'avg_temperature_30d', 'battery_age_days', 'battery_id', 'charge_cycle_count', 'current_soh', 'failed', 'failed_payment_count', 'overdue', 'overdue_rate', 'total_rentals', 'user_id', 'voltage_drop_rate']

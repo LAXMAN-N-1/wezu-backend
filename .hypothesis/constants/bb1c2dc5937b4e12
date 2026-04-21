@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/passkey.py
-# hypothesis_version: 6.151.11
-
-['passkey_challenges', 'passkey_credentials', 'users.id']

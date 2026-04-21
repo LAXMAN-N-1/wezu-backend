@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/admin/media.py
-# hypothesis_version: 6.151.11
-
-[404, '/', '/upload', '/{asset_id}', 'Asset not found', 'general', 'ok']

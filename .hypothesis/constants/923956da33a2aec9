@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/wallet_enhanced.py
-# hypothesis_version: 6.151.11
-
-[400, 404, '/cashback', '/transfer', '/withdrawals', '0.00', 'Insufficient balance', 'Recipient not found', 'Transfer successful', 'Withdrawal initiated', 'amount', 'bank_account_id', 'cashback', 'credit', 'debit', 'is_deleted', 'message', 'pending', 'recipient', 'status', 'success', 'total_cashback', 'transaction_id', 'transactions', 'transfer_in', 'transfer_out', 'user_transfer']

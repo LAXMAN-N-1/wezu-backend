@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/admin/admin_groups.py
-# hypothesis_version: 6.151.11
-
-[100, 400, 404, '/', '/{group_id}', 'admin-groups', 'admin_group_id', 'admin_users', 'created_at', 'description', 'id', 'is_active', 'member_count', 'name', 'ok', 'updated_at']

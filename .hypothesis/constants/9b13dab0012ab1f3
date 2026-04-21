@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/workers/daily_jobs.py
-# hypothesis_version: 6.151.11
-
-[0.0, 0.1, 10.0, 'COMPLETED', 'FAIL', 'FAILED', 'RUNNING', 'SCHEDULED', 'available', 'available_batteries', 'commissions_created', 'daily_inventory_sync', 'date', 'dealers_processed', 'fees_created', 'high_risk_users', 'overdue_rentals', 'rental_id', 'scores_updated', 'station_count', 'station_revenues', 'synced_inventories', 'timestamp', 'total_commission', 'total_fees', 'total_revenue', 'users_processed']

@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/booking_service.py
-# hypothesis_version: 6.151.11
-
-['ACTIVE', 'CANCELLED', 'COMPLETED', 'EXPIRED', 'PENDING', 'Reservation Reminder', 'Station not found', 'address', 'available_batteries', 'booking_service', 'closed', 'create_reservation', 'distance', 'error', 'id', 'is_24x7', 'latitude', 'longitude', 'maintenance', 'mark_expired_if_due', 'name', 'offline', 'rating']

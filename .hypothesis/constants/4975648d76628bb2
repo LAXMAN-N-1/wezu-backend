@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/screens.py
-# hypothesis_version: 6.151.11
-
-['/{screen_id}/config', 'actions', 'all', 'bulk_actions', 'columns', 'enabled', 'field', 'filters', 'id', 'label', 'permission', 'permission_required', 'sortable', 'visible']

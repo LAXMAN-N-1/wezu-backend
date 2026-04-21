@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/dealer_ledger_service.py
-# hypothesis_version: 6.151.11
-
-[0.0, 0.1, 0.9, 3600, 10000, '%Y-%m-%d %H:%M:%S', '-', 'Amount', 'Commission', 'Completed', 'Date & Time', 'Payment Captured', 'Penalty', 'Pending', 'RENTAL', 'Reference ID', 'Rental Income', 'Rental Started', 'Rental not found', 'Settlement Queued', 'Slot 1', 'Station', 'Status', 'TXN ID', 'Type', 'Unknown', 'active', 'bat-', 'completed', 'date', 'name', 'paid', 'pending', 'status', 'txn-c', 'txn-r']

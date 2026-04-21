@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/admin/stock.py
-# hypothesis_version: 6.151.11
-
-[0.0, 0.1, 0.5, 3.0, 100.0, 100, 404, '/alerts', '/locations', '/overview', '/reorder', '/stations', 'AVAILABLE', 'Alert dismissed', 'Li-ion', 'MAINTENANCE', 'RENTED', 'Service Center 1', 'Station not found', 'Warehouse Central', 'available', 'batteries', 'config', 'health_percentage', 'id', 'is_low_stock', 'maintenance', 'message', 'rented', 'serial_number', 'status', 'success', 'total', 'type', 'updated_at', 'utilization']

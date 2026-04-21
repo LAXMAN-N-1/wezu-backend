@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/organization.py
-# hypothesis_version: 6.151.11
-
-['Branch', 'Organization', 'all, delete-orphan', 'cascade', 'facebook', 'instagram', 'linkedin', 'organization', 'organizations', 'organizations.id', 'others', 'social_links', 'twitter', 'website', 'youtube']

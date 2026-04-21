@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/video_kyc.py
-# hypothesis_version: 6.151.11
-
-['User', 'foreign_keys', 'initiated', 'unknown', 'users.id', 'video_kyc_sessions']

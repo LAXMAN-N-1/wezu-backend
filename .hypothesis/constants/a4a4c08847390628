@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/admin/analytics.py
-# hypothesis_version: 6.151.11
-
-[',', '/conversion-funnel', '/dashboard', '/demand-forecast', '/export', '/inventory-status', '/overview', '/recent-activity', '/revenue/by-region', '/revenue/by-station', '/top-stations', '/trends', '/user-behavior', '/user-growth', '30d', 'Avg Rentals/User', 'Avg Session Minutes', 'Content-Disposition', 'Metric', 'Peak Hours', 'Value', 'admin-analytics', 'all', 'avg_rentals_per_user', 'avg_session_duration', 'behavior', 'conversion-funnel', 'dashboard', 'data', 'demand-forecast', 'endpoint', 'forecast', 'inventory-status', 'monthly', 'overview', 'peak_hours', 'recent-activity', 'revenue-by-region', 'revenue-by-station', 'text/csv', 'top-stations', 'trends', 'user-behavior', 'user-growth', 'value', 'weekly']

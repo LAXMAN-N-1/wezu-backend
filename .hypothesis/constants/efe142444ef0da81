@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/role_rights.py
-# hypothesis_version: 6.151.11
-
-[404, '/', '/role/{role_id}', '/{right_id}', 'RoleRight not found', 'create', 'edit', 'role_rights']

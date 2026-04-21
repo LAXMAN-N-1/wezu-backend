@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/wallet.py
-# hypothesis_version: 6.151.11
-
-[400, 404, 500, '***', '/', '/balance', '/lookup', '/payment-methods', '/recharge', '/transactions', '/withdraw', 'Payment method added', 'User not found', 'WALLET', 'WALLET_RECHARGE', 'WALLET_WITHDRAWAL', 'account_holder_name', 'account_number', 'available_methods', 'balance', 'bank_name', 'cashback_balance', 'created', 'currency', 'data', 'default_method_id', 'id', 'ifsc_code', 'is_default', 'masked_name', 'message', 'method', 'method_id', 'methods', 'payment_mode', 'razorpay', 'request_id', 'status', 'success', 'upi_id', 'user_id']

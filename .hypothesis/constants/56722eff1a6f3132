@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/fraud_service.py
-# hypothesis_version: 6.151.11
-
-[100, 'CRITICAL', 'FAIL', 'HIGH', 'LOW', 'MEDIUM', 'blacklist', 'breakdown', 'count', 'count_30m', 'device_fingerprints', 'failed_checks_30d', 'hit', 'otp', 'otp_velocity', 'points', 'risk_level', 'score', 'total', 'user_id', 'wezu_fraud']

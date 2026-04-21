@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/inventory.py
-# hypothesis_version: 6.151.11
-
-['[]', 'batteries.id', 'battery_id', 'driver_profiles.id', 'inventory_transfers', 'open', 'pending', 'station', 'stock_discrepancies', 'transfer_id', 'users.id', 'warehouse']

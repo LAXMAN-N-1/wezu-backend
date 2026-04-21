@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/admin/bess.py
-# hypothesis_version: 6.151.11
-
-[0.0, 404, 500, '%Y-%m-%d', '/energy-logs', '/energy-logs/summary', '/grid-events', '/overview', '/reports', '/reports/kpi', '/units', '/units/{unit_id}', 'BESS unit not found', 'Days of history', 'Days to summarize', 'Grid event not found', 'avg_efficiency', 'charged', 'completed', 'date', 'discharged', 'ok', 'online', 'report_count', 'status', 'total_charged', 'total_cost', 'total_discharged', 'total_revenue']

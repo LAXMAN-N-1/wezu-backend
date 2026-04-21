@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/dealer_portal_auth.py
-# hypothesis_version: 6.151.11
-
-[400, 401, 403, 404, 410, 423, '/activate/{token}', '/change-password', '/login', '/refresh', '/register', '/register/status', 'DEALER_USER', 'Invalid credentials', 'Invalid token type', 'NOT_STARTED', 'SUBMITTED', 'User not found', 'access_token', 'bearer', 'business_name', 'created_at', 'current_stage', 'dealer', 'dealer_id', 'dealer_name', 'dict', 'email', 'expired', 'full_name', 'is_active', 'message', 'must_change_password', 'new_password', 'note', 'password', 'permissions', 'proprietorship', 'refresh', 'refresh_token', 'role_color', 'role_icon', 'role_name', 'sid', 'stage', 'status_history', 'sub', 'timestamp', 'token_type', 'type', 'user', 'valid', 'wezu_dealer_auth']

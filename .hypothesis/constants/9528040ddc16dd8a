@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/telemetry.py
-# hypothesis_version: 6.151.11
-
-[-1.5, 1.5, 17.385, 32.0, 72.0, 78.4867, 100.0, -180, 100, 180, 403, 404, 'Battery not found', 'No location data', 'Not authorized', 'Rental not found', 'has_violations', 'id', 'log_id', 'name', 'normal', 'timestamp', 'type', 'violations']

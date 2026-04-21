@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/location.py
-# hypothesis_version: 6.151.11
-
-[-180, 100, 180, 360, 1000, 'GPS', 'HIGH', 'MEDIUM', 'Not authorized', 'Rental not found', 'accuracy', 'current_location', 'geofence_id', 'has_violations', 'latitude', 'log_id', 'longitude', 'message', 'name', 'outside_safe_zone', 'reason', 'restricted_zone', 'severity', 'timestamp', 'type', 'violation_count', 'violations']

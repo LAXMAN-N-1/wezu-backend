@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/membership.py
-# hypothesis_version: 6.151.11
-
-[0.0, 'User', 'active', 'bronze', 'gold', 'membership', 'platinum', 'silver', 'user_memberships', 'users.id']

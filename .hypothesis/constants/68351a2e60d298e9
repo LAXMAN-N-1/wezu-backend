@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/admin/rentals.py
-# hypothesis_version: 6.151.11
-
-[0.0, 100, 400, 404, '/active', '/history', '/late-fees', '/purchases', '/stats', '/swaps', 'APPROVED', 'NONE', 'Rental not found', 'Unknown', 'WAIVED', 'active_rentals', 'amount', 'battery_id', 'battery_level', 'created_at', 'days_overdue', 'end_time', 'expected_end_time', 'id', 'message', 'new_battery_soc', 'old_battery_soc', 'overdue_rentals', 'payment_status', 'start_time', 'station_id', 'status', 'success', 'timestamp', 'today_revenue', 'total_amount', 'total_late_fee', 'user_name', 'waiver_id', 'waiver_status']

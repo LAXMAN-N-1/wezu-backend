@@ -1,7 +1,0 @@
-info:
-  name: Dealer_Auth
-  type: folder
-  seq: 1
-
-request:
-  auth: inherit

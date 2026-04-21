@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/iot.py
-# hypothesis_version: 6.151.11
-
-['Battery', 'DeviceCommand', 'batteries.id', 'commands', 'device', 'device_commands', 'firmware_updates', 'iot_device', 'iot_devices', 'iot_devices.id', 'mqtt', 'offline', 'queued', 'tracker_v1']

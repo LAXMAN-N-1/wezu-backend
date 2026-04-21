@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/location.py
-# hypothesis_version: 6.151.11
-
-['City', 'Country', 'Region', 'Station', 'Zone', 'cities', 'cities.id', 'city', 'continent', 'continents', 'continents.id', 'countries', 'countries.id', 'country', 'region', 'regions', 'regions.id', 'zone', 'zones']

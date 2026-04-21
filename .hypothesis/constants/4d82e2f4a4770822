@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/ecommerce.py
-# hypothesis_version: 6.151.11
-
-['DeliveryAssignment', 'EcommerceOrderItem', 'User', 'addresses.id', 'battery', 'ecommerce_orders', 'ecommerce_orders.id', 'ecommerce_products', 'items', 'order', 'order_items', 'pending', 'product', 'users.id']

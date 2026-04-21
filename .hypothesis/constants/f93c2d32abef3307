@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/membership_service.py
-# hypothesis_version: 6.151.11
-
-[10.0, 100, 365, 1000, 5000, 20000, 'Birthday rewards', 'Email support', 'Maximum tier reached', 'Priority support', 'Standard swap rates', 'next_tier', 'points_needed', 'progress_percentage', 'rental', 'requirement']

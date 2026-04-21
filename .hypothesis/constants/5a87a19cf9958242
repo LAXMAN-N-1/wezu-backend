@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/schemas/input_contracts.py
-# hypothesis_version: 6.151.11
-
-[100, 128, 200, 500, 1000, 'ALL', 'ISO 8601 date string', 'medium', 'other', 'verification']

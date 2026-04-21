@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/payments_enhanced.py
-# hypothesis_version: 6.151.11
-
-[400, 404, 503, '/methods', '/razorpay/webhook', '/refunds/history', '0.01', '0.18', 'Invalid signature', 'X-Razorpay-Event-Id', 'X-Razorpay-Signature', 'accepted', 'active', 'amount', 'brand', 'category', 'created_at', 'description', 'event_id', 'gateway_refund_id', 'gst', 'id', 'invoice_id', 'invoice_url', 'is_default', 'last4', 'message', 'method_id', 'mode', 'processed_at', 'provider', 'queue_id', 'queued', 'razorpay', 'reason', 'receipt_url', 'status', 'total', 'transaction_id', 'type']

@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/mqtt_service.py
-# hypothesis_version: 6.151.11
-
-[0.0, 100.0, 100, 300, 1883, 86400, '+00:00', '/', ':', 'CRITICAL', 'HIGH', 'HIGH_TEMPERATURE', 'LOW_BATTERY', 'LOW_HEALTH', 'MEDIUM', 'Z', 'current', 'error_codes', 'gps_altitude', 'gps_latitude', 'gps_longitude', 'gps_speed', 'health', 'json', 'lat', 'lng', 'message', 'mqtt', 'mqtt://', 'severity', 'soc', 'soh', 'speed', 'telematics.ingest.v1', 'temp', 'temperature', 'timestamp', 'type', 'voltage']

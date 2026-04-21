@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/battery_service.py
-# hypothesis_version: 6.151.11
-
-[0.0, 0.01, 0.05, 100.0, 100, 1000, 'Initial registration', 'available_count', 'created', 'health_alert', 'id', 'maintenance_count', 'model', 'rented_count', 'retired_count', 'sku_id', 'spec_id', 'station_assigned', 'status', 'status_change', 'total_batteries']

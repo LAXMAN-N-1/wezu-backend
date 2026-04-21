@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/admin_invoices.py
-# hypothesis_version: 6.151.11
-
-[100, 404, 500, '/', '/{invoice_id}/pdf', 'Content-Disposition', 'Invoice not found', 'application/pdf', 'data', 'limit', 'skip', 'total']

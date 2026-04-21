@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/admin/roles.py
-# hypothesis_version: 6.151.11
-
-[400, 404, '/', '/permissions', '/{id}', 'Role already exists', 'Role not found', 'permission_ids']

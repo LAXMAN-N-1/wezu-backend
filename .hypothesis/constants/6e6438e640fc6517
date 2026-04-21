@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/notifications.py
-# hypothesis_version: 6.151.11
-
-[404, '/', '/admin/bulk', '/my', '/read-all', '/send', '/unread-count', '/{notification_id}', 'Notification deleted', 'User not found', 'all', 'count', 'message', 'unread_count']

@@ -1,7 +1,0 @@
-info:
-  name: Admin_KYC
-  type: folder
-  seq: 1
-
-request:
-  auth: inherit

@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/audit_log.py
-# hypothesis_version: 6.151.11
-
-['ACCOUNT_ACTIVATION', 'AUTH_LOGIN', 'AUTH_LOGOUT', 'BALANCE_ADJUSTMENT', 'DATA_MODIFICATION', 'PASSWORD_RESET', 'PERMISSION_CHANGE', 'SESSION_TERMINATED', 'USER_CREATION', 'USER_INVITE', 'audit_logs', 'medium', 'metadata', 'new_value', 'old_value', 'security_events']

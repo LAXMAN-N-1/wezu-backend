@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/qr_service.py
-# hypothesis_version: 6.151.11
-
-[',', '.', '/', ':', '=', 'PNG', 'WZB1', 'app', 'app_scan_value', 'ascii', 'battery', 'battery_id', 'bid', 'black', 'content_type', 'deep_link', 'image/png', 'location_id', 'location_type', 'mode', 'qr_code_base64', 'qr_code_data_uri', 'reference', 'resolved_by', 'scan_value', 'secure', 'secure_scan_value', 'serial_number', 'signed_token', 'sn', 'status', 'stored_qr', 't', 'utf-8', 'v', 'wezu', 'white']

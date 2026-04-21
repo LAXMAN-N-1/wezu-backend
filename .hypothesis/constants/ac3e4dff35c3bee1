@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/webhooks/razorpay.py
-# hypothesis_version: 6.151.11
-
-[100.0, 400, 500, '/razorpay', 'Invalid JSON body', 'Invalid signature', 'amount', 'entity', 'event', 'id', 'notes', 'ok', 'payload', 'payment', 'payment.captured', 'payment.failed', 'payment_id', 'pending', 'processed', 'refund', 'refund.processed', 'status', 'success', 'user_id', 'utf-8', 'wezu_payments']

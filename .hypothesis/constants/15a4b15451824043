@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/order_realtime_outbox_service.py
-# hypothesis_version: 6.151.11
-
-[1000, 1970, ',', ':', 'acquired', 'backend_unavailable', 'claimed', 'failed', 'held_elsewhere', 'lock_backend_checked', 'lock_state_code', 'none', 'pending', 'postgresql', 'processing', 'publish failed', 'published', 'wezu:orders:updates']

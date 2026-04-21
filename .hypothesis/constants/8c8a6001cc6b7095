@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/admin/jobs.py
-# hypothesis_version: 6.151.11
-
-[100, 400, 404, '/', '/executions/recent', '/{job_id}', '/{job_id}/history', '/{job_id}/run', 'Execution not found', 'Job is not active', 'Job not found', 'MANUAL', 'PENDING', 'RUNNING', 'Unknown', 'completed_at', 'duration_seconds', 'error_message', 'error_stack_trace', 'execution_id', 'execution_log', 'failed_items', 'job_id', 'job_name', 'processed_items', 'result_summary', 'started_at', 'status', 'trigger_type']

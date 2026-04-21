@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/rbac.py
-# hypothesis_version: 6.151.11
-
-['#4CAF50', 'AdminUser', 'Role', 'Role.id', 'RoleRight', 'User', 'access_paths', 'admin_user_roles', 'admin_users.id', 'all, delete-orphan', 'back_populates', 'cascade', 'children', 'dealer_profiles.id', 'global', 'parent', 'permissions', 'permissions.id', 'primaryjoin', 'remote_side', 'role', 'role_permissions', 'roles', 'roles.id', 'secondaryjoin', 'shield', 'system', 'user_access_paths', 'user_roles', 'users.id', 'view']

@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/distributed_cache_service.py
-# hypothesis_version: 6.151.11
-
-[1000, ',', ':', 'cache.decode_failed', 'compute', 'compute_no_lock', 'hit', 'stale', 'utf-8', 'wait_hit']

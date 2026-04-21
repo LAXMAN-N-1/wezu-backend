@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/admin/fraud.py
-# hypothesis_version: 6.151.11
-
-[50.0, 100, 400, 404, '/blacklist', '/blacklist/{id}', '/device-fingerprints', '/duplicate-accounts', '/high-risk-users', 'Already blacklisted', 'CLEARED', 'CONFIRMED', 'FALSE_POSITIVE', 'INVESTIGATING', 'Not found', 'action', 'breakdown', 'device_id', 'device_type', 'email', 'first_seen', 'id', 'ip_address', 'is_suspicious', 'last_seen', 'last_updated', 'os_name', 'phone', 'removed', 'risk_score', 'status', 'updated', 'user_email', 'user_id']

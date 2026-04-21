@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/admin/support.py
-# hypothesis_version: 6.151.11
-
-[404, '/agents/performance', '/queue-stats', '/tickets', 'Ticket not found']

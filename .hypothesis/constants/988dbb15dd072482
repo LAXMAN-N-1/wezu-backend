@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/settlement.py
-# hypothesis_version: 6.151.11
-
-[0.0, 'CommissionLog', 'DealerProfile', 'INR', 'Vendor', 'dealer_profiles.id', 'pending', 'settlement', 'settlements', 'vendors.id']

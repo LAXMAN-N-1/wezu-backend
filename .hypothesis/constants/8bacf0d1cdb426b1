@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/payment_method.py
-# hypothesis_version: 6.151.11
-
-['active', 'payment_methods', 'postgresql', 'razorpay', 'users.id']

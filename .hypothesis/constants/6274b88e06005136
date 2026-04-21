@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/dealer_station_service.py
-# hypothesis_version: 6.151.11
-
-[20.0, 100, 400, 404, '-', ':', 'Operational', 'Station not found', 'available_count', 'current_charge', 'cycle_count', 'damaged', 'degraded', 'end_time', 'good', 'health_percentage', 'health_status', 'id', 'inactive', 'message', 'pending', 'reason', 'serial_number', 'slot_number', 'start_time', 'station_id', 'station_name', 'status', 'threshold_pct', 'total_slots']

@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/analytics/customer_service.py
-# hypothesis_version: 6.151.11
-
-[0.0, 0.05, 0.12, 4.5, 12.3, 500, 750, 3600, '2024-01', '2024-02', '2h 30m', '30d', 'Bronze', 'Mon', 'N/A', 'RENTAL_PAYMENT', 'SUBSCRIPTION', 'Station Alpha', 'Tue', 'active_rentals', 'avg_rental_duration', 'carbon_saved_kg', 'cost', 'duration', 'energy_consumed_kwh', 'epoch', 'health', 'id', 'membership_level', 'monthly_spending', 'most_used_station', 'purchase', 'rental', 'rental_usage', 'rental_vs_purchase', 'spending_history', 'success', 'timestamp', 'total_amount_spent', 'total_batteries_used', 'total_rentals', 'usage_time_hours', 'wallet_balance']

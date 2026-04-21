@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/telematics_service.py
-# hypothesis_version: 6.151.11
-
-['anomaly', 'current', 'geofence_violation', 'health', 'lat', 'lon', 'soc', 'soh', 'temp', 'temperature', 'unknown', 'voltage', 'wezu_telematics']

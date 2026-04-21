@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/event_stream_service.py
-# hypothesis_version: 6.151.11
-
-[100, 500, 1000, 10000, '$', ',', ':', '>', 'BUSYGROUP', 'REDIS_STREAM_MAXLEN', 'attempt', 'event_id', 'event_type', 'idempotency_key', 'last_error', 'last_failure_at', 'last_failure_stream', 'metadata', 'occurred_at', 'payload', 'pending', 'producer_host', 'schema_version', 'source', 'v1']

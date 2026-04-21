@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/stock_movement.py
-# hypothesis_version: 6.151.11
-
-['ADJUSTMENT_ADD', 'ADJUSTMENT_SUB', 'DAMAGED', 'GRN', 'IN', 'OUT', 'RETURN', 'SALE', 'Stock', 'TRANSFER_IN', 'TRANSFER_OUT', 'movements', 'stock_movements', 'stocks.id', 'users.id']

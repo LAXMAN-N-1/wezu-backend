@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/manifest.py
-# hypothesis_version: 6.151.11
-
-['Battery', 'In Transit', 'ManifestItem', 'batteries.id', 'battery_id', 'items', 'manifest', 'manifest_id', 'manifest_items', 'manifests', 'manifests.id', 'pending']

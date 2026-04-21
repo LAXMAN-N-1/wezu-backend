@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/dealer_onboarding.py
-# hypothesis_version: 6.151.11
-
-[400, 403, 404, '/stage/submit-kyc', '/status', 'ACTIVE', 'APPROVED', 'COMPLETED', 'Dealer activated', 'KYC_SUBMITTED', 'MANUAL_REVIEW_PASSED', 'Not a dealer', 'REJECTED', 'Record not found', 'Review completed', 'SCHEDULED', 'SUBMITTED', 'TRAINING_COMPLETED', 'Training completed', 'current_stage', 'history', 'message', 'risk_score', 'stage']

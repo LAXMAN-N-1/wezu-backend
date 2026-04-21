@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/chargeback.py
-# hypothesis_version: 6.151.11
-
-['chargebacks', 'pending', 'settlements.id', 'swap_sessions.id', 'users.id']

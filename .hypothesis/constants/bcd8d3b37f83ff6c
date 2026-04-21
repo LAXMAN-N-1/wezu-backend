@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/admin/audit_trails.py
-# hypothesis_version: 6.151.11
-
-[404, '/', '/stats', '/{entry_id}', 'System', 'action_type', 'actor_id', 'actor_name', 'battery_id', 'disposal', 'disposals', 'entries', 'from_location_id', 'from_location_type', 'id', 'manual_entries', 'manual_entry', 'notes', 'page', 'page_size', 'status_change', 'status_changes', 'timestamp', 'to_location_id', 'to_location_type', 'today_count', 'total_count', 'total_entries', 'transfer', 'transfers', 'week_count']

@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/fraud.py
-# hypothesis_version: 6.151.11
-
-[0.0, 75.0, 95.0, 403, '/device/fingerprint', '/verify/gst', '/verify/pan', '/verify/phone', 'DETECTED', 'FAIL', 'GST_VERIFY', 'HIGH', 'Invalid GST format', 'Invalid PAN format', 'LOW', 'Not authorized', 'PAN_VERIFY', 'PASS', 'PHONE', 'PHONE_CHECK', 'Phone number clean', 'details', 'initial', 'risk_level', 'status']

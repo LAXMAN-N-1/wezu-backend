@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/stock.py
-# hypothesis_version: 6.151.11
-
-['BatteryCatalog', 'StockMovement', 'Warehouse', 'battery_catalog.id', 'stock', 'stocks', 'warehouses.id']

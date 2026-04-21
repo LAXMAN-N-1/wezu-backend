@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/core/logging.py
-# hypothesis_version: 6.151.11
-
-['%Y-%m-%dT%H:%M:%S', '%s', '%s | %s', '/health', '/ready', '_FallbackBoundLogger', 'aiosqlite', 'args', 'asyncio', 'gunicorn', 'gunicorn.access', 'gunicorn.error', 'iso', 'production', 'sqlalchemy.engine', 'uvicorn', 'uvicorn.access', 'uvicorn.error']

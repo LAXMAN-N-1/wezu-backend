@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/dealer_portal_customers.py
-# hypothesis_version: 6.151.11
-
-[100, 403, 404, 3600, '/rentals/active', '/{customer_id}', 'Customer not found', 'N/A', 'Not a dealer', 'Unknown', 'active', 'battery_health', 'battery_serial', 'created_at', 'customer_id', 'customer_name', 'customers', 'duration_hours', 'email', 'end_time', 'error', 'full_name', 'id', 'last_login', 'limit', 'page', 'phone_number', 'rental_id', 'rentals', 'start_time', 'station_name', 'status', 'total', 'total_rentals']

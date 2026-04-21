@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/admin/health.py
-# hypothesis_version: 6.151.11
-
-[0.0, 100.0, 100, 365, 404, 422, 2000, 9999, '%Y-%m-%d', '+00:00', '/alerts', '/analytics', '/batteries', '/maintenance', '/overview', 'Alert not found', 'Alert resolved', 'Battery not found', 'Z', 'critical', 'degradation_rate', 'fair', 'good', 'health_asc', 'health_desc', 'last_service', 'message', 'poor', 'status', 'success', 'value']

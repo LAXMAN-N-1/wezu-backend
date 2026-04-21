@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/revenue_report.py
-# hypothesis_version: 6.151.11
-
-[0.0, 'breakdown_by_dealer', 'breakdown_by_source', 'breakdown_by_station', 'revenue_reports']

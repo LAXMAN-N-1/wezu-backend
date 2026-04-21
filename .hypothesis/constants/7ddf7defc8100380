@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/websocket_service.py
-# hypothesis_version: 6.151.11
-
-[0.0, 0.1, 0.2, 0.25, 1.0, 1.25, 1.5, 2.0, 3.0, 15.0, 30.0, '*', 'affected_locations', 'alert', 'battery_id', 'battery_update', 'claimed', 'data', 'heartbeat', 'inventory', 'inventory_update', 'location_id', 'location_type', 'lock_backend_checked', 'lock_state_code', 'message', 'order', 'order_id', 'order_update', 'replace', 'scope', 'shelf', 'station', 'timestamp', 'type', 'utf-8', 'warehouse', 'wezu:orders:updates']

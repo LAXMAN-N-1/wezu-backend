@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/user.py
-# hypothesis_version: 6.151.11
-
-['Address', 'DealerProfile', 'DeliveryOrder', 'Device', 'DriverProfile', 'KYCDocument', 'KYCRecord', 'Rental', 'Role', 'SessionToken', 'StaffProfile', 'Transaction', 'TwoFactorAuth', 'UserAccessPath', 'UserMembership', 'UserProfile', 'UserSession', 'Vehicle', 'Wallet', '[KYCRecord.user_id]', '[User.role_id]', 'active', 'admin', 'approved', 'customer', 'dealer', 'dealer_profiles.id', 'dealer_staff', 'deleted', 'driver', 'foreign_keys', 'inactive', 'logistics', 'not_submitted', 'pending', 'pending_verification', 'rejected', 'roles.id', 'support_agent', 'suspended', 'uselist', 'user', 'users', 'verified']

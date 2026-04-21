@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/profile.py
-# hypothesis_version: 6.151.11
-
-[300, 400, 404, '%H:%M', '/account', '/addresses', '/change-password', '/login-history', '/picture', '/preferences', '/sessions', 'Address not found', 'Incorrect password', 'Preferences updated', 'PreferencesUpdate', 'Session not found', 'Session revoked', 'id', 'image/', 'message', 'quiet_hours_end', 'quiet_hours_start', 'updated_at', 'uploads/profiles', 'user_id', 'wb']

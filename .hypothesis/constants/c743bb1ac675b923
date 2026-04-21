@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/sessions.py
-# hypothesis_version: 6.151.11
-
-[403, 404, '/list', '/revoke/{session_id}', 'Session not found', 'Session revoked', 'created_at', 'device_name', 'device_type', 'id', 'ip_address', 'is_active', 'is_current', 'last_active_at', 'message', 'none', 'session-list', 'sid']

@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/core/security.py
-# hypothesis_version: 6.151.11
-
-['Wezu Energy', 'access', 'auto', 'exp', 'iat', 'jti', 'pbkdf2_sha256', 'refresh', 'sub', 'type']

@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/support.py
-# hypothesis_version: 6.151.11
-
-['ChatMessage', 'ChatSession', 'SupportTicket', 'TicketMessage', 'User', 'active', 'auto_responses', 'chat_messages', 'chat_sessions', 'chat_sessions.id', 'closed', 'critical', 'foreign_keys', 'general', 'high', 'in_progress', 'low', 'medium', 'messages', 'open', 'resolved', 'session', 'support_tickets', 'support_tickets.id', 'ticket', 'ticket_messages', 'users.id', 'waiting']

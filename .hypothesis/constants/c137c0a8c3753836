@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/customer_auth.py
-# hypothesis_version: 6.151.11
-
-[400, 401, 403, '/login', '/register', 'bearer', 'customer', 'not_submitted', 'password', 'sid', 'wezu_customer_auth']

@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/battery_consistency.py
-# hypothesis_version: 6.151.11
-
-[400, 404, 409, '-', '_', 'active', 'assigned', 'available', 'battery_id', 'battery_ids', 'charging', 'customer', 'deployed', 'dispatched', 'faulty', 'in_progress', 'in_transit', 'is_deleted', 'maintenance', 'new', 'out_for_delivery', 'pending', 'ready', 'reserved', 'retired', 'shelf', 'station', 'status', 'target', 'transit', 'warehouse']

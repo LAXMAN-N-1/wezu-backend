@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/financial_report_service.py
-# hypothesis_version: 6.151.11
-
-[0.0, 1.0, 100, 365, '%Y-%m', '-', 'Category Breakdown', 'PURCHASE', 'RENTAL', 'SWAP', 'Station-', 'Unknown', 'amount', 'basis', 'breakdown_by_station', 'category', 'change_percent', 'confidence', 'count', 'created_at', 'credit', 'current', 'daily', 'discrepancy', 'forecasted_revenue', 'gateway_count', 'gateway_total', 'growth_percentage', 'historical_average', 'id', 'internal_count', 'internal_total', 'last_year_period', 'low', 'medium', 'month', 'monthly', 'net_revenue', 'next', 'next_period_estimate', 'no historical data', 'other', 'period', 'period_end', 'period_start', 'period_type', 'previous_period', 'purchase', 'reconciled', 'refund', 'rental', 'report_type', 'revenue', 'station_id', 'success', 'target_date', 'total_refunds', 'total_revenue', 'total_transactions', 'trend_factor', 'value', 'weekly']

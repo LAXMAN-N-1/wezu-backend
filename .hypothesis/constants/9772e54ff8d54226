@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/favorites.py
-# hypothesis_version: 6.151.11
-
-[0.0, 404, '/stations', 'Favorite not found', 'added', 'already_favorited', 'ready', 'removed', 'status']

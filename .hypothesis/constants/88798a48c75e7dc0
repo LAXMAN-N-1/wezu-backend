@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/support.py
-# hypothesis_version: 6.151.11
-
-[403, 404, '/admin/support/queue', '/admin/tickets', '/chat/initiate', '/faq', '/faq/{faq_id}', '/feedback', '/feedback/my', '/tickets', '/tickets/my', '/tickets/{ticket_id}', 'FAQ not found', 'Not permitted', 'Ticket not found', 'closed', 'open']

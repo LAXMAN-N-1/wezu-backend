@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/battery.py
-# hypothesis_version: 6.151.11
-
-[0.0, 25.0, 100.0, '48V/30Ah', 'BatteryCatalog', 'CRITICAL', 'DAMAGED', 'EXCELLENT', 'FAIR', 'GOOD', 'IoTDevice', 'POOR', 'Rental', '[Battery.sku_id]', 'available', 'batteries', 'batteries.id', 'battery', 'battery_audit_logs', 'battery_catalog.id', 'charging', 'foreign_keys', 'lifecycle_events', 'maintenance', 'onupdate', 'overlaps', 'recycling', 'rented', 'retired', 'service_center', 'sku', 'station', 'stations.id', 'uselist', 'users.id', 'warehouse']

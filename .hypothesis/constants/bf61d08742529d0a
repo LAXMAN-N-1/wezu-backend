@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/dealer_inventory.py
-# hypothesis_version: 6.151.11
-
-[100, 'DealerProfile', 'InventoryTransaction', 'dealer_inventories', 'dealer_profiles.id', 'inventory', 'transactions', 'users.id']

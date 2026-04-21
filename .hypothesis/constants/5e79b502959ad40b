@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/core/dashboard_config.py
-# hypothesis_version: 6.151.11
-
-['Active Users', 'Daily Swaps', 'Nearby Stations', 'Station Status', 'Total Revenue', 'Welcome', 'Welcome to Wezu', 'active_users_stat', 'admin', 'bar', 'battery_health_map', 'chart', 'chart_type', 'config', 'customer', 'daily_swaps', 'data_source', 'default', 'h', 'id', 'line', 'list', 'map', 'message', 'nearby_stations', 'position', 'revenue_chart', 'stat', 'station_status', 'title', 'type', 'vehicle_soc', 'vendor_owner', 'w', 'welcome_widget', 'x', 'y']

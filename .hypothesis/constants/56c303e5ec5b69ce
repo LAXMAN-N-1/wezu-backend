@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/faqs.py
-# hypothesis_version: 6.151.11
-
-[404, '/', '/categories', '/{id}', '/{id}/helpful', 'FAQ not found', 'category', 'count', 'message']

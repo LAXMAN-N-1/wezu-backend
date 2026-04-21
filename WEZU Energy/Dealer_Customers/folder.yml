@@ -1,7 +1,0 @@
-info:
-  name: Dealer_Customers
-  type: folder
-  seq: 1
-
-request:
-  auth: inherit

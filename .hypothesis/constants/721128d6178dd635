@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/maintenance_checklist.py
-# hypothesis_version: 6.151.11
-
-['postgresql', 'routine', 'standard', 'users.id']

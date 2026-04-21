@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/stock.py
-# hypothesis_version: 6.151.11
-
-[400, 404, 'ADJUSTMENT', 'GRN', 'TRANSFER']

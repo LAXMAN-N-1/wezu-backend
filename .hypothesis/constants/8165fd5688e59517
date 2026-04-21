@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/inventory.py
-# hypothesis_version: 6.151.11
-
-[400, 404, '/audit-trail', '/audit-trail/export', '/low-stock', '/transfers', '/transfers/{id}', 'Action', 'Actor ID', 'Battery ID', 'Content-Disposition', 'From ID', 'From Type', 'ID', 'Low stock threshold', 'Notes', 'Timestamp', 'To ID', 'To Type', 'Transfer not found', 'count', 'location_id', 'location_name', 'ready', 'ready_count', 'station', 'text/csv', 'type']

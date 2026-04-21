@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/batteries.py
-# hypothesis_version: 6.151.11
-
-[80.0, 100, 200, 400, 404, 500, 1000, '.csv', '/', '/batch/export', '/batch/import', '/batch/update', '/low-health', '/qr/generate', '/qr/verify', '/scan-qr', '/utilization-report', '/{battery_id}', '/{battery_id}/alerts', '/{battery_id}/status', '/{battery_id}/stream', 'BATTERY', 'Battery not found', 'Battery retired', 'CREATE_BATTERY', 'Content-Disposition', 'Manual decommission', 'Manual status update', 'Manual update', 'STATUS_CHANGE', 'battery', 'battery:read', 'battery_id', 'command', 'current', 'description', 'driver', 'entity_id', 'entity_type', 'expires_in_hours', 'health', 'message', 'ping', 'pong', 'qr_code', 'retired', 'severity', 'soc', 'station', 'status', 'status_change', 'success', 'temperature', 'text/csv', 'timestamp', 'transfer', 'type', 'utf-8', 'voltage']

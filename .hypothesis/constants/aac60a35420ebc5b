@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/audit_service.py
-# hypothesis_version: 6.151.11
-
-['action', 'auth', 'critical', 'id', 'ip_address', 'logs', 'new_value', 'old_value', 'resource_type', 'security', 'success', 'target_id', 'timestamp', 'to_dict', 'total_count', 'user_agent', 'user_id']

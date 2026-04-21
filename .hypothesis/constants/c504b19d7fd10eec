@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/admin_financial_reports.py
-# hypothesis_version: 6.151.11
-
-[100, 400, 404, '-', '/export/csv', '/export/json', '/generate', '/history', '/reconciliation', '/revenue', '/revenue/comparison', '/revenue/forecast', '/revenue/margins', '/revenue/trends', '/{report_id}', '30d', 'Content-Disposition', 'Report not found', 'daily', 'data', 'date', 'limit', 'monthly', 'skip', 'text/csv', 'total', 'weekly']

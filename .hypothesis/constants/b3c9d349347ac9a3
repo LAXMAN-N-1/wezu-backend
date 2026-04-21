@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/late_fee_service.py
-# hypothesis_version: 6.151.11
-
-[1.5, 3600, 'LATE_FEE_MULTIPLIER', 'LateFee', 'PAID', 'PENDING', 'active', 'chargeable_hours', 'daily_rate', 'hourly_rate', 'hours_late', 'in_grace_period', 'is_late', 'late_fee', 'rental_id', 'user_id']

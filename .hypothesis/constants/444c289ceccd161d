@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/batch_job.py
-# hypothesis_version: 6.151.11
-
-[300, 3600, 'JobExecution', 'PENDING', 'batch_jobs', 'batch_jobs.id', 'executions', 'job', 'job_executions', 'job_executions.id', 'postgresql', 'users.id']

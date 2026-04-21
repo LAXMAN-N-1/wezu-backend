@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/admin/settings.py
-# hypothesis_version: 6.151.11
-
-[120, 400, 404, 1000, '****', '/api-keys', '/api-keys/{key_id}', '/feature-flags', '/general', '/general/{config_id}', '/system-health', 'API key deleted', 'API key not found', 'API key updated', 'APScheduler running', 'Background Scheduler', 'IoT messaging', 'MQTT Broker', 'Not configured', 'Payment processing', 'PostgreSQL Database', 'Push notifications', 'Redis Cache', 'SELECT 1', 'Setting not found', 'batteries', 'created_at', 'database_stats', 'description', 'details', 'development', 'environment', 'hostname', 'id', 'is_active', 'is_enabled', 'key', 'key_name', 'key_value_masked', 'last_used_at', 'latency_ms', 'message', 'name', 'offline', 'online', 'os', 'python_version', 'rentals', 'service_name', 'services', 'standby', 'stations', 'status', 'system', 'updated_at', 'uptime', 'users', 'value']

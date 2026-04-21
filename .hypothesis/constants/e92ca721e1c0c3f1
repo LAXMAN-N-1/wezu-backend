@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/two_factor_auth.py
-# hypothesis_version: 6.151.11
-
-['User', 'two_factor_auth', 'users.id']

@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/admin_stations.py
-# hypothesis_version: 6.151.11
-
-[0.0, 100.0, 100, 404, 500, '/health', '/{station_id}/alerts', 'OFFLINE', 'ONLINE', 'Station not found', 'acknowledged_at', 'active', 'alert_id', 'alert_type', 'alerts', 'created_at', 'message', 'network_latency', 'severity']

@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/telematics.py
-# hypothesis_version: 6.151.11
-
-[10.0, 45.0, 404, '/ingest', 'Battery not found', 'No data found', 'alert_low_battery', 'alert_overheating']

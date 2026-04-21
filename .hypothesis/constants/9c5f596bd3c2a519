@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/bookings.py
-# hypothesis_version: 6.151.11
-
-[0.0, 49.0, 400, 403, 404, 100000, '/', '/{booking_id}', '/{booking_id}/pay', 'ACTIVE', 'Booking Reminder', 'Booking already paid', 'Booking cancelled', 'Booking not found', 'CANCELLED', 'COMPLETED', 'EXPIRED', 'INR', 'PENDING', 'Reminder sent', 'Wallet is frozen', 'booking_id', 'info', 'message', 'push', 'transactional', 'wallet']

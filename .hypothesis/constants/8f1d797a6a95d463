@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/dealer_portal_tickets.py
-# hypothesis_version: 6.151.11
-
-[100, 400, 404, '/{ticket_id}', '/{ticket_id}/close', '/{ticket_id}/reply', 'Ticket closed', 'Ticket not found', 'category', 'created_at', 'description', 'general', 'id', 'is_internal', 'limit', 'medium', 'message', 'messages', 'page', 'priority', 'resolved_at', 'sender_id', 'status', 'subject', 'ticket_id', 'tickets', 'total', 'updated_at', 'value']

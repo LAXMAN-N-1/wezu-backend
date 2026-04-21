@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/notification_admin.py
-# hypothesis_version: 6.151.11
-
-['all', 'automated_triggers', 'draft', 'notification_configs', 'notification_logs', 'push', 'push_campaigns', 'push_campaigns.id', 'sent', 'users.id']

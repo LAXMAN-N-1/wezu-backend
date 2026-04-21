@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/workers/hourly_jobs.py
-# hypothesis_version: 6.151.11
-
-[20.0, 'AVAILABLE', 'COMPLETED', 'FAILED', 'RENTED', 'active', 'alert', 'alerts_created', 'alerts_sent', 'batteries_checked', 'hourly_stock_alerts', 'hourly_swap_alerts', 'inventories_checked', 'rentals_checked', 'swap_alerts_sent', 'timestamp', 'violations_detected']

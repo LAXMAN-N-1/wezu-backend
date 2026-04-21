@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/maintenance.py
-# hypothesis_version: 6.151.11
-
-[0.0, 'Station', 'User', 'completed', 'maintenance_records', 'protected_namespaces', 'station_downtimes', 'stations.id', 'users.id']

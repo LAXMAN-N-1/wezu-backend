@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/purchases_enhanced.py
-# hypothesis_version: 6.151.11
-
-[400, 404, '/cart/{item_id}', 'Cart item updated', 'Order not found', 'cancelled', 'confirmed', 'item_id', 'medium', 'message', 'open', 'order_id', 'pending', 'processing', 'quantity', 'refund_status', 'status', 'ticket_id', 'under_review', 'warranty']

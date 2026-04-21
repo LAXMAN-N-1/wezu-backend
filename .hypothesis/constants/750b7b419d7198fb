@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/admin/iot.py
-# hypothesis_version: 6.151.11
-
-[98.5, 404, '/alerts', '/batteries/health', '/commands', '/commands/history', '/devices', '/geofences', '/stats', 'Alert not found', 'Device not found', 'active_alerts', 'critical', 'health_score', 'healthy', 'offline_devices', 'online', 'online_devices', 'queued', 'status', 'success', 'total', 'total_devices', 'warning']

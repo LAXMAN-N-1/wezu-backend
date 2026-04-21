@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/support_enhanced.py
-# hypothesis_version: 6.151.11
-
-[404, '/faq/search', 'Ticket not found', 'count', 'file_name', 'file_path', 'message', 'query', 'results', 'uploads/support', 'wb']

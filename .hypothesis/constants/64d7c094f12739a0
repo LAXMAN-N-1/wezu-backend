@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/middleware/rbac_middleware.py
-# hypothesis_version: 6.151.11
-
-['/docs', '/openapi.json', '/redoc', 'Authorization', 'Bearer ', 'OPTIONS', 'auth_error', 'error', 'token_expired', 'token_invalid']

@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/deps.py
-# hypothesis_version: 6.151.11
-
-[0.0, 'Bearer', 'WWW-Authenticate', 'admin', 'error', 'iat', 'logistics', 'null', 'operator', 'production', 'sid', 'token_expired', 'token_invalid', 'token_missing', 'undefined', 'utf-8', 'view', 'warehouse_manager']

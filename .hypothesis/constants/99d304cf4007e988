@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/notifications_enhanced.py
-# hypothesis_version: 6.151.11
-
-[255, 404, 4096, '-', '/device-token', '/read-all', 'Notification deleted', '_', 'after', 'android', 'app_scope', 'count', 'device_id', 'ios', 'message', 'platform', 'token', 'web']

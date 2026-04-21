@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/notification_outbox.py
-# hypothesis_version: 6.151.11
-
-['dead_letter', 'failed', 'notification_outbox', 'notifications.id', 'pending', 'processing', 'published', 'users.id']

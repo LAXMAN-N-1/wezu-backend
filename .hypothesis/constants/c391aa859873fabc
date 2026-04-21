@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/services/invoice_service.py
-# hypothesis_version: 6.151.11
-
-[0.3, 0.5, 0.6, 1.2, 2.5, 4.5, 3600, '#', '#1a73e8', '%d-%m-%Y', '%d-%m-%Y %H:%M', '<b>Bill To:</b>', '<b>Order Items:</b>', '<b>Total Amount:</b>', 'ALIGN', 'Active', 'BACKGROUND', 'BOTTOMPADDING', 'CENTER', 'CustomTitle', 'Daily Rate:', 'Duration:', 'End Date:', 'FONTNAME', 'FONTSIZE', 'GRID', 'GST (18%):', 'GST: 27XXXXX1234X1ZX', 'Heading1', 'Heading2', 'Heading3', 'Heading4', 'Helvetica-Bold', 'Invoice Date:', 'Invoice Number:', 'LINEABOVE', 'N/A', 'Normal', 'Payment Method:', 'Payment Status:', 'Product', 'Qty', 'RIGHT', 'Rental ID:', 'SKU', 'Shipping:', 'Start Date:', 'Status:', 'Subtotal:', 'TEXTCOLOR', 'Total', 'Total Amount:', 'Unit Price', 'WEZU Energy']

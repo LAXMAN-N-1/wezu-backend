@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/admin/kyc_admin.py
-# hypothesis_version: 6.151.11
-
-[404, '/', '/stats', '/{doc_id}', '/{doc_id}/approve', '/{doc_id}/reject', 'Document approved', 'Document not found', 'Document rejected', 'Unknown', 'doc_status', 'document_number', 'document_type', 'documents', 'file_url', 'id', 'message', 'page', 'page_size', 'pending', 'pending_users', 'reason', 'rejected', 'rejection_reason', 'status', 'success', 'total_count', 'total_documents', 'total_pending', 'total_rejected', 'total_verified', 'uploaded_at', 'user_email', 'user_id', 'user_kyc_status', 'user_name', 'user_phone', 'value', 'verified', 'verified_at', 'verified_by']

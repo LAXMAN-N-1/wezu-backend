@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/models/battery_health.py
-# hypothesis_version: 6.151.11
-
-['automated', 'batteries.id', 'calibration', 'completed', 'critical', 'critical_health', 'deep_service', 'high', 'high_temp', 'in_progress', 'info', 'inspection', 'iot_sync', 'low', 'manual', 'medium', 'overdue', 'overdue_service', 'rapid_degradation', 'replacement', 'scheduled', 'users.id', 'warning', 'warranty_expiry']

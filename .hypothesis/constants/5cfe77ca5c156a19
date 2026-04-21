@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/dealer_portal_users.py
-# hypothesis_version: 6.151.11
-
-[400, 403, 404, '/bulk', '/check-email', '/stats', '/{user_id}', '/{user_id}/sessions', '/{user_id}/status', 'AUTH', 'DEALER_USER', 'Deleted by admin', 'Email is available', 'Invalid role', 'LOGIN', 'Not a dealer account', 'Password required', 'Session not found', 'User not found', 'active', 'all', 'dealer_portal_users', 'email', 'errors', 'failed', 'inactive', 'manual', 'message', 'mode', 'notes', 'notes_internal', 'role_id', 'status', 'success', 'suspended', 'terminated', 'unknown', 'value']

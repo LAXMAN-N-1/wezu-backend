@@ -1,4 +1,0 @@
-# file: /Users/mohithavala/Documents/wezu-backend-unified/app/api/v1/audit.py
-# hypothesis_version: 6.151.11
-
-[403, '/auth/failures', '/data-access', '/permissions/usage', '/users/{user_id}', 'Granted: True', 'Not authorized', 'Unknown', '_id', 'admin', 'denied', 'description', 'granted', 'login_failed', 'permission_check', 'role', 'slug', 'super_admin', 'total_checks', 'unique_user_count', 'unused_permissions', 'used_permissions', 'users']
