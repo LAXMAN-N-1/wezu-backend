@@ -64,13 +64,27 @@ def _parse_revision_file(path: Path) -> _RevisionFile | None:
     down_revision_value = None
 
     for node in tree.body:
-        if not isinstance(node, ast.Assign):
+        target_names: list[str] = []
+        value_node: ast.AST | None = None
+
+        if isinstance(node, ast.Assign):
+            value_node = node.value
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    target_names.append(target.id)
+        elif isinstance(node, ast.AnnAssign):
+            value_node = node.value
+            if isinstance(node.target, ast.Name):
+                target_names.append(node.target.id)
+
+        if not value_node or not target_names:
             continue
-        for target in node.targets:
-            if isinstance(target, ast.Name) and target.id == "revision":
-                revision = _extract_literal(node.value)
-            elif isinstance(target, ast.Name) and target.id == "down_revision":
-                down_revision_value = _extract_literal(node.value)
+
+        for name in target_names:
+            if name == "revision":
+                revision = _extract_literal(value_node)
+            elif name == "down_revision":
+                down_revision_value = _extract_literal(value_node)
 
     if not revision or not isinstance(revision, str):
         return None
@@ -218,10 +232,11 @@ def validate_migration_graph(
         issues.append(f"expected exactly 1 alembic head, found {len(heads)}: {', '.join(heads)}")
 
     db_revisions = tuple()
-    try:
-        db_revisions = _collect_db_revisions()
-    except Exception as exc:
-        issues.append(f"failed to inspect alembic_version table: {exc}")
+    if db_at_head:
+        try:
+            db_revisions = _collect_db_revisions()
+        except Exception as exc:
+            issues.append(f"failed to inspect alembic_version table: {exc}")
 
     if db_at_head:
         if not db_revisions:
