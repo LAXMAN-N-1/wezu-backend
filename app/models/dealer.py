@@ -59,12 +59,12 @@ class DealerProfile(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
-    owner: "User" = Relationship(
-        back_populates="owned_dealer_profile",
+    user: "User" = Relationship(
+        back_populates="dealer_profile",
         sa_relationship_kwargs={
             "primaryjoin": "DealerProfile.user_id == User.id",
             "foreign_keys": "[DealerProfile.user_id]",
-            "overlaps": "dealer_profile,user,owner,owned_dealer_profile,staff_members"
+            "overlaps": "dealer_profile,staff_members"
         }
     )
     stations: List["Station"] = Relationship(back_populates="dealer")
