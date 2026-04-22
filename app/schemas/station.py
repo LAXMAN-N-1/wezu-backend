@@ -80,9 +80,12 @@ class HeatmapPoint(BaseModel):
 
 class NearbyFilterSchema(BaseModel):
     battery_type: Optional[str] = None
-    min_capacity: Optional[float] = None
-    max_capacity: Optional[float] = None
+    capacity_min: Optional[float] = None   # field name used by station_service
+    capacity_max: Optional[float] = None
     charger_type: Optional[str] = None
+    price_min: Optional[float] = None      # used by station_service for BatteryCatalog filter
+    price_max: Optional[float] = None
+    availability: bool = False             # if True, skip stations with 0 matching batteries
 
 class StationAvailabilityResponse(BaseModel):
     station_id: int
