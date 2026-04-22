@@ -1,5 +1,6 @@
 from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status, Body, Response
+from fastapi.responses import FileResponse
 from sqlmodel import Session, select
 from typing import List, Optional, Any
 from datetime import datetime
@@ -111,6 +112,7 @@ def schedule_visit(
 
 from app.services.financial_service import FinancialService
 from app.models.settlement import Settlement
+from app.services.settlement_service import SettlementService
 
 class SettlementRequest(BaseModel):
     dealer_id: int
@@ -275,6 +277,32 @@ def get_dealer_commissions(
         
     history = DealerService.get_commission_history(session, profile.id, skip, limit)
     return DataResponse(success=True, data=history)
+
+
+@router.get("/me/commissions/{settlement_id}/settlement-pdf")
+def get_dealer_settlement_pdf(
+    settlement_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    """Dealer: download settlement PDF by settlement id."""
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Not a dealer")
+
+    settlement = session.get(Settlement, settlement_id)
+    if not settlement or settlement.dealer_id != profile.id:
+        raise HTTPException(status_code=404, detail="Settlement not found")
+
+    path = SettlementService.generate_settlement_pdf(session, settlement_id)
+    if not path:
+        raise HTTPException(status_code=500, detail="Unable to generate settlement PDF")
+
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        filename=f"settlement_{settlement_id}.pdf",
+    )
 
 @router.get("/{id}", response_model=DataResponse[DealerProfileResponse])
 def read_dealer(

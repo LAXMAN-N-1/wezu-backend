@@ -73,14 +73,44 @@ class CustomerAuthResponse(BaseModel):
 
 @router.post("/login", response_model=CustomerAuthResponse)
 async def customer_login(
-    login_data: CustomerLoginRequest,
     request: Request,
     db: Session = Depends(deps.get_db),
 ):
     """
-    Customer JSON login. Accepts email or phone as the 'email' field.
+    Customer login. Supports JSON and form payloads.
+    Accepted identifier keys: email, username, phone_number.
     """
-    identifier = login_data.email.strip()
+    payload: dict = {}
+    content_type = (request.headers.get("content-type") or "").lower()
+
+    if "application/json" in content_type:
+        try:
+            body = await request.json()
+            payload = body if isinstance(body, dict) else {}
+        except Exception:
+            payload = {}
+    elif "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+        form_data = await request.form()
+        payload = dict(form_data)
+    else:
+        # Best effort for unknown content types
+        try:
+            body = await request.json()
+            payload = body if isinstance(body, dict) else {}
+        except Exception:
+            payload = {}
+
+    identifier = str(
+        payload.get("email")
+        or payload.get("username")
+        or payload.get("phone_number")
+        or ""
+    ).strip()
+    password = str(payload.get("password") or "")
+
+    if not identifier or not password:
+        raise HTTPException(status_code=422, detail="email/username and password are required")
+
     logger.info(f"Customer login attempt: {identifier}")
 
     # Look up by email first, then phone
@@ -91,7 +121,7 @@ async def customer_login(
     if not user or not user.hashed_password:
         raise HTTPException(status_code=401, detail="Invalid email/phone or password")
 
-    if not verify_password(login_data.password, user.hashed_password):
+    if not verify_password(password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email/phone or password")
 
     if user.status != UserStatus.ACTIVE:

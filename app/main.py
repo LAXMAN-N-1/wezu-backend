@@ -64,7 +64,7 @@ from app.api.v1 import (
     telematics, vehicles, locations, system, roles, menus, role_rights,
     admin_kyc, audit, ml, inventory, admin_stations, station_monitoring,
     dealer_portal_auth, dealer_portal_dashboard, dealer_portal_tickets,
-    dealer_portal_customers, dealer_portal_settings, dealer_onboarding,
+    dealer_portal_customers, dealer_portal_settings, dealer_onboarding, dealer_kyc,
     dealer_documents, dealer_portal_roles, dealer_portal_users,
     dealer_analytics, dealer_campaigns, dealer_stations, drivers, catalog,
     admin_invoices, admin_financial_reports, admin_audit, admin_rbac, admin_users,
@@ -675,6 +675,7 @@ app.include_router(dealer_portal_customers.router, prefix=f"{dealer_api}/analyti
 app.include_router(dealer_analytics.router, prefix=f"{dealer_api}/analytics", tags=["Dealer: Analytics"], dependencies=dealer_scope_deps)
 app.include_router(dealer_campaigns.router, prefix=f"{dealer_api}/campaigns", tags=["Dealer: Campaigns"], dependencies=dealer_scope_deps)
 app.include_router(dealer_onboarding.router, prefix=f"{dealer_api}/onboarding", tags=["Dealer: Onboarding"], dependencies=dealer_scope_deps)
+app.include_router(dealer_kyc.router, prefix=f"{dealer_api}/onboarding", tags=["Dealer: KYC"])
 app.include_router(dealer_portal_inventory.router, prefix=f"{dealer_api}/portal", tags=["Dealer: Inventory"], dependencies=dealer_scope_deps)
 
 # ── Logistics ──────────────────────────────────────────────────────────────

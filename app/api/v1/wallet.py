@@ -147,6 +147,11 @@ class WithdrawRequest(BaseModel):
     ifsc_code: Optional[str] = None
     upi_id: Optional[str] = None
 
+
+class WalletPayRequest(BaseModel):
+    amount: float
+    description: Optional[str] = None
+
 @router.post("/withdraw", response_model=dict) # Return basic dict or WithdrawalRequest model if schema defined
 @audit_log("WALLET_WITHDRAWAL", "WALLET")
 async def request_withdrawal(
@@ -174,6 +179,36 @@ async def request_withdrawal(
     except Exception as e:
         logger.exception("withdrawal_request_failed", user_id=current_user.id)
         raise HTTPException(status_code=500, detail="Withdrawal request failed")
+
+
+@router.post("/pay", response_model=dict)
+@audit_log("WALLET_PAYMENT", "WALLET")
+async def pay_from_wallet(
+    request: Request,
+    req: WalletPayRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    """
+    Deduct amount from wallet for direct in-app payment flows.
+    """
+    try:
+        wallet = WalletService.deduct_balance(
+            db,
+            current_user.id,
+            req.amount,
+            description=req.description or "Wallet payment",
+        )
+        return {
+            "status": "success",
+            "balance": float(wallet.balance),
+            "message": "Payment successful",
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("wallet_payment_failed", user_id=current_user.id)
+        raise HTTPException(status_code=500, detail="Wallet payment failed")
 
 @router.get("/transactions/{payment_id}/receipt")
 async def get_payment_receipt(
