@@ -1,5 +1,5 @@
 from __future__ import annotations
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Form
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Form, Body
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from sqlmodel import Session, select
@@ -18,7 +18,7 @@ from app.schemas.user import TokenPayload
 from app.core.config import settings
 from app.api import deps
 from app.core.audit import AuditLogger, audit_log
-from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator, ValidationError
 import logging
 import re
 from typing import Any, List, Optional
@@ -974,7 +974,7 @@ async def logout_all(
 @limiter.limit("5/hour")
 async def forgot_password(
     request: Request,
-    forgot_in: ForgotPasswordRequest,
+    forgot_in: dict = Body(...),
     db: Session = Depends(deps.get_db)
 ):
     """
@@ -982,19 +982,24 @@ async def forgot_password(
     Sends 6-digit OTP to registered email or phone.
     OTP expires in 10 minutes.
     """
+    try:
+        forgot_request = ForgotPasswordRequest.model_validate(forgot_in)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()) from exc
+
     user = None
     target = None
     channel = None
     
     # 1. Look up user
-    if forgot_in.email:
-        user = db.exec(select(User).where(User.email == forgot_in.email)).first()
-        target = forgot_in.email
+    if forgot_request.email:
+        user = db.exec(select(User).where(User.email == forgot_request.email)).first()
+        target = forgot_request.email
         channel = "email"
-    elif forgot_in.phone_number:
+    elif forgot_request.phone_number:
         # Normalize phone if needed, but for now strict match
-        user = db.exec(select(User).where(User.phone_number == forgot_in.phone_number)).first()
-        target = forgot_in.phone_number
+        user = db.exec(select(User).where(User.phone_number == forgot_request.phone_number)).first()
+        target = forgot_request.phone_number
         channel = "sms"
         
     if not user:
@@ -1026,19 +1031,24 @@ async def forgot_password(
 @limiter.limit("5/hour")
 async def resend_otp(
     request: Request,
-    otp_data: OTPRequest,
+    otp_data: dict = Body(...),
     db: Session = Depends(deps.get_db)
 ):
     """Resend OTP for registration or verification"""
+    try:
+        otp_request = OTPRequest.model_validate(otp_data)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()) from exc
+
     # Generate and send new OTP
-    code = OTPService.generate_otp(otp_data.target)
-    OTPService.create_otp_record(db, otp_data.target, code, otp_data.purpose)
+    code = OTPService.generate_otp(otp_request.target)
+    OTPService.create_otp_record(db, otp_request.target, code, otp_request.purpose)
     
-    logger.info(f"OTP resent for {otp_data.target}")
-    if "@" in otp_data.target:
-        await OTPService.send_email_otp(otp_data.target, code)
+    logger.info(f"OTP resent for {otp_request.target}")
+    if "@" in otp_request.target:
+        await OTPService.send_email_otp(otp_request.target, code)
     else:
-        await OTPService.send_sms_otp(otp_data.target, code)
+        await OTPService.send_sms_otp(otp_request.target, code)
     
     return {"message": "OTP resent successfully"}
 
