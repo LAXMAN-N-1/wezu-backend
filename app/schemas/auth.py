@@ -1,6 +1,7 @@
 from __future__ import annotations
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator, ValidationInfo, ConfigDict
 from typing import Optional, List, Any, Dict
+from typing_extensions import Self
 
 class LoginRequest(BaseModel):
     credential: str = Field(..., description="Login credential (email address or phone number)")
@@ -92,7 +93,7 @@ class ForgotPasswordRequest(BaseModel):
         return v
     
     @model_validator(mode='after')
-    def validate_either_email_or_phone(self) -> 'ForgotPasswordRequest':
+    def validate_either_email_or_phone(self) -> Self:
         if not self.email and not self.phone_number:
             raise ValueError("Either email or phone number must be provided")
         return self
@@ -141,7 +142,7 @@ class ChangePasswordRequest(BaseModel):
         return v
 
     @model_validator(mode='after')
-    def validate_passwords_different(self) -> 'ChangePasswordRequest':
+    def validate_passwords_different(self) -> Self:
         if self.current_password and self.new_password and self.current_password == self.new_password:
             raise ValueError("New password must be different from the current password")
         return self
