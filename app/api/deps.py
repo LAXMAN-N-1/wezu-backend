@@ -10,6 +10,7 @@ from jose import jwt, JWTError, ExpiredSignatureError
 from pydantic import ValidationError
 from sqlmodel import Session, select
 from sqlalchemy import func, or_
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.orm import joinedload
 from app.core.config import settings
 from app.core.rbac import canonical_role_name
@@ -145,7 +146,17 @@ def _coerce_iat(raw_iat: Any) -> Optional[int]:
 
 
 def _assert_not_blacklisted(db: Session, token: str) -> None:
-    blacklisted = db.exec(select(BlacklistedToken).where(BlacklistedToken.token == token)).first()
+    try:
+        blacklisted = db.exec(
+            select(BlacklistedToken).where(BlacklistedToken.token == token)
+        ).first()
+    except (ProgrammingError, OperationalError) as exc:
+        message = str(getattr(exc, "orig", exc)).lower()
+        if "blacklisted_tokens" in message and "does not exist" in message:
+            # Keep auth functional in dev/partially-migrated DBs.
+            logger.error("auth.blacklist_table_missing", error=str(exc))
+            return
+        raise
     if blacklisted:
         raise _auth_unauthorized("token_invalid")
 

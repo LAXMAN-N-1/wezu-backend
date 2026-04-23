@@ -13,6 +13,7 @@ from app.core.rbac import canonical_role_name, canonicalize_permission_set
 from app.core.proxy import get_client_ip
 from fastapi import HTTPException, status, Request
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlmodel import Session, select
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,73 @@ class AuthService:
     _supabase_jwks_cache: list[dict[str, Any]] | None = None
     _supabase_jwks_cache_expiry: float = 0.0
     _supabase_jwks_lock = Lock()
+
+    @staticmethod
+    def _is_missing_schema_error(exc: Exception) -> bool:
+        message = str(getattr(exc, "orig", exc)).lower()
+        return (
+            "does not exist" in message
+            or "undefinedtable" in message
+            or "undefinedcolumn" in message
+        )
+
+    @staticmethod
+    def _fallback_permissions_for_role(role_name: str) -> list[str]:
+        fallback = {
+            "customer": [
+                "profile:view:own",
+                "stations:view:global",
+                "rentals:create:own",
+                "rentals:view:own",
+                "wallet:view:own",
+            ],
+            "dealer_owner": [
+                "dashboard:view:dealer",
+                "stations:update:dealer",
+                "staff:assign:dealer",
+                "finance:view:dealer",
+            ],
+            "operations_admin": [
+                "dashboard:view:global",
+                "users:assign:global",
+                "dealers:assign:global",
+                "settings:update:global",
+                "audit:view:global",
+            ],
+            "super_admin": [
+                "dashboard:view:global",
+                "users:assign:global",
+                "dealers:assign:global",
+                "settings:override:global",
+                "audit:view:global",
+                "rbac:override:global",
+            ],
+        }
+        return fallback.get(role_name, [])
+
+    @staticmethod
+    def _fallback_menu_for_role(role_name: str) -> list[dict]:
+        if role_name == "customer":
+            return [
+                {"id": "dashboard", "label": "Dashboard", "path": "/dashboard", "route": "/dashboard", "icon": "home"},
+                {"id": "vehicle", "label": "My Vehicle", "path": "/vehicle", "route": "/vehicle", "icon": "car"},
+                {"id": "stations", "label": "Find Stations", "path": "/stations", "route": "/stations", "icon": "map"},
+            ]
+        if role_name in ["dealer_owner", "dealer_manager"]:
+            return [
+                {"id": "dashboard", "label": "Dashboard", "path": "/dashboard", "route": "/dashboard", "icon": "home"},
+                {"id": "stations", "label": "Stations", "path": "/stations", "route": "/stations", "icon": "fuel"},
+                {"id": "staff", "label": "Staff", "path": "/staff", "route": "/staff", "icon": "users"},
+                {"id": "finance", "label": "Finance", "path": "/finance", "route": "/finance", "icon": "dollar-sign"},
+            ]
+        if role_name in ["operations_admin", "super_admin"]:
+            return [
+                {"id": "admin_dashboard", "label": "Dashboard", "path": "/admin/dashboard", "route": "/admin/dashboard", "icon": "activity"},
+                {"id": "admin_users", "label": "Users", "path": "/admin/users", "route": "/admin/users", "icon": "users"},
+                {"id": "admin_dealers", "label": "Dealers", "path": "/admin/users", "route": "/admin/users", "icon": "briefcase"},
+                {"id": "admin_settings", "label": "Settings", "path": "/admin/settings", "route": "/admin/settings", "icon": "settings"},
+            ]
+        return []
 
     @staticmethod
     async def verify_google_token(token: str):
@@ -249,38 +317,86 @@ class AuthService:
         named_roles = [canonical_role_name(str(rid)) for rid in identifiers if isinstance(rid, str)]
 
         if db is not None:
+            try:
+                if numeric_role_ids:
+                    perms.extend(
+                        list(
+                            db.exec(
+                                select(Permission.slug)
+                                .join(RolePermission)
+                                .where(RolePermission.role_id.in_(numeric_role_ids))
+                            ).all()
+                        )
+                    )
+                if named_roles:
+                    perms.extend(
+                        list(
+                            db.exec(
+                                select(Permission.slug)
+                                .join(RolePermission)
+                                .join(Role)
+                                .where(func.lower(Role.name).in_(named_roles))
+                            ).all()
+                        )
+                    )
+            except SQLAlchemyError as exc:
+                if not AuthService._is_missing_schema_error(exc):
+                    raise
+                # psycopg2 marks the transaction as aborted on UndefinedTable/
+                # UndefinedColumn; rollback before any fallback queries.
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
+                logger.warning(
+                    "auth.permissions_schema_missing_fallback",
+                    extra={"error": str(exc), "role_ids": numeric_role_ids, "role_names": named_roles},
+                )
+                fallback_role_names = set(named_roles)
+                if numeric_role_ids:
+                    try:
+                        resolved_names = db.exec(
+                            select(Role.name).where(Role.id.in_(numeric_role_ids))
+                        ).all()
+                        fallback_role_names.update(
+                            canonical_role_name(str(name))
+                            for name in resolved_names
+                            if name
+                        )
+                    except Exception:
+                        pass
+                for fallback_name in fallback_role_names:
+                    perms.extend(AuthService._fallback_permissions_for_role(fallback_name))
+                return sorted(canonicalize_permission_set(perms))
+
+        if db is not None and not perms and settings.ENVIRONMENT != "production":
+            fallback_role_names = set(named_roles)
             if numeric_role_ids:
-                perms.extend(
-                    list(
-                        db.exec(
-                            select(Permission.slug)
-                            .join(RolePermission)
-                            .where(RolePermission.role_id.in_(numeric_role_ids))
-                        ).all()
+                try:
+                    resolved_names = db.exec(
+                        select(Role.name).where(Role.id.in_(numeric_role_ids))
+                    ).all()
+                    fallback_role_names.update(
+                        canonical_role_name(str(name))
+                        for name in resolved_names
+                        if name
                     )
-                )
-            if named_roles:
-                perms.extend(
-                    list(
-                        db.exec(
-                            select(Permission.slug)
-                            .join(RolePermission)
-                            .join(Role)
-                            .where(func.lower(Role.name).in_(named_roles))
-                        ).all()
-                    )
-                )
+                except Exception:
+                    try:
+                        db.rollback()
+                    except Exception:
+                        pass
+            for fallback_name in fallback_role_names:
+                perms.extend(AuthService._fallback_permissions_for_role(fallback_name))
 
         # Legacy fallback for callers without a DB session.
         if db is None and len(identifiers) == 1 and isinstance(identifiers[0], str):
             role_name = canonical_role_name(identifiers[0])
-            fallback = {
-                "customer": ["profile:view:own", "stations:view:global", "rentals:create:own", "rentals:view:own", "wallet:view:own"],
-                "dealer_owner": ["dashboard:view:dealer", "stations:update:dealer", "staff:assign:dealer", "finance:view:dealer"],
-                "operations_admin": ["dashboard:view:global", "users:assign:global", "dealers:assign:global", "settings:update:global", "audit:view:global"],
-                "super_admin": ["dashboard:view:global", "users:assign:global", "dealers:assign:global", "settings:override:global", "audit:view:global", "rbac:override:global"],
-            }
-            return sorted(canonicalize_permission_set(fallback.get(role_name, [])))
+            return sorted(
+                canonicalize_permission_set(
+                    AuthService._fallback_permissions_for_role(role_name)
+                )
+            )
 
         return sorted(canonicalize_permission_set(perms))
 
@@ -311,54 +427,88 @@ class AuthService:
         named_roles = [canonical_role_name(str(rid)) for rid in identifiers if isinstance(rid, str)]
 
         if db is not None:
-            statement = None
-            if numeric_role_ids:
-                statement = (
-                    select(Menu)
-                    .join(RoleRight, RoleRight.menu_id == Menu.id)
-                    .where(RoleRight.role_id.in_(numeric_role_ids))
-                    .order_by(Menu.menu_order)
-                )
-            if named_roles:
-                named_statement = (
-                    select(Menu)
-                    .join(RoleRight, RoleRight.menu_id == Menu.id)
-                    .join(Role)
-                    .where(func.lower(Role.name).in_(named_roles))
-                    .order_by(Menu.menu_order)
-                )
-                if statement is None:
-                    statement = named_statement
-                else:
-                    menus.extend(list(db.exec(named_statement).all()))
+            try:
+                statement = None
+                if numeric_role_ids:
+                    statement = (
+                        select(Menu)
+                        .join(RoleRight, RoleRight.menu_id == Menu.id)
+                        .where(RoleRight.role_id.in_(numeric_role_ids))
+                        .order_by(Menu.menu_order)
+                    )
+                if named_roles:
+                    named_statement = (
+                        select(Menu)
+                        .join(RoleRight, RoleRight.menu_id == Menu.id)
+                        .join(Role)
+                        .where(func.lower(Role.name).in_(named_roles))
+                        .order_by(Menu.menu_order)
+                    )
+                    if statement is None:
+                        statement = named_statement
+                    else:
+                        menus.extend(list(db.exec(named_statement).all()))
 
-            if statement is not None:
-                menus.extend(list(db.exec(statement).all()))
+                if statement is not None:
+                    menus.extend(list(db.exec(statement).all()))
+            except SQLAlchemyError as exc:
+                if not AuthService._is_missing_schema_error(exc):
+                    raise
+                # Clear failed transaction state before continuing with fallback.
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
+                logger.warning(
+                    "auth.menu_schema_missing_fallback",
+                    extra={"error": str(exc), "role_ids": numeric_role_ids, "role_names": named_roles},
+                )
+                fallback_role_names = set(named_roles)
+                if numeric_role_ids:
+                    try:
+                        resolved_names = db.exec(
+                            select(Role.name).where(Role.id.in_(numeric_role_ids))
+                        ).all()
+                        fallback_role_names.update(
+                            canonical_role_name(str(name))
+                            for name in resolved_names
+                            if name
+                        )
+                    except Exception:
+                        pass
+                merged: dict[str, dict] = {}
+                for fallback_name in fallback_role_names:
+                    for item in AuthService._fallback_menu_for_role(fallback_name):
+                        merged[item["id"]] = item
+                return list(merged.values())
+
+        if db is not None and not menus and settings.ENVIRONMENT != "production":
+            fallback_role_names = set(named_roles)
+            if numeric_role_ids:
+                try:
+                    resolved_names = db.exec(
+                        select(Role.name).where(Role.id.in_(numeric_role_ids))
+                    ).all()
+                    fallback_role_names.update(
+                        canonical_role_name(str(name))
+                        for name in resolved_names
+                        if name
+                    )
+                except Exception:
+                    try:
+                        db.rollback()
+                    except Exception:
+                        pass
+            merged: dict[str, dict] = {}
+            for fallback_name in fallback_role_names:
+                for item in AuthService._fallback_menu_for_role(fallback_name):
+                    merged[item["id"]] = item
+            if merged:
+                return list(merged.values())
 
         if db is None and len(identifiers) == 1 and isinstance(identifiers[0], str):
             role_name = canonical_role_name(identifiers[0])
-            # Fallback
-            if role_name == "customer":
-                return [
-                    {"id": "dashboard", "label": "Dashboard", "path": "/dashboard", "route": "/dashboard", "icon": "home"},
-                    {"id": "vehicle", "label": "My Vehicle", "path": "/vehicle", "route": "/vehicle", "icon": "car"},
-                    {"id": "stations", "label": "Find Stations", "path": "/stations", "route": "/stations", "icon": "map"},
-                ]
-            elif role_name in ["dealer_owner", "dealer_manager"]:
-                return [
-                    {"id": "dashboard", "label": "Dashboard", "path": "/dashboard", "route": "/dashboard", "icon": "home"},
-                    {"id": "stations", "label": "Stations", "path": "/stations", "route": "/stations", "icon": "fuel"},
-                    {"id": "staff", "label": "Staff", "path": "/staff", "route": "/staff", "icon": "users"},
-                    {"id": "finance", "label": "Finance", "path": "/finance", "route": "/finance", "icon": "dollar-sign"},
-                ]
-            elif role_name in ["operations_admin", "super_admin"]:
-                return [
-                    {"id": "admin_dashboard", "label": "Dashboard", "path": "/admin/dashboard", "route": "/admin/dashboard", "icon": "activity"},
-                    {"id": "admin_users", "label": "Users", "path": "/admin/users", "route": "/admin/users", "icon": "users"},
-                    {"id": "admin_dealers", "label": "Dealers", "path": "/admin/users", "route": "/admin/users", "icon": "briefcase"},
-                    {"id": "admin_settings", "label": "Settings", "path": "/admin/settings", "route": "/admin/settings", "icon": "settings"},
-                ]
-            return []
+            return AuthService._fallback_menu_for_role(role_name)
 
         deduped: dict[str, Menu] = {}
         for menu in menus:

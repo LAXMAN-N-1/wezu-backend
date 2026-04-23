@@ -1,5 +1,5 @@
 from __future__ import annotations
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from typing import Optional, List
 from datetime import datetime
 
@@ -80,12 +80,29 @@ class HeatmapPoint(BaseModel):
 
 class NearbyFilterSchema(BaseModel):
     battery_type: Optional[str] = None
+    min_rating: Optional[float] = Field(default=None, ge=0, le=5)
     capacity_min: Optional[float] = None   # field name used by station_service
     capacity_max: Optional[float] = None
     charger_type: Optional[str] = None
     price_min: Optional[float] = None      # used by station_service for BatteryCatalog filter
     price_max: Optional[float] = None
     availability: bool = False             # if True, skip stations with 0 matching batteries
+
+    @model_validator(mode="after")
+    def validate_ranges(self):
+        if (
+            self.price_min is not None
+            and self.price_max is not None
+            and self.price_min > self.price_max
+        ):
+            raise ValueError("price_min cannot be greater than price_max")
+        if (
+            self.capacity_min is not None
+            and self.capacity_max is not None
+            and self.capacity_min > self.capacity_max
+        ):
+            raise ValueError("capacity_min cannot be greater than capacity_max")
+        return self
 
 class StationAvailabilityResponse(BaseModel):
     station_id: int

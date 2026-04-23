@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Literal
 from datetime import datetime
 import uuid
 
@@ -92,3 +92,43 @@ class StockAlertResponse(BaseModel):
     capacity: int
     threshold: int
     utilization_percentage: float
+
+
+class DealerStockRequestResponse(BaseModel):
+    id: int
+    dealer_id: int
+    dealer_name: Optional[str] = None
+    model_id: Optional[int] = None
+    model_name: Optional[str] = None
+    quantity: int
+    priority: str
+    status: str
+    reason: Optional[str] = None
+    notes: Optional[str] = None
+    admin_notes: Optional[str] = None
+    rejected_reason: Optional[str] = None
+    delivery_date: Optional[datetime] = None
+    created_at: datetime
+    approved_at: Optional[datetime] = None
+    fulfilled_at: Optional[datetime] = None
+    fulfilled_quantity: Optional[int] = None
+
+
+class DealerStockRequestReview(BaseModel):
+    action: Literal["approve", "reject"]
+    admin_notes: Optional[str] = None
+    rejected_reason: Optional[str] = None
+
+
+class DealerStockRequestFulfillRequest(BaseModel):
+    warehouse_id: Optional[int] = None
+    assigned_driver_id: Optional[int] = None
+    fulfilled_quantity: Optional[int] = None
+    admin_notes: Optional[str] = None
+
+
+class DealerStockRequestFulfillResponse(BaseModel):
+    request_id: int
+    status: str
+    fulfilled_quantity: int
+    logistics_order_id: str

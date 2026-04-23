@@ -5,6 +5,7 @@ Full CRUD + application pipeline + KYC + commission management for admin portal.
 """
 from typing import Any, Optional, List, Dict
 from datetime import datetime, timezone; UTC = timezone.utc
+import secrets
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func, or_
 from pydantic import BaseModel
@@ -14,6 +15,7 @@ from app.models.dealer import DealerProfile, DealerApplication, DealerDocument
 from app.models.user import User
 from app.models.station import Station
 from app.models.commission import CommissionConfig, CommissionLog
+from app.models.rbac import Role
 
 router = APIRouter()
 
@@ -21,12 +23,12 @@ router = APIRouter()
 # ─── Schemas ───────────────────────────────────────────────────────────────
 
 class DealerCreateRequest(BaseModel):
-    email: str
-    full_name: str
-    password: str
+    email: Optional[str] = None
+    full_name: Optional[str] = None
+    password: Optional[str] = None
     business_name: str
     contact_person: str
-    contact_email: str
+    contact_email: Optional[str] = None
     contact_phone: str
     address_line1: str
     city: str
@@ -174,18 +176,40 @@ def create_dealer(
     """Admin-initiated dealer creation."""
     from app.core.security import get_password_hash
 
+    email = (data.email or data.contact_email or "").strip().lower()
+    if not email:
+        raise HTTPException(
+            status_code=422,
+            detail="Either email or contact_email is required",
+        )
+    full_name = (data.full_name or data.contact_person or data.business_name).strip()
+    if not full_name:
+        full_name = "Dealer User"
+
+    raw_password = (data.password or "").strip()
+    auto_generated_password = not bool(raw_password)
+    if auto_generated_password:
+        raw_password = secrets.token_urlsafe(12)
+
     # Check duplicate email
-    existing = db.exec(select(User).where(User.email == data.email)).first()
+    existing = db.exec(select(User).where(User.email == email)).first()
     if existing:
         raise HTTPException(400, "User with this email already exists")
 
+    dealer_role = db.exec(
+        select(Role)
+        .where(Role.name.ilike("dealer"))
+        .order_by(Role.id.asc())
+    ).first()
+
     # Create user
     user = User(
-        email=data.email,
-        full_name=data.full_name,
-        hashed_password=get_password_hash(data.password),
+        email=email,
+        full_name=full_name,
+        hashed_password=get_password_hash(raw_password),
         user_type="DEALER",
-        role_id=32,  # dealer role
+        role_id=dealer_role.id if dealer_role else None,
+        force_password_change=auto_generated_password,
     )
     db.add(user)
     db.flush()
@@ -195,7 +219,7 @@ def create_dealer(
         user_id=user.id,
         business_name=data.business_name,
         contact_person=data.contact_person,
-        contact_email=data.contact_email,
+        contact_email=(data.contact_email or email),
         contact_phone=data.contact_phone,
         address_line1=data.address_line1,
         city=data.city,
@@ -215,7 +239,10 @@ def create_dealer(
     db.commit()
     db.refresh(dp)
 
-    return {"status": "success", "dealer_id": dp.id, "user_id": user.id}
+    response = {"status": "success", "dealer_id": dp.id, "user_id": user.id}
+    if auto_generated_password:
+        response["temporary_password"] = raw_password
+    return response
 
 
 @router.put("/{dealer_id}")

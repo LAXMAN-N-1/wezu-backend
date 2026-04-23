@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from time import monotonic
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import Float, Integer, String, and_, case, cast, literal, union_all
+from sqlalchemy import Float, String, and_, case, cast, literal, union_all
 from sqlmodel import Session, func, select
 
 from app.core.config import settings
@@ -70,6 +70,12 @@ class AnalyticsService:
             try:
                 result = loader()
             except Exception:
+                # Ensure one failed section does not leave the DB session in an
+                # aborted transaction state for the next section.
+                try:
+                    db.rollback()
+                except Exception:
+                    pass
                 logger.exception(
                     "admin.analytics.dashboard.section_failed",
                     extra={"section": name, "period": period},
@@ -150,9 +156,25 @@ class AnalyticsService:
         total_rev = sum(t.amount for t in transactions)
         rental_rev = sum(t.amount for t in transactions if t.transaction_type == TransactionType.RENTAL_PAYMENT)
         purchase_rev = sum(t.amount for t in transactions if t.transaction_type == TransactionType.PURCHASE)
-        
-        # Simple comparison logic (mocking previous period for now or querying if needed)
-        # For production, we would query the preceding period of same duration
+
+        # Compare with the preceding period of equal length.
+        period_delta = end_date - start_date
+        prev_start = start_date - period_delta
+        prev_end = start_date
+        prev_total_rev = db.exec(
+            select(func.coalesce(func.sum(Transaction.amount), 0.0)).where(
+                Transaction.status == TransactionStatus.SUCCESS,
+                Transaction.created_at >= prev_start,
+                Transaction.created_at < prev_end,
+            )
+        ).one() or 0.0
+
+        if prev_total_rev > 0:
+            comparison_percentage = ((float(total_rev) - float(prev_total_rev)) / float(prev_total_rev)) * 100
+        elif float(total_rev) > 0:
+            comparison_percentage = 100.0
+        else:
+            comparison_percentage = 0.0
         
         return {
             "period": f"{start_date.date()} to {end_date.date()}",
@@ -160,7 +182,7 @@ class AnalyticsService:
             "rental_revenue": round(rental_rev, 2),
             "purchase_revenue": round(purchase_rev, 2),
             "transaction_count": len(transactions),
-            "comparison_percentage": 5.2 # Mocked growth
+            "comparison_percentage": round(comparison_percentage, 2),
         }
 
     @staticmethod
@@ -879,10 +901,10 @@ class AnalyticsService:
             select(
                 literal("rental").label("event_type"),
                 Rental.created_at.label("timestamp"),
-                Rental.id.label("entity_id"),
-                Rental.user_id.label("user_id"),
-                Rental.start_station_id.label("station_id"),
-                Rental.battery_id.label("battery_id"),
+                cast(Rental.id, String).label("entity_id"),
+                cast(Rental.user_id, String).label("user_id"),
+                cast(Rental.start_station_id, String).label("station_id"),
+                cast(Rental.battery_id, String).label("battery_id"),
                 cast(Rental.total_amount, Float).label("amount"),
                 cast(literal(None), String).label("payment_method"),
                 cast(Rental.status, String).label("status_text"),
@@ -897,10 +919,10 @@ class AnalyticsService:
             select(
                 literal("payment").label("event_type"),
                 Transaction.created_at.label("timestamp"),
-                Transaction.id.label("entity_id"),
-                Transaction.user_id.label("user_id"),
-                cast(literal(None), Integer).label("station_id"),
-                cast(literal(None), Integer).label("battery_id"),
+                cast(Transaction.id, String).label("entity_id"),
+                cast(Transaction.user_id, String).label("user_id"),
+                cast(literal(None), String).label("station_id"),
+                cast(literal(None), String).label("battery_id"),
                 cast(Transaction.amount, Float).label("amount"),
                 cast(Transaction.payment_method, String).label("payment_method"),
                 cast(Transaction.status, String).label("status_text"),
@@ -916,10 +938,10 @@ class AnalyticsService:
             select(
                 literal("alert").label("event_type"),
                 SupportTicket.created_at.label("timestamp"),
-                SupportTicket.id.label("entity_id"),
-                SupportTicket.user_id.label("user_id"),
-                cast(literal(None), Integer).label("station_id"),
-                cast(literal(None), Integer).label("battery_id"),
+                cast(SupportTicket.id, String).label("entity_id"),
+                cast(SupportTicket.user_id, String).label("user_id"),
+                cast(literal(None), String).label("station_id"),
+                cast(literal(None), String).label("battery_id"),
                 cast(literal(None), Float).label("amount"),
                 cast(literal(None), String).label("payment_method"),
                 cast(SupportTicket.status, String).label("status_text"),
@@ -944,32 +966,49 @@ class AnalyticsService:
 
         activity_union = union_all(*selected_branches).subquery()
         rows = db.exec(
-            select(activity_union)
+            select(
+                activity_union.c.event_type,
+                activity_union.c.timestamp,
+                activity_union.c.entity_id,
+                activity_union.c.user_id,
+                activity_union.c.station_id,
+                activity_union.c.battery_id,
+                activity_union.c.amount,
+                activity_union.c.payment_method,
+                activity_union.c.status_text,
+                activity_union.c.priority_text,
+                activity_union.c.subject,
+            )
             .order_by(activity_union.c.timestamp.desc())
             .limit(limit)
         ).all()
 
         activities: List[Dict[str, Any]] = []
         for row in rows:
-            timestamp = row.timestamp
-            event_type = row.event_type
+            values = row._mapping if hasattr(row, "_mapping") else row
+            is_mapping = hasattr(values, "keys")
+            timestamp = values["timestamp"] if is_mapping else row.timestamp
+            event_type = values["event_type"] if is_mapping else row.event_type
             if event_type == "rental":
-                rental_status = (row.status_text or "unknown").lower()
+                rental_status = ((values["status_text"] if is_mapping else row.status_text) or "unknown").lower()
                 activities.append(
                     {
                         "title": "Rental Started"
                         if rental_status == RentalStatus.ACTIVE.value
                         else f"Rental {rental_status}",
-                        "description": f"User {row.user_id} at station {row.station_id}",
+                        "description": (
+                            f"User {(values['user_id'] if is_mapping else row.user_id)} "
+                            f"at station {(values['station_id'] if is_mapping else row.station_id)}"
+                        ),
                         "time": timestamp.strftime("%b %d, %H:%M"),
                         "type": "rental",
                         "severity": "info"
                         if rental_status == RentalStatus.ACTIVE.value
                         else "low",
                         "details": {
-                            "rental_id": row.entity_id,
-                            "battery_id": row.battery_id,
-                            "amount": float(row.amount or 0.0),
+                            "rental_id": values["entity_id"] if is_mapping else row.entity_id,
+                            "battery_id": values["battery_id"] if is_mapping else row.battery_id,
+                            "amount": float((values["amount"] if is_mapping else row.amount) or 0.0),
                         },
                     }
                 )
@@ -977,29 +1016,32 @@ class AnalyticsService:
                 activities.append(
                     {
                         "title": "Payment Successful",
-                        "description": f"₹{float(row.amount or 0.0)} via {row.payment_method}",
+                        "description": (
+                            f"₹{float((values['amount'] if is_mapping else row.amount) or 0.0)} "
+                            f"via {(values['payment_method'] if is_mapping else row.payment_method)}"
+                        ),
                         "time": timestamp.strftime("%b %d, %H:%M"),
                         "type": "payment",
                         "severity": "success",
                         "details": {
-                            "transaction_id": row.entity_id,
-                            "user_id": row.user_id,
+                            "transaction_id": values["entity_id"] if is_mapping else row.entity_id,
+                            "user_id": values["user_id"] if is_mapping else row.user_id,
                         },
                     }
                 )
             else:
-                priority = (row.priority_text or "medium").lower()
+                priority = ((values["priority_text"] if is_mapping else row.priority_text) or "medium").lower()
                 severity = "critical" if priority in {"high", "critical"} else "medium"
                 activities.append(
                     {
-                        "title": f"Support: {row.subject}",
+                        "title": f"Support: {(values['subject'] if is_mapping else row.subject)}",
                         "description": f"Priority {priority}",
                         "time": timestamp.strftime("%b %d, %H:%M"),
                         "type": "alert",
                         "severity": severity,
                         "details": {
-                            "ticket_id": row.entity_id,
-                            "status": row.status_text,
+                            "ticket_id": values["entity_id"] if is_mapping else row.entity_id,
+                            "status": values["status_text"] if is_mapping else row.status_text,
                         },
                     }
                 )

@@ -152,6 +152,41 @@ class WalletPayRequest(BaseModel):
     amount: float
     description: Optional[str] = None
 
+
+class WithdrawVerifyRequest(BaseModel):
+    pin: str = Field(min_length=4, max_length=12)
+    amount: float = Field(gt=0)
+
+
+@router.post("/withdraw/verify", response_model=dict)
+async def verify_withdrawal_request(
+    req: WithdrawVerifyRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    """
+    Lightweight compatibility endpoint used by mobile clients before submit.
+    Validates PIN format and sufficient wallet balance for the requested amount.
+    """
+    normalized_pin = (req.pin or "").strip()
+    if not normalized_pin.isdigit() or len(normalized_pin) != 4:
+        return {"success": False, "message": "Invalid PIN"}
+
+    profile_pin = (
+        getattr(getattr(current_user, "user_profile", None), "pin_code", None) or ""
+    ).strip()
+    if profile_pin and normalized_pin != profile_pin:
+        return {"success": False, "message": "Invalid PIN"}
+
+    wallet = WalletService.get_wallet(db, current_user.id)
+    requested = WalletService._to_money(req.amount)
+    balance = WalletService._to_money(wallet.balance)
+    if balance < requested:
+        return {"success": False, "message": "Insufficient wallet balance"}
+
+    return {"success": True, "message": "PIN verified"}
+
+
 @router.post("/withdraw", response_model=dict) # Return basic dict or WithdrawalRequest model if schema defined
 @audit_log("WALLET_WITHDRAWAL", "WALLET")
 async def request_withdrawal(

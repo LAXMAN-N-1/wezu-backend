@@ -14,6 +14,7 @@ from sqlmodel import Session, select, func, col
 
 from app.models.swap import SwapSession
 from app.models.station import Station, StationSlot
+from app.models.rental import Rental
 from app.models.commission import CommissionLog
 
 logger = logging.getLogger(__name__)
@@ -519,8 +520,7 @@ class DealerAnalyticsService:
             pdf_data[k] = v
 
         try:
-            # We don't have a direct raw PDF generator, so we use this mock
-            # Or build a simple FPDF right here
+            # Render a lightweight PDF report directly from analytics payload.
             from fpdf import FPDF
             pdf = FPDF()
             pdf.add_page()
@@ -561,9 +561,178 @@ class DealerAnalyticsService:
 
         # Send email
         body = f"Attached is your performance overview up to {datetime.now(UTC).isoformat()}."
-        # In actual prod we attach the file via EmailService (which is currently mocked)
         EmailService.send_email(dealer.contact_email, "Dealer Performance Report", body)
         return {"status": "success", "email": dealer.contact_email}
+
+    @staticmethod
+    def get_revenue_chart_data(
+        db: Session,
+        dealer_id: int,
+        *,
+        granularity: str = "daily",
+        periods: int = 7,
+        compare: bool = False,
+    ) -> Dict[str, Any]:
+        """Revenue + swap chart data in hourly/daily/weekly buckets."""
+        station_ids = DealerAnalyticsService._get_station_ids(db, dealer_id)
+        if not station_ids:
+            return {"granularity": granularity, "points": [], "comparison": []}
+
+        normalized_granularity = (granularity or "daily").strip().lower()
+        if normalized_granularity not in {"hourly", "daily", "weekly"}:
+            normalized_granularity = "daily"
+
+        now = datetime.now(UTC)
+
+        windows: list[tuple[str, datetime, datetime]] = []
+        if normalized_granularity == "hourly":
+            cursor = now.replace(minute=0, second=0, microsecond=0)
+            for offset in range(periods - 1, -1, -1):
+                start = cursor - timedelta(hours=offset)
+                end = start + timedelta(hours=1)
+                windows.append((start.strftime("%Y-%m-%d %H:00"), start, end))
+        elif normalized_granularity == "weekly":
+            week_start = (now - timedelta(days=now.weekday())).replace(
+                hour=0,
+                minute=0,
+                second=0,
+                microsecond=0,
+            )
+            for offset in range(periods - 1, -1, -1):
+                start = week_start - timedelta(weeks=offset)
+                end = start + timedelta(days=7)
+                windows.append((f"W{start.isocalendar().week}-{start.year}", start, end))
+        else:
+            day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            for offset in range(periods - 1, -1, -1):
+                start = day_start - timedelta(days=offset)
+                end = start + timedelta(days=1)
+                windows.append((start.strftime("%Y-%m-%d"), start, end))
+
+        points = []
+        for label, start, end in windows:
+            revenue = db.exec(
+                select(func.coalesce(func.sum(SwapSession.swap_amount), 0.0))
+                .where(
+                    col(SwapSession.station_id).in_(station_ids),
+                    SwapSession.status == "completed",
+                    SwapSession.created_at >= start,
+                    SwapSession.created_at < end,
+                )
+            ).one() or 0.0
+            swaps = db.exec(
+                select(func.count(SwapSession.id)).where(
+                    col(SwapSession.station_id).in_(station_ids),
+                    SwapSession.status == "completed",
+                    SwapSession.created_at >= start,
+                    SwapSession.created_at < end,
+                )
+            ).one() or 0
+            points.append(
+                {
+                    "label": label,
+                    "revenue": round(float(revenue), 2),
+                    "swaps": int(swaps),
+                }
+            )
+
+        comparison_points = []
+        if compare and windows:
+            span = windows[-1][2] - windows[0][1]
+            for label, start, end in windows:
+                prev_start = start - span
+                prev_end = end - span
+                revenue = db.exec(
+                    select(func.coalesce(func.sum(SwapSession.swap_amount), 0.0))
+                    .where(
+                        col(SwapSession.station_id).in_(station_ids),
+                        SwapSession.status == "completed",
+                        SwapSession.created_at >= prev_start,
+                        SwapSession.created_at < prev_end,
+                    )
+                ).one() or 0.0
+                swaps = db.exec(
+                    select(func.count(SwapSession.id)).where(
+                        col(SwapSession.station_id).in_(station_ids),
+                        SwapSession.status == "completed",
+                        SwapSession.created_at >= prev_start,
+                        SwapSession.created_at < prev_end,
+                    )
+                ).one() or 0
+                comparison_points.append(
+                    {
+                        "label": label,
+                        "revenue": round(float(revenue), 2),
+                        "swaps": int(swaps),
+                    }
+                )
+
+        return {
+            "granularity": normalized_granularity,
+            "points": points,
+            "comparison": comparison_points,
+        }
+
+    @staticmethod
+    def get_commission_summary(
+        db: Session,
+        dealer_id: int,
+        *,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> Dict[str, float]:
+        """Aggregate dealer revenue, fees, and payout for settlement dashboard."""
+        from app.models.commission import CommissionConfig, CommissionLog
+        from app.models.settlement import Settlement
+
+        settlement_query = select(Settlement).where(Settlement.dealer_id == dealer_id)
+        if start_date is not None:
+            settlement_query = settlement_query.where(Settlement.created_at >= start_date)
+        if end_date is not None:
+            settlement_query = settlement_query.where(Settlement.created_at <= end_date)
+        settlements = db.exec(settlement_query).all()
+
+        gross_revenue = sum(float(s.total_revenue or 0.0) for s in settlements)
+        platform_fees = sum(float(s.platform_fee or 0.0) for s in settlements)
+        commission_earned = sum(float(s.total_commission or 0.0) for s in settlements)
+        net_payout = sum(float(s.net_payable or 0.0) for s in settlements)
+
+        if not settlements:
+            station_ids = DealerAnalyticsService._get_station_ids(db, dealer_id)
+            rental_query = select(func.coalesce(func.sum(Rental.total_amount), 0.0)).where(
+                col(Rental.start_station_id).in_(station_ids)
+            )
+            if start_date is not None:
+                rental_query = rental_query.where(Rental.start_time >= start_date)
+            if end_date is not None:
+                rental_query = rental_query.where(Rental.start_time <= end_date)
+            gross_revenue = float(db.exec(rental_query).one() or 0.0)
+
+            commission_query = select(func.coalesce(func.sum(CommissionLog.amount), 0.0)).where(
+                CommissionLog.dealer_id == dealer_id
+            )
+            if start_date is not None:
+                commission_query = commission_query.where(CommissionLog.created_at >= start_date)
+            if end_date is not None:
+                commission_query = commission_query.where(CommissionLog.created_at <= end_date)
+            commission_earned = float(db.exec(commission_query).one() or 0.0)
+            platform_fees = max(0.0, gross_revenue - commission_earned)
+            net_payout = max(0.0, gross_revenue - platform_fees)
+
+        commission_config = db.exec(
+            select(CommissionConfig)
+            .where(CommissionConfig.dealer_id == dealer_id)
+            .order_by(CommissionConfig.created_at.desc())
+        ).first()
+        current_rate = float(commission_config.percentage) if commission_config else 15.0
+
+        return {
+            "gross_revenue": round(gross_revenue, 2),
+            "platform_fees_deducted": round(platform_fees, 2),
+            "commission_earned": round(commission_earned, 2),
+            "net_payout": round(net_payout, 2),
+            "current_commission_rate": round(current_rate, 2),
+        }
 
     # ─── Helpers ───
 

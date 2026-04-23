@@ -8,12 +8,97 @@ from typing import Optional, Dict, Any
 from sqlmodel import Session, select, func
 from app.core.database import engine
 from app.models.audit_log import AuditLog, SecurityEvent
-from datetime import datetime, timezone; UTC = timezone.utc
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 
 logger = logging.getLogger(__name__)
 
 
 class AuditService:
+    @staticmethod
+    def get_dashboard_counts(db: Session) -> Dict[str, Any]:
+        """
+        Summary counters for audit dashboard top cards.
+        """
+        now = datetime.now(UTC)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        yesterday_start = today_start - timedelta(days=1)
+
+        def _count_since(start: datetime, *, action: Optional[str] = None, status: Optional[str] = None, level: Optional[str] = None) -> int:
+            query = select(func.count(AuditLog.id)).where(AuditLog.timestamp >= start)
+            if action is not None:
+                query = query.where(AuditLog.action == action)
+            if status is not None:
+                query = query.where(AuditLog.status == status)
+            if level is not None:
+                query = query.where(AuditLog.level == level)
+            return int(db.exec(query).one() or 0)
+
+        total_requests_today = _count_since(today_start)
+        total_requests_yesterday = int(
+            db.exec(
+                select(func.count(AuditLog.id)).where(
+                    AuditLog.timestamp >= yesterday_start,
+                    AuditLog.timestamp < today_start,
+                )
+            ).one() or 0
+        )
+
+        failed_logins_today = _count_since(
+            today_start,
+            action="AUTH_LOGIN",
+            status="failure",
+        )
+        failed_logins_yesterday = int(
+            db.exec(
+                select(func.count(AuditLog.id)).where(
+                    AuditLog.timestamp >= yesterday_start,
+                    AuditLog.timestamp < today_start,
+                    AuditLog.action == "AUTH_LOGIN",
+                    AuditLog.status == "failure",
+                )
+            ).one() or 0
+        )
+
+        critical_events_today = _count_since(today_start, level="CRITICAL")
+        critical_events_yesterday = int(
+            db.exec(
+                select(func.count(AuditLog.id)).where(
+                    AuditLog.timestamp >= yesterday_start,
+                    AuditLog.timestamp < today_start,
+                    AuditLog.level == "CRITICAL",
+                )
+            ).one() or 0
+        )
+
+        unique_users_today = int(
+            db.exec(
+                select(func.count(func.distinct(AuditLog.user_id))).where(
+                    AuditLog.timestamp >= today_start,
+                    AuditLog.user_id.is_not(None),
+                )
+            ).one() or 0
+        )
+
+        def _trend(current: int, previous: int) -> str:
+            if previous > 0:
+                pct = ((current - previous) / previous) * 100
+            elif current > 0:
+                pct = 100.0
+            else:
+                pct = 0.0
+            sign = "+" if pct >= 0 else ""
+            return f"{sign}{round(pct, 1)}%"
+
+        return {
+            "total_requests": total_requests_today,
+            "failed_logins": failed_logins_today,
+            "critical_events": critical_events_today,
+            "active_users": unique_users_today,
+            "requests_trend": _trend(total_requests_today, total_requests_yesterday),
+            "failed_logins_trend": _trend(failed_logins_today, failed_logins_yesterday),
+            "critical_trend": _trend(critical_events_today, critical_events_yesterday),
+        }
+
     @staticmethod
     def log_action(
         db: Session,

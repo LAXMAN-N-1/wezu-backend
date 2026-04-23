@@ -12,6 +12,19 @@ from app.core.proxy import get_client_ip
 logger = get_logger(__name__)
 
 
+def _safe_user_id(request: Request):
+    """Read user_id without triggering SQLAlchemy lazy-load on a detached instance."""
+    user_id = getattr(request.state, "user_id", None)
+    if user_id is None:
+        user = getattr(request.state, "user", None)
+        if user is not None:
+            try:
+                user_id = user.__dict__.get("id")
+            except Exception:
+                pass
+    return user_id
+
+
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
         start = perf_counter()
@@ -41,7 +54,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 duration_ms=duration_ms,
                 query_keys=sorted(request.query_params.keys()),
                 auth_error=getattr(request.state, "auth_error", None),
-                user_id=getattr(getattr(request.state, "user", None), "id", None),
+                user_id=_safe_user_id(request),
             )
             clear_contextvars()
             raise
@@ -50,9 +63,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         response.headers.setdefault("X-Request-ID", request_id)
         response.headers.setdefault("X-Correlation-ID", correlation_id)
 
-        user_id = getattr(getattr(request.state, "user", None), "id", None) or getattr(
-            request.state, "user_id", None
-        )
+        user_id = _safe_user_id(request)
         auth_error = getattr(request.state, "auth_error", None)
         route = request.scope.get("route")
         route_name = getattr(route, "name", None)

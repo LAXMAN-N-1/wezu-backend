@@ -3,6 +3,9 @@ from fastapi import APIRouter, Depends, HTTPException, Body, UploadFile, File
 from sqlmodel import Session, select
 from typing import Any, List
 from datetime import datetime
+from pathlib import Path
+import uuid
+import os
 
 from app.db.session import get_session
 from app.api import deps
@@ -55,11 +58,38 @@ def get_document_history(
     ).all()
     return docs
 
+UPLOADS_DIR = Path("uploads/documents")
+ALLOWED_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+
+@router.post("/upload-file")
+async def upload_document_file(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    """Accept a raw file upload, save to disk, return the accessible URL."""
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"File type '{ext}' not allowed. Use PDF, JPG or PNG.")
+
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="File exceeds 10 MB limit.")
+
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    safe_name = f"dealer{current_user.id}_{uuid.uuid4().hex}{ext}"
+    dest = UPLOADS_DIR / safe_name
+    dest.write_bytes(content)
+
+    return {"file_url": f"/uploads/documents/{safe_name}"}
+
+
 @router.post("/upload")
 def upload_document_version(
     document_type: str = Body(...),
     category: str = Body("verification"),
-    file_url: str = Body(...), # Or realistically passing an UploadFile via form and storing to S3
+    file_url: str = Body(...),
     valid_until: datetime = Body(None),
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),

@@ -33,6 +33,15 @@ def make_cors_aware_response(
 
 def _request_log_context(request: Request) -> dict[str, object]:
     user = getattr(request.state, "user", None)
+    # Safely read user.id — the User instance may be detached from its Session
+    # after the endpoint's db session is closed, so attribute access can raise
+    # DetachedInstanceError.  Fall back to request.state.user_id if so.
+    user_id = getattr(request.state, "user_id", None)
+    if user_id is None and user is not None:
+        try:
+            user_id = user.__dict__.get("id")  # read from instance dict, no lazy load
+        except Exception:
+            pass
     return {
         "request_id": getattr(request.state, "request_id", None),
         "correlation_id": getattr(request.state, "correlation_id", None),
@@ -40,7 +49,7 @@ def _request_log_context(request: Request) -> dict[str, object]:
         "path": request.url.path,
         "query_keys": sorted(request.query_params.keys()),
         "client_ip": getattr(request.state, "client_ip", None),
-        "user_id": getattr(user, "id", None) or getattr(request.state, "user_id", None),
+        "user_id": user_id,
         "auth_error": getattr(request.state, "auth_error", None),
     }
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Request, UploadFile, File, Form
 from sqlmodel import Session, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload, selectinload
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Dict
@@ -200,20 +201,35 @@ def _build_user_profile_response(user: User, db: Session = None) -> UserProfileR
         permissions = []
         menu = []
     
-    # Get wallet balance (handle if wallet relationship not loaded but available in session?)
-    # Ideally user.wallet should be loaded.
-    wallet_balance = user.wallet.balance if user.wallet else 0.0
-    
+    # Wallet/staff relations can fail on partially migrated schemas; degrade gracefully.
+    wallet_balance = 0.0
+    try:
+        wallet = user.wallet
+        wallet_balance = wallet.balance if wallet else 0.0
+    except Exception:
+        if db is not None:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
     # Get staff assignment info
     staff_assignment = None
-    if user.staff_profile:
-        staff_assignment = StaffAssignmentInfo(
-            staff_type=user.staff_profile.staff_type,
-            station_id=user.staff_profile.station_id,
-            dealer_id=user.staff_profile.dealer_id,
-            employment_id=user.staff_profile.employment_id,
-            is_active=user.staff_profile.is_active
-        )
+    try:
+        if user.staff_profile:
+            staff_assignment = StaffAssignmentInfo(
+                staff_type=user.staff_profile.staff_type,
+                station_id=user.staff_profile.station_id,
+                dealer_id=user.staff_profile.dealer_id,
+                employment_id=user.staff_profile.employment_id,
+                is_active=user.staff_profile.is_active
+            )
+    except Exception:
+        if db is not None:
+            try:
+                db.rollback()
+            except Exception:
+                pass
     
     # User Profile Data
     profile_data = {}
@@ -264,13 +280,29 @@ async def read_user_me(
     Get current user's full profile.
     """
     def _load_profile() -> dict:
-        statement = select(User).where(User.id == current_user.id).options(
-            joinedload(User.role),
-            joinedload(User.wallet),
-            joinedload(User.staff_profile),
-            joinedload(User.user_profile)
-        )
-        user = db.exec(statement).first()
+        try:
+            statement = select(User).where(User.id == current_user.id).options(
+                joinedload(User.role),
+                joinedload(User.wallet),
+                joinedload(User.staff_profile),
+                joinedload(User.user_profile)
+            )
+            user = db.exec(statement).first()
+        except SQLAlchemyError as exc:
+            message = str(getattr(exc, "orig", exc)).lower()
+            if (
+                "does not exist" not in message
+                and "undefinedtable" not in message
+                and "undefinedcolumn" not in message
+            ):
+                raise
+            db.rollback()
+            # Fallback path without optional relations from drift-prone tables.
+            fallback_stmt = select(User).where(User.id == current_user.id).options(
+                joinedload(User.role),
+                joinedload(User.user_profile),
+            )
+            user = db.exec(fallback_stmt).first()
         return _build_user_profile_response(user, db).model_dump(mode="json")
 
     return _user_self_cache(current_user.id, "profile", _load_profile)

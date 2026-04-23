@@ -4,7 +4,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 from sqlmodel import Session, select
 from app.db.session import get_session
-from app.models.user import User, UserStatus, KYCStatus
+from app.models.user import User, UserStatus, KYCStatus, UserType
 from app.schemas.user import Token
 from app.models.session import UserSession
 from app.models.otp import OTP
@@ -47,12 +47,91 @@ def _active_roles_for_user(db: Session, user: User) -> list:
     return [user.role] if user.role else []
 
 
+def _bootstrap_roles_for_legacy_user(db: Session, user: User) -> list:
+    """
+    Backfill role assignments for legacy users that only had users.role_id or
+    user_type but no rows in user_roles.
+    """
+    from app.models.rbac import Role
+
+    def _active_role_map() -> dict[str, Role]:
+        role_map: dict[str, Role] = {}
+        roles = db.exec(
+            select(Role)
+            .where(Role.is_active == True)
+            .order_by(Role.level.desc(), Role.id.asc())
+        ).all()
+        for role in roles:
+            canonical_name = canonical_role_name(role.name)
+            if canonical_name and canonical_name not in role_map:
+                role_map[canonical_name] = role
+        return role_map
+
+    def _resolve_fallback_role(role_names: list[str], role_map: dict[str, Role]) -> Optional[Role]:
+        for role_name in role_names:
+            role = role_map.get(canonical_role_name(role_name))
+            if role:
+                return role
+        return None
+
+    if user.role_id:
+        role = db.get(Role, user.role_id)
+        if role and role.is_active:
+            _assign_primary_role(db, user, role)
+            return [role]
+
+    if user.role and getattr(user.role, "is_active", False):
+        _assign_primary_role(db, user, user.role)
+        return [user.role]
+
+    fallback_role_names: list[str]
+    if user.is_superuser:
+        fallback_role_names = ["super_admin", "admin", "operations_admin"]
+    elif user.user_type == UserType.ADMIN:
+        fallback_role_names = ["admin", "operations_admin", "super_admin"]
+    elif user.user_type == UserType.DEALER:
+        fallback_role_names = ["dealer_owner", "dealer"]
+    elif user.user_type == UserType.LOGISTICS:
+        fallback_role_names = ["logistics_manager", "dispatcher"]
+    elif user.user_type == UserType.SUPPORT_AGENT:
+        fallback_role_names = ["support_agent", "support_manager"]
+    else:
+        fallback_role_names = ["customer"]
+
+    role_map = _active_role_map()
+    role = _resolve_fallback_role(fallback_role_names, role_map)
+    if role:
+        _assign_primary_role(db, user, role)
+        return [role]
+
+    # Last-resort compatibility path for sparse legacy databases where roles
+    # were never seeded (or only partially seeded).
+    try:
+        from app.db.initial_data import seed_roles
+
+        seed_roles(db)
+        role_map = _active_role_map()
+        role = _resolve_fallback_role(fallback_role_names, role_map)
+        if role:
+            _assign_primary_role(db, user, role)
+            return [role]
+    except Exception as exc:
+        logger.warning(
+            "auth.legacy_role_seed_failed",
+            extra={"user_id": user.id, "error": str(exc)},
+        )
+
+    return []
+
+
 def _resolve_selected_role(
     db: Session,
     user: User,
     requested_role: Optional[str] = None,
 ):
     active_roles = _active_roles_for_user(db, user)
+    if not active_roles:
+        active_roles = _bootstrap_roles_for_legacy_user(db, user)
     if not active_roles:
         raise HTTPException(status_code=403, detail="No roles assigned to user")
 

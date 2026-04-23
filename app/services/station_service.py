@@ -43,7 +43,7 @@ class StationService:
         query = select(Station).options(selectinload(Station.images))
         if status:
             query = query.where(Station.status == status)
-        if filters and filters.min_rating is not None:
+        if filters and getattr(filters, "min_rating", None) is not None:
             query = query.where(Station.rating >= filters.min_rating)
         if is_24x7:
              query = query.where(Station.is_24x7 == True)

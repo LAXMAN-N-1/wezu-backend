@@ -29,8 +29,11 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 
 from app.core.config import settings
 from app.core.database import (
+    ensure_admin_schema_compatibility,
+    ensure_runtime_tables_compatibility,
     ensure_roles_schema_compatibility,
     ensure_transactions_schema_compatibility,
+    ensure_users_schema_compatibility,
     ensure_warehouses_schema_compatibility,
 )
 from app.db.session import engine
@@ -268,6 +271,45 @@ async def lifespan(app: FastAPI):
                 startup_without_db = True
                 logger.exception(
                     "schema.transactions_compatibility_failed.degraded_mode",
+                    error=str(exc),
+                )
+
+        # Users compatibility backfill
+        if not startup_without_db:
+            try:
+                ensure_users_schema_compatibility()
+            except SQLAlchemyError as exc:
+                if not allow_start_without_db:
+                    raise
+                startup_without_db = True
+                logger.exception(
+                    "schema.users_compatibility_failed.degraded_mode",
+                    error=str(exc),
+                )
+
+        # Runtime-critical table compatibility backfill
+        if not startup_without_db:
+            try:
+                ensure_runtime_tables_compatibility()
+            except SQLAlchemyError as exc:
+                if not allow_start_without_db:
+                    raise
+                startup_without_db = True
+                logger.exception(
+                    "schema.runtime_tables_compatibility_failed.degraded_mode",
+                    error=str(exc),
+                )
+
+        # Admin compatibility backfill (drifted legacy schemas)
+        if not startup_without_db:
+            try:
+                ensure_admin_schema_compatibility()
+            except SQLAlchemyError as exc:
+                if not allow_start_without_db:
+                    raise
+                startup_without_db = True
+                logger.exception(
+                    "schema.admin_compatibility_failed.degraded_mode",
                     error=str(exc),
                 )
 
