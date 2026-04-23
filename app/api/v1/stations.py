@@ -61,7 +61,7 @@ async def search_nearby_stations(
     lat: float,
     lon: float,
     radius: float = 50.0,
-    filters: NearbyFilterSchema = Depends(),
+    filters: NearbyFilterSchema = Depends(NearbyFilterSchema),
     status: Optional[str] = Query(None, description="Station status (active, maintenance)"),
     is_24x7: Optional[bool] = Query(None, description="Filter only 24x7 stations"),
     sort_by: str = Query("distance", description="Sort by: distance, rating, availability"),

@@ -584,7 +584,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _validate_production_secrets(self) -> "Settings":
-        _PLACEHOLDER_MARKERS = ["your-", "change-this", "CHANGEME", "xxxx", "placeholder"]
+        _PLACEHOLDER_MARKERS = ["your-", "change-this", "change_this", "changeme", "xxxx", "placeholder"]
         if any(marker in self.SECRET_KEY.lower() for marker in _PLACEHOLDER_MARKERS):
             import warnings
             msg = (

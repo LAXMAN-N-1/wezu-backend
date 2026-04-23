@@ -288,7 +288,7 @@ class EmailPasswordRequestForm:
 async def login_access_token(
     request: Request,
     db: Session = Depends(deps.get_db),
-    form_data: EmailPasswordRequestForm = Depends()
+    form_data: EmailPasswordRequestForm = Depends(EmailPasswordRequestForm)
 ) -> Any:
     """
     OAuth2 compatible token login, get an access token for future requests (uses 'email' as username)

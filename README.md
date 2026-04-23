@@ -37,6 +37,16 @@ For ingress through Coolify/Traefik (no app host port publishing), follow:
 - [DEPLOY_COOLIFY_TRAEFIK.md](docs/DEPLOY_COOLIFY_TRAEFIK.md)
 - [DOCKER_MULTI_PHASE_DEPLOYMENT.md](docs/DOCKER_MULTI_PHASE_DEPLOYMENT.md)
 
+For direct VPS (Hostinger) production setup and systemd service management, follow:
+
+- [HOSTINGER_VPS_BACKEND_RUNBOOK.md](docs/HOSTINGER_VPS_BACKEND_RUNBOOK.md)
+
+Preflight check before restarting services:
+
+```bash
+python3 scripts/vps_preflight.py
+```
+
 ## 📊 Logging (Production)
 
 The backend now uses a unified structured logging pipeline from `app/core/logging.py`.
