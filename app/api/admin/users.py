@@ -36,6 +36,7 @@ class AdminUserCreateRequest(BaseModel):
     status: Optional[UserStatus] = UserStatus.ACTIVE
 
 
+@router.post("", include_in_schema=False, response_model=dict)
 @router.post("/", response_model=dict)
 def admin_create_user(
     payload: AdminUserCreateRequest,
