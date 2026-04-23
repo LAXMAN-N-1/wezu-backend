@@ -269,12 +269,12 @@ class EmailPasswordRequestForm:
     """
     def __init__(
         self,
-        grant_type: str = Form(None, pattern="password"),
+        grant_type: str | None = Form(None, pattern="password"),
         username: str = Form(..., description="Email or phone number", title="Email"),
         password: str = Form(...),
         scope: str = Form(""),
-        client_id: Optional[str] = Form(None),
-        client_secret: Optional[str] = Form(None),
+        client_id: str | None = Form(None),
+        client_secret: str | None = Form(None),
     ):
         self.grant_type = grant_type
         self.username = username
