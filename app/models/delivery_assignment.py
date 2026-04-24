@@ -1,5 +1,5 @@
 from typing import Optional
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from sqlmodel import SQLModel, Field, Relationship
 from app.models.driver_profile import DriverProfile
 from typing import TYPE_CHECKING

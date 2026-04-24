@@ -1,0 +1,7505 @@
+{
+  "generated_at": "2026-04-06T16:35:43.640206+00:00",
+  "total_registrations": 911,
+  "unique_paths": 756,
+  "duplicate_count": 0,
+  "duplicates": [],
+  "routes": [
+    {
+      "method": "OPTIONS",
+      "path": "/{full_path:path}",
+      "handler": "app.main:global_options_handler",
+      "tags": []
+    },
+    {
+      "method": "GET",
+      "path": "/live",
+      "handler": "app.main:live_check",
+      "tags": [
+        "System"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "handler": "app.main:health_check",
+      "tags": [
+        "System"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/ready",
+      "handler": "app.main:readiness_check",
+      "tags": [
+        "System"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "handler": "app.main:root",
+      "tags": [
+        "System"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/.well-known/assetlinks.json",
+      "handler": "app.main:android_assetlinks",
+      "tags": []
+    },
+    {
+      "method": "HEAD",
+      "path": "/.well-known/assetlinks.json",
+      "handler": "app.main:android_assetlinks",
+      "tags": []
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/register",
+      "handler": "app.api.v1.auth:register",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/token",
+      "handler": "app.api.v1.auth:login_access_token",
+      "tags": [
+        "Auth",
+        "authentication"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/register/request-otp",
+      "handler": "app.api.v1.auth:request_registration_otp",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/register/verify-otp",
+      "handler": "app.api.v1.auth:verify_registration_otp",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/verify-otp",
+      "handler": "app.api.v1.auth:verify_otp_alias",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/social-login",
+      "handler": "app.api.v1.auth:social_login",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/register/password",
+      "handler": "app.api.v1.auth:register_with_password",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/refresh",
+      "handler": "app.api.v1.auth:refresh_token",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "handler": "app.api.v1.auth:logout",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "handler": "app.api.v1.auth:login",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/select-role",
+      "handler": "app.api.v1.auth:select_role",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/logout-all",
+      "handler": "app.api.v1.auth:logout_all",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/forgot-password",
+      "handler": "app.api.v1.auth:forgot_password",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/resend-otp",
+      "handler": "app.api.v1.auth:resend_otp",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/resend-verification",
+      "handler": "app.api.v1.auth:send_email_verification",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/email/send-verification",
+      "handler": "app.api.v1.auth:send_email_verification",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/verify-email",
+      "handler": "app.api.v1.auth:verify_email",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/change-password",
+      "handler": "app.api.v1.auth:change_password",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/enable-2fa",
+      "handler": "app.api.v1.auth:enable_2fa_request",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/verify-2fa",
+      "handler": "app.api.v1.auth:verify_2fa_and_enable",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/2fa/disable",
+      "handler": "app.api.v1.auth:disable_2fa",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/biometric/register",
+      "handler": "app.api.v1.auth:biometric_register",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/biometric-login",
+      "handler": "app.api.v1.auth:biometric_login",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/security-questions",
+      "handler": "app.api.v1.auth:list_security_questions",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/security-questions/set",
+      "handler": "app.api.v1.auth:set_security_question",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/security-questions/verify",
+      "handler": "app.api.v1.auth:verify_security_question_route",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/admin/login",
+      "handler": "app.api.v1.auth:admin_login",
+      "tags": [
+        "Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/customer/auth/login",
+      "handler": "app.api.v1.customer_auth:customer_login",
+      "tags": [
+        "Customer Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/customer/auth/register",
+      "handler": "app.api.v1.customer_auth:customer_register",
+      "tags": [
+        "Customer Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/passkeys/register/options",
+      "handler": "app.api.v1.passkeys:create_registration_options",
+      "tags": [
+        "Auth Passkeys"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/passkeys/register/verify",
+      "handler": "app.api.v1.passkeys:verify_registration",
+      "tags": [
+        "Auth Passkeys"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/passkeys/auth/options",
+      "handler": "app.api.v1.passkeys:create_authentication_options",
+      "tags": [
+        "Auth Passkeys"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/passkeys/auth/verify",
+      "handler": "app.api.v1.passkeys:verify_authentication",
+      "tags": [
+        "Auth Passkeys"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/passkeys",
+      "handler": "app.api.v1.passkeys:list_passkeys",
+      "tags": [
+        "Auth Passkeys"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/auth/passkeys/{credential_id}",
+      "handler": "app.api.v1.passkeys:delete_passkey",
+      "tags": [
+        "Auth Passkeys"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/sessions/list",
+      "handler": "app.api.v1.sessions:list_sessions",
+      "tags": [
+        "Sessions"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/sessions/revoke/{session_id}",
+      "handler": "app.api.v1.sessions:revoke_session",
+      "tags": [
+        "Sessions"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/users/",
+      "handler": "app.api.v1.users:create_user",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/me",
+      "handler": "app.api.v1.users:read_user_me",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/users/me",
+      "handler": "app.api.v1.users:update_user_me",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/users/me/profile-picture",
+      "handler": "app.api.v1.users:upload_profile_picture",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/users/me/avatar",
+      "handler": "app.api.v1.users:upload_avatar",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/users/me/addresses",
+      "handler": "app.api.v1.users:create_address",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/me/addresses",
+      "handler": "app.api.v1.users:read_addresses",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/me/menu-config",
+      "handler": "app.api.v1.users:get_user_menu_config",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/users/me",
+      "handler": "app.api.v1.users:partial_update_user_me",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/users/me/avatar",
+      "handler": "app.api.v1.users:delete_avatar",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/users/me/addresses/{address_id}/default",
+      "handler": "app.api.v1.users:set_default_address",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/users/me/addresses/{address_id}",
+      "handler": "app.api.v1.users:update_address",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/users/me/addresses/{address_id}",
+      "handler": "app.api.v1.users:delete_address",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/users/me",
+      "handler": "app.api.v1.users:delete_my_account",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/me/login-history",
+      "handler": "app.api.v1.users:get_my_login_history",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/me/activity-log",
+      "handler": "app.api.v1.users:get_my_activity_log",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/me/membership",
+      "handler": "app.api.v1.users:get_my_membership",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/me/dashboard-summary",
+      "handler": "app.api.v1.users:get_my_dashboard_summary",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/me/feature-flags",
+      "handler": "app.api.v1.users:get_user_feature_flags",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/me/dashboard-widgets",
+      "handler": "app.api.v1.users:get_user_dashboard_config",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/me/notification-preferences",
+      "handler": "app.api.v1.users:get_notification_preferences",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/users/me/notification-preferences",
+      "handler": "app.api.v1.users:update_notification_preferences",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/",
+      "handler": "app.api.v1.users:read_users",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/search",
+      "handler": "app.api.v1.users:search_users",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/{user_id}",
+      "handler": "app.api.v1.users:get_user_by_id",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/users/{user_id}/status",
+      "handler": "app.api.v1.users:update_user_status",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/{user_id}/activity",
+      "handler": "app.api.v1.users:get_user_activity",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/users/{user_id}",
+      "handler": "app.api.v1.users:delete_user",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/me/sessions",
+      "handler": "app.api.v1.users:get_my_sessions",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/users/me/sessions/{session_id}",
+      "handler": "app.api.v1.users:revoke_session",
+      "tags": [
+        "Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/profile",
+      "handler": "app.api.v1.profile:get_profile",
+      "tags": [
+        "Profile"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/profile",
+      "handler": "app.api.v1.profile:update_profile",
+      "tags": [
+        "Profile"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/profile/account",
+      "handler": "app.api.v1.profile:deactivate_account",
+      "tags": [
+        "Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/profile/addresses",
+      "handler": "app.api.v1.profile:get_addresses",
+      "tags": [
+        "Profile"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/profile/addresses",
+      "handler": "app.api.v1.profile:create_address",
+      "tags": [
+        "Profile"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/profile/addresses/{address_id}",
+      "handler": "app.api.v1.profile:update_address",
+      "tags": [
+        "Profile"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/profile/addresses/{address_id}",
+      "handler": "app.api.v1.profile:delete_address",
+      "tags": [
+        "Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/profile/preferences",
+      "handler": "app.api.v1.profile:get_preferences",
+      "tags": [
+        "Profile"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/profile/preferences",
+      "handler": "app.api.v1.profile:update_preferences",
+      "tags": [
+        "Profile"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/profile/picture",
+      "handler": "app.api.v1.profile:upload_profile_picture",
+      "tags": [
+        "Profile"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/profile/change-password",
+      "handler": "app.api.v1.profile:change_password",
+      "tags": [
+        "Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/profile/login-history",
+      "handler": "app.api.v1.profile:login_history",
+      "tags": [
+        "Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/profile/sessions",
+      "handler": "app.api.v1.profile:get_sessions",
+      "tags": [
+        "Profile"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/profile/sessions/{session_id}",
+      "handler": "app.api.v1.profile:revoke_session",
+      "tags": [
+        "Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/status",
+      "handler": "app.api.v1.kyc:get_kyc_status",
+      "tags": [
+        "KYC"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/submit",
+      "handler": "app.api.v1.kyc:submit_kyc_document",
+      "tags": [
+        "KYC"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/aadhaar-verify",
+      "handler": "app.api.v1.kyc:verify_aadhaar",
+      "tags": [
+        "KYC"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/pan-verify",
+      "handler": "app.api.v1.kyc:verify_pan",
+      "tags": [
+        "KYC"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/video-kyc",
+      "handler": "app.api.v1.kyc:upload_video_kyc",
+      "tags": [
+        "KYC"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/me/kyc/video-kyc/request",
+      "handler": "app.api.v1.kyc:request_video_kyc",
+      "tags": [
+        "KYC"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/resubmit",
+      "handler": "app.api.v1.kyc:resubmit_kyc",
+      "tags": [
+        "KYC"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/rejection-reasons",
+      "handler": "app.api.v1.kyc:get_kyc_rejection_reasons",
+      "tags": [
+        "KYC"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/utility-bill-verify",
+      "handler": "app.api.v1.kyc:verify_utility_bill",
+      "tags": [
+        "KYC"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/stations/",
+      "handler": "app.api.v1.stations:read_stations",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/stations/nearby",
+      "handler": "app.api.v1.stations:search_nearby_stations",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/stations/",
+      "handler": "app.api.v1.stations:create_station",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/stations/{station_id}",
+      "handler": "app.api.v1.stations:read_station",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/stations/{station_id}",
+      "handler": "app.api.v1.stations:update_station",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/stations/{station_id}",
+      "handler": "app.api.v1.stations:delete_station",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/stations/{station_id}/status",
+      "handler": "app.api.v1.stations:update_station_status",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/stations/{station_id}/performance",
+      "handler": "app.api.v1.stations:read_station_performance",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/stations/{station_id}/rental-history",
+      "handler": "app.api.v1.stations:read_station_rental_history",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/stations/{station_id}/photos",
+      "handler": "app.api.v1.stations:upload_station_photo",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/stations/{station_id}/photos/{photo_id}",
+      "handler": "app.api.v1.stations:delete_station_photo",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/stations/{station_id}/maintenance-schedule",
+      "handler": "app.api.v1.stations:read_station_maintenance_schedule",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/stations/{station_id}/maintenance-schedule",
+      "handler": "app.api.v1.stations:create_station_maintenance_task",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/stations/{station_id}/maintenance-schedule/{task_id}",
+      "handler": "app.api.v1.stations:update_station_maintenance_task",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/stations/map",
+      "handler": "app.api.v1.stations:get_stations_map",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/stations/heatmap",
+      "handler": "app.api.v1.stations:get_stations_heatmap",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/stations/{station_id}/reviews",
+      "handler": "app.api.v1.stations:read_station_reviews",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/stations/{station_id}/reviews",
+      "handler": "app.api.v1.stations:create_review",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/stations/{station_id}/reviews/{review_id}",
+      "handler": "app.api.v1.stations:update_review",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/stations/{station_id}/reviews/{review_id}",
+      "handler": "app.api.v1.stations:delete_review",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/stations/{station_id}/favorite",
+      "handler": "app.api.v1.stations:favorite_station",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/stations/{station_id}/favorite",
+      "handler": "app.api.v1.stations:unfavorite_station",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/stations/{station_id}/batteries",
+      "handler": "app.api.v1.stations:read_station_batteries",
+      "tags": [
+        "Stations"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/batteries/scan-qr",
+      "handler": "app.api.v1.batteries:scan_battery_qr",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/batteries/{battery_id}/health-history",
+      "handler": "app.api.v1.batteries:get_battery_health_history",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/batteries/{battery_id}/audit-logs",
+      "handler": "app.api.v1.batteries:get_battery_audit_logs",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/batteries/{battery_id}/rental-history",
+      "handler": "app.api.v1.batteries:get_battery_rental_history",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/batteries/{battery_id}/maintenance",
+      "handler": "app.api.v1.batteries:log_battery_maintenance",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/batteries/{battery_id}/maintenance-history",
+      "handler": "app.api.v1.batteries:get_battery_maintenance_history",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/batteries/{battery_id}/status",
+      "handler": "app.api.v1.batteries:update_battery_status",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/batteries/{battery_id}/assign-station",
+      "handler": "app.api.v1.batteries:assign_battery_station",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/batteries/{battery_id}/transfer",
+      "handler": "app.api.v1.batteries:transfer_battery",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/batteries/low-health",
+      "handler": "app.api.v1.batteries:get_low_health_batteries",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/batteries/utilization-report",
+      "handler": "app.api.v1.batteries:get_battery_utilization_report",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/batteries/qr/generate",
+      "handler": "app.api.v1.batteries:generate_qr_code",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/batteries/qr/verify",
+      "handler": "app.api.v1.batteries:verify_qr_code",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/batteries/",
+      "handler": "app.api.v1.batteries:read_batteries",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/batteries/",
+      "handler": "app.api.v1.batteries:create_battery",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/batteries/{battery_id}",
+      "handler": "app.api.v1.batteries:update_battery",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/batteries/{battery_id}",
+      "handler": "app.api.v1.batteries:decommission_battery",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/batteries/batch/import",
+      "handler": "app.api.v1.batteries:import_batteries_csv",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/batteries/batch/export",
+      "handler": "app.api.v1.batteries:export_batteries_csv",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/batteries/batch/update",
+      "handler": "app.api.v1.batteries:update_batteries_batch",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/batteries/{battery_id}/telemetry",
+      "handler": "app.api.v1.batteries:get_battery_telemetry",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/batteries/{battery_id}/alerts",
+      "handler": "app.api.v1.batteries:get_battery_alerts",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/batteries/{battery_id}",
+      "handler": "app.api.v1.batteries:read_battery",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/batteries/{battery_id}/lifecycle",
+      "handler": "app.api.v1.batteries:update_battery_lifecycle",
+      "tags": [
+        "Batteries"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/batteries/specs",
+      "handler": "app.api.v1.battery_catalog:create_battery_spec",
+      "tags": [
+        "Battery Catalog"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/batteries/specs",
+      "handler": "app.api.v1.battery_catalog:read_battery_specs",
+      "tags": [
+        "Battery Catalog"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/batteries/batches",
+      "handler": "app.api.v1.battery_catalog:create_battery_batch",
+      "tags": [
+        "Battery Catalog"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/rentals/",
+      "handler": "app.api.v1.rentals:read_rentals",
+      "tags": [
+        "Rentals"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/rentals/admin/all",
+      "handler": "app.api.v1.rentals:read_rentals",
+      "tags": [
+        "Rentals"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/rentals/my",
+      "handler": "app.api.v1.rentals:read_my_rentals",
+      "tags": [
+        "Rentals"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/rentals/",
+      "handler": "app.api.v1.rentals:create_rental",
+      "tags": [
+        "Rentals"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/rentals/active",
+      "handler": "app.api.v1.rentals:read_active_rentals",
+      "tags": [
+        "Rentals"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/rentals/active/current",
+      "handler": "app.api.v1.rentals:read_current_active_rental",
+      "tags": [
+        "Rentals"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/rentals/history",
+      "handler": "app.api.v1.rentals:read_rental_history",
+      "tags": [
+        "Rentals"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/rentals/{rental_id}/return",
+      "handler": "app.api.v1.rentals:return_rental_battery",
+      "tags": [
+        "Rentals"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/rentals/{rental_id}/extend",
+      "handler": "app.api.v1.rentals:request_extension",
+      "tags": [
+        "Rentals"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/rentals/{rental_id}/pause",
+      "handler": "app.api.v1.rentals:request_pause",
+      "tags": [
+        "Rentals"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/rentals/{rental_id}/resume",
+      "handler": "app.api.v1.rentals:resume_rental",
+      "tags": [
+        "Rentals"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/rentals/{rental_id}/late-fees",
+      "handler": "app.api.v1.rentals:get_late_fees",
+      "tags": [
+        "Rentals"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/rentals/{rental_id}/late-fees/waiver",
+      "handler": "app.api.v1.rentals:request_late_fee_waiver",
+      "tags": [
+        "Rentals"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/rentals/{rental_id}/swap-suggestions",
+      "handler": "app.api.v1.rentals:get_swap_suggestions",
+      "tags": [
+        "Rentals"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/rentals/{rental_id}/swap-request",
+      "handler": "app.api.v1.rentals:request_battery_swap",
+      "tags": [
+        "Rentals"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/bookings/",
+      "handler": "app.api.v1.bookings:create_booking",
+      "tags": [
+        "Bookings"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/bookings/",
+      "handler": "app.api.v1.bookings:list_my_bookings",
+      "tags": [
+        "Bookings"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/bookings/{booking_id}",
+      "handler": "app.api.v1.bookings:get_booking_details",
+      "tags": [
+        "Bookings"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/bookings/{booking_id}",
+      "handler": "app.api.v1.bookings:update_booking",
+      "tags": [
+        "Bookings"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/bookings/{booking_id}",
+      "handler": "app.api.v1.bookings:cancel_booking",
+      "tags": [
+        "Bookings"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/bookings/{booking_id}/reminder",
+      "handler": "app.api.v1.bookings:send_booking_reminder",
+      "tags": [
+        "Bookings"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/bookings/{booking_id}/pay",
+      "handler": "app.api.v1.bookings:pay_for_booking",
+      "tags": [
+        "Bookings"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/vehicles/",
+      "handler": "app.api.v1.vehicles:read_my_vehicles",
+      "tags": [
+        "Vehicles"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/vehicles/",
+      "handler": "app.api.v1.vehicles:create_vehicle",
+      "tags": [
+        "Vehicles"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/vehicles/{vehicle_id}",
+      "handler": "app.api.v1.vehicles:delete_vehicle",
+      "tags": [
+        "Vehicles"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/swaps/initiate",
+      "handler": "app.api.v1.swaps:initiate_swap",
+      "tags": [
+        "Swaps"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/swaps/{swap_id}/complete",
+      "handler": "app.api.v1.swaps:complete_swap",
+      "tags": [
+        "Swaps"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/maintenance/record",
+      "handler": "app.api.v1.maintenance:create_maintenance_record",
+      "tags": [
+        "Maintenance"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/maintenance/downtime",
+      "handler": "app.api.v1.maintenance:report_downtime",
+      "tags": [
+        "Maintenance"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/maintenance/history",
+      "handler": "app.api.v1.maintenance:get_maintenance_history",
+      "tags": [
+        "Maintenance"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/location/{rental_id}/location",
+      "handler": "app.api.v1.location:update_location",
+      "tags": [
+        "Location"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/location/{rental_id}/location/current",
+      "handler": "app.api.v1.location:get_current_location",
+      "tags": [
+        "Location"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/location/{rental_id}/location/history",
+      "handler": "app.api.v1.location:get_location_history",
+      "tags": [
+        "Location"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/location/{rental_id}/location/path",
+      "handler": "app.api.v1.location:get_travel_path",
+      "tags": [
+        "Location"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/location/{rental_id}/location/stats",
+      "handler": "app.api.v1.location:get_location_stats",
+      "tags": [
+        "Location"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/location/{rental_id}/geofence/status",
+      "handler": "app.api.v1.location:get_geofence_status",
+      "tags": [
+        "Location"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/wallet/payment-methods",
+      "handler": "app.api.v1.wallet:list_payment_methods",
+      "tags": [
+        "Wallet"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/wallet/payment-methods",
+      "handler": "app.api.v1.wallet:add_payment_method",
+      "tags": [
+        "Wallet"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/wallet/payment-methods/{method_id}",
+      "handler": "app.api.v1.wallet:remove_payment_method",
+      "tags": [
+        "Wallet"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/wallet/",
+      "handler": "app.api.v1.wallet:get_wallet_balance",
+      "tags": [
+        "Wallet"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/wallet/balance",
+      "handler": "app.api.v1.wallet:get_wallet_balance",
+      "tags": [
+        "Wallet"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/wallet/recharge",
+      "handler": "app.api.v1.wallet:recharge_wallet",
+      "tags": [
+        "Wallet"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/wallet/transactions",
+      "handler": "app.api.v1.wallet:get_wallet_transactions",
+      "tags": [
+        "Wallet"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/wallet/withdraw",
+      "handler": "app.api.v1.wallet:request_withdrawal",
+      "tags": [
+        "Wallet"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/wallet/transactions/{payment_id}/receipt",
+      "handler": "app.api.v1.wallet:get_payment_receipt",
+      "tags": [
+        "Wallet"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/wallet/lookup",
+      "handler": "app.api.v1.wallet:lookup_user_by_phone",
+      "tags": [
+        "Wallet"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/payments/methods",
+      "handler": "app.api.v1.payments:add_payment_method",
+      "tags": [
+        "Payments"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/payments/methods/{method_id}",
+      "handler": "app.api.v1.payments:delete_payment_method",
+      "tags": [
+        "Payments"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/payments/orders/{order_id}/invoice",
+      "handler": "app.api.v1.payments:download_order_invoice",
+      "tags": [
+        "Payments"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/payments/rentals/{rental_id}/invoice",
+      "handler": "app.api.v1.payments:download_rental_invoice",
+      "tags": [
+        "Payments"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/payments/transactions",
+      "handler": "app.api.v1.payments:get_user_all_payments",
+      "tags": [
+        "Payments"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/payments/payment-methods",
+      "handler": "app.api.v1.payments:get_payment_methods",
+      "tags": [
+        "Payments"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/payments/{id}",
+      "handler": "app.api.v1.payments:get_payment_detail",
+      "tags": [
+        "Payments"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/payments/{id}/refund",
+      "handler": "app.api.v1.payments:admin_initiate_refund",
+      "tags": [
+        "Payments"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/payments/{id}/refund-status",
+      "handler": "app.api.v1.payments:get_refund_status",
+      "tags": [
+        "Payments"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/payments/admin/payments",
+      "handler": "app.api.v1.payments:admin_get_all_payments",
+      "tags": [
+        "Payments"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/payments/admin/revenue",
+      "handler": "app.api.v1.payments:get_revenue_dashboard",
+      "tags": [
+        "Payments"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/payments/admin/revenue/by-station",
+      "handler": "app.api.v1.payments:get_revenue_by_station",
+      "tags": [
+        "Payments"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/payments/admin/revenue/forecast",
+      "handler": "app.api.v1.payments:get_revenue_forecast",
+      "tags": [
+        "Payments"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/payments/admin/profit-margins",
+      "handler": "app.api.v1.payments:get_profit_margins",
+      "tags": [
+        "Payments"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/payments/orders/{order_id}/refund",
+      "handler": "app.api.v1.payments:request_refund",
+      "tags": [
+        "Payments"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/payments/refunds",
+      "handler": "app.api.v1.payments:get_user_refunds",
+      "tags": [
+        "Payments"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/payments/webhooks/razorpay",
+      "handler": "app.api.v1.payments:razorpay_webhook",
+      "tags": [
+        "Payments"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/notifications/my",
+      "handler": "app.api.v1.notifications:read_notifications",
+      "tags": [
+        "Notifications"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/notifications/{notification_id}/read",
+      "handler": "app.api.v1.notifications:mark_notification_read",
+      "tags": [
+        "Notifications"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/notifications/{notification_id}",
+      "handler": "app.api.v1.notifications:delete_notification",
+      "tags": [
+        "Notifications"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/notifications/",
+      "handler": "app.api.v1.notifications:clear_all_notifications",
+      "tags": [
+        "Notifications"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/notifications/send",
+      "handler": "app.api.v1.notifications:admin_send_notification",
+      "tags": [
+        "Notifications"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/notifications/admin/bulk",
+      "handler": "app.api.v1.notifications:admin_bulk_notification",
+      "tags": [
+        "Notifications"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/notifications/unread-count",
+      "handler": "app.api.v1.notifications:get_my_unread_count",
+      "tags": [
+        "Notifications"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/notifications/{notification_id}/read",
+      "handler": "app.api.v1.notifications:put_mark_notification_read",
+      "tags": [
+        "Notifications"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/notifications/read-all",
+      "handler": "app.api.v1.notifications:put_mark_all_read",
+      "tags": [
+        "Notifications"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/support/admin/tickets",
+      "handler": "app.api.v1.support:admin_read_tickets",
+      "tags": [
+        "Support"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/tickets",
+      "handler": "app.api.v1.support:create_ticket",
+      "tags": [
+        "Support"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/support/tickets/my",
+      "handler": "app.api.v1.support:read_my_tickets",
+      "tags": [
+        "Support"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/support/tickets/{ticket_id}",
+      "handler": "app.api.v1.support:read_ticket_detail",
+      "tags": [
+        "Support"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/tickets/{ticket_id}/reply",
+      "handler": "app.api.v1.support:reply_ticket",
+      "tags": [
+        "Support"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/support/tickets/{ticket_id}/close",
+      "handler": "app.api.v1.support:close_ticket",
+      "tags": [
+        "Support"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/chat/initiate",
+      "handler": "app.api.v1.support:initiate_live_chat",
+      "tags": [
+        "Support"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/chat/{sessionId}/message",
+      "handler": "app.api.v1.support:send_chat_message",
+      "tags": [
+        "Support"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/support/chat/{sessionId}/history",
+      "handler": "app.api.v1.support:get_chat_history",
+      "tags": [
+        "Support"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/support/admin/support/queue",
+      "handler": "app.api.v1.support:get_support_queue_stats",
+      "tags": [
+        "Support"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/support/admin/support/performance",
+      "handler": "app.api.v1.support:get_support_agent_performance",
+      "tags": [
+        "Support"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/feedback",
+      "handler": "app.api.v1.support:submit_feedback",
+      "tags": [
+        "Support"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/support/feedback/my",
+      "handler": "app.api.v1.support:list_my_feedback",
+      "tags": [
+        "Support"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/support/faq",
+      "handler": "app.api.v1.support:list_faqs",
+      "tags": [
+        "Support"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/support/faq/{faq_id}",
+      "handler": "app.api.v1.support:get_faq_detail",
+      "tags": [
+        "Support"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/favorites/stations",
+      "handler": "app.api.v1.favorites:get_favorite_stations",
+      "tags": [
+        "Favorites"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/favorites/stations/{station_id}",
+      "handler": "app.api.v1.favorites:add_favorite_station",
+      "tags": [
+        "Favorites"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/favorites/stations/{station_id}",
+      "handler": "app.api.v1.favorites:remove_favorite_station",
+      "tags": [
+        "Favorites"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/transactions/",
+      "handler": "app.api.v1.transactions:get_my_transactions",
+      "tags": [
+        "Transactions"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/transactions/{id}/invoice",
+      "handler": "app.api.v1.transactions:get_invoice",
+      "tags": [
+        "Transactions"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/settlements/generate",
+      "handler": "app.api.v1.settlements:generate_settlement",
+      "tags": [
+        "Settlements"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/settlements/",
+      "handler": "app.api.v1.settlements:read_settlements",
+      "tags": [
+        "Settlements"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/settlements/{settlement_id}",
+      "handler": "app.api.v1.settlements:update_settlement_status",
+      "tags": [
+        "Settlements"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/payments/methods",
+      "handler": "app.api.v1.payments_enhanced:list_payment_methods",
+      "tags": [
+        "Payments Enhanced"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/payments/methods/{method_id}/default",
+      "handler": "app.api.v1.payments_enhanced:set_default_payment_method",
+      "tags": [
+        "Payments Enhanced"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/payments/refunds/history",
+      "handler": "app.api.v1.payments_enhanced:list_refunds",
+      "tags": [
+        "Payments Enhanced"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/payments/{transaction_id}/receipt",
+      "handler": "app.api.v1.payments_enhanced:get_receipt",
+      "tags": [
+        "Payments Enhanced"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/payments/razorpay/webhook",
+      "handler": "app.api.v1.payments_enhanced:razorpay_webhook",
+      "tags": [
+        "Payments Enhanced"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/payments/invoice/{transaction_id}",
+      "handler": "app.api.v1.payments_enhanced:get_invoice",
+      "tags": [
+        "Payments Enhanced"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/wallet/withdrawals",
+      "handler": "app.api.v1.wallet_enhanced:withdraw_from_wallet",
+      "tags": [
+        "Wallet Enhanced"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/wallet/cashback",
+      "handler": "app.api.v1.wallet_enhanced:get_cashback_history",
+      "tags": [
+        "Wallet Enhanced"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/wallet/transfer",
+      "handler": "app.api.v1.wallet_enhanced:transfer_to_user",
+      "tags": [
+        "Wallet Enhanced"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/notifications/{notification_id:int}/read",
+      "handler": "app.api.v1.notifications_enhanced:mark_notification_read",
+      "tags": [
+        "Notifications Enhanced"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/notifications/read-all",
+      "handler": "app.api.v1.notifications_enhanced:mark_all_notifications_read",
+      "tags": [
+        "Notifications Enhanced"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/notifications/device-token",
+      "handler": "app.api.v1.notifications_enhanced:register_device_token",
+      "tags": [
+        "Notifications Enhanced"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/notifications/device-token",
+      "handler": "app.api.v1.notifications_enhanced:unregister_device_token",
+      "tags": [
+        "Notifications Enhanced"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/notifications/{notification_id:int}",
+      "handler": "app.api.v1.notifications_enhanced:delete_notification",
+      "tags": [
+        "Notifications Enhanced"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/notifications",
+      "handler": "app.api.v1.notifications_enhanced:clear_all_notifications",
+      "tags": [
+        "Notifications Enhanced"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/support/tickets/{ticket_id}/attachment",
+      "handler": "app.api.v1.support_enhanced:upload_ticket_attachment",
+      "tags": [
+        "Support Enhanced"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/support/faq/search",
+      "handler": "app.api.v1.support_enhanced:search_faq",
+      "tags": [
+        "Support Enhanced"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/rentals/{rental_id}/report-issue",
+      "handler": "app.api.v1.rentals_enhanced:report_rental_issue",
+      "tags": [
+        "Rentals Enhanced"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/rentals/{rental_id}/receipt",
+      "handler": "app.api.v1.rentals_enhanced:get_rental_receipt",
+      "tags": [
+        "Rentals Enhanced"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/purchases/cart/{item_id}",
+      "handler": "app.api.v1.purchases_enhanced:update_cart_item",
+      "tags": [
+        "Purchases Enhanced"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/purchases/cart/{item_id}",
+      "handler": "app.api.v1.purchases_enhanced:remove_cart_item",
+      "tags": [
+        "Purchases Enhanced"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/purchases/orders/{order_id}/cancel",
+      "handler": "app.api.v1.purchases_enhanced:cancel_order",
+      "tags": [
+        "Purchases Enhanced"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/purchases/orders/{order_id}/warranty",
+      "handler": "app.api.v1.purchases_enhanced:claim_warranty",
+      "tags": [
+        "Purchases Enhanced"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/analytics/carbon-savings",
+      "handler": "app.api.v1.analytics_enhanced:get_carbon_savings",
+      "tags": [
+        "Analytics Enhanced"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/analytics/export",
+      "handler": "app.api.v1.analytics_enhanced:export_analytics_data",
+      "tags": [
+        "Analytics Enhanced"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/promo/validate",
+      "handler": "app.api.v1.promo:validate_promo",
+      "tags": [
+        "Promo"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/promo/apply",
+      "handler": "app.api.v1.promo:apply_promo",
+      "tags": [
+        "Promo"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/faqs/",
+      "handler": "app.api.v1.faqs:get_faqs",
+      "tags": [
+        "FAQs"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/faqs/categories",
+      "handler": "app.api.v1.faqs:get_faq_categories",
+      "tags": [
+        "FAQs"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/faqs/{id}",
+      "handler": "app.api.v1.faqs:get_faq_detail",
+      "tags": [
+        "FAQs"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/faqs/{id}/helpful",
+      "handler": "app.api.v1.faqs:mark_faq_helpful",
+      "tags": [
+        "FAQs"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/catalog/products/categories",
+      "handler": "app.api.v1.catalog:get_product_categories",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/catalog/admin/products",
+      "handler": "app.api.v1.catalog:admin_create_product",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/catalog/admin/products/{id}",
+      "handler": "app.api.v1.catalog:admin_update_product",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/catalog/admin/products/{id}",
+      "handler": "app.api.v1.catalog:admin_delete_product",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/catalog/products/search",
+      "handler": "app.api.v1.catalog:search_products",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/catalog/products",
+      "handler": "app.api.v1.catalog:get_products",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/catalog/products/metadata",
+      "handler": "app.api.v1.catalog:get_catalog_metadata",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/catalog/products/{product_id}",
+      "handler": "app.api.v1.catalog:get_product_details",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/catalog/products/featured",
+      "handler": "app.api.v1.catalog:get_featured_products",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/catalog/admin/catalog/orders",
+      "handler": "app.api.v1.catalog:admin_get_orders",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/catalog/orders",
+      "handler": "app.api.v1.catalog:create_order",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/catalog/orders/{order_id}",
+      "handler": "app.api.v1.catalog:get_order_details",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/catalog/orders",
+      "handler": "app.api.v1.catalog:get_user_orders",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/catalog/orders/{order_id}/cancel",
+      "handler": "app.api.v1.catalog:cancel_order",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/catalog/orders/{order_id}/invoice",
+      "handler": "app.api.v1.catalog:get_order_invoice",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/catalog/orders/{order_id}/return",
+      "handler": "app.api.v1.catalog:initiate_order_return",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/catalog/orders/{order_id}/tracking",
+      "handler": "app.api.v1.catalog:get_order_tracking",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/catalog/cart",
+      "handler": "app.api.v1.catalog:get_cart",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/catalog/cart",
+      "handler": "app.api.v1.catalog:add_to_cart",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/catalog/cart/{item_id}",
+      "handler": "app.api.v1.catalog:update_cart_item",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/catalog/cart/{item_id}",
+      "handler": "app.api.v1.catalog:remove_cart_item",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/catalog/cart",
+      "handler": "app.api.v1.catalog:clear_cart",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/catalog/orders/checkout",
+      "handler": "app.api.v1.catalog:checkout_cart",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/catalog/orders/{order_id}/warranty",
+      "handler": "app.api.v1.catalog:claim_warranty",
+      "tags": [
+        "Catalog"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/i18n/{lang}",
+      "handler": "app.api.v1.i18n:get_translations",
+      "tags": [
+        "i18n"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/i18n/",
+      "handler": "app.api.v1.i18n:update_translation",
+      "tags": [
+        "i18n"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/screens/{screen_id}/config",
+      "handler": "app.api.v1.screens:get_screen_config",
+      "tags": [
+        "UI Config"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/utils/upload",
+      "handler": "app.api.v1.utils:upload_file",
+      "tags": [
+        "Utilities"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/analytics/admin/overview",
+      "handler": "app.api.v1.analytics.admin:get_admin_overview",
+      "tags": [
+        "Analytics",
+        "analytics-admin"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/analytics/dealer/overview",
+      "handler": "app.api.v1.analytics.dealer:get_dealer_overview",
+      "tags": [
+        "Analytics",
+        "analytics-dealer"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/analytics/logistics/overview",
+      "handler": "app.api.v1.analytics.logistics:get_logistics_overview",
+      "tags": [
+        "Analytics",
+        "analytics-logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/analytics/customer/overview",
+      "handler": "app.api.v1.analytics.customer:get_customer_overview",
+      "tags": [
+        "Analytics",
+        "analytics-customer"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/station-monitoring/heartbeat",
+      "handler": "app.api.v1.station_monitoring:record_heartbeat",
+      "tags": [
+        "Station Monitoring"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/station-monitoring/charging/prioritize",
+      "handler": "app.api.v1.station_monitoring:prioritize_charging",
+      "tags": [
+        "Station Monitoring"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/station-monitoring/charging/reprioritize",
+      "handler": "app.api.v1.station_monitoring:reprioritize_charging",
+      "tags": [
+        "Station Monitoring"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/roles/",
+      "handler": "app.api.v1.roles:create_role",
+      "tags": [
+        "Roles"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/roles/",
+      "handler": "app.api.v1.roles:read_roles",
+      "tags": [
+        "Roles"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/roles/{role_id}",
+      "handler": "app.api.v1.roles:read_role",
+      "tags": [
+        "Roles"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/roles/{role_id}",
+      "handler": "app.api.v1.roles:update_role",
+      "tags": [
+        "Roles"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/roles/{role_id}",
+      "handler": "app.api.v1.roles:delete_role",
+      "tags": [
+        "Roles"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/menus/",
+      "handler": "app.api.v1.menus:create_menu",
+      "tags": [
+        "Menus"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/menus/",
+      "handler": "app.api.v1.menus:read_menus",
+      "tags": [
+        "Menus"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/menus/{menu_id}",
+      "handler": "app.api.v1.menus:read_menu",
+      "tags": [
+        "Menus"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/menus/{menu_id}",
+      "handler": "app.api.v1.menus:update_menu",
+      "tags": [
+        "Menus"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/menus/{menu_id}",
+      "handler": "app.api.v1.menus:delete_menu",
+      "tags": [
+        "Menus"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/role-rights/",
+      "handler": "app.api.v1.role_rights:create_role_right",
+      "tags": [
+        "Role Rights"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/role-rights/role/{role_id}",
+      "handler": "app.api.v1.role_rights:read_role_rights",
+      "tags": [
+        "Role Rights"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/role-rights/{right_id}",
+      "handler": "app.api.v1.role_rights:update_role_right",
+      "tags": [
+        "Role Rights"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/security/enable-2fa",
+      "handler": "app.api.v1.security:enable_2fa",
+      "tags": [
+        "Admin Security"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/security/verify-enable-2fa",
+      "handler": "app.api.v1.security:verify_enable_2fa",
+      "tags": [
+        "Admin Security"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/security/activity-logs",
+      "handler": "app.api.v1.security:get_activity_logs",
+      "tags": [
+        "Admin Security"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/stats",
+      "handler": "app.api.admin.main:get_admin_stats",
+      "tags": [
+        "Admin: Core"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/audit-trails/stats",
+      "handler": "app.api.admin.audit_trails:get_audit_stats",
+      "tags": [
+        "Admin: Core",
+        "Admin Audit Trails"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/audit-trails/",
+      "handler": "app.api.admin.audit_trails:list_audit_trails",
+      "tags": [
+        "Admin: Core",
+        "Admin Audit Trails"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/audit-trails/{entry_id}",
+      "handler": "app.api.admin.audit_trails:get_audit_detail",
+      "tags": [
+        "Admin: Core",
+        "Admin Audit Trails"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/stations/",
+      "handler": "app.api.admin.stations:list_stations",
+      "tags": [
+        "Admin: Core",
+        "Admin Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/stations/stats",
+      "handler": "app.api.admin.stations:get_station_stats",
+      "tags": [
+        "Admin: Core",
+        "Admin Stations"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/stations/",
+      "handler": "app.api.admin.stations:create_station",
+      "tags": [
+        "Admin: Core",
+        "Admin Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/stations/{station_id}",
+      "handler": "app.api.admin.stations:get_station_detail",
+      "tags": [
+        "Admin: Core",
+        "Admin Stations"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/stations/{station_id}",
+      "handler": "app.api.admin.stations:update_station",
+      "tags": [
+        "Admin: Core",
+        "Admin Stations"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/stations/{station_id}",
+      "handler": "app.api.admin.stations:delete_station",
+      "tags": [
+        "Admin: Core",
+        "Admin Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/stations/{station_id}/performance",
+      "handler": "app.api.admin.stations:get_station_performance",
+      "tags": [
+        "Admin: Core",
+        "Admin Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/stations/performance/all",
+      "handler": "app.api.admin.stations:get_all_station_performance",
+      "tags": [
+        "Admin: Core",
+        "Admin Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/stations/maintenance/all",
+      "handler": "app.api.admin.stations:list_all_maintenance",
+      "tags": [
+        "Admin: Core",
+        "Admin Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/stations/maintenance/stats",
+      "handler": "app.api.admin.stations:get_maintenance_stats",
+      "tags": [
+        "Admin: Core",
+        "Admin Stations"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/stations/maintenance/create",
+      "handler": "app.api.admin.stations:create_maintenance_record",
+      "tags": [
+        "Admin: Core",
+        "Admin Stations"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/stations/maintenance/{record_id}/status",
+      "handler": "app.api.admin.stations:update_maintenance_status",
+      "tags": [
+        "Admin: Core",
+        "Admin Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/stations/maintenance/checklists/templates",
+      "handler": "app.api.admin.stations:list_checklist_templates",
+      "tags": [
+        "Admin: Core",
+        "Admin Stations"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/stations/maintenance/checklists/templates",
+      "handler": "app.api.admin.stations:create_checklist_template",
+      "tags": [
+        "Admin: Core",
+        "Admin Stations"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/stations/maintenance/checklists/templates/{template_id}",
+      "handler": "app.api.admin.stations:update_checklist_template",
+      "tags": [
+        "Admin: Core",
+        "Admin Stations"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/stations/maintenance/checklists/templates/{template_id}",
+      "handler": "app.api.admin.stations:delete_checklist_template",
+      "tags": [
+        "Admin: Core",
+        "Admin Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/stations/maintenance/checklists/submissions",
+      "handler": "app.api.admin.stations:list_checklist_submissions",
+      "tags": [
+        "Admin: Core",
+        "Admin Stations"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/stations/maintenance/checklists/submissions",
+      "handler": "app.api.admin.stations:create_checklist_submission",
+      "tags": [
+        "Admin: Core",
+        "Admin Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/stations/{station_id}/specs",
+      "handler": "app.api.admin.stations:get_station_specs",
+      "tags": [
+        "Admin: Core",
+        "Admin Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/stations/{station_id}/maintenance",
+      "handler": "app.api.admin.stations:get_station_maintenance",
+      "tags": [
+        "Admin: Core",
+        "Admin Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/cms/faqs/",
+      "handler": "app.api.admin.cms:list_faqs",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/cms/faqs/",
+      "handler": "app.api.admin.cms:create_faq",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/cms/faqs/{faq_id}",
+      "handler": "app.api.admin.cms:update_faq",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/cms/faqs/{faq_id}",
+      "handler": "app.api.admin.cms:delete_faq",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/cms/blogs/",
+      "handler": "app.api.admin.cms:list_blogs",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/cms/blogs/",
+      "handler": "app.api.admin.cms:create_blog",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/cms/blogs/{blog_id}",
+      "handler": "app.api.admin.cms:get_blog",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/cms/blogs/{blog_id}",
+      "handler": "app.api.admin.cms:update_blog",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/cms/blogs/{blog_id}",
+      "handler": "app.api.admin.cms:delete_blog",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/cms/banners/",
+      "handler": "app.api.admin.cms:list_banners",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/cms/banners/",
+      "handler": "app.api.admin.cms:create_banner",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/cms/banners/{banner_id}",
+      "handler": "app.api.admin.cms:update_banner",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/cms/banners/{banner_id}",
+      "handler": "app.api.admin.cms:delete_banner",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/cms/legal/",
+      "handler": "app.api.admin.cms:list_legal_docs",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/cms/legal/",
+      "handler": "app.api.admin.cms:create_legal_doc",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/cms/legal/{doc_id}",
+      "handler": "app.api.admin.cms:update_legal_doc",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/cms/legal/{doc_id}",
+      "handler": "app.api.admin.cms:delete_legal_doc",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/cms/media/",
+      "handler": "app.api.admin.cms:list_media_assets",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/cms/media/",
+      "handler": "app.api.admin.cms:create_media_asset",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/cms/media/{asset_id}",
+      "handler": "app.api.admin.cms:update_media_asset",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/cms/media/{asset_id}",
+      "handler": "app.api.admin.cms:delete_media_asset",
+      "tags": [
+        "Admin: Core",
+        "Admin CMS"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/users/",
+      "handler": "app.api.admin.users:admin_create_user",
+      "tags": [
+        "Admin: Core",
+        "Admin Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/users/",
+      "handler": "app.api.admin.users:list_users",
+      "tags": [
+        "Admin: Core",
+        "Admin Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/users/summary",
+      "handler": "app.api.admin.users:get_user_summary",
+      "tags": [
+        "Admin: Core",
+        "Admin Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/users/suspended",
+      "handler": "app.api.admin.users:list_suspended_users",
+      "tags": [
+        "Admin: Core",
+        "Admin Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/users/{user_id}",
+      "handler": "app.api.admin.users:get_user_detail",
+      "tags": [
+        "Admin: Core",
+        "Admin Users"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/users/{user_id}",
+      "handler": "app.api.admin.users:update_user_detail",
+      "tags": [
+        "Admin: Core",
+        "Admin Users"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/users/{user_id}/password",
+      "handler": "app.api.admin.users:update_user_password",
+      "tags": [
+        "Admin: Core",
+        "Admin Users"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/users/{user_id}",
+      "handler": "app.api.admin.users:delete_user",
+      "tags": [
+        "Admin: Core",
+        "Admin Users"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/users/{user_id}/toggle-active",
+      "handler": "app.api.admin.users:toggle_user_active",
+      "tags": [
+        "Admin: Core",
+        "Admin Users"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/users/{user_id}/suspend",
+      "handler": "app.api.admin.users:suspend_user",
+      "tags": [
+        "Admin: Core",
+        "Admin Users"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/users/{user_id}/reactivate",
+      "handler": "app.api.admin.users:reactivate_user",
+      "tags": [
+        "Admin: Core",
+        "Admin Users"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/users/{user_id}/kyc-status",
+      "handler": "app.api.admin.users:update_user_kyc_status",
+      "tags": [
+        "Admin: Core",
+        "Admin Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/batteries",
+      "handler": "app.api.admin.batteries:list_batteries",
+      "tags": [
+        "Admin: Core",
+        "Admin Batteries"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/batteries/summary",
+      "handler": "app.api.admin.batteries:get_battery_summary",
+      "tags": [
+        "Admin: Core",
+        "Admin Batteries"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/batteries/export",
+      "handler": "app.api.admin.batteries:export_batteries",
+      "tags": [
+        "Admin: Core",
+        "Admin Batteries"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/batteries/bulk-update",
+      "handler": "app.api.admin.batteries:bulk_update_batteries",
+      "tags": [
+        "Admin: Core",
+        "Admin Batteries"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/batteries/{battery_id}",
+      "handler": "app.api.admin.batteries:get_battery_detail",
+      "tags": [
+        "Admin: Core",
+        "Admin Batteries"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/batteries/{battery_id}/history",
+      "handler": "app.api.admin.batteries:get_battery_audit_logs",
+      "tags": [
+        "Admin: Core",
+        "Admin Batteries"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/batteries/{battery_id}/health-history",
+      "handler": "app.api.admin.batteries:get_battery_health_history",
+      "tags": [
+        "Admin: Core",
+        "Admin Batteries"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/batteries",
+      "handler": "app.api.admin.batteries:create_battery",
+      "tags": [
+        "Admin: Core",
+        "Admin Batteries"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/batteries/{battery_id}",
+      "handler": "app.api.admin.batteries:update_battery",
+      "tags": [
+        "Admin: Core",
+        "Admin Batteries"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/batteries/import",
+      "handler": "app.api.admin.batteries:import_batteries",
+      "tags": [
+        "Admin: Core",
+        "Admin Batteries"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/stock/overview",
+      "handler": "app.api.admin.stock:get_stock_overview",
+      "tags": [
+        "Admin: Core",
+        "Admin Stock Levels"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/stock/stations",
+      "handler": "app.api.admin.stock:get_stations_stock",
+      "tags": [
+        "Admin: Core",
+        "Admin Stock Levels"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/stock/locations",
+      "handler": "app.api.admin.stock:get_locations_stock",
+      "tags": [
+        "Admin: Core",
+        "Admin Stock Levels"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/stock/stations/{station_id}",
+      "handler": "app.api.admin.stock:get_station_stock_detail",
+      "tags": [
+        "Admin: Core",
+        "Admin Stock Levels"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/stock/stations/{station_id}/config",
+      "handler": "app.api.admin.stock:update_station_stock_config",
+      "tags": [
+        "Admin: Core",
+        "Admin Stock Levels"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/stock/reorder",
+      "handler": "app.api.admin.stock:create_reorder_request",
+      "tags": [
+        "Admin: Core",
+        "Admin Stock Levels"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/stock/alerts",
+      "handler": "app.api.admin.stock:get_active_stock_alerts",
+      "tags": [
+        "Admin: Core",
+        "Admin Stock Levels"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/stock/alerts/{station_id}/dismiss",
+      "handler": "app.api.admin.stock:dismiss_stock_alert",
+      "tags": [
+        "Admin: Core",
+        "Admin Stock Levels"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/health/overview",
+      "handler": "app.api.admin.health:get_health_overview",
+      "tags": [
+        "Admin: Core",
+        "Admin Battery Health"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/health/batteries",
+      "handler": "app.api.admin.health:get_health_batteries",
+      "tags": [
+        "Admin: Core",
+        "Admin Battery Health"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/health/batteries/{battery_id}",
+      "handler": "app.api.admin.health:get_health_battery_detail",
+      "tags": [
+        "Admin: Core",
+        "Admin Battery Health"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/health/batteries/{battery_id}/snapshots",
+      "handler": "app.api.admin.health:get_battery_snapshots",
+      "tags": [
+        "Admin: Core",
+        "Admin Battery Health"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/health/batteries/{battery_id}/snapshot",
+      "handler": "app.api.admin.health:record_health_snapshot",
+      "tags": [
+        "Admin: Core",
+        "Admin Battery Health"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/health/alerts",
+      "handler": "app.api.admin.health:get_health_alerts",
+      "tags": [
+        "Admin: Core",
+        "Admin Battery Health"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/health/alerts/{alert_id}/resolve",
+      "handler": "app.api.admin.health:resolve_health_alert",
+      "tags": [
+        "Admin: Core",
+        "Admin Battery Health"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/health/maintenance",
+      "handler": "app.api.admin.health:schedule_maintenance",
+      "tags": [
+        "Admin: Core",
+        "Admin Battery Health"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/health/maintenance",
+      "handler": "app.api.admin.health:get_maintenance_list",
+      "tags": [
+        "Admin: Core",
+        "Admin Battery Health"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/health/analytics",
+      "handler": "app.api.admin.health:get_health_analytics",
+      "tags": [
+        "Admin: Core",
+        "Admin Battery Health"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/rentals/stats",
+      "handler": "app.api.admin.rentals:get_rental_stats",
+      "tags": [
+        "Admin: Core",
+        "Admin Rentals"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/rentals/active",
+      "handler": "app.api.admin.rentals:list_active_rentals",
+      "tags": [
+        "Admin: Core",
+        "Admin Rentals"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/rentals/history",
+      "handler": "app.api.admin.rentals:list_rental_history",
+      "tags": [
+        "Admin: Core",
+        "Admin Rentals"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/rentals/swaps",
+      "handler": "app.api.admin.rentals:list_swaps",
+      "tags": [
+        "Admin: Core",
+        "Admin Rentals"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/rentals/purchases",
+      "handler": "app.api.admin.rentals:list_purchases",
+      "tags": [
+        "Admin: Core",
+        "Admin Rentals"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/rentals/late-fees",
+      "handler": "app.api.admin.rentals:list_late_fees",
+      "tags": [
+        "Admin: Core",
+        "Admin Rentals"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/rentals/late-fees/waivers/{waiver_id}/review",
+      "handler": "app.api.admin.rentals:review_waiver",
+      "tags": [
+        "Admin: Core",
+        "Admin Rentals"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/rentals/{rental_id}/terminate",
+      "handler": "app.api.admin.rentals:terminate_rental",
+      "tags": [
+        "Admin: Core",
+        "Admin Rentals"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/finance/dashboard",
+      "handler": "app.api.admin.finance:get_finance_dashboard",
+      "tags": [
+        "Admin: Core",
+        "Admin Finance"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/finance/transactions",
+      "handler": "app.api.admin.finance:list_transactions",
+      "tags": [
+        "Admin: Core",
+        "Admin Finance"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/finance/transactions/stats",
+      "handler": "app.api.admin.finance:get_transaction_stats",
+      "tags": [
+        "Admin: Core",
+        "Admin Finance"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/finance/settlements",
+      "handler": "app.api.admin.finance:list_settlements",
+      "tags": [
+        "Admin: Core",
+        "Admin Finance"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/finance/settlements/stats",
+      "handler": "app.api.admin.finance:get_settlement_stats",
+      "tags": [
+        "Admin: Core",
+        "Admin Finance"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/finance/settlements/{settlement_id}/approve",
+      "handler": "app.api.admin.finance:approve_settlement",
+      "tags": [
+        "Admin: Core",
+        "Admin Finance"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/finance/invoices",
+      "handler": "app.api.admin.finance:list_invoices",
+      "tags": [
+        "Admin: Core",
+        "Admin Finance"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/finance/invoices/stats",
+      "handler": "app.api.admin.finance:get_invoice_stats",
+      "tags": [
+        "Admin: Core",
+        "Admin Finance"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/finance/profit/analysis",
+      "handler": "app.api.admin.finance:get_profit_analysis",
+      "tags": [
+        "Admin: Core",
+        "Admin Finance"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/finance/withdrawals",
+      "handler": "app.api.admin.finance:list_withdrawal_requests",
+      "tags": [
+        "Admin: Core",
+        "Admin Finance"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/finance/withdrawals/{request_id}/approve",
+      "handler": "app.api.admin.finance:approve_withdrawal",
+      "tags": [
+        "Admin: Core",
+        "Admin Finance"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/finance/refunds",
+      "handler": "app.api.admin.finance:initiate_refund",
+      "tags": [
+        "Admin: Core",
+        "Admin Finance"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/iot/stats",
+      "handler": "app.api.admin.iot:get_iot_stats",
+      "tags": [
+        "Admin: Core",
+        "Admin IoT"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/iot/devices",
+      "handler": "app.api.admin.iot:list_iot_devices",
+      "tags": [
+        "Admin: Core",
+        "Admin IoT"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/iot/commands",
+      "handler": "app.api.admin.iot:send_device_command",
+      "tags": [
+        "Admin: Core",
+        "Admin IoT"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/iot/commands/history",
+      "handler": "app.api.admin.iot:get_command_history",
+      "tags": [
+        "Admin: Core",
+        "Admin IoT"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/iot/geofences",
+      "handler": "app.api.admin.iot:list_geofences",
+      "tags": [
+        "Admin: Core",
+        "Admin IoT"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/iot/geofences",
+      "handler": "app.api.admin.iot:create_geofence",
+      "tags": [
+        "Admin: Core",
+        "Admin IoT"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/iot/alerts",
+      "handler": "app.api.admin.iot:list_alerts",
+      "tags": [
+        "Admin: Core",
+        "Admin IoT"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/iot/alerts/{alert_id}/acknowledge",
+      "handler": "app.api.admin.iot:acknowledge_alert",
+      "tags": [
+        "Admin: Core",
+        "Admin IoT"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/iot/batteries/health",
+      "handler": "app.api.admin.iot:get_battery_health_overview",
+      "tags": [
+        "Admin: Core",
+        "Admin IoT"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/iot/telematics/{battery_id}",
+      "handler": "app.api.admin.iot:get_battery_telematics",
+      "tags": [
+        "Admin: Core",
+        "Admin IoT"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/fraud/high-risk-users",
+      "handler": "app.api.admin.fraud:get_high_risk_users",
+      "tags": [
+        "Admin: Core",
+        "Admin Fraud"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/fraud/duplicate-accounts",
+      "handler": "app.api.admin.fraud:get_duplicate_accounts",
+      "tags": [
+        "Admin: Core",
+        "Admin Fraud"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/fraud/blacklist",
+      "handler": "app.api.admin.fraud:add_to_blacklist",
+      "tags": [
+        "Admin: Core",
+        "Admin Fraud"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/fraud/blacklist",
+      "handler": "app.api.admin.fraud:get_blacklist",
+      "tags": [
+        "Admin: Core",
+        "Admin Fraud"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/fraud/blacklist/{id}",
+      "handler": "app.api.admin.fraud:remove_from_blacklist",
+      "tags": [
+        "Admin: Core",
+        "Admin Fraud"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/fraud/device-fingerprints",
+      "handler": "app.api.admin.fraud:get_device_fingerprints",
+      "tags": [
+        "Admin: Core",
+        "Admin Fraud"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/fraud/duplicate-accounts/{id}/action",
+      "handler": "app.api.admin.fraud:handle_duplicate_account",
+      "tags": [
+        "Admin: Core",
+        "Admin Fraud"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/jobs/",
+      "handler": "app.api.admin.jobs:list_jobs",
+      "tags": [
+        "Admin: Core",
+        "Admin Jobs"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/jobs/{job_id}",
+      "handler": "app.api.admin.jobs:get_job",
+      "tags": [
+        "Admin: Core",
+        "Admin Jobs"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/jobs/{job_id}/run",
+      "handler": "app.api.admin.jobs:trigger_job",
+      "tags": [
+        "Admin: Core",
+        "Admin Jobs"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/jobs/{job_id}/history",
+      "handler": "app.api.admin.jobs:get_job_history",
+      "tags": [
+        "Admin: Core",
+        "Admin Jobs"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/jobs/{job_id}/logs/{execution_id}",
+      "handler": "app.api.admin.jobs:get_execution_logs",
+      "tags": [
+        "Admin: Core",
+        "Admin Jobs"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/jobs/{job_id}",
+      "handler": "app.api.admin.jobs:update_job",
+      "tags": [
+        "Admin: Core",
+        "Admin Jobs"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/jobs/executions/recent",
+      "handler": "app.api.admin.jobs:get_recent_executions",
+      "tags": [
+        "Admin: Core",
+        "Admin Jobs"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/monitoring/health",
+      "handler": "app.api.admin.monitoring:system_health",
+      "tags": [
+        "Admin: Core",
+        "Admin Monitoring"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/monitoring/metrics",
+      "handler": "app.api.admin.monitoring:performance_metrics",
+      "tags": [
+        "Admin: Core",
+        "Admin Monitoring"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/monitoring/uptime",
+      "handler": "app.api.admin.monitoring:uptime_tracking",
+      "tags": [
+        "Admin: Core",
+        "Admin Monitoring"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/monitoring/errors",
+      "handler": "app.api.admin.monitoring:error_logs",
+      "tags": [
+        "Admin: Core",
+        "Admin Monitoring"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/monitoring/performance/api",
+      "handler": "app.api.admin.monitoring:api_performance",
+      "tags": [
+        "Admin: Core",
+        "Admin Monitoring"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/monitoring/database/stats",
+      "handler": "app.api.admin.monitoring:database_stats",
+      "tags": [
+        "Admin: Core",
+        "Admin Monitoring"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/kyc-docs/",
+      "handler": "app.api.admin.kyc_admin:list_kyc_documents",
+      "tags": [
+        "Admin: Core",
+        "Admin KYC Documents"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/kyc-docs/stats",
+      "handler": "app.api.admin.kyc_admin:get_kyc_stats",
+      "tags": [
+        "Admin: Core",
+        "Admin KYC Documents"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/kyc-docs/{doc_id}",
+      "handler": "app.api.admin.kyc_admin:get_document_detail",
+      "tags": [
+        "Admin: Core",
+        "Admin KYC Documents"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/kyc-docs/{doc_id}/approve",
+      "handler": "app.api.admin.kyc_admin:approve_document",
+      "tags": [
+        "Admin: Core",
+        "Admin KYC Documents"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/kyc-docs/{doc_id}/reject",
+      "handler": "app.api.admin.kyc_admin:reject_document",
+      "tags": [
+        "Admin: Core",
+        "Admin KYC Documents"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/groups/",
+      "handler": "app.api.admin.admin_groups:read_admin_groups",
+      "tags": [
+        "Admin: Core",
+        "Admin Groups"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/groups/",
+      "handler": "app.api.admin.admin_groups:create_admin_group",
+      "tags": [
+        "Admin: Core",
+        "Admin Groups"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/groups/{group_id}",
+      "handler": "app.api.admin.admin_groups:update_admin_group",
+      "tags": [
+        "Admin: Core",
+        "Admin Groups"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/groups/{group_id}",
+      "handler": "app.api.admin.admin_groups:delete_admin_group",
+      "tags": [
+        "Admin: Core",
+        "Admin Groups"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/logistics/orders",
+      "handler": "app.api.admin.logistics:list_delivery_orders",
+      "tags": [
+        "Admin: Core",
+        "Admin Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/logistics/orders/stats",
+      "handler": "app.api.admin.logistics:get_order_stats",
+      "tags": [
+        "Admin: Core",
+        "Admin Logistics"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/logistics/orders",
+      "handler": "app.api.admin.logistics:create_delivery_order",
+      "tags": [
+        "Admin: Core",
+        "Admin Logistics"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/logistics/orders/{order_id}/status",
+      "handler": "app.api.admin.logistics:update_order_status",
+      "tags": [
+        "Admin: Core",
+        "Admin Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/logistics/drivers",
+      "handler": "app.api.admin.logistics:list_drivers",
+      "tags": [
+        "Admin: Core",
+        "Admin Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/logistics/drivers/stats",
+      "handler": "app.api.admin.logistics:get_driver_stats",
+      "tags": [
+        "Admin: Core",
+        "Admin Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/logistics/routes",
+      "handler": "app.api.admin.logistics:list_routes",
+      "tags": [
+        "Admin: Core",
+        "Admin Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/logistics/returns",
+      "handler": "app.api.admin.logistics:list_returns",
+      "tags": [
+        "Admin: Core",
+        "Admin Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/logistics/returns/stats",
+      "handler": "app.api.admin.logistics:get_return_stats",
+      "tags": [
+        "Admin: Core",
+        "Admin Logistics"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/logistics/returns/{return_id}/status",
+      "handler": "app.api.admin.logistics:update_return_status",
+      "tags": [
+        "Admin: Core",
+        "Admin Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/logistics/tracking",
+      "handler": "app.api.admin.logistics:get_live_tracking",
+      "tags": [
+        "Admin: Core",
+        "Admin Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/support/tickets",
+      "handler": "app.api.admin.support:get_tickets",
+      "tags": [
+        "Admin: Core",
+        "Admin Support"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/support/tickets/stats",
+      "handler": "app.api.admin.support:get_ticket_stats",
+      "tags": [
+        "Admin: Core",
+        "Admin Support"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/support/tickets/{ticket_id}",
+      "handler": "app.api.admin.support:get_ticket_detail",
+      "tags": [
+        "Admin: Core",
+        "Admin Support"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/support/tickets/{ticket_id}/status",
+      "handler": "app.api.admin.support:update_ticket_status",
+      "tags": [
+        "Admin: Core",
+        "Admin Support"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/support/tickets/{ticket_id}/assign",
+      "handler": "app.api.admin.support:assign_ticket",
+      "tags": [
+        "Admin: Core",
+        "Admin Support"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/support/tickets/{ticket_id}/priority",
+      "handler": "app.api.admin.support:update_ticket_priority",
+      "tags": [
+        "Admin: Core",
+        "Admin Support"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/support/tickets/{ticket_id}/messages",
+      "handler": "app.api.admin.support:add_ticket_message",
+      "tags": [
+        "Admin: Core",
+        "Admin Support"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/support/knowledge-base",
+      "handler": "app.api.admin.support:get_knowledge_base",
+      "tags": [
+        "Admin: Core",
+        "Admin Support"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/support/knowledge-base/stats",
+      "handler": "app.api.admin.support:get_kb_stats",
+      "tags": [
+        "Admin: Core",
+        "Admin Support"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/support/knowledge-base",
+      "handler": "app.api.admin.support:create_kb_article",
+      "tags": [
+        "Admin: Core",
+        "Admin Support"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/support/knowledge-base/{article_id}",
+      "handler": "app.api.admin.support:update_kb_article",
+      "tags": [
+        "Admin: Core",
+        "Admin Support"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/support/knowledge-base/{article_id}",
+      "handler": "app.api.admin.support:delete_kb_article",
+      "tags": [
+        "Admin: Core",
+        "Admin Support"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/support/team/performance",
+      "handler": "app.api.admin.support:get_team_performance",
+      "tags": [
+        "Admin: Core",
+        "Admin Support"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/support/team/overview",
+      "handler": "app.api.admin.support:get_team_overview",
+      "tags": [
+        "Admin: Core",
+        "Admin Support"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/bess/overview",
+      "handler": "app.api.admin.bess:get_bess_overview",
+      "tags": [
+        "Admin: Core",
+        "Admin BESS"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/bess/units",
+      "handler": "app.api.admin.bess:list_bess_units",
+      "tags": [
+        "Admin: Core",
+        "Admin BESS"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/bess/units/{unit_id}",
+      "handler": "app.api.admin.bess:get_bess_unit",
+      "tags": [
+        "Admin: Core",
+        "Admin BESS"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/bess/units",
+      "handler": "app.api.admin.bess:create_bess_unit",
+      "tags": [
+        "Admin: Core",
+        "Admin BESS"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/bess/energy-logs",
+      "handler": "app.api.admin.bess:list_energy_logs",
+      "tags": [
+        "Admin: Core",
+        "Admin BESS"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/bess/energy-logs/summary",
+      "handler": "app.api.admin.bess:energy_summary",
+      "tags": [
+        "Admin: Core",
+        "Admin BESS"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/bess/grid-events",
+      "handler": "app.api.admin.bess:list_grid_events",
+      "tags": [
+        "Admin: Core",
+        "Admin BESS"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/bess/grid-events",
+      "handler": "app.api.admin.bess:create_grid_event",
+      "tags": [
+        "Admin: Core",
+        "Admin BESS"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/bess/grid-events/{event_id}",
+      "handler": "app.api.admin.bess:update_grid_event_status",
+      "tags": [
+        "Admin: Core",
+        "Admin BESS"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/bess/reports",
+      "handler": "app.api.admin.bess:list_reports",
+      "tags": [
+        "Admin: Core",
+        "Admin BESS"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/bess/reports/kpi",
+      "handler": "app.api.admin.bess:reports_kpi",
+      "tags": [
+        "Admin: Core",
+        "Admin BESS"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/notifications/campaigns",
+      "handler": "app.api.admin.notifications:list_campaigns",
+      "tags": [
+        "Admin: Core",
+        "Admin Notifications"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/notifications/campaigns",
+      "handler": "app.api.admin.notifications:create_campaign",
+      "tags": [
+        "Admin: Core",
+        "Admin Notifications"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/notifications/campaigns/{campaign_id}/send",
+      "handler": "app.api.admin.notifications:send_campaign",
+      "tags": [
+        "Admin: Core",
+        "Admin Notifications"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/notifications/campaigns/{campaign_id}",
+      "handler": "app.api.admin.notifications:delete_campaign",
+      "tags": [
+        "Admin: Core",
+        "Admin Notifications"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/notifications/triggers",
+      "handler": "app.api.admin.notifications:list_triggers",
+      "tags": [
+        "Admin: Core",
+        "Admin Notifications"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/notifications/triggers",
+      "handler": "app.api.admin.notifications:create_trigger",
+      "tags": [
+        "Admin: Core",
+        "Admin Notifications"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/notifications/triggers/{trigger_id}",
+      "handler": "app.api.admin.notifications:update_trigger",
+      "tags": [
+        "Admin: Core",
+        "Admin Notifications"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/notifications/triggers/{trigger_id}",
+      "handler": "app.api.admin.notifications:delete_trigger",
+      "tags": [
+        "Admin: Core",
+        "Admin Notifications"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/notifications/logs",
+      "handler": "app.api.admin.notifications:list_notification_logs",
+      "tags": [
+        "Admin: Core",
+        "Admin Notifications"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/notifications/logs/stats",
+      "handler": "app.api.admin.notifications:notification_stats",
+      "tags": [
+        "Admin: Core",
+        "Admin Notifications"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/notifications/config",
+      "handler": "app.api.admin.notifications:list_notification_configs",
+      "tags": [
+        "Admin: Core",
+        "Admin Notifications"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/notifications/config",
+      "handler": "app.api.admin.notifications:create_notification_config",
+      "tags": [
+        "Admin: Core",
+        "Admin Notifications"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/notifications/config/{config_id}",
+      "handler": "app.api.admin.notifications:update_notification_config",
+      "tags": [
+        "Admin: Core",
+        "Admin Notifications"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/notifications/config/{config_id}/test",
+      "handler": "app.api.admin.notifications:test_notification_config",
+      "tags": [
+        "Admin: Core",
+        "Admin Notifications"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings/general",
+      "handler": "app.api.admin.settings:get_general_settings",
+      "tags": [
+        "Admin: Core",
+        "Admin Settings"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/settings/general/{config_id}",
+      "handler": "app.api.admin.settings:update_general_setting",
+      "tags": [
+        "Admin: Core",
+        "Admin Settings"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/settings/general",
+      "handler": "app.api.admin.settings:create_general_setting",
+      "tags": [
+        "Admin: Core",
+        "Admin Settings"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings/feature-flags",
+      "handler": "app.api.admin.settings:list_feature_flags",
+      "tags": [
+        "Admin: Core",
+        "Admin Settings"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/settings/feature-flags/{flag_id}",
+      "handler": "app.api.admin.settings:toggle_feature_flag",
+      "tags": [
+        "Admin: Core",
+        "Admin Settings"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings/api-keys",
+      "handler": "app.api.admin.settings:list_api_keys",
+      "tags": [
+        "Admin: Core",
+        "Admin Settings"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/settings/api-keys",
+      "handler": "app.api.admin.settings:create_api_key",
+      "tags": [
+        "Admin: Core",
+        "Admin Settings"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/settings/api-keys/{key_id}",
+      "handler": "app.api.admin.settings:update_api_key",
+      "tags": [
+        "Admin: Core",
+        "Admin Settings"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/settings/api-keys/{key_id}",
+      "handler": "app.api.admin.settings:delete_api_key",
+      "tags": [
+        "Admin: Core",
+        "Admin Settings"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/settings/system-health",
+      "handler": "app.api.admin.settings:system_health",
+      "tags": [
+        "Admin: Core",
+        "Admin Settings"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/security/audit-logs",
+      "handler": "app.api.admin.security:list_audit_logs",
+      "tags": [
+        "Admin: Core",
+        "Admin Security"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/security/audit-logs/stats",
+      "handler": "app.api.admin.security:audit_stats",
+      "tags": [
+        "Admin: Core",
+        "Admin Security"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/security/security-events",
+      "handler": "app.api.admin.security:list_security_events",
+      "tags": [
+        "Admin: Core",
+        "Admin Security"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/security/security-events/{event_id}/resolve",
+      "handler": "app.api.admin.security:resolve_security_event",
+      "tags": [
+        "Admin: Core",
+        "Admin Security"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/security/security-settings",
+      "handler": "app.api.admin.security:get_security_settings",
+      "tags": [
+        "Admin: Core",
+        "Admin Security"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/security/security-settings",
+      "handler": "app.api.admin.security:update_security_settings",
+      "tags": [
+        "Admin: Core",
+        "Admin Security"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dashboard/summary",
+      "handler": "app.api.v1.dashboard:get_dashboard_summary",
+      "tags": [
+        "Admin: Dashboard"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dashboard/trend",
+      "handler": "app.api.v1.dashboard:get_dashboard_trend",
+      "tags": [
+        "Admin: Dashboard"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dashboard/station-health",
+      "handler": "app.api.v1.dashboard:get_station_health",
+      "tags": [
+        "Admin: Dashboard"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dashboard/activity-feed",
+      "handler": "app.api.v1.dashboard:get_dashboard_activity_feed",
+      "tags": [
+        "Admin: Dashboard"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dashboard/top-stations",
+      "handler": "app.api.v1.dashboard:get_dashboard_top_stations",
+      "tags": [
+        "Admin: Dashboard"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/users/{user_id}/force-logout",
+      "handler": "app.api.v1.admin_users:force_logout_user",
+      "tags": [
+        "Admin: Users"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/users/{user_id}/ban",
+      "handler": "app.api.v1.admin_users:ban_user",
+      "tags": [
+        "Admin: Users"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/users/{user_id}/unban",
+      "handler": "app.api.v1.admin_users:unban_user",
+      "tags": [
+        "Admin: Users"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/users/{user_id}/reset-password",
+      "handler": "app.api.v1.admin_users:admin_reset_password",
+      "tags": [
+        "Admin: Users"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/users/{user_id}/force-password-change",
+      "handler": "app.api.v1.admin_users:force_password_change",
+      "tags": [
+        "Admin: Users"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/users/{user_id}/transition",
+      "handler": "app.api.v1.admin_users:transition_user_state",
+      "tags": [
+        "Admin: Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/kyc/pending",
+      "handler": "app.api.v1.admin_kyc:get_pending_kyc_queue",
+      "tags": [
+        "Admin: KYC"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/kyc/{user_id}/verify",
+      "handler": "app.api.v1.admin_kyc:verify_kyc_submission",
+      "tags": [
+        "Admin: KYC"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/kyc/documents",
+      "handler": "app.api.v1.admin_kyc:list_kyc_documents",
+      "tags": [
+        "Admin: KYC"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/kyc/stats",
+      "handler": "app.api.v1.admin_kyc:get_kyc_stats",
+      "tags": [
+        "Admin: KYC"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/kyc/documents/{doc_id}/approve",
+      "handler": "app.api.v1.admin_kyc:approve_document",
+      "tags": [
+        "Admin: KYC"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/kyc/documents/{doc_id}/reject",
+      "handler": "app.api.v1.admin_kyc:reject_document",
+      "tags": [
+        "Admin: KYC"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/kyc/{user_id}/reject",
+      "handler": "app.api.v1.admin_kyc:reject_kyc_submission",
+      "tags": [
+        "Admin: KYC"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/kyc/video-kyc/{session_id}/complete",
+      "handler": "app.api.v1.admin_kyc:complete_video_kyc",
+      "tags": [
+        "Admin: KYC"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/kyc/dashboard",
+      "handler": "app.api.v1.admin_kyc:get_kyc_admin_dashboard",
+      "tags": [
+        "Admin: KYC"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/kyc/{user_id}/approve",
+      "handler": "app.api.v1.admin_kyc:approve_user_kyc",
+      "tags": [
+        "Admin: KYC"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/kyc/{user_id}/reject",
+      "handler": "app.api.v1.admin_kyc:reject_user_kyc",
+      "tags": [
+        "Admin: KYC"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/stations/health",
+      "handler": "app.api.v1.admin_stations:get_station_health_stats",
+      "tags": [
+        "Admin: Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/stations/{station_id}/alerts",
+      "handler": "app.api.v1.admin_stations:get_station_alerts",
+      "tags": [
+        "Admin: Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/stations/{station_id}/charging-queue",
+      "handler": "app.api.v1.admin_stations:get_station_charging_queue",
+      "tags": [
+        "Admin: Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/invoices/",
+      "handler": "app.api.v1.admin_invoices:list_admin_invoices",
+      "tags": [
+        "Admin: Invoices"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/invoices/{invoice_id}/pdf",
+      "handler": "app.api.v1.admin_invoices:download_invoice_pdf",
+      "tags": [
+        "Admin: Invoices"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/analytics/dashboard",
+      "handler": "app.api.v1.admin.analytics:get_admin_dashboard",
+      "tags": [
+        "Admin: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/analytics/overview",
+      "handler": "app.api.v1.admin.analytics:get_platform_overview",
+      "tags": [
+        "Admin: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/analytics/trends",
+      "handler": "app.api.v1.admin.analytics:get_platform_trends",
+      "tags": [
+        "Admin: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/analytics/conversion-funnel",
+      "handler": "app.api.v1.admin.analytics:get_conversion_funnel",
+      "tags": [
+        "Admin: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/analytics/user-behavior",
+      "handler": "app.api.v1.admin.analytics:get_user_behavior",
+      "tags": [
+        "Admin: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/analytics/battery-health-distribution",
+      "handler": "app.api.v1.admin.analytics:get_battery_health_distribution",
+      "tags": [
+        "Admin: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/analytics/demand-forecast",
+      "handler": "app.api.v1.admin.analytics:get_demand_forecast",
+      "tags": [
+        "Admin: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/analytics/recent-activity",
+      "handler": "app.api.v1.admin.analytics:get_recent_activity",
+      "tags": [
+        "Admin: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/analytics/revenue/by-station",
+      "handler": "app.api.v1.admin.analytics:get_revenue_by_station",
+      "tags": [
+        "Admin: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/analytics/revenue/by-battery-type",
+      "handler": "app.api.v1.admin.analytics:get_revenue_by_battery_type",
+      "tags": [
+        "Admin: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/analytics/top-stations",
+      "handler": "app.api.v1.admin.analytics:get_top_stations",
+      "tags": [
+        "Admin: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/analytics/revenue/by-region",
+      "handler": "app.api.v1.admin.analytics:get_revenue_by_region",
+      "tags": [
+        "Admin: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/analytics/user-growth",
+      "handler": "app.api.v1.admin.analytics:get_user_growth_metrics",
+      "tags": [
+        "Admin: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/analytics/inventory-status",
+      "handler": "app.api.v1.admin.analytics:get_global_inventory_status",
+      "tags": [
+        "Admin: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/analytics/export",
+      "handler": "app.api.v1.admin.analytics:export_analytics_report",
+      "tags": [
+        "Admin: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/audit-logs/",
+      "handler": "app.api.v1.admin_audit:list_audit_logs",
+      "tags": [
+        "Admin: Audit"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/audit-logs/stats",
+      "handler": "app.api.v1.admin_audit:audit_log_stats",
+      "tags": [
+        "Admin: Audit"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/audit-logs/export/csv",
+      "handler": "app.api.v1.admin_audit:export_audit_csv",
+      "tags": [
+        "Admin: Audit"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/audit-logs/export/json",
+      "handler": "app.api.v1.admin_audit:export_audit_json",
+      "tags": [
+        "Admin: Audit"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/rbac/roles",
+      "handler": "app.api.v1.admin_rbac:read_roles",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/rbac/roles",
+      "handler": "app.api.v1.admin_rbac:create_role",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/rbac/permissions",
+      "handler": "app.api.v1.admin_rbac:create_permission",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/rbac/permissions",
+      "handler": "app.api.v1.admin_rbac:read_permissions",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/rbac/roles/{role_id}/permissions",
+      "handler": "app.api.v1.admin_rbac:get_role_permissions",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/rbac/roles/{role_id}/permissions",
+      "handler": "app.api.v1.admin_rbac:assign_permissions_to_role",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/rbac/users/{user_id}/roles",
+      "handler": "app.api.v1.admin_rbac:get_user_roles",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/rbac/roles/bulk-assign",
+      "handler": "app.api.v1.admin_rbac:bulk_assign_roles",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/rbac/roles/{role_id}/users",
+      "handler": "app.api.v1.admin_rbac:get_users_by_role",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/rbac/users/{source_user_id}/roles/transfer",
+      "handler": "app.api.v1.admin_rbac:transfer_role_assignment",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/rbac/users/{user_id}/roles",
+      "handler": "app.api.v1.admin_rbac:assign_roles_to_user",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/rbac/users/{user_id}/roles/{role_id}",
+      "handler": "app.api.v1.admin_rbac:remove_role_from_user",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/rbac/roles/{role_id}",
+      "handler": "app.api.v1.admin_rbac:update_role",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/rbac/roles/{role_id}",
+      "handler": "app.api.v1.admin_rbac:get_role_detail",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/rbac/roles/{role_id}",
+      "handler": "app.api.v1.admin_rbac:delete_role",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/rbac/users/{user_id}/permissions/check",
+      "handler": "app.api.v1.admin_rbac:check_user_permission",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/rbac/users/{user_id}/permissions",
+      "handler": "app.api.v1.admin_rbac:get_user_permissions",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/rbac/roles/{role_id}/duplicate",
+      "handler": "app.api.v1.admin_rbac:duplicate_role",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/rbac/hierarchy",
+      "handler": "app.api.v1.admin_rbac:get_role_hierarchy",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/rbac/users/{user_id}/access-paths",
+      "handler": "app.api.v1.admin_rbac:assign_access_path",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/rbac/users/{user_id}/access-paths",
+      "handler": "app.api.v1.admin_rbac:get_user_access_paths",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/rbac/users/{user_id}/access-paths/{path_id}",
+      "handler": "app.api.v1.admin_rbac:remove_access_path",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/rbac/users/{user_id}/access-paths/{path_id}",
+      "handler": "app.api.v1.admin_rbac:update_access_path",
+      "tags": [
+        "Admin: RBAC"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/legal/",
+      "handler": "app.api.v1.admin.legal:read_legal_documents",
+      "tags": [
+        "Admin: Legal"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/legal/",
+      "handler": "app.api.v1.admin.legal:create_legal_document",
+      "tags": [
+        "Admin: Legal"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/legal/{doc_id}",
+      "handler": "app.api.v1.admin.legal:read_legal_document",
+      "tags": [
+        "Admin: Legal"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/legal/{doc_id}",
+      "handler": "app.api.v1.admin.legal:update_legal_document",
+      "tags": [
+        "Admin: Legal"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/legal/{doc_id}",
+      "handler": "app.api.v1.admin.legal:delete_legal_document",
+      "tags": [
+        "Admin: Legal"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/banners/",
+      "handler": "app.api.v1.admin.banners:read_banners",
+      "tags": [
+        "Admin: Banners"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/banners/",
+      "handler": "app.api.v1.admin.banners:create_banner",
+      "tags": [
+        "Admin: Banners"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/banners/{banner_id}",
+      "handler": "app.api.v1.admin.banners:update_banner",
+      "tags": [
+        "Admin: Banners"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/banners/{banner_id}",
+      "handler": "app.api.v1.admin.banners:delete_banner",
+      "tags": [
+        "Admin: Banners"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/blogs/",
+      "handler": "app.api.v1.admin.blogs:read_blogs",
+      "tags": [
+        "Admin: Blogs"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/blogs/",
+      "handler": "app.api.v1.admin.blogs:create_blog",
+      "tags": [
+        "Admin: Blogs"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/blogs/{blog_id}",
+      "handler": "app.api.v1.admin.blogs:read_blog",
+      "tags": [
+        "Admin: Blogs"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/admin/blogs/{blog_id}",
+      "handler": "app.api.v1.admin.blogs:update_blog",
+      "tags": [
+        "Admin: Blogs"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/admin/blogs/{blog_id}",
+      "handler": "app.api.v1.admin.blogs:delete_blog",
+      "tags": [
+        "Admin: Blogs"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/dealers/",
+      "handler": "app.api.v1.admin_dealers:list_dealers",
+      "tags": [
+        "Admin: Dealers"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/dealers/stats",
+      "handler": "app.api.v1.admin_dealers:get_dealer_stats",
+      "tags": [
+        "Admin: Dealers"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/dealers/create",
+      "handler": "app.api.v1.admin_dealers:create_dealer",
+      "tags": [
+        "Admin: Dealers"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/dealers/{dealer_id}",
+      "handler": "app.api.v1.admin_dealers:update_dealer",
+      "tags": [
+        "Admin: Dealers"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/dealers/applications",
+      "handler": "app.api.v1.admin_dealers:list_applications",
+      "tags": [
+        "Admin: Dealers"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/dealers/applications/{app_id}/stage",
+      "handler": "app.api.v1.admin_dealers:update_application_stage",
+      "tags": [
+        "Admin: Dealers"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/dealers/kyc",
+      "handler": "app.api.v1.admin_dealers:list_kyc_documents",
+      "tags": [
+        "Admin: Dealers"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/dealers/documents/{doc_id}/verify",
+      "handler": "app.api.v1.admin_dealers:verify_document",
+      "tags": [
+        "Admin: Dealers"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/dealers/documents/all",
+      "handler": "app.api.v1.admin_dealers:list_all_documents",
+      "tags": [
+        "Admin: Dealers"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/dealers/commissions/configs",
+      "handler": "app.api.v1.admin_dealers:list_commission_configs",
+      "tags": [
+        "Admin: Dealers"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/dealers/commissions/configs",
+      "handler": "app.api.v1.admin_dealers:create_commission_config",
+      "tags": [
+        "Admin: Dealers"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/admin/dealers/commissions/configs/{config_id}",
+      "handler": "app.api.v1.admin_dealers:update_commission_config",
+      "tags": [
+        "Admin: Dealers"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/dealers/commissions/logs",
+      "handler": "app.api.v1.admin_dealers:list_commission_logs",
+      "tags": [
+        "Admin: Dealers"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/dealers/commissions/stats",
+      "handler": "app.api.v1.admin_dealers:get_commission_stats",
+      "tags": [
+        "Admin: Dealers"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/dealers/{dealer_id}",
+      "handler": "app.api.v1.admin_dealers:get_dealer_detail",
+      "tags": [
+        "Admin: Dealers"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/financial-reports/revenue",
+      "handler": "app.api.v1.admin_financial_reports:get_revenue_report",
+      "tags": [
+        "Admin: Financial Reports"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/financial-reports/revenue/trends",
+      "handler": "app.api.v1.admin_financial_reports:get_revenue_trends",
+      "tags": [
+        "Admin: Financial Reports"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/financial-reports/revenue/forecast",
+      "handler": "app.api.v1.admin_financial_reports:get_revenue_forecast",
+      "tags": [
+        "Admin: Financial Reports"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/financial-reports/reconciliation",
+      "handler": "app.api.v1.admin_financial_reports:get_reconciliation_report",
+      "tags": [
+        "Admin: Financial Reports"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/admin/financial-reports/generate",
+      "handler": "app.api.v1.admin_financial_reports:generate_report",
+      "tags": [
+        "Admin: Financial Reports"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/financial-reports/export/csv",
+      "handler": "app.api.v1.admin_financial_reports:export_report_csv",
+      "tags": [
+        "Admin: Financial Reports"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/financial-reports/export/json",
+      "handler": "app.api.v1.admin_financial_reports:export_report_json",
+      "tags": [
+        "Admin: Financial Reports"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/financial-reports/history",
+      "handler": "app.api.v1.admin_financial_reports:list_reports",
+      "tags": [
+        "Admin: Financial Reports"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/financial-reports/{report_id}",
+      "handler": "app.api.v1.admin_financial_reports:get_report_by_id",
+      "tags": [
+        "Admin: Financial Reports"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/financial-reports/revenue/forecast/profitability",
+      "handler": "app.api.v1.admin_financial_reports:get_profitability_forecast",
+      "tags": [
+        "Admin: Financial Reports"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/financial-reports/revenue/margins",
+      "handler": "app.api.v1.admin_financial_reports:get_profit_margins",
+      "tags": [
+        "Admin: Financial Reports"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/admin/financial-reports/revenue/comparison",
+      "handler": "app.api.v1.admin_financial_reports:get_revenue_comparison",
+      "tags": [
+        "Admin: Financial Reports"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/auth/login",
+      "handler": "app.api.v1.dealer_portal_auth:dealer_login",
+      "tags": [
+        "Dealer: Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/auth/register",
+      "handler": "app.api.v1.dealer_portal_auth:dealer_register",
+      "tags": [
+        "Dealer: Auth"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/auth/register/status",
+      "handler": "app.api.v1.dealer_portal_auth:registration_status",
+      "tags": [
+        "Dealer: Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/auth/change-password",
+      "handler": "app.api.v1.dealer_portal_auth:change_password",
+      "tags": [
+        "Dealer: Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/auth/refresh",
+      "handler": "app.api.v1.dealer_portal_auth:refresh_token",
+      "tags": [
+        "Dealer: Auth"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/auth/validate-invite/{token}",
+      "handler": "app.api.v1.dealer_portal_auth:validate_invite_token",
+      "tags": [
+        "Dealer: Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/auth/activate/{token}",
+      "handler": "app.api.v1.dealer_portal_auth:activate_account",
+      "tags": [
+        "Dealer: Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/auth/force-change-password",
+      "handler": "app.api.v1.dealer_portal_auth:force_change_password",
+      "tags": [
+        "Dealer: Auth"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealers/",
+      "handler": "app.api.v1.dealers:create_dealer_profile",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealers/",
+      "handler": "app.api.v1.dealers:read_dealers",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealers/registration-status",
+      "handler": "app.api.v1.dealers:get_registration_status",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealers/me/dashboard",
+      "handler": "app.api.v1.dealers:get_dealer_dashboard",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealers/application/{app_id}/stage",
+      "handler": "app.api.v1.dealers:update_stage",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealers/visits/schedule",
+      "handler": "app.api.v1.dealers:schedule_visit",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealers/settlements/generate",
+      "handler": "app.api.v1.dealers:generate_settlement",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealers/settlements",
+      "handler": "app.api.v1.dealers:get_my_settlements",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealers/me/stations",
+      "handler": "app.api.v1.dealers:get_dealer_stations",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealers/me/transactions",
+      "handler": "app.api.v1.dealers:get_dealer_transactions",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealers/me/transactions/export",
+      "handler": "app.api.v1.dealers:export_dealer_transactions",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealers/me/transactions/{txn_id}",
+      "handler": "app.api.v1.dealers:get_dealer_transaction_details",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealers/me/inventory",
+      "handler": "app.api.v1.dealers:get_dealer_inventory",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealers/me/commissions",
+      "handler": "app.api.v1.dealers:get_dealer_commissions",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealers/{id}",
+      "handler": "app.api.v1.dealers:read_dealer",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/dealers/me",
+      "handler": "app.api.v1.dealers:update_my_profile",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/dealers/{id}",
+      "handler": "app.api.v1.dealers:update_dealer",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealers/me/documents",
+      "handler": "app.api.v1.dealers:upload_dealer_document",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealers/me/documents",
+      "handler": "app.api.v1.dealers:list_dealer_documents",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/dealers/me/documents/{id}",
+      "handler": "app.api.v1.dealers:delete_dealer_document",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealers/me/promotions",
+      "handler": "app.api.v1.dealers:create_dealer_promotion",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealers/me/promotions",
+      "handler": "app.api.v1.dealers:list_dealer_promotions",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealers/me/commission-statement/{month}",
+      "handler": "app.api.v1.dealers:get_commission_statement",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealers/me/support-tickets",
+      "handler": "app.api.v1.dealers:get_dealer_support_tickets",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealers/me/sales",
+      "handler": "app.api.v1.dealers:get_dealer_sales",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/dealers/me/promotions/{id}",
+      "handler": "app.api.v1.dealers:update_dealer_promotion",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealers/me/bank-account",
+      "handler": "app.api.v1.dealers:get_bank_account",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealers/me/bank-account",
+      "handler": "app.api.v1.dealers:update_bank_account",
+      "tags": [
+        "Dealer: Profile"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer-stations",
+      "handler": "app.api.v1.dealer_stations:list_stations",
+      "tags": [
+        "Dealer: Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer-stations/{station_id}",
+      "handler": "app.api.v1.dealer_stations:get_station_detail",
+      "tags": [
+        "Dealer: Stations"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/dealer-stations/{station_id}",
+      "handler": "app.api.v1.dealer_stations:update_station",
+      "tags": [
+        "Dealer: Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer-stations/{station_id}/maintenance",
+      "handler": "app.api.v1.dealer_stations:get_station_maintenance",
+      "tags": [
+        "Dealer: Stations"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer-stations/new",
+      "handler": "app.api.v1.dealer_stations:submit_new_station",
+      "tags": [
+        "Dealer: Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer-stations/{station_id}/batteries",
+      "handler": "app.api.v1.dealer_stations:get_station_batteries",
+      "tags": [
+        "Dealer: Stations"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/dealer-stations/{station_id}/inventory-rules",
+      "handler": "app.api.v1.dealer_stations:update_inventory_rules",
+      "tags": [
+        "Dealer: Stations"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/dealer-stations/{station_id}/hours",
+      "handler": "app.api.v1.dealer_stations:update_opening_hours",
+      "tags": [
+        "Dealer: Stations"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer-stations/{station_id}/schedule-maintenance",
+      "handler": "app.api.v1.dealer_stations:schedule_maintenance",
+      "tags": [
+        "Dealer: Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer-stations/inventory/alerts",
+      "handler": "app.api.v1.dealer_stations:fetch_inventory_alerts",
+      "tags": [
+        "Dealer: Stations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/dashboard",
+      "handler": "app.api.v1.dealer_portal_dashboard:get_dashboard_summary",
+      "tags": [
+        "Dealer: Dashboard"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/alerts",
+      "handler": "app.api.v1.dealer_portal_dashboard:get_alerts",
+      "tags": [
+        "Dealer: Dashboard"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/activity",
+      "handler": "app.api.v1.dealer_portal_dashboard:get_activity_feed",
+      "tags": [
+        "Dealer: Dashboard"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/customers",
+      "handler": "app.api.v1.dealer_portal_dashboard:get_customers_list",
+      "tags": [
+        "Dealer: Dashboard"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/campaigns",
+      "handler": "app.api.v1.dealer_portal_dashboard:get_dealer_campaigns",
+      "tags": [
+        "Dealer: Dashboard"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/profile",
+      "handler": "app.api.v1.dealer_portal_dashboard:get_dealer_profile_details",
+      "tags": [
+        "Dealer: Dashboard"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/documents",
+      "handler": "app.api.v1.dealer_portal_dashboard:list_dealer_documents",
+      "tags": [
+        "Dealer: Dashboard"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/portal/documents/upload",
+      "handler": "app.api.v1.dealer_portal_dashboard:upload_dealer_document",
+      "tags": [
+        "Dealer: Dashboard"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/transactions",
+      "handler": "app.api.v1.dealer_portal_dashboard:get_dealer_transactions",
+      "tags": [
+        "Dealer: Dashboard"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/tickets",
+      "handler": "app.api.v1.dealer_portal_tickets:list_tickets",
+      "tags": [
+        "Dealer: Tickets"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/portal/tickets",
+      "handler": "app.api.v1.dealer_portal_tickets:create_ticket",
+      "tags": [
+        "Dealer: Tickets"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/tickets/{ticket_id}",
+      "handler": "app.api.v1.dealer_portal_tickets:get_ticket_detail",
+      "tags": [
+        "Dealer: Tickets"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/portal/tickets/{ticket_id}/reply",
+      "handler": "app.api.v1.dealer_portal_tickets:reply_to_ticket",
+      "tags": [
+        "Dealer: Tickets"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/dealer/portal/tickets/{ticket_id}/close",
+      "handler": "app.api.v1.dealer_portal_tickets:close_ticket",
+      "tags": [
+        "Dealer: Tickets"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/roles",
+      "handler": "app.api.v1.dealer_portal_roles:get_roles",
+      "tags": [
+        "Dealer: Roles"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/roles/{role_id}",
+      "handler": "app.api.v1.dealer_portal_roles:get_role_detail",
+      "tags": [
+        "Dealer: Roles"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/portal/roles",
+      "handler": "app.api.v1.dealer_portal_roles:create_role",
+      "tags": [
+        "Dealer: Roles"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/dealer/portal/roles/{role_id}",
+      "handler": "app.api.v1.dealer_portal_roles:update_role",
+      "tags": [
+        "Dealer: Roles"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/dealer/portal/roles/{role_id}",
+      "handler": "app.api.v1.dealer_portal_roles:delete_role",
+      "tags": [
+        "Dealer: Roles"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/roles/{role_id}/users",
+      "handler": "app.api.v1.dealer_portal_roles:get_role_users",
+      "tags": [
+        "Dealer: Roles"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/portal/roles/{role_id}/users",
+      "handler": "app.api.v1.dealer_portal_roles:assign_user_to_role",
+      "tags": [
+        "Dealer: Roles"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/dealer/portal/roles/{role_id}/users/{user_id}",
+      "handler": "app.api.v1.dealer_portal_roles:remove_user_from_role",
+      "tags": [
+        "Dealer: Roles"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/roles/permissions/modules",
+      "handler": "app.api.v1.dealer_portal_roles:get_permission_modules",
+      "tags": [
+        "Dealer: Roles"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/roles/matrix",
+      "handler": "app.api.v1.dealer_portal_roles:get_roles_matrix",
+      "tags": [
+        "Dealer: Roles"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/portal/roles/users/invite",
+      "handler": "app.api.v1.dealer_portal_roles:invite_user",
+      "tags": [
+        "Dealer: Roles"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/roles/{role_id}/audit-log",
+      "handler": "app.api.v1.dealer_portal_roles:get_role_audit_log",
+      "tags": [
+        "Dealer: Roles"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/users/stats",
+      "handler": "app.api.v1.dealer_portal_users:get_user_stats",
+      "tags": [
+        "Dealer: Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/users",
+      "handler": "app.api.v1.dealer_portal_users:list_dealer_users",
+      "tags": [
+        "Dealer: Users"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/portal/users",
+      "handler": "app.api.v1.dealer_portal_users:create_dealer_user",
+      "tags": [
+        "Dealer: Users"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/portal/users/check-email",
+      "handler": "app.api.v1.dealer_portal_users:check_email_availability",
+      "tags": [
+        "Dealer: Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/users/{user_id}",
+      "handler": "app.api.v1.dealer_portal_users:get_dealer_user_detail",
+      "tags": [
+        "Dealer: Users"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/dealer/portal/users/{user_id}",
+      "handler": "app.api.v1.dealer_portal_users:update_dealer_user",
+      "tags": [
+        "Dealer: Users"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/dealer/portal/users/{user_id}",
+      "handler": "app.api.v1.dealer_portal_users:delete_dealer_user",
+      "tags": [
+        "Dealer: Users"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/dealer/portal/users/{user_id}/status",
+      "handler": "app.api.v1.dealer_portal_users:change_user_status",
+      "tags": [
+        "Dealer: Users"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/portal/users/{user_id}/reset-password",
+      "handler": "app.api.v1.dealer_portal_users:reset_user_password",
+      "tags": [
+        "Dealer: Users"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/portal/users/{user_id}/resend-invite",
+      "handler": "app.api.v1.dealer_portal_users:resend_invite",
+      "tags": [
+        "Dealer: Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/users/{user_id}/sessions",
+      "handler": "app.api.v1.dealer_portal_users:get_user_sessions",
+      "tags": [
+        "Dealer: Users"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/dealer/portal/users/{user_id}/sessions",
+      "handler": "app.api.v1.dealer_portal_users:terminate_all_sessions",
+      "tags": [
+        "Dealer: Users"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/dealer/portal/users/{user_id}/sessions/{session_id}",
+      "handler": "app.api.v1.dealer_portal_users:terminate_session",
+      "tags": [
+        "Dealer: Users"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/portal/users/bulk",
+      "handler": "app.api.v1.dealer_portal_users:bulk_action",
+      "tags": [
+        "Dealer: Users"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/settings/profile",
+      "handler": "app.api.v1.dealer_portal_settings:get_profile",
+      "tags": [
+        "Dealer: Settings"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/dealer/portal/settings/profile",
+      "handler": "app.api.v1.dealer_portal_settings:update_profile",
+      "tags": [
+        "Dealer: Settings"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/portal/settings/bank-account",
+      "handler": "app.api.v1.dealer_portal_settings:update_bank_account",
+      "tags": [
+        "Dealer: Settings"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/settings/bank-account",
+      "handler": "app.api.v1.dealer_portal_settings:get_bank_account",
+      "tags": [
+        "Dealer: Settings"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/settings/notification-preferences",
+      "handler": "app.api.v1.dealer_portal_settings:get_notification_preferences",
+      "tags": [
+        "Dealer: Settings"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/dealer/portal/settings/notification-preferences",
+      "handler": "app.api.v1.dealer_portal_settings:update_notification_preferences",
+      "tags": [
+        "Dealer: Settings"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/settings/notifications",
+      "handler": "app.api.v1.dealer_portal_settings:list_notifications",
+      "tags": [
+        "Dealer: Settings"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/dealer/portal/settings/notifications/{notification_id}/read",
+      "handler": "app.api.v1.dealer_portal_settings:mark_notification_read",
+      "tags": [
+        "Dealer: Settings"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/dealer/portal/settings/notifications/read-all",
+      "handler": "app.api.v1.dealer_portal_settings:mark_all_read",
+      "tags": [
+        "Dealer: Settings"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/settings/station-defaults",
+      "handler": "app.api.v1.dealer_portal_settings:get_station_defaults",
+      "tags": [
+        "Dealer: Settings"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/dealer/portal/settings/station-defaults",
+      "handler": "app.api.v1.dealer_portal_settings:update_station_defaults",
+      "tags": [
+        "Dealer: Settings"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/settings/inventory-rules",
+      "handler": "app.api.v1.dealer_portal_settings:get_inventory_rules",
+      "tags": [
+        "Dealer: Settings"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/dealer/portal/settings/inventory-rules",
+      "handler": "app.api.v1.dealer_portal_settings:update_inventory_rules",
+      "tags": [
+        "Dealer: Settings"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/settings/holiday-calendar",
+      "handler": "app.api.v1.dealer_portal_settings:get_holiday_calendar",
+      "tags": [
+        "Dealer: Settings"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/dealer/portal/settings/holiday-calendar",
+      "handler": "app.api.v1.dealer_portal_settings:update_holiday_calendar",
+      "tags": [
+        "Dealer: Settings"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/portal/settings/rental-settings",
+      "handler": "app.api.v1.dealer_portal_settings:get_rental_settings",
+      "tags": [
+        "Dealer: Settings"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/dealer/portal/settings/rental-settings",
+      "handler": "app.api.v1.dealer_portal_settings:update_rental_settings",
+      "tags": [
+        "Dealer: Settings"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/analytics/rentals/active",
+      "handler": "app.api.v1.dealer_portal_customers:get_active_rentals",
+      "tags": [
+        "Dealer: Customers"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/analytics",
+      "handler": "app.api.v1.dealer_portal_customers:list_customers",
+      "tags": [
+        "Dealer: Customers"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/analytics/{customer_id}",
+      "handler": "app.api.v1.dealer_portal_customers:get_customer_detail",
+      "tags": [
+        "Dealer: Customers"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/analytics/overview",
+      "handler": "app.api.v1.dealer_analytics:get_overview",
+      "tags": [
+        "Dealer: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/analytics/trends",
+      "handler": "app.api.v1.dealer_analytics:get_trends",
+      "tags": [
+        "Dealer: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/analytics/stations",
+      "handler": "app.api.v1.dealer_analytics:get_station_metrics",
+      "tags": [
+        "Dealer: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/analytics/comparison",
+      "handler": "app.api.v1.dealer_analytics:get_comparison",
+      "tags": [
+        "Dealer: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/analytics/revenue-breakdown",
+      "handler": "app.api.v1.dealer_analytics:get_revenue_breakdown",
+      "tags": [
+        "Dealer: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/analytics/customers",
+      "handler": "app.api.v1.dealer_analytics:get_customer_insights",
+      "tags": [
+        "Dealer: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/analytics/peak-hours",
+      "handler": "app.api.v1.dealer_analytics:get_peak_hours",
+      "tags": [
+        "Dealer: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/analytics/profitability",
+      "handler": "app.api.v1.dealer_analytics:get_profitability_analysis",
+      "tags": [
+        "Dealer: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/analytics/margin-by-battery",
+      "handler": "app.api.v1.dealer_analytics:get_margin_by_battery",
+      "tags": [
+        "Dealer: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/analytics/export/csv",
+      "handler": "app.api.v1.dealer_analytics:export_csv",
+      "tags": [
+        "Dealer: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/analytics/export/json",
+      "handler": "app.api.v1.dealer_analytics:export_json",
+      "tags": [
+        "Dealer: Analytics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/analytics/export/pdf",
+      "handler": "app.api.v1.dealer_analytics:export_pdf",
+      "tags": [
+        "Dealer: Analytics"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/analytics/email-report",
+      "handler": "app.api.v1.dealer_analytics:email_report",
+      "tags": [
+        "Dealer: Analytics"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/campaigns",
+      "handler": "app.api.v1.dealer_campaigns:create_campaign",
+      "tags": [
+        "Dealer: Campaigns"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/campaigns",
+      "handler": "app.api.v1.dealer_campaigns:list_campaigns",
+      "tags": [
+        "Dealer: Campaigns"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/campaigns/{campaign_id}",
+      "handler": "app.api.v1.dealer_campaigns:get_campaign",
+      "tags": [
+        "Dealer: Campaigns"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/dealer/campaigns/{campaign_id}",
+      "handler": "app.api.v1.dealer_campaigns:update_campaign",
+      "tags": [
+        "Dealer: Campaigns"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/dealer/campaigns/{campaign_id}",
+      "handler": "app.api.v1.dealer_campaigns:deactivate_campaign",
+      "tags": [
+        "Dealer: Campaigns"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/campaigns/validate",
+      "handler": "app.api.v1.dealer_campaigns:validate_promo",
+      "tags": [
+        "Dealer: Campaigns"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/campaigns/{campaign_id}/analytics",
+      "handler": "app.api.v1.dealer_campaigns:get_campaign_analytics",
+      "tags": [
+        "Dealer: Campaigns"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/campaigns/bulk-create",
+      "handler": "app.api.v1.dealer_campaigns:bulk_create_csv",
+      "tags": [
+        "Dealer: Campaigns"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/campaigns/bulk-toggle",
+      "handler": "app.api.v1.dealer_campaigns:bulk_toggle",
+      "tags": [
+        "Dealer: Campaigns"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/campaigns/{campaign_id}/clone",
+      "handler": "app.api.v1.dealer_campaigns:clone_campaign",
+      "tags": [
+        "Dealer: Campaigns"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/dealer/onboarding/status",
+      "handler": "app.api.v1.dealer_onboarding:get_onboarding_status",
+      "tags": [
+        "Dealer: Onboarding"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/onboarding/stage/trigger-checks",
+      "handler": "app.api.v1.dealer_onboarding:trigger_automated_checks",
+      "tags": [
+        "Dealer: Onboarding"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/onboarding/stage/submit-kyc",
+      "handler": "app.api.v1.dealer_onboarding:submit_kyc",
+      "tags": [
+        "Dealer: Onboarding"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/onboarding/stage/complete-training",
+      "handler": "app.api.v1.dealer_onboarding:complete_training",
+      "tags": [
+        "Dealer: Onboarding"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/onboarding/admin/{application_id}/review",
+      "handler": "app.api.v1.dealer_onboarding:admin_manual_review",
+      "tags": [
+        "Dealer: Onboarding"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/onboarding/admin/{application_id}/schedule-visit",
+      "handler": "app.api.v1.dealer_onboarding:admin_schedule_visit",
+      "tags": [
+        "Dealer: Onboarding"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/onboarding/admin/{application_id}/complete-visit",
+      "handler": "app.api.v1.dealer_onboarding:admin_complete_visit",
+      "tags": [
+        "Dealer: Onboarding"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/onboarding/admin/{application_id}/approve",
+      "handler": "app.api.v1.dealer_onboarding:admin_final_approve",
+      "tags": [
+        "Dealer: Onboarding"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/dealer/onboarding/admin/{application_id}/handover-inventory",
+      "handler": "app.api.v1.dealer_onboarding:admin_handover_inventory",
+      "tags": [
+        "Dealer: Onboarding"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/logistics/drivers/{id}/assign-vehicle",
+      "handler": "app.api.v1.logistics:assign_vehicle",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/logistics/drivers/{id}/status",
+      "handler": "app.api.v1.logistics:update_driver_status",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/me/assignments",
+      "handler": "app.api.v1.logistics:get_my_assignments",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/dashboard",
+      "handler": "app.api.v1.logistics:get_driver_dashboard",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/logistics/orders",
+      "handler": "app.api.v1.logistics:create_logistics_order",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/orders",
+      "handler": "app.api.v1.logistics:list_logistics_orders",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/orders/{id}",
+      "handler": "app.api.v1.logistics:get_order_details",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/logistics/orders/{id}/assign",
+      "handler": "app.api.v1.logistics:assign_order_to_driver",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/logistics/orders/{id}/status",
+      "handler": "app.api.v1.logistics:update_order_status",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/logistics/orders/{id}/pod",
+      "handler": "app.api.v1.logistics:upload_order_pod",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/orders/{id}/pod",
+      "handler": "app.api.v1.logistics:retrieve_order_pod",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/deliveries/active",
+      "handler": "app.api.v1.logistics:get_active_deliveries",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/deliveries/history",
+      "handler": "app.api.v1.logistics:get_delivery_history",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/deliveries/{id}/tracking",
+      "handler": "app.api.v1.logistics:track_delivery_live",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/logistics/drivers",
+      "handler": "app.api.v1.logistics:create_driver",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/drivers",
+      "handler": "app.api.v1.logistics:list_drivers",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/drivers/{id}",
+      "handler": "app.api.v1.logistics:get_driver_detail",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/logistics/drivers/{id}",
+      "handler": "app.api.v1.logistics:update_driver_profile",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/logistics/drivers/{id}/availability",
+      "handler": "app.api.v1.logistics:toggle_driver_availability",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/drivers/{id}/performance",
+      "handler": "app.api.v1.logistics:get_driver_kp_metrics",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/logistics/routes/optimize",
+      "handler": "app.api.v1.logistics:optimize_driver_route",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/routes/{id}",
+      "handler": "app.api.v1.logistics:get_route_details_endpoint",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/routes/history",
+      "handler": "app.api.v1.logistics:get_route_history_endpoint",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/logistics/routes/{id}/recalculate",
+      "handler": "app.api.v1.logistics:recalculate_route_endpoint",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/orders/{id}/route",
+      "handler": "app.api.v1.logistics:get_order_live_route",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/logistics/returns",
+      "handler": "app.api.v1.logistics:initiate_return_logistics",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/returns/{id}",
+      "handler": "app.api.v1.logistics:get_return_request_detail",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/performance",
+      "handler": "app.api.v1.logistics:platform_logistics_metrics",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/logistics/handover/generate-qr",
+      "handler": "app.api.v1.logistics:generate_handover_qr",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/logistics/handover/warehouse-scan",
+      "handler": "app.api.v1.logistics:warehouse_scan",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/logistics/handover/transfer",
+      "handler": "app.api.v1.logistics:process_transfer",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/logistics/handover/verify",
+      "handler": "app.api.v1.logistics:verify_handover",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/analytics/utilization",
+      "handler": "app.api.v1.logistics:get_utilization_metrics",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/analytics/performance",
+      "handler": "app.api.v1.logistics:get_logistics_performance_summary",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/analytics/ranking",
+      "handler": "app.api.v1.logistics:get_driver_ranking",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/logistics/analytics/forecasting",
+      "handler": "app.api.v1.logistics:get_demand_forecasting",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/logistics/notifications/delivery-update",
+      "handler": "app.api.v1.logistics:send_delivery_notification",
+      "tags": [
+        "Logistics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orders/",
+      "handler": "app.api.v1.orders:get_orders",
+      "tags": [
+        "Logistics Orders"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/orders/{order_id}",
+      "handler": "app.api.v1.orders:get_order",
+      "tags": [
+        "Logistics Orders"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orders/",
+      "handler": "app.api.v1.orders:create_order",
+      "tags": [
+        "Logistics Orders"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/orders/{order_id}/status",
+      "handler": "app.api.v1.orders:update_order_status",
+      "tags": [
+        "Logistics Orders"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orders/{order_id}/mark-in-transit",
+      "handler": "app.api.v1.orders:mark_in_transit",
+      "tags": [
+        "Logistics Orders"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orders/{order_id}/mark-failed",
+      "handler": "app.api.v1.orders:mark_failed",
+      "tags": [
+        "Logistics Orders"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orders/{order_id}/proof-of-delivery",
+      "handler": "app.api.v1.orders:submit_proof_of_delivery",
+      "tags": [
+        "Logistics Orders"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orders/{order_id}/assign-driver",
+      "handler": "app.api.v1.orders:assign_driver",
+      "tags": [
+        "Logistics Orders"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/orders/{order_id}/assign-driver",
+      "handler": "app.api.v1.orders:assign_driver",
+      "tags": [
+        "Logistics Orders"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/orders/{order_id}/schedule",
+      "handler": "app.api.v1.orders:schedule_delivery",
+      "tags": [
+        "Logistics Orders"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orders/{order_id}/confirm-request",
+      "handler": "app.api.v1.orders:request_confirmation",
+      "tags": [
+        "Logistics Orders"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orders/{order_id}/notify",
+      "handler": "app.api.v1.orders:send_notification",
+      "tags": [
+        "Logistics Orders"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orders/{order_id}/return",
+      "handler": "app.api.v1.orders:initiate_return",
+      "tags": [
+        "Logistics Orders"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/orders/{order_id}/refund",
+      "handler": "app.api.v1.orders:process_refund",
+      "tags": [
+        "Logistics Orders"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/drivers/onboard",
+      "handler": "app.api.v1.drivers:onboard_driver",
+      "tags": [
+        "Fleet Drivers"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/drivers/me",
+      "handler": "app.api.v1.drivers:get_my_driver_profile",
+      "tags": [
+        "Fleet Drivers"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/drivers/routes",
+      "handler": "app.api.v1.drivers:get_assigned_routes",
+      "tags": [
+        "Fleet Drivers"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/manifests/",
+      "handler": "app.api.v1.manifests:get_manifests",
+      "tags": [
+        "Manifests"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/manifests/",
+      "handler": "app.api.v1.manifests:create_manifest",
+      "tags": [
+        "Manifests"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/manifests/{manifest_id}",
+      "handler": "app.api.v1.manifests:get_manifest",
+      "tags": [
+        "Manifests"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/manifests/{manifest_id}/receive",
+      "handler": "app.api.v1.manifests:receive_manifest",
+      "tags": [
+        "Manifests"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/manifests/{manifest_id}/process",
+      "handler": "app.api.v1.manifests:process_manifest",
+      "tags": [
+        "Manifests"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/warehouse/",
+      "handler": "app.api.v1.warehouse_structure:get_warehouse_structure",
+      "tags": [
+        "Warehouse Structure"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/warehouse/all",
+      "handler": "app.api.v1.warehouse_structure:list_warehouse_structures",
+      "tags": [
+        "Warehouse Structure"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/warehouse/shelves/{shelf_id}/batteries",
+      "handler": "app.api.v1.warehouse_structure:assign_battery_to_shelf",
+      "tags": [
+        "Warehouse Structure"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/routes/optimize",
+      "handler": "app.api.v1.routes:optimize_route",
+      "tags": [
+        "Route Optimization"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/stock/warehouse/{warehouse_id}",
+      "handler": "app.api.v1.stock:read_warehouse_stock",
+      "tags": [
+        "Stock"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/stock/product/{product_id}",
+      "handler": "app.api.v1.stock:read_product_stock",
+      "tags": [
+        "Stock"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/stock/receive",
+      "handler": "app.api.v1.stock:receive_stock",
+      "tags": [
+        "Stock"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/stock/transfer",
+      "handler": "app.api.v1.stock:transfer_stock",
+      "tags": [
+        "Stock"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/stock/adjust",
+      "handler": "app.api.v1.stock:adjust_stock",
+      "tags": [
+        "Stock"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/telematics/ingest",
+      "handler": "app.api.v1.telematics:ingest_telemetry",
+      "tags": [
+        "Telematics"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/telematics/battery/{battery_id}/latest",
+      "handler": "app.api.v1.telematics:get_latest_telemetry",
+      "tags": [
+        "Telematics"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/telemetry/rentals/{rental_id}/location",
+      "handler": "app.api.v1.telemetry:update_location",
+      "tags": [
+        "Telemetry"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/telemetry/rentals/{rental_id}/telemetry",
+      "handler": "app.api.v1.telemetry:get_rental_telemetry",
+      "tags": [
+        "Telemetry"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/telemetry/rentals/{rental_id}/location-history",
+      "handler": "app.api.v1.telemetry:get_location_history_points",
+      "tags": [
+        "Telemetry"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/telemetry/rentals/{rental_id}/travel-path",
+      "handler": "app.api.v1.telemetry:get_travel_path",
+      "tags": [
+        "Telemetry"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/telemetry/rentals/{rental_id}/geofence-status",
+      "handler": "app.api.v1.telemetry:get_geofence_status",
+      "tags": [
+        "Telemetry"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/iot/{battery_id}/lock",
+      "handler": "app.api.v1.iot:lock_battery",
+      "tags": [
+        "IoT"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/iot/{battery_id}/unlock",
+      "handler": "app.api.v1.iot:unlock_battery",
+      "tags": [
+        "IoT"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/iot/{battery_id}/shutdown",
+      "handler": "app.api.v1.iot:shutdown_battery",
+      "tags": [
+        "IoT"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/fraud/users/{user_id}/risk-score",
+      "handler": "app.api.v1.fraud:get_user_risk_score",
+      "tags": [
+        "Fraud Detection"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/fraud/verify/pan",
+      "handler": "app.api.v1.fraud:verify_pan",
+      "tags": [
+        "Fraud Detection"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/fraud/verify/gst",
+      "handler": "app.api.v1.fraud:verify_gst",
+      "tags": [
+        "Fraud Detection"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/fraud/verify/phone",
+      "handler": "app.api.v1.fraud:verify_phone",
+      "tags": [
+        "Fraud Detection"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/fraud/device/fingerprint",
+      "handler": "app.api.v1.fraud:submit_device_fingerprint",
+      "tags": [
+        "Fraud Detection"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/branches/",
+      "handler": "app.api.v1.branches:read_branches",
+      "tags": [
+        "Branches"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/branches/{branch_id}",
+      "handler": "app.api.v1.branches:read_branch",
+      "tags": [
+        "Branches"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/branches/",
+      "handler": "app.api.v1.branches:create_branch",
+      "tags": [
+        "Branches"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/branches/{branch_id}",
+      "handler": "app.api.v1.branches:update_branch",
+      "tags": [
+        "Branches"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/branches/{branch_id}",
+      "handler": "app.api.v1.branches:delete_branch",
+      "tags": [
+        "Branches"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/organizations/",
+      "handler": "app.api.v1.organizations:read_organizations",
+      "tags": [
+        "Organizations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/organizations/{organization_id}",
+      "handler": "app.api.v1.organizations:read_organization",
+      "tags": [
+        "Organizations"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/organizations/",
+      "handler": "app.api.v1.organizations:create_organization",
+      "tags": [
+        "Organizations"
+      ]
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/organizations/{organization_id}",
+      "handler": "app.api.v1.organizations:update_organization",
+      "tags": [
+        "Organizations"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/organizations/{organization_id}",
+      "handler": "app.api.v1.organizations:delete_organization",
+      "tags": [
+        "Organizations"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/organizations/{organization_id}/logo",
+      "handler": "app.api.v1.organizations:upload_organization_logo",
+      "tags": [
+        "Organizations"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/warehouses/",
+      "handler": "app.api.v1.warehouses:read_warehouses",
+      "tags": [
+        "Warehouses"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/warehouses/",
+      "handler": "app.api.v1.warehouses:create_warehouse",
+      "tags": [
+        "Warehouses"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/warehouses/{id}",
+      "handler": "app.api.v1.warehouses:read_warehouse",
+      "tags": [
+        "Warehouses"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/warehouses/{id}",
+      "handler": "app.api.v1.warehouses:update_warehouse",
+      "tags": [
+        "Warehouses"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/v1/warehouses/{id}",
+      "handler": "app.api.v1.warehouses:delete_warehouse",
+      "tags": [
+        "Warehouses"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/locations/continents",
+      "handler": "app.api.v1.locations:read_continents",
+      "tags": [
+        "Locations Hierarchy"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/locations/continents",
+      "handler": "app.api.v1.locations:create_continent",
+      "tags": [
+        "Locations Hierarchy"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/locations/countries",
+      "handler": "app.api.v1.locations:read_countries",
+      "tags": [
+        "Locations Hierarchy"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/locations/countries",
+      "handler": "app.api.v1.locations:create_country",
+      "tags": [
+        "Locations Hierarchy"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/locations/regions",
+      "handler": "app.api.v1.locations:read_regions",
+      "tags": [
+        "Locations Hierarchy"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/locations/regions",
+      "handler": "app.api.v1.locations:create_region",
+      "tags": [
+        "Locations Hierarchy"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/locations/cities",
+      "handler": "app.api.v1.locations:read_cities",
+      "tags": [
+        "Locations Hierarchy"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/locations/cities",
+      "handler": "app.api.v1.locations:create_city",
+      "tags": [
+        "Locations Hierarchy"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/locations/zones",
+      "handler": "app.api.v1.locations:read_zones",
+      "tags": [
+        "Locations Hierarchy"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/locations/zones",
+      "handler": "app.api.v1.locations:create_zone",
+      "tags": [
+        "Locations Hierarchy"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/inventory/transfers",
+      "handler": "app.api.v1.inventory:create_transfer_order",
+      "tags": [
+        "Inventory"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/inventory/transfers",
+      "handler": "app.api.v1.inventory:list_transfers",
+      "tags": [
+        "Inventory"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/inventory/low-stock",
+      "handler": "app.api.v1.inventory:get_low_stock_alerts",
+      "tags": [
+        "Inventory"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/inventory/transfers/{id}",
+      "handler": "app.api.v1.inventory:get_transfer_detail",
+      "tags": [
+        "Inventory"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/inventory/transfers/{id}/confirm",
+      "handler": "app.api.v1.inventory:confirm_transfer_receipt",
+      "tags": [
+        "Inventory"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/inventory/audit-trail",
+      "handler": "app.api.v1.inventory:get_inventory_audit_trail",
+      "tags": [
+        "Inventory"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/inventory/audit-trail/export",
+      "handler": "app.api.v1.inventory:export_inventory_audit",
+      "tags": [
+        "Inventory"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/ml/battery-health/{battery_id}/predict",
+      "handler": "app.api.v1.ml:predict_battery_health",
+      "tags": [
+        "Machine Learning"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/ml/demand/forecast/{station_id}",
+      "handler": "app.api.v1.ml:forecast_demand",
+      "tags": [
+        "Machine Learning"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/audit/users/{user_id}",
+      "handler": "app.api.v1.audit:get_user_audit_log",
+      "tags": [
+        "Audit Logs"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/audit/roles/{role_id}/changes",
+      "handler": "app.api.v1.audit:get_role_audit_log",
+      "tags": [
+        "Audit Logs"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/audit/permissions/usage",
+      "handler": "app.api.v1.audit:get_permission_usage_analytics",
+      "tags": [
+        "Audit Logs"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/audit/auth/failures",
+      "handler": "app.api.v1.audit:get_auth_failures",
+      "tags": [
+        "Audit Logs"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/audit/data-access",
+      "handler": "app.api.v1.audit:get_data_access_log",
+      "tags": [
+        "Audit Logs"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health",
+      "handler": "app.api.v1.system:health_check",
+      "tags": [
+        "System"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health/detailed",
+      "handler": "app.api.v1.system:detailed_health_check",
+      "tags": [
+        "System"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/version",
+      "handler": "app.api.v1.system:get_version",
+      "tags": [
+        "System"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/config",
+      "handler": "app.api.v1.system:get_public_config",
+      "tags": [
+        "System"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/webhooks/razorpay",
+      "handler": "app.api.webhooks.razorpay:razorpay_webhook_event",
+      "tags": [
+        "Webhooks"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/api/internal/hotspots/telematics/ingest",
+      "handler": "app.api.internal.hotspots:ingest_telematics_internal",
+      "tags": [
+        "Internal"
+      ]
+    }
+  ]
+}

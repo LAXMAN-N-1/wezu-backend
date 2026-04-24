@@ -1,10 +1,11 @@
+from __future__ import annotations
 """
 Late Fee Service
 Calculate and manage late fees for overdue rentals
 """
 from sqlmodel import Session, select
 from typing import Optional, Dict, List
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta
 from app.models.rental import Rental
 from app.models.financial import Transaction
 from app.core.config import settings
@@ -35,15 +36,22 @@ class LateFeeService:
         # Determine expected end time using explicit field when available
         expected_end = rental.expected_end_time or (rental.start_time + timedelta(hours=24))
 
+        # Normalize to naive UTC for safe comparison (rental timestamps are naive UTC)
+        if expected_end and expected_end.tzinfo is not None:
+            expected_end = expected_end.replace(tzinfo=None)
+
         if not rental.end_time:
-            now = datetime.now(UTC)
+            now = datetime.utcnow()
             if now <= expected_end:
                 return {'late_fee': 0, 'hours_late': 0, 'is_late': False}
             hours_late = (now - expected_end).total_seconds() / 3600
         else:
-            if rental.end_time <= expected_end:
+            end_time = rental.end_time
+            if end_time.tzinfo is not None:
+                end_time = end_time.replace(tzinfo=None)
+            if end_time <= expected_end:
                 return {'late_fee': 0, 'hours_late': 0, 'is_late': False}
-            hours_late = (rental.end_time - expected_end).total_seconds() / 3600
+            hours_late = (end_time - expected_end).total_seconds() / 3600
         
         # Apply grace period
         grace_period_hours = settings.RENTAL_GRACE_PERIOD_HOURS if hasattr(settings, 'RENTAL_GRACE_PERIOD_HOURS') else 2
@@ -61,12 +69,9 @@ class LateFeeService:
         
         # Late fee is 1.5x the daily rate per hour
         late_fee_multiplier = settings.LATE_FEE_MULTIPLIER if hasattr(settings, 'LATE_FEE_MULTIPLIER') else 1.5
-        # Derive hourly rate defensively
-        if getattr(rental, "daily_rate", None):
-            hourly_rate = rental.daily_rate / 24
-        else:
-            total_hours = ((expected_end - rental.start_time).total_seconds() / 3600) or 24
-            hourly_rate = (rental.total_amount or 0) / total_hours
+        # Derive hourly rate from total_amount and rental duration
+        total_hours = ((expected_end - rental.start_time).total_seconds() / 3600) or 24
+        hourly_rate = (rental.total_amount or 0) / total_hours
         late_fee = chargeable_hours * hourly_rate * late_fee_multiplier
         
         return {
@@ -104,7 +109,7 @@ class LateFeeService:
                 existing_fee.days_overdue = int(fee_details['hours_late'] // 24)
                 existing_fee.total_late_fee = fee_details['late_fee']
                 existing_fee.amount_outstanding = existing_fee.total_late_fee - existing_fee.amount_paid - existing_fee.amount_waived
-                existing_fee.updated_at = datetime.now(UTC)
+                existing_fee.updated_at = datetime.utcnow()
                 db.add(existing_fee)
                 db.commit()
                 db.refresh(existing_fee)
@@ -151,7 +156,7 @@ class LateFeeService:
     @staticmethod
     def get_overdue_rentals(session: Session) -> List[dict]:
         """Get all overdue rentals"""
-        now = datetime.now(UTC)
+        now = datetime.utcnow()
         
         # Get active rentals
         active_rentals = session.exec(
@@ -162,8 +167,8 @@ class LateFeeService:
         for rental in active_rentals:
             expected_end = rental.expected_end_time or (rental.start_time + timedelta(hours=24))
             
-            if expected_end and expected_end.tzinfo is None:
-                expected_end = expected_end.replace(tzinfo=UTC)
+            if expected_end and expected_end.tzinfo is not None:
+                expected_end = expected_end.replace(tzinfo=None)
                 
             if now > expected_end:
                 fee_details = LateFeeService.calculate_late_fee(rental.id, session)
@@ -183,18 +188,21 @@ class LateFeeService:
         fee = db.exec(select(LateFee).where(LateFee.rental_id == rental_id)).first()
         if not fee or fee.amount_outstanding <= 0:
             return False
-            
-        # Deduct from wallet
-        WalletService.deduct_balance(
-            db, fee.user_id, fee.amount_outstanding, 
-            f"Late Fee Payment for Rental {rental_id}"
-        )
-        
-        fee.amount_paid += fee.amount_outstanding
+
+        outstanding = fee.amount_outstanding
+
+        # Update fee record first so the deduction and status update are in the
+        # same transaction (WalletService.deduct_balance commits internally).
+        fee.amount_paid += outstanding
         fee.amount_outstanding = 0
         fee.payment_status = "PAID"
-        fee.updated_at = datetime.now(UTC)
-        
+        fee.updated_at = datetime.utcnow()
         db.add(fee)
-        db.commit()
+
+        # Deduct from wallet — this flushes & commits the entire session
+        WalletService.deduct_balance(
+            db, fee.user_id, outstanding,
+            f"Late Fee Payment for Rental {rental_id}"
+        )
+
         return True

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fpdf import FPDF
 import os
 

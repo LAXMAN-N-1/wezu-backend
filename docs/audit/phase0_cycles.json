@@ -1,0 +1,329 @@
+{
+  "generated_at": "2026-04-10T11:14:15.607963+00:00",
+  "cycle_count": 36,
+  "cycles": [
+    {
+      "chain": [
+        "app.models.admin_group",
+        "app.models.admin_user",
+        "app.models.admin_group"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.battery",
+        "app.models.battery_catalog",
+        "app.models.battery"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.battery",
+        "app.models.logistics",
+        "app.models.return_request",
+        "app.models.delivery_assignment",
+        "app.models.driver_profile",
+        "app.models.user",
+        "app.models.dealer",
+        "app.models.station",
+        "app.models.battery"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.battery",
+        "app.models.logistics",
+        "app.models.return_request",
+        "app.models.delivery_assignment",
+        "app.models.driver_profile",
+        "app.models.user",
+        "app.models.financial",
+        "app.models.rental",
+        "app.models.battery"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.battery",
+        "app.models.logistics",
+        "app.models.return_request",
+        "app.models.delivery_assignment",
+        "app.models.driver_profile",
+        "app.models.user",
+        "app.models.financial",
+        "app.models.rental",
+        "app.models.station",
+        "app.models.battery"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.battery",
+        "app.models.logistics",
+        "app.models.return_request",
+        "app.models.delivery_assignment",
+        "app.models.driver_profile",
+        "app.models.user",
+        "app.models.financial",
+        "app.models.rental",
+        "app.models.swap",
+        "app.models.battery"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.battery",
+        "app.models.logistics",
+        "app.models.return_request",
+        "app.models.delivery_assignment",
+        "app.models.driver_profile",
+        "app.models.user",
+        "app.models.financial",
+        "app.models.rental",
+        "app.models.swap",
+        "app.models.station",
+        "app.models.battery"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.battery",
+        "app.models.logistics",
+        "app.models.user",
+        "app.models.dealer",
+        "app.models.station",
+        "app.models.battery"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.battery",
+        "app.models.logistics",
+        "app.models.user",
+        "app.models.financial",
+        "app.models.rental",
+        "app.models.battery"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.battery",
+        "app.models.logistics",
+        "app.models.user",
+        "app.models.financial",
+        "app.models.rental",
+        "app.models.station",
+        "app.models.battery"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.battery",
+        "app.models.logistics",
+        "app.models.user",
+        "app.models.financial",
+        "app.models.rental",
+        "app.models.swap",
+        "app.models.battery"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.battery",
+        "app.models.logistics",
+        "app.models.user",
+        "app.models.financial",
+        "app.models.rental",
+        "app.models.swap",
+        "app.models.station",
+        "app.models.battery"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.battery",
+        "app.models.rental",
+        "app.models.battery"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.battery",
+        "app.models.rental",
+        "app.models.financial",
+        "app.models.user",
+        "app.models.dealer",
+        "app.models.station",
+        "app.models.battery"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.battery",
+        "app.models.rental",
+        "app.models.station",
+        "app.models.battery"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.battery",
+        "app.models.rental",
+        "app.models.swap",
+        "app.models.battery"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.battery",
+        "app.models.rental",
+        "app.models.swap",
+        "app.models.station",
+        "app.models.battery"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.battery",
+        "app.models.rental",
+        "app.models.swap",
+        "app.models.user",
+        "app.models.dealer",
+        "app.models.station",
+        "app.models.battery"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.battery",
+        "app.models.rental",
+        "app.models.user",
+        "app.models.dealer",
+        "app.models.station",
+        "app.models.battery"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.battery",
+        "app.models.station",
+        "app.models.battery"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.branch",
+        "app.models.warehouse",
+        "app.models.branch"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.dealer",
+        "app.models.station",
+        "app.models.dealer"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.delivery_assignment",
+        "app.models.return_request",
+        "app.models.delivery_assignment"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.driver_profile",
+        "app.models.user",
+        "app.models.driver_profile"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.financial",
+        "app.models.rental",
+        "app.models.financial"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.financial",
+        "app.models.rental",
+        "app.models.swap",
+        "app.models.user",
+        "app.models.financial"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.financial",
+        "app.models.rental",
+        "app.models.user",
+        "app.models.financial"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.financial",
+        "app.models.user",
+        "app.models.financial"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.kyc",
+        "app.models.user",
+        "app.models.kyc"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.logistics",
+        "app.models.return_request",
+        "app.models.logistics"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.rbac",
+        "app.models.user",
+        "app.models.rbac"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.rental",
+        "app.models.swap",
+        "app.models.rental"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.session",
+        "app.models.user",
+        "app.models.session"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.stock",
+        "app.models.warehouse",
+        "app.models.stock"
+      ]
+    },
+    {
+      "chain": [
+        "app.models.user",
+        "app.models.vehicle",
+        "app.models.user"
+      ]
+    },
+    {
+      "chain": [
+        "app.services.notification_outbox_service",
+        "app.services.notification_service",
+        "app.services.notification_outbox_service"
+      ]
+    }
+  ]
+}

@@ -1,5 +1,6 @@
+from __future__ import annotations
 from sqlmodel import Session, select, func, and_, desc, extract
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from typing import Dict, List, Any
 
 from app.schemas.analytics.customer import CustomerOverviewResponse

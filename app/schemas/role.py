@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Optional, List, Any
 from sqlmodel import SQLModel, Field
 from datetime import datetime
@@ -11,6 +12,7 @@ class RoleBase(SQLModel):
 
 class RoleCreate(RoleBase):
     permissions: List[str] = [] # slugs
+    parent_role_id: Optional[int] = None
 
 class RoleUpdate(SQLModel):
     name: Optional[str] = None
@@ -19,12 +21,16 @@ class RoleUpdate(SQLModel):
     color: Optional[str] = None
     is_active: Optional[bool] = None
     permissions: Optional[List[str]] = None # slugs
+    parent_role_id: Optional[int] = None
 
 class RoleRead(RoleBase):
     id: int
     user_count: int = 0
+    active_user_count: int = 0
     permission_summary: str = ""
     is_system: bool = Field(default=False, alias="is_system")
+    is_custom_role: bool = False
+    scope_owner: str = "global"
     permissions_matrix: dict[str, list[str]] = Field(default={}, alias="permissions") # module -> list of actions
     created_at: datetime
     updated_at: Optional[datetime] = None

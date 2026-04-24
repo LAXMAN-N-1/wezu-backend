@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
@@ -83,7 +84,7 @@ def update_ticket_status(
         
     ticket.status = status
     if status == TicketStatus.RESOLVED:
-        from datetime import datetime, UTC
+        from datetime import datetime, timezone; UTC = timezone.utc
         ticket.resolved_at = datetime.now(UTC)
         
     db.add(ticket)

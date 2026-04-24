@@ -1,11 +1,17 @@
+from __future__ import annotations
+import json
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
 from typing import Any, List, Optional
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from pydantic import BaseModel
 from app.api import deps
 from app.models.station import Station, StationStatus, StationSlot
 from app.models.maintenance import MaintenanceRecord, StationDowntime
+from app.models.maintenance_checklist import (
+    MaintenanceChecklistSubmission,
+    MaintenanceChecklistTemplate,
+)
 from app.models.user import User
 from app.core.database import get_db
 
@@ -49,6 +55,98 @@ class MaintenanceCreateRequest(BaseModel):
     cost: float = 0.0
     parts_replaced: Optional[str] = None
     status: str = "scheduled"
+
+
+class ChecklistTemplateRequest(BaseModel):
+    name: str
+    description: Optional[str] = None
+    station_type: Optional[str] = "standard"
+    maintenance_type: str = "routine"
+    tasks: Optional[List[dict[str, Any]]] = None
+    items: Optional[List[Any]] = None
+    version: Optional[int] = None
+    is_active: bool = True
+
+
+class ChecklistSubmissionRequest(BaseModel):
+    event_id: Optional[str] = None
+    template_id: str
+    template_version: int = 1
+    completed_tasks: List[dict[str, Any]]
+    submitted_by: Optional[str] = None
+    submitted_at: Optional[datetime] = None
+    is_final: bool = False
+
+
+def _normalize_checklist_tasks(
+    *,
+    tasks: Optional[List[dict[str, Any]]] = None,
+    items: Optional[List[Any]] = None,
+) -> List[dict[str, Any]]:
+    normalized: List[dict[str, Any]] = []
+
+    if tasks:
+        for index, task in enumerate(tasks):
+            title = str(task.get("title") or "").strip()
+            if not title:
+                continue
+            normalized.append(
+                {
+                    "id": str(task.get("id") or f"task_{index + 1}"),
+                    "title": title,
+                    "description": str(task.get("description") or ""),
+                    "is_required": bool(task.get("is_required", True)),
+                    "is_completed": bool(task.get("is_completed", False)),
+                    "note": task.get("note"),
+                    "photo_paths": task.get("photo_paths") or [],
+                }
+            )
+        return normalized
+
+    for index, item in enumerate(items or []):
+        title = str(item).strip()
+        if not title:
+            continue
+        normalized.append(
+            {
+                "id": f"task_{index + 1}",
+                "title": title,
+                "description": "",
+                "is_required": True,
+                "is_completed": False,
+                "note": None,
+                "photo_paths": [],
+            }
+        )
+    return normalized
+
+
+def _serialize_template(template: MaintenanceChecklistTemplate) -> dict[str, Any]:
+    return {
+        "id": str(template.id),
+        "name": template.name,
+        "description": template.description or "",
+        "station_type": template.station_type,
+        "maintenance_type": template.maintenance_type,
+        "tasks": template.tasks or [],
+        "version": template.version,
+        "created_at": template.created_at.isoformat() if template.created_at else None,
+        "updated_at": template.updated_at.isoformat() if template.updated_at else None,
+        "is_active": template.is_active,
+    }
+
+
+def _serialize_submission(submission: MaintenanceChecklistSubmission) -> dict[str, Any]:
+    return {
+        "id": str(submission.id),
+        "event_id": str(submission.maintenance_record_id) if submission.maintenance_record_id is not None else "",
+        "template_id": str(submission.template_id),
+        "template_version": submission.template_version,
+        "completed_tasks": submission.completed_tasks or [],
+        "submitted_by": submission.submitted_by_name or "Unknown",
+        "submitted_at": submission.submitted_at.isoformat() if submission.submitted_at else None,
+        "is_final": submission.is_final,
+    }
 
 
 # ---- STATION LISTING & CRUD ----
@@ -129,7 +227,7 @@ def get_station_stats(
 ):
     """Get station network statistics."""
     total = db.exec(select(func.count()).select_from(Station)).one()
-    operational = db.exec(select(func.count()).where(Station.status == StationStatus.OPERATIONAL)).one()
+    operational = db.exec(select(func.count()).where(Station.status == StationStatus.ACTIVE)).one()
     maintenance = db.exec(select(func.count()).where(Station.status == StationStatus.MAINTENANCE)).one()
     offline = db.exec(select(func.count()).where(Station.status == StationStatus.OFFLINE)).one()
     closed = db.exec(select(func.count()).where(Station.status == StationStatus.CLOSED)).one()
@@ -172,7 +270,7 @@ def create_station(
         contact_phone=request.contact_phone,
         operating_hours=request.operating_hours,
         is_24x7=request.is_24x7,
-        status=StationStatus.OPERATIONAL,
+        status=StationStatus.ACTIVE,
         available_slots=request.total_slots,
     )
     db.add(station)
@@ -498,6 +596,170 @@ def update_maintenance_status(
     db.refresh(record)
 
     return {"status": "success", "message": f"Maintenance record updated to '{new_status}'"}
+
+
+@router.get("/maintenance/checklists/templates")
+def list_checklist_templates(
+    station_type: Optional[str] = None,
+    maintenance_type: Optional[str] = None,
+    active_only: bool = True,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(deps.get_current_active_admin),
+):
+    statement = select(MaintenanceChecklistTemplate)
+
+    if active_only:
+        statement = statement.where(MaintenanceChecklistTemplate.is_active == True)
+    if station_type:
+        statement = statement.where(
+            func.lower(MaintenanceChecklistTemplate.station_type) == station_type.lower()
+        )
+    if maintenance_type:
+        statement = statement.where(
+            func.lower(MaintenanceChecklistTemplate.maintenance_type) == maintenance_type.lower()
+        )
+
+    templates = db.exec(
+        statement.order_by(MaintenanceChecklistTemplate.updated_at.desc())
+    ).all()
+    return {"items": [_serialize_template(template) for template in templates]}
+
+
+@router.post("/maintenance/checklists/templates")
+def create_checklist_template(
+    request: ChecklistTemplateRequest,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(deps.get_current_active_admin),
+):
+    tasks = _normalize_checklist_tasks(tasks=request.tasks, items=request.items)
+    if not tasks:
+        raise HTTPException(status_code=400, detail="Checklist template must contain at least one task")
+
+    template = MaintenanceChecklistTemplate(
+        name=request.name.strip(),
+        description=(request.description or "").strip() or None,
+        station_type=(request.station_type or "standard").strip().lower(),
+        maintenance_type=request.maintenance_type.strip().lower(),
+        tasks=tasks,
+        version=request.version or 1,
+        is_active=request.is_active,
+        created_by_user_id=current_user.id,
+    )
+    db.add(template)
+    db.commit()
+    db.refresh(template)
+    return _serialize_template(template)
+
+
+@router.put("/maintenance/checklists/templates/{template_id}")
+def update_checklist_template(
+    template_id: int,
+    request: ChecklistTemplateRequest,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(deps.get_current_active_admin),
+):
+    template = db.get(MaintenanceChecklistTemplate, template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Checklist template not found")
+
+    tasks = _normalize_checklist_tasks(tasks=request.tasks, items=request.items)
+    if not tasks:
+        raise HTTPException(status_code=400, detail="Checklist template must contain at least one task")
+
+    template.name = request.name.strip()
+    template.description = (request.description or "").strip() or None
+    template.station_type = (request.station_type or template.station_type).strip().lower()
+    template.maintenance_type = request.maintenance_type.strip().lower()
+    template.tasks = tasks
+    template.version = request.version or (template.version + 1)
+    template.is_active = request.is_active
+    template.updated_at = datetime.now(UTC)
+
+    db.add(template)
+    db.commit()
+    db.refresh(template)
+    return _serialize_template(template)
+
+
+@router.delete("/maintenance/checklists/templates/{template_id}")
+def delete_checklist_template(
+    template_id: int,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(deps.get_current_active_admin),
+):
+    template = db.get(MaintenanceChecklistTemplate, template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Checklist template not found")
+
+    template.is_active = False
+    template.updated_at = datetime.now(UTC)
+    db.add(template)
+    db.commit()
+    return {"status": "success", "message": "Checklist template archived"}
+
+
+@router.get("/maintenance/checklists/submissions")
+def list_checklist_submissions(
+    event_id: Optional[str] = None,
+    template_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(deps.get_current_active_admin),
+):
+    statement = select(MaintenanceChecklistSubmission)
+    if event_id and event_id.isdigit():
+        statement = statement.where(
+            MaintenanceChecklistSubmission.maintenance_record_id == int(event_id)
+        )
+    if template_id:
+        statement = statement.where(MaintenanceChecklistSubmission.template_id == template_id)
+
+    submissions = db.exec(
+        statement.order_by(MaintenanceChecklistSubmission.submitted_at.desc())
+    ).all()
+    return {"items": [_serialize_submission(submission) for submission in submissions]}
+
+
+@router.post("/maintenance/checklists/submissions")
+def create_checklist_submission(
+    request: ChecklistSubmissionRequest,
+    db: Session = Depends(get_db),
+    current_user: Any = Depends(deps.get_current_active_admin),
+):
+    template_id = int(request.template_id)
+    template = db.get(MaintenanceChecklistTemplate, template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Checklist template not found")
+
+    maintenance_record_id = None
+    if request.event_id:
+        if not request.event_id.isdigit():
+            raise HTTPException(status_code=400, detail="event_id must be numeric")
+        maintenance_record_id = int(request.event_id)
+        if not db.get(MaintenanceRecord, maintenance_record_id):
+            raise HTTPException(status_code=404, detail="Maintenance record not found")
+
+    submission = MaintenanceChecklistSubmission(
+        maintenance_record_id=maintenance_record_id,
+        template_id=template_id,
+        template_version=request.template_version or template.version,
+        completed_tasks=_normalize_checklist_tasks(tasks=request.completed_tasks),
+        submitted_by_user_id=current_user.id,
+        submitted_by_name=request.submitted_by or current_user.full_name or current_user.email or "Admin",
+        submitted_at=request.submitted_at or datetime.now(UTC),
+        is_final=request.is_final,
+    )
+    db.add(submission)
+    db.commit()
+    db.refresh(submission)
+
+    if maintenance_record_id and request.is_final:
+        record = db.get(MaintenanceRecord, maintenance_record_id)
+        if record:
+            record.status = "completed"
+            db.add(record)
+            db.commit()
+
+    return _serialize_submission(submission)
 
 
 # ---- LEGACY ENDPOINTS (kept for backward compat) ----

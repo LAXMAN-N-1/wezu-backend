@@ -1,5 +1,7 @@
+from __future__ import annotations
 from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator, ValidationInfo, ConfigDict
 from typing import Optional, List, Any, Dict
+from typing_extensions import Self
 
 class LoginRequest(BaseModel):
     credential: str = Field(..., description="Login credential (email address or phone number)")
@@ -91,7 +93,7 @@ class ForgotPasswordRequest(BaseModel):
         return v
     
     @model_validator(mode='after')
-    def validate_either_email_or_phone(self) -> 'ForgotPasswordRequest':
+    def validate_either_email_or_phone(self) -> Self:
         if not self.email and not self.phone_number:
             raise ValueError("Either email or phone number must be provided")
         return self
@@ -140,7 +142,7 @@ class ChangePasswordRequest(BaseModel):
         return v
 
     @model_validator(mode='after')
-    def validate_passwords_different(self) -> 'ChangePasswordRequest':
+    def validate_passwords_different(self) -> Self:
         if self.current_password and self.new_password and self.current_password == self.new_password:
             raise ValueError("New password must be different from the current password")
         return self
@@ -275,3 +277,46 @@ class SetSecurityQuestionRequest(BaseModel):
 
 class VerifySecurityQuestionRequest(BaseModel):
     answer: str
+
+
+# ── Passkey / WebAuthn Schemas (from hardened repo) ────────────────────────
+from datetime import datetime
+
+class PasskeyRegistrationOptionsRequest(BaseModel):
+    passkey_name: Optional[str] = Field(default=None, max_length=120)
+
+class PasskeyOptionsRequest(BaseModel):
+    username: Optional[str] = None
+
+class PasskeyRegistrationVerifyRequest(BaseModel):
+    challenge_id: str = Field(min_length=8, max_length=128)
+    credential: Dict[str, Any]
+    passkey_name: Optional[str] = Field(default=None, max_length=120)
+
+class PasskeyVerifyRequest(BaseModel):
+    challenge_id: str = Field(min_length=8, max_length=128)
+    credential: Dict[str, Any]
+    role: Optional[str] = None
+
+class PasskeyOptionsResponse(BaseModel):
+    challenge_id: str
+    public_key: Dict[str, Any]
+    expires_at: datetime
+
+class PasskeyCredentialInfo(BaseModel):
+    credential_id: str
+    passkey_name: Optional[str] = None
+    created_at: datetime
+    last_used_at: Optional[datetime] = None
+    device_type: Optional[str] = None
+    backed_up: bool = False
+
+class PasskeyListResponse(BaseModel):
+    items: List[PasskeyCredentialInfo]
+
+class PasskeyOperationResponse(BaseModel):
+    success: bool = True
+    message: str = "OK"
+
+class PasskeyRegistrationVerifyResponse(PasskeyOperationResponse):
+    credential: PasskeyCredentialInfo

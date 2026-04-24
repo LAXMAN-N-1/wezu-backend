@@ -1,6 +1,7 @@
+from __future__ import annotations
 from fastapi import APIRouter
 
-from . import main, fraud, jobs, monitoring, users, rentals, finance, iot, batteries, stock, health, stations, kyc_admin, rbac_admin, dealers, cms, admin_groups, audit_trails, logistics, support, bess, notifications, settings, security
+from . import main, fraud, jobs, monitoring, users, rentals, finance, iot, batteries, stock, health, stations, kyc_admin, rbac_admin, cms, admin_groups, audit_trails, logistics, support, bess, notifications, settings, security
 
 router = APIRouter()
 router.include_router(main.router)
@@ -18,8 +19,12 @@ router.include_router(fraud.router, prefix="/fraud", tags=["Admin Fraud"])
 router.include_router(jobs.router, prefix="/jobs", tags=["Admin Jobs"])
 router.include_router(monitoring.router, prefix="/monitoring", tags=["Admin Monitoring"])
 router.include_router(kyc_admin.router, prefix="/kyc-docs", tags=["Admin KYC Documents"])
-router.include_router(rbac_admin.router, prefix="/rbac", tags=["Admin RBAC"])
-router.include_router(dealers.router, prefix="/dealers", tags=["Admin Dealers"])
+# DECONFLICTED P0-A: RBAC routes are mounted directly in app/main.py via
+# admin_rbac.router at /api/v1/admin/rbac.  Including rbac_admin.router here
+# caused 23 duplicate route registrations because rbac_admin.py re-exports
+# the same router object.  Removed 2026-04-06.
+# Dealers are served by app.api.v1.admin_dealers and mounted directly in
+# app.main to avoid duplicate route registrations at /api/v1/admin/dealers.
 router.include_router(admin_groups.router, prefix="/groups", tags=["Admin Groups"])
 # Analytics is served by app.api.v1.admin.analytics to avoid duplicate route
 # registrations at /api/v1/admin/analytics.

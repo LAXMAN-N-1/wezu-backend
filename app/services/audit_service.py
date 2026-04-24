@@ -1,3 +1,4 @@
+from __future__ import annotations
 import csv
 import io
 import json
@@ -5,15 +6,100 @@ import logging
 from typing import Optional, Dict, Any
 
 from sqlmodel import Session, select, func
+from app.core.database import engine
 from app.models.audit_log import AuditLog, SecurityEvent
 from app.utils.audit_context import log_audit_action
-from datetime import datetime, UTC
-from app.core.database import engine
+from datetime import datetime, UTC, timedelta, timezone; UTC = timezone.utc
 
 logger = logging.getLogger(__name__)
 
 
 class AuditService:
+    @staticmethod
+    def get_dashboard_counts(db: Session) -> Dict[str, Any]:
+        """
+        Summary counters for audit dashboard top cards.
+        """
+        now = datetime.now(UTC)
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        yesterday_start = today_start - timedelta(days=1)
+
+        def _count_since(start: datetime, *, action: Optional[str] = None, status: Optional[str] = None, level: Optional[str] = None) -> int:
+            query = select(func.count(AuditLog.id)).where(AuditLog.timestamp >= start)
+            if action is not None:
+                query = query.where(AuditLog.action == action)
+            if status is not None:
+                query = query.where(AuditLog.status == status)
+            if level is not None:
+                query = query.where(AuditLog.level == level)
+            return int(db.exec(query).one() or 0)
+
+        total_requests_today = _count_since(today_start)
+        total_requests_yesterday = int(
+            db.exec(
+                select(func.count(AuditLog.id)).where(
+                    AuditLog.timestamp >= yesterday_start,
+                    AuditLog.timestamp < today_start,
+                )
+            ).one() or 0
+        )
+
+        failed_logins_today = _count_since(
+            today_start,
+            action="AUTH_LOGIN",
+            status="failure",
+        )
+        failed_logins_yesterday = int(
+            db.exec(
+                select(func.count(AuditLog.id)).where(
+                    AuditLog.timestamp >= yesterday_start,
+                    AuditLog.timestamp < today_start,
+                    AuditLog.action == "AUTH_LOGIN",
+                    AuditLog.status == "failure",
+                )
+            ).one() or 0
+        )
+
+        critical_events_today = _count_since(today_start, level="CRITICAL")
+        critical_events_yesterday = int(
+            db.exec(
+                select(func.count(AuditLog.id)).where(
+                    AuditLog.timestamp >= yesterday_start,
+                    AuditLog.timestamp < today_start,
+                    AuditLog.level == "CRITICAL",
+                )
+            ).one() or 0
+        )
+
+        unique_users_today = int(
+            db.exec(
+                select(func.count(func.distinct(AuditLog.user_id))).where(
+                    AuditLog.timestamp >= today_start,
+                    AuditLog.user_id.is_not(None),
+                )
+            ).one() or 0
+        )
+
+        def _trend(current: int, previous: int) -> str:
+            if previous > 0:
+                pct = ((current - previous) / previous) * 100
+            elif current > 0:
+                pct = 100.0
+            else:
+                pct = 0.0
+            sign = "+" if pct >= 0 else ""
+            return f"{sign}{round(pct, 1)}%"
+
+        return {
+            "total_requests": total_requests_today,
+            "failed_logins": failed_logins_today,
+            "critical_events": critical_events_today,
+            "active_users": unique_users_today,
+            "requests_trend": _trend(total_requests_today, total_requests_yesterday),
+            "failed_logins_trend": _trend(failed_logins_today, failed_logins_yesterday),
+            "critical_trend": _trend(critical_events_today, critical_events_yesterday),
+        }
+
     @staticmethod
     def log_action(
         db: Session,
@@ -27,31 +113,28 @@ class AuditService:
         user_agent: str = None,
         old_value: Dict[str, Any] = None,
         new_value: Dict[str, Any] = None,
-        response_time_ms: Optional[float] = None,
-        module: Optional[str] = None,
-        status: str = "success"
     ):
-        """Create an audit log entry with full change tracking using standard context."""
+        """Create an audit log entry with full change tracking."""
         try:
-            # We use log_audit_action which pulls trace/session from ContextVars
-            log_audit_action(
-                db=db,
+            log = AuditLog(
+                user_id=user_id,
                 action=action,
-                module=module,
-                status=status,
                 resource_type=resource_type,
+                resource_id=resource_id,
                 target_id=target_id,
+                details=details,
+                ip_address=ip_address,
+                user_agent=user_agent,
                 old_value=old_value,
                 new_value=new_value,
-                details=details,
-                response_time_ms=response_time_ms
             )
+            db.add(log)
             db.commit()
         except Exception as e:
             try:
                 db.rollback()
             except Exception:
-                pass
+                logger.warning("audit.rollback_failed_after_write", exc_info=True)
             logger.error(f"Failed to write audit log: {e}")
 
     async def log_event(
@@ -60,32 +143,29 @@ class AuditService:
         user_id: Optional[int],
         resource: str,
         action: str,
-        status: str = "success",
-        metadata: Dict[str, Any] = None,
-        ip_address: Optional[str] = None,
-        response_time_ms: Optional[float] = None,
-        module: Optional[str] = None
+        status: str,
+        metadata: Dict[str, Any],
+        ip_address: Optional[str] = None
     ):
-        """Async version for middleware/events using context-aware logging."""
-        from app.core.database import engine as current_engine
-        with Session(current_engine) as db:
+        """Async version for middleware and high-frequency logging using context-aware logging."""
+        with Session(engine) as db:
             try:
-                log_audit_action(
-                    db=db,
+                log = AuditLog(
+                    user_id=user_id,
                     action=action,
-                    module=module,
-                    status=status,
                     resource_type=event_type,
+                    resource_id=resource,
                     details=f"Status: {status}",
-                    meta_data=metadata,
-                    response_time_ms=response_time_ms
+                    ip_address=ip_address,
+                    meta_data=metadata
                 )
+                db.add(log)
                 db.commit()
             except Exception as e:
                 try:
                     db.rollback()
                 except Exception:
-                    pass
+                    logger.warning("audit.rollback_failed_after_event", exc_info=True)
                 logger.error(f"Failed to log event: {e}")
 
     async def log_security_event(self, user_id: int, event: str, metadata: Dict[str, Any]):
@@ -125,13 +205,17 @@ class AuditService:
             try:
                 db.rollback()
             except Exception:
-                pass
+                logger.warning("audit.rollback_failed_after_security_event", exc_info=True)
             logger.error(f"Failed to write security event: {e}")
 
     async def get_logs(self, user_id: int = None, page: int = 1, limit: int = 20):
         """Fetch paginated logs."""
         with Session(engine) as db:
-            return await self.get_logs_advanced(db=db, user_id=user_id, page=page, limit=limit)
+            query = select(AuditLog)
+            count_query = select(func.count(AuditLog.id))
+            if user_id:
+                query = query.where(AuditLog.user_id == user_id)
+                count_query = count_query.where(AuditLog.user_id == user_id)
 
     async def get_logs_advanced(
         self,
@@ -177,9 +261,27 @@ class AuditService:
         logs = db.exec(query.offset(offset).limit(limit)).all()
         
         return {
-            "logs": logs,
+            "logs": [log.to_dict() if hasattr(log, "to_dict") else log for log in logs],
             "total_count": total_count
         }
+
+    async def get_logs(self, user_id: int = None, page: int = 1, limit: int = 20):
+        """Fetch paginated logs."""
+        with Session(engine) as db:
+            query = select(AuditLog)
+            count_query = select(func.count(AuditLog.id))
+            if user_id:
+                query = query.where(AuditLog.user_id == user_id)
+                count_query = count_query.where(AuditLog.user_id == user_id)
+
+            total = int(db.exec(count_query).one() or 0)
+            query = query.order_by(AuditLog.timestamp.desc()).offset((page - 1) * limit).limit(limit)
+            logs = db.exec(query).all()
+            
+            return {
+                "logs": [log.to_dict() if hasattr(log, "to_dict") else log for log in logs],
+                "total_count": total
+            }
 
     @staticmethod
     def _build_query(
@@ -211,79 +313,27 @@ class AuditService:
             query = query.where(AuditLog.timestamp >= date_from)
         if date_to is not None:
             query = query.where(AuditLog.timestamp <= date_to)
-        if module is not None:
-            query = query.where(AuditLog.module == module)
-        if status is not None:
-            query = query.where(AuditLog.status == status)
-        if trace_id is not None:
-            query = query.where(AuditLog.trace_id == trace_id)
-        if level is not None:
-            query = query.where(AuditLog.level == level)
-        if is_suspicious is not None:
-            query = query.where(AuditLog.is_suspicious == is_suspicious)
-        if ip_address is not None:
-            query = query.where(AuditLog.ip_address == ip_address)
-            
         return query.order_by(AuditLog.timestamp.desc())
-
-    @staticmethod
-    def get_dashboard_counts(db: Session) -> Dict[str, Any]:
-        """Aggregate counts for the Audit & Security Dashboard status cards."""
-        from sqlalchemy import func
-        today = datetime.now(UTC).date()
-        
-        total_today = db.exec(
-            select(func.count(AuditLog.id)).where(func.date(AuditLog.timestamp) == today)
-        ).one()
-        
-        admin_actions = db.exec(
-            select(func.count(AuditLog.id))
-            .where(func.date(AuditLog.timestamp) == today)
-            .where(AuditLog.role_prefix == "ADM")
-        ).one()
-        
-        failed_logins = db.exec(
-            select(func.count(AuditLog.id))
-            .where(func.date(AuditLog.timestamp) == today)
-            .where(AuditLog.action == "AUTH_LOGIN")
-            .where(AuditLog.status == "failure")
-        ).one()
-        
-        critical_events = db.exec(
-            select(func.count(AuditLog.id))
-            .where(func.date(AuditLog.timestamp) == today)
-            .where(AuditLog.level == "CRITICAL")
-        ).one()
-        
-        return {
-            "total_today": total_today,
-            "admin_actions": admin_actions,
-            "failed_logins": failed_logins,
-            "critical_events": critical_events
-        }
 
     @staticmethod
     def export_logs_csv(
         db: Session, **filters
     ) -> str:
-        """Export filtered logs to a CSV string. Handles 100k+ records in-memory."""
+        """Export filtered logs to CSV while iterating rows to avoid large memory spikes."""
         query = AuditService._build_query(db, **filters)
-        logs = db.exec(query).all()
 
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow([
             "id", "user_id", "action", "resource_type", "target_id",
-            "old_value", "new_value", "ip_address", "user_agent", 
-            "module", "status", "trace_id", "timestamp",
+            "old_value", "new_value", "ip_address", "user_agent", "timestamp",
         ])
-        for log in logs:
+        for log in db.exec(query):
             writer.writerow([
                 log.id, log.user_id, log.action, log.resource_type, log.target_id,
                 json.dumps(log.old_value) if log.old_value else "",
                 json.dumps(log.new_value) if log.new_value else "",
                 log.ip_address, log.user_agent,
-                log.module, log.status, log.trace_id,
                 log.timestamp.isoformat() if log.timestamp else "",
             ])
         return output.getvalue()
@@ -294,7 +344,6 @@ class AuditService:
     ) -> list:
         """Export filtered logs as a JSON-serializable list."""
         query = AuditService._build_query(db, **filters)
-        logs = db.exec(query).all()
         return [
             {
                 "id": log.id,
@@ -306,12 +355,9 @@ class AuditService:
                 "new_value": log.new_value,
                 "ip_address": log.ip_address,
                 "user_agent": log.user_agent,
-                "module": log.module,
-                "status": log.status,
-                "trace_id": log.trace_id,
                 "timestamp": log.timestamp.isoformat() if log.timestamp else None,
             }
-            for log in logs
+            for log in db.exec(query)
         ]
 
 audit_service = AuditService()

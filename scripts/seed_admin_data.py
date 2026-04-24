@@ -124,7 +124,7 @@ def seed_data():
                     longitude=lng,
                     station_type="automated",
                     total_slots=random.choice([10, 15, 20]),
-                    status=StationStatus.OPERATIONAL,
+                    status=StationStatus.ACTIVE,
                     is_24x7=True,
                     rating=random.uniform(4.0, 5.0)
                  )

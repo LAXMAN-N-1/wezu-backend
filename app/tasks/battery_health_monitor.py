@@ -1,8 +1,9 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from app.core.database import engine
 from app.models.battery import Battery
 from app.services.battery_service import BatteryService
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 import logging
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ def monitor_battery_health():
     
     with Session(engine) as session:
         # We only monitor batteries that are available, in use, or charging
-        stmt = select(Battery).where(Battery.status.in_(["AVAILABLE", "RENTED", "CHARGING"]))
+        stmt = select(Battery).where(Battery.status.in_(["available", "rented", "charging"]))
         batteries = session.exec(stmt).all()
         
         updated_count = 0

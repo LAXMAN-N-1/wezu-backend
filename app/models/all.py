@@ -1,10 +1,8 @@
-# 1. Base / Support Models first
-from app.models.enums import *
-from app.models.location import Zone, City, Region, Country, Continent
-from app.models.address import Address
-from app.models.kyc import KYCDocument, KYCRecord, KYCRequest, KYCDocumentType, KYCDocumentStatus
-from app.models.rbac import Role, Permission, RolePermission, UserRole, UserAccessPath, AdminUserRole
+from __future__ import annotations
+# Core Identity & Role
+from app.models.user import User, UserType, UserStatus
 from app.models.user_profile import UserProfile
+from app.models.rbac import Role, Permission, RolePermission, UserRole, UserAccessPath
 from app.models.token import SessionToken
 from app.models.two_factor_auth import TwoFactorAuth
 from app.models.session import UserSession
@@ -38,6 +36,7 @@ from app.models.delivery_assignment import DeliveryAssignment
 from app.models.delivery_route import DeliveryRoute, RouteStop
 from app.models.return_request import ReturnRequest
 from app.models.maintenance import MaintenanceSchedule, MaintenanceRecord, StationDowntime
+from app.models.maintenance_checklist import MaintenanceChecklistTemplate, MaintenanceChecklistSubmission
 from app.models.charging_queue import ChargingQueue
 from app.models.vehicle import Vehicle
 
@@ -57,8 +56,9 @@ from app.models.late_fee import LateFee, LateFeeWaiver
 from app.models.promo_code import PromoCode
 from app.models.referral import Referral
 
-# Support & Content
+# Support, KYC & Feedback
 from app.models.support import SupportTicket, TicketStatus, TicketPriority
+from app.models.kyc import KYCDocument, KYCRecord, KYCRequest, KYCDocumentType, KYCDocumentStatus
 from app.models.video_kyc import VideoKYCSession
 from app.models.feedback import Feedback
 from app.models.review import Review
@@ -68,7 +68,9 @@ from app.models.banner import Banner
 from app.models.legal import LegalDocument
 from app.models.media import MediaAsset
 
-# Organization & Infrastructure
+# Location & Org
+from app.models.location import Zone, City, Region, Country, Continent
+from app.models.address import Address
 from app.models.branch import Branch
 from app.models.organization import Organization, OrganizationSocialLink
 from app.models.warehouse import Warehouse
@@ -78,26 +80,37 @@ from app.models.otp import OTP
 from app.models.notification import Notification
 from app.models.notification_preference import NotificationPreference
 from app.models.audit_log import AuditLog, SecurityEvent
-from app.models.admin_user import AdminUser
 from app.models.admin_group import AdminGroup
+from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
 from app.models.driver_profile import DriverProfile
+from app.models.staff import StaffProfile
 from app.models.vendor import Vendor, VendorDocument
 from app.models.role_right import RoleRight
 from app.models.menu import Menu
 from app.models.favorite import Favorite
 from app.models.i18n import Translation
 from app.models.fraud import RiskScore, FraudCheckLog, Blacklist
-from app.models.security_settings import SecuritySettings
-from app.models.fraud_alert import FraudAlert
 from app.models.batch_job import BatchJob, JobExecution
 from app.models.membership import UserMembership
 from app.models.oauth import BlacklistedToken
 from app.models.dealer_kyc import DealerKYCApplication, KYCStateTransition
 from app.models.dealer_inventory import DealerInventory, InventoryTransaction
-from app.models.dealer_stock_request import DealerStockRequest
 from app.models.stock import Stock
 from app.models.stock_movement import StockMovement
 from app.models.dealer_promotion import DealerPromotion, PromotionUsage
+
+# ── Hardened-only models (ported) ──────────────────────────────────────────
+from app.models.analytics_dashboard import AnalyticsActivityEvent, AnalyticsReportJob
+from app.models.idempotency import IdempotencyKey
+from app.models.inventory import InventoryTransfer, InventoryTransferItem, StockDiscrepancy
+from app.models.manifest import Manifest, ManifestItem
+from app.models.notification_outbox import NotificationOutbox
+from app.models.order import Order, OrderBattery
+from app.models.order_realtime_outbox import OrderRealtimeOutbox
+from app.models.passkey import PasskeyCredential, PasskeyChallenge
+from app.models.payment_method import PaymentMethod
+from app.models.station_metrics import StationDailyMetric
+from app.models.telematics import TelemeticsData
 from app.models.search_history import SearchHistory
 
 # New modules
@@ -105,9 +118,15 @@ from app.models.system import SystemConfig, FeatureFlag
 from app.models.bess import BessUnit, BessEnergyLog, BessGridEvent, BessReport
 from app.models.notification_admin import PushCampaign, AutomatedTrigger, NotificationLog, NotificationConfig
 from app.models.api_key import ApiKeyConfig
+from app.models.dealer_stock_request import DealerStockRequest
 
+# Previously orphaned — imported so SQLModel.metadata sees them (required for
+# alembic autogenerate to include these tables).
+from app.models.analytics import DemandForecast, ChurnPrediction, PricingRecommendation
+from app.models.battery_reservation import BatteryReservation
+from app.models.biometric import BiometricCredential
+from app.models.cart import CartItem
+from app.models.inventory_audit import InventoryAuditLog
+from app.models.security_question import SecurityQuestion, UserSecurityQuestion
+from app.models.user_history import UserStatusLog
 
-# 4. Core Identity (Moved to bottom to ensure dependencies are registered)
-from app.models.user import User, UserType, UserStatus
-from app.models.dealer import DealerProfile, DealerApplication, FieldVisit
-from app.models.staff import StaffProfile

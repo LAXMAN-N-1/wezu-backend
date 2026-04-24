@@ -1,6 +1,7 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from app.core.database import engine
-from app.models.station import Station
+from app.models.station import Station, StationStatus
 from app.models.battery import Battery
 from app.models.charging_queue import ChargingQueue
 from app.services.charging_service import ChargingService
@@ -20,7 +21,7 @@ def optimize_charging_queues():
     logger.info("Starting charging queue optimization task...")
     
     with Session(engine) as session:
-        stations = session.exec(select(Station).where(Station.status == "OPERATIONAL")).all()
+        stations = session.exec(select(Station).where(Station.status == StationStatus.ACTIVE)).all()
         
         for station in stations:
             try:

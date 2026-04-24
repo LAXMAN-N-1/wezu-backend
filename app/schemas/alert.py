@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Alert and monitoring schemas
 """

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Audit log and security event schemas
 """

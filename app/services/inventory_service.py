@@ -1,9 +1,10 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from app.models.logistics import BatteryTransfer
 from app.models.inventory_audit import InventoryAuditLog
 from app.models.battery import Battery, BatteryStatus, LocationType
 from app.schemas.inventory import TransferCreate
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from typing import List, Optional
 
 class InventoryService:

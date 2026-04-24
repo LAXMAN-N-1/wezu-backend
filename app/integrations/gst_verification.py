@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 GST Verification Integration
 Handles GSTIN verification

@@ -1,7 +1,7 @@
 """add test_reports table
 
 Revision ID: c1a2b3d4e5f7
-Revises: merge_e28d_f6f6
+Revises: 8d7c6b5a4f3e
 Create Date: 2026-03-31 21:39:00
 """
 from typing import Sequence, Union
@@ -10,12 +10,17 @@ import sqlalchemy as sa
 
 
 revision: str = 'c1a2b3d4e5f7'
-down_revision: Union[str, None] = 'ba316815d31e'
+down_revision: Union[str, None] = '8d7c6b5a4f3e'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if inspector.has_table("test_reports"):
+        return
+
     op.create_table(
         'test_reports',
         sa.Column('id', sa.Integer(), primary_key=True, autoincrement=True, nullable=False),
@@ -34,5 +39,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if not inspector.has_table("test_reports"):
+        return
     op.drop_index('ix_test_reports_id', table_name='test_reports')
     op.drop_table('test_reports')

@@ -1,8 +1,9 @@
+from __future__ import annotations
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 from sqlmodel import Session, select
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from pydantic import BaseModel, ConfigDict
 
 from app.db.session import get_session

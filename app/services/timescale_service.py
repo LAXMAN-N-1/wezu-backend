@@ -1,7 +1,9 @@
+from __future__ import annotations
 """
 TimescaleDB Service
 Time-series data management for IoT and analytics
 """
+import asyncio
 from sqlalchemy import text
 from typing import Dict, List, Optional
 from datetime import datetime, timedelta
@@ -133,7 +135,7 @@ class TimescaleDBService:
         except Exception as e:
             logger.error(f"Failed to setup retention policies: {str(e)}")
     
-    def get_battery_health_timeseries(
+    async def get_battery_health_timeseries(
         self,
         battery_id: int,
         start_time: datetime,
@@ -141,7 +143,22 @@ class TimescaleDBService:
         interval: str = '1 hour'
     ) -> List[Dict]:
         """
-        Get aggregated battery health data
+        Get aggregated battery health data asynchronously.
+        """
+        return await asyncio.to_thread(
+            self._get_battery_health_timeseries_sync,
+            battery_id, start_time, end_time, interval
+        )
+
+    def _get_battery_health_timeseries_sync(
+        self,
+        battery_id: int,
+        start_time: datetime,
+        end_time: datetime,
+        interval: str = '1 hour'
+    ) -> List[Dict]:
+        """
+        Get aggregated battery health data (synchronous worker)
         
         Args:
             battery_id: Battery ID
@@ -188,8 +205,12 @@ class TimescaleDBService:
             logger.error(f"Failed to get battery health timeseries: {str(e)}")
             return []
     
-    def get_realtime_analytics(self) -> Dict:
-        """Get real-time system analytics"""
+    async def get_realtime_analytics(self) -> Dict:
+        """Get real-time system analytics asynchronously"""
+        return await asyncio.to_thread(self._get_realtime_analytics_sync)
+
+    def _get_realtime_analytics_sync(self) -> Dict:
+        """Get real-time system analytics (synchronous worker)"""
         try:
             with self.engine.connect() as conn:
                 # Active rentals

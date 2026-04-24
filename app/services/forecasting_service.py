@@ -1,8 +1,9 @@
+from __future__ import annotations
 from sqlmodel import Session, select, func
 from app.models.analytics import DemandForecast
 from app.models.swap import SwapSession
 from app.models.station import Station
-from datetime import datetime, UTC, date, timedelta
+from datetime import datetime, date, timedelta, timezone; UTC = timezone.utc
 import logging
 
 logger = logging.getLogger("wezu_forecasting")

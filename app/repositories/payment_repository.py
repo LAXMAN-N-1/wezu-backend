@@ -1,9 +1,10 @@
+from __future__ import annotations
 """
 Payment Repository  
 Data access layer for Transaction model
 """
 from typing import Optional, List
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from sqlmodel import Session, select, func
 from app.models.financial import Transaction
 from app.repositories.base_repository import BaseRepository
@@ -61,7 +62,7 @@ class PaymentRepository(BaseRepository[Transaction, PaymentCreate, PaymentUpdate
         """Get successful transactions for a user"""
         query = select(Transaction).where(
             (Transaction.user_id == user_id) &
-            (Transaction.status == "completed")
+            (Transaction.status == "success")
         ).offset(skip).limit(limit)
         return list(db.exec(query).all())
     
@@ -70,7 +71,7 @@ class PaymentRepository(BaseRepository[Transaction, PaymentCreate, PaymentUpdate
         result = db.exec(
             select(func.sum(Transaction.amount)).where(
                 (Transaction.user_id == user_id) &
-                (Transaction.status == "completed") &
+                (Transaction.status == "success") &
                 (Transaction.transaction_type == "debit")
             )
         ).one()

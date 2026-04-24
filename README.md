@@ -35,6 +35,38 @@ High-performance FastAPI backend powering the WEZU battery swapping ecosystem, i
 For ingress through Coolify/Traefik (no app host port publishing), follow:
 
 - [DEPLOY_COOLIFY_TRAEFIK.md](docs/DEPLOY_COOLIFY_TRAEFIK.md)
+- [DOCKER_MULTI_PHASE_DEPLOYMENT.md](docs/DOCKER_MULTI_PHASE_DEPLOYMENT.md)
+
+For direct VPS (Hostinger) production setup and systemd service management, follow:
+
+- [HOSTINGER_VPS_BACKEND_RUNBOOK.md](docs/HOSTINGER_VPS_BACKEND_RUNBOOK.md)
+
+Preflight check before restarting services:
+
+```bash
+python3 scripts/vps_preflight.py
+```
+
+## 📊 Logging (Production)
+
+The backend now uses a unified structured logging pipeline from `app/core/logging.py`.
+
+- JSON structured logs in production.
+- Request/correlation IDs on every request log line.
+- Automatic redaction for sensitive fields (`token`, `password`, `secret`, cookies, etc.).
+- Safe serialization for validation errors (no bytes serialization crashes).
+- Noise controls for health/readiness logs via `LOG_EXCLUDE_PATHS`.
+
+Key envs:
+- `LOG_LEVEL`
+- `LOG_REQUESTS`
+- `LOG_ACCESS_LOGS`
+- `LOG_HEALTHCHECKS`
+- `LOG_SLOW_REQUEST_THRESHOLD_MS`
+- `LOG_REDACT_SENSITIVE_FIELDS`
+- `LOG_MAX_FIELD_LENGTH`
+- `LOG_MAX_COLLECTION_ITEMS`
+- `LOG_EXCLUDE_PATHS`
 
 ## 📂 Repository Structure
 - `app/api/v1`: Route handlers grouped by domain.

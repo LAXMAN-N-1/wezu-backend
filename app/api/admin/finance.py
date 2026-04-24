@@ -1,7 +1,8 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func, col
 from typing import List, Optional
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from app.api import deps
 from app.core.database import get_db
 from app.models.user import User
@@ -186,7 +187,7 @@ def list_settlements(
 
     from app.models.dealer import DealerProfile
     dealer_ids = {s.dealer_id for s in settlements if s.dealer_id}
-    dealer_map = {d.user_id: d for d in db.exec(select(DealerProfile).where(DealerProfile.user_id.in_(dealer_ids))).all()} if dealer_ids else {}
+    dealer_map = {d.id: d for d in db.exec(select(DealerProfile).where(DealerProfile.id.in_(dealer_ids))).all()} if dealer_ids else {}
 
     result = []
     for s in settlements:

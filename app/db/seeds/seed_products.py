@@ -1,3 +1,4 @@
+from __future__ import annotations
 import os
 from sqlmodel import Session, create_engine, select
 from app.models.catalog import CatalogProduct, CatalogProductImage, ProductCategory, ProductStatus

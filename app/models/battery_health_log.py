@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 class BatteryHealthLog(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)

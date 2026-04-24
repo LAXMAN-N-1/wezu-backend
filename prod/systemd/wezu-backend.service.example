@@ -1,0 +1,21 @@
+[Unit]
+Description=WEZU Backend API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/wezu/wezu-backend
+EnvironmentFile=/var/www/wezu/wezu-backend/.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/var/www/wezu/wezu-backend/venv/bin/gunicorn -c gunicorn_conf.py app.main:app
+Restart=always
+RestartSec=5
+TimeoutStartSec=120
+TimeoutStopSec=30
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

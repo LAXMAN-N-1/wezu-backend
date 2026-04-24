@@ -2,24 +2,14 @@ from sqlmodel import SQLModel, Field, Relationship
 from typing import List, Optional, TYPE_CHECKING
 if TYPE_CHECKING:
     from app.models.user import User
-    from app.models.admin_user import AdminUser
     from app.models.role_right import RoleRight
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 # Link Table for Role <-> Permission
 class RolePermission(SQLModel, table=True):
     __tablename__ = "role_permissions"
     role_id: int = Field(foreign_key="roles.id", primary_key=True)
     permission_id: int = Field(foreign_key="permissions.id", primary_key=True)
-
-# Link Table for AdminUser <-> Role
-class AdminUserRole(SQLModel, table=True):
-    __tablename__ = "admin_user_roles"
-    admin_id: int = Field(foreign_key="admin_users.id", primary_key=True)
-    role_id: int = Field(foreign_key="roles.id", primary_key=True)
-    
-    assigned_by: Optional[int] = Field(default=None, foreign_key="admin_users.id")
-    assigned_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 # Link Table for User <-> Role (Many-to-Many)
@@ -28,7 +18,7 @@ class UserRole(SQLModel, table=True):
     user_id: int = Field(foreign_key="users.id", primary_key=True)
     role_id: int = Field(foreign_key="roles.id", primary_key=True)
     
-    assigned_by: Optional[int] = Field(default=None, foreign_key="admin_users.id")
+    assigned_by: Optional[int] = Field(default=None)
     notes: Optional[str] = None
     effective_from: datetime = Field(default_factory=lambda: datetime.now(UTC))
     expires_at: Optional[datetime] = None
@@ -56,7 +46,9 @@ class Role(SQLModel, table=True):
     level: int = Field(default=0) # Hierarchy level (e.g. 100=Admin, 10=User)
     parent_id: Optional[int] = Field(default=None, foreign_key="roles.id")
     is_system_role: bool = Field(default=False)  # If True, cannot be deleted (e.g., Super Admin)
+    is_custom_role: bool = Field(default=False)  # True for dealer-scoped runtime custom roles
     is_active: bool = Field(default=True)
+    scope_owner: str = Field(default="global")  # global | dealer
     
     # Dealer Scoping (Phases 5/6)
     dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id", index=True)
@@ -85,17 +77,8 @@ class Role(SQLModel, table=True):
 
     permissions: List[Permission] = Relationship(back_populates="roles", link_model=RolePermission)
     
-    admin_users: List["AdminUser"] = Relationship(
-        back_populates="roles",
-        link_model=AdminUserRole,
-        sa_relationship_kwargs={
-            "primaryjoin": "Role.id==AdminUserRole.role_id",
-            "secondaryjoin": "AdminUser.id==AdminUserRole.admin_id"
-        }
-    )
-
-    # Change to Many-to-Many to match User model
-    users: List["User"] = Relationship(back_populates="roles", link_model=UserRole)
+    # Change to One-to-Many to match User model
+    users: List["User"] = Relationship(back_populates="role")
     
     # Merged from app/models/role.py (Legacy/Chandu branch)
     role_rights: List["RoleRight"] = Relationship(back_populates="role", sa_relationship_kwargs={"cascade": "all, delete-orphan"})
@@ -124,7 +107,7 @@ class UserAccessPath(SQLModel, table=True):
     access_level: str = Field(default="view") # view, manage, admin
     
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    created_by: Optional[int] = Field(default=None, foreign_key="admin_users.id")
+    created_by: Optional[int] = Field(default=None)
     
     # Relationships
     user: "User" = Relationship(back_populates="access_paths")

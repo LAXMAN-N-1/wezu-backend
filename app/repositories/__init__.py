@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Repositories package
 Data access layer for all models

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Aadhaar KYC Verification Integration
 Handles Aadhaar e-KYC verification

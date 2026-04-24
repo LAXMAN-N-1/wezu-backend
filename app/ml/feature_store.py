@@ -1,5 +1,6 @@
+from __future__ import annotations
 from typing import Dict, Any, Optional
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from sqlmodel import Session, select, func
 from app.models.battery import Battery
 from app.models.telemetry import Telemetry

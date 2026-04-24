@@ -1,11 +1,16 @@
+from __future__ import annotations
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select, func, col, update
 from sqlalchemy.orm import selectinload
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
+import logging
+
 from app.api import deps
+
+logger = logging.getLogger(__name__)
 from app.models.admin_user import AdminUser
-from app.models.rbac import Role, Permission, RolePermission, AdminUserRole, UserRole
+from app.models.rbac import Role, Permission, RolePermission, UserRole
 from app.models.session import UserSession
 from app.services.auth_service import AuthService
 from app.schemas import rbac as rbac_schema
@@ -66,6 +71,7 @@ def read_roles(
     # Batch count users for these roles to avoid N+1 and slow relationship loading
     role_ids = [r.id for r in roles]
     user_counts = {}
+    active_user_counts = {}
     if role_ids:
         from app.models.rbac import UserRole
         # Efficient count query grouping by role_id
@@ -75,6 +81,17 @@ def read_roles(
             .group_by(UserRole.role_id)
         ).all()
         user_counts = {rid: count for rid, count in count_data}
+        now = datetime.now(UTC)
+        active_count_data = db.exec(
+            select(UserRole.role_id, func.count(UserRole.user_id))
+            .where(
+                col(UserRole.role_id).in_(role_ids),
+                UserRole.effective_from <= now,
+                ((UserRole.expires_at == None) | (UserRole.expires_at >= now)),
+            )
+            .group_by(UserRole.role_id)
+        ).all()
+        active_user_counts = {rid: count for rid, count in active_count_data}
 
     for role in roles:
         # Use pre-fetched permissions
@@ -85,6 +102,7 @@ def read_roles(
         
         # Use batch-fetched user count
         role_data.user_count = user_counts.get(role.id, 0)
+        role_data.active_user_count = active_user_counts.get(role.id, 0)
             
         if not include_permissions:
             role_data.permissions = None
@@ -114,10 +132,30 @@ def create_role(
     permissions_to_assign = set(role_in.permissions or [])
     
     parent_id = getattr(role_in, "parent_role_id", None) or getattr(role_in, "parent_id", None)
+
     if parent_id:
         parent_role = db.get(Role, parent_id)
         if not parent_role:
              raise HTTPException(status_code=404, detail="Parent role not found")
+        allowed_dealer_templates = {
+            "dealer_owner",
+            "dealer_manager",
+            "dealer_inventory_staff",
+            "dealer_finance_staff",
+            "dealer_support_staff",
+        }
+        if (parent_role.name or "").strip().lower() not in allowed_dealer_templates:
+            raise HTTPException(
+                status_code=400,
+                detail="Custom role parent must be a dealer template role",
+            )
+        if not role_in.dealer_id:
+            raise HTTPException(
+                status_code=400,
+                detail="dealer_id is required for custom role creation",
+            )
+        role_data["is_custom_role"] = True
+        role_data["scope_owner"] = "dealer"
         
         # Load parent permissions
         # Note: SQLModel relationship access might require eager load or session attached
@@ -126,17 +164,22 @@ def create_role(
         permissions_to_assign.update(parent_perms)
         
         role_data["parent_id"] = parent_id
+    else:
+        # Allow production admins to create global custom roles from Admin UI.
+        role_data["is_custom_role"] = True
+        role_data["scope_owner"] = "global"
 
     role = Role(**role_data)
     db.add(role)
     db.commit()
     db.refresh(role)
     
-    # 3. Assign Permissions
-    for slug in permissions_to_assign:
-        permission = db.exec(select(Permission).where(Permission.slug == slug)).first()
-        if permission:
-            # Check if link exists (unlikely for new role but safe)
+    # 3. Assign Permissions (batch lookup instead of per-slug query)
+    if permissions_to_assign:
+        found_perms = db.exec(
+            select(Permission).where(col(Permission.slug).in_(list(permissions_to_assign)))
+        ).all()
+        for permission in found_perms:
             link = RolePermission(role_id=role.id, permission_id=permission.id)
             db.add(link)
     
@@ -199,8 +242,11 @@ def read_permissions(
             grouped[perm.module] = []
             
         # Transform to Item
-        # Infer properties if not present
-        label = perm.slug.split(":")[-1].replace("_", " ").title() if ":" in perm.slug else perm.slug
+        parts = perm.slug.split(":")
+        if len(parts) >= 3:
+            label = f"{parts[1].replace('_', ' ').title()} ({parts[2]})"
+        else:
+            label = perm.slug
         if perm.description:
              desc = perm.description
         else:
@@ -212,7 +258,7 @@ def read_permissions(
             description=desc,
             resource=perm.module,
             action=perm.action,
-            scope="all" # Default as requested
+            scope=perm.scope or "global"
         )
         grouped[perm.module].append(item)
         
@@ -422,18 +468,24 @@ def get_user_roles(
     # We can fetch UserRoles and then join or just iterate since likely small number
     user_roles = db.exec(select(UserRole).where(UserRole.user_id == user_id)).all()
     
+    # Batch-load roles + admin users (eliminates 2 N+1 per user-role)
+    role_ids = list({ur.role_id for ur in user_roles if ur.role_id})
+    admin_ids = list({ur.assigned_by for ur in user_roles if ur.assigned_by})
+    roles_map = {r.id: r for r in db.exec(select(Role).where(Role.id.in_(role_ids))).all()} if role_ids else {}
+    admins_map = {a.id: a for a in db.exec(select(AdminUser).where(AdminUser.id.in_(admin_ids))).all()} if admin_ids else {}
+
     results = []
     now = datetime.now(UTC)
     
     for ur in user_roles:
-        role = db.get(Role, ur.role_id)
+        role = roles_map.get(ur.role_id)
         if not role:
             # Should not happen with FK constraint but safe check
             continue
             
         assigned_by_name = None
         if ur.assigned_by:
-            admin = db.get(AdminUser, ur.assigned_by)
+            admin = admins_map.get(ur.assigned_by)
             if admin:
                 assigned_by_name = admin.full_name or admin.email
         
@@ -487,9 +539,20 @@ def bulk_assign_roles(
     
     assigned_by_admin_id = _resolve_assigned_by_admin_id(db, current_user)
 
+    # Batch-load users + existing links (eliminates 2 N+1 per user)
+    batch_users = db.exec(select(User).where(User.id.in_(assignment.user_ids))).all()
+    batch_users_map = {u.id: u for u in batch_users}
+    existing_links_list = db.exec(
+        select(UserRole).where(
+            UserRole.user_id.in_(assignment.user_ids),
+            UserRole.role_id == role.id,
+        )
+    ).all()
+    existing_link_set = {el.user_id for el in existing_links_list}
+
     for uid in assignment.user_ids:
         try:
-            user = db.get(User, uid)
+            user = batch_users_map.get(uid)
             if not user:
                 results.append(rbac_schema.BulkAssignmentResult(user_id=uid, success=False, message="User not found"))
                 fail_count += 1
@@ -501,13 +564,7 @@ def bulk_assign_roles(
                 db.add(user)
                 
             # Check existing
-            existing_link = db.exec(
-                select(UserRole)
-                .where(UserRole.user_id == uid)
-                .where(UserRole.role_id == role.id)
-            ).first()
-            
-            if existing_link:
+            if uid in existing_link_set:
                  # Already assigned, consider success or updated
                  results.append(rbac_schema.BulkAssignmentResult(user_id=uid, success=True, message="Already assigned"))
                  success_count += 1
@@ -764,7 +821,8 @@ def transfer_role_assignment(
         
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Transfer failed: {str(e)}")
+        logger.exception("role_transfer_failed")
+        raise HTTPException(status_code=500, detail="Role transfer failed")
 
 
 @router.post("/users/{user_id}/roles", response_model=rbac_schema.UserRoleAssignmentResponse)
@@ -843,7 +901,7 @@ def assign_roles_to_user(
         for p in r.permissions:
             active_perms.add(p.slug)
             
-    menu = AuthService.get_menu_for_role(role.name)
+    menu = AuthService.get_menu_for_role(db, role.name)
     
     return rbac_schema.UserRoleAssignmentResponse(
         success=True,
@@ -936,9 +994,11 @@ def remove_role_from_user(
     
     # Reload user.roles
     user_roles = db.exec(select(UserRole).where(UserRole.user_id == user_id)).all()
-    # Need to fetch Role objects
+    # Batch-load Role objects (eliminates N+1 per role)
+    ur_role_ids = list({ur.role_id for ur in user_roles})
+    ur_roles_map = {r.id: r for r in db.exec(select(Role).where(Role.id.in_(ur_role_ids))).all()} if ur_role_ids else {}
     for ur in user_roles:
-        r = db.get(Role, ur.role_id)
+        r = ur_roles_map.get(ur.role_id)
         if r and r.is_active:
             if not first_role_name:
                 first_role_name = r.name
@@ -948,7 +1008,7 @@ def remove_role_from_user(
     # Fallback for menu if roles exist (which they should)
     menu = []
     if first_role_name:
-         menu = AuthService.get_menu_for_role(first_role_name)
+         menu = AuthService.get_menu_for_role(db, first_role_name)
     
     return rbac_schema.UserRoleAssignmentResponse(
         success=True,
@@ -1013,13 +1073,15 @@ def update_role(
         for link in existing_links:
             db.delete(link)
             
-        # Add new
+        # Add new (batch lookup instead of per-slug query)
         added_perms = []
-        for slug in role_in.permissions:
-            permission = db.exec(select(Permission).where(Permission.slug == slug)).first()
-            if permission:
-                 db.add(RolePermission(role_id=role.id, permission_id=permission.id))
-                 added_perms.append(slug)
+        if role_in.permissions:
+            found_perms = db.exec(
+                select(Permission).where(col(Permission.slug).in_(list(role_in.permissions)))
+            ).all()
+            for permission in found_perms:
+                db.add(RolePermission(role_id=role.id, permission_id=permission.id))
+                added_perms.append(permission.slug)
         changes.append(f"Permissions set to: {', '.join(added_perms)}")
         
         # 4. Session Invalidation (Security)
@@ -1131,10 +1193,7 @@ def delete_role(
     if user_count > 0:
         raise HTTPException(status_code=400, detail="Cannot delete role with assigned active users")
         
-    # Check AdminUserRole table
-    admin_user_count = db.exec(select(func.count()).select_from(AdminUserRole).where(AdminUserRole.role_id == role_id)).one()
-    if admin_user_count > 0:
-        raise HTTPException(status_code=400, detail="Cannot delete role with assigned admin users")
+    # AdminUserRole table removed (legacy); role assignment now uses UserRole only.
 
     # 3. Soft Delete
     role.is_active = False

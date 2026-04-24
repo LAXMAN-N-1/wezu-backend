@@ -1,12 +1,13 @@
+from __future__ import annotations
 from typing import Dict, Any, Optional, Protocol, List
 from app.models.kyc import KYCDocumentType, KYCDocumentStatus
 from app.models.user import User, KYCStatus
 from app.core.config import settings
+from app.core.logging import get_logger
 from sqlmodel import Session, select, func
-from datetime import datetime, UTC, timedelta
-import logging
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class KYCProvider(Protocol):
     async def verify_aadhaar(self, aadhaar_number: str) -> Dict[str, Any]: ...
@@ -15,22 +16,22 @@ class KYCProvider(Protocol):
 class MockKYCProvider:
     """Mock provider for development/testing only."""
     async def verify_aadhaar(self, aadhaar_number: str) -> Dict[str, Any]:
-        logger.info(f"MOCK_KYC: Aadhaar verification for {aadhaar_number[:4]}****")
+        logger.info("kyc.mock_aadhaar_verify", aadhaar_prefix=aadhaar_number[:4])
         return {"success": True, "verification_id": f"mock_aadhaar_{aadhaar_number[:4]}", "status": "VERIFIED"}
 
     async def verify_pan(self, pan_number: str) -> Dict[str, Any]:
-        logger.info(f"MOCK_KYC: PAN verification for {pan_number[:4]}****")
+        logger.info("kyc.mock_pan_verify", pan_prefix=pan_number[:4])
         return {"success": True, "verification_id": f"mock_pan_{pan_number[:4]}", "status": "VERIFIED"}
 
 
 class PendingReviewProvider:
     """Production fallback: marks documents for manual review instead of auto-verifying."""
     async def verify_aadhaar(self, aadhaar_number: str) -> Dict[str, Any]:
-        logger.info(f"KYC_PENDING: Aadhaar submitted for manual review: {aadhaar_number[:4]}****")
+        logger.info("kyc.pending_aadhaar_review", aadhaar_prefix=aadhaar_number[:4])
         return {"success": True, "verification_id": None, "status": "PENDING_REVIEW"}
 
     async def verify_pan(self, pan_number: str) -> Dict[str, Any]:
-        logger.info(f"KYC_PENDING: PAN submitted for manual review: {pan_number[:4]}****")
+        logger.info("kyc.pending_pan_review", pan_prefix=pan_number[:4])
         return {"success": True, "verification_id": None, "status": "PENDING_REVIEW"}
 
 
@@ -39,9 +40,20 @@ class KYCService:
         if settings.ENVIRONMENT == "production":
             # Production: queue for manual review until real KYC API is integrated
             self.provider = PendingReviewProvider()
-            logger.warning("KYC_SERVICE: Running in manual-review mode. Integrate real KYC provider for auto-verification.")
+            logger.info("kyc.manual_review_mode_active")
         else:
             self.provider = MockKYCProvider()
+
+        # ── Production safety guard ──────────────────────────────────────
+        # MockKYCProvider auto-approves ALL documents.  It MUST NEVER be
+        # the active provider in production, even if someone changes the
+        # conditional above.  This is a belt-and-suspenders check.
+        if settings.ENVIRONMENT == "production" and isinstance(self.provider, MockKYCProvider):
+            raise RuntimeError(
+                "FATAL: MockKYCProvider is active in production. "
+                "This would auto-approve all KYC submissions. "
+                "Use PendingReviewProvider or a real KYC integration."
+            )
 
     async def verify_aadhaar(self, db: Session, user: User, aadhaar_number: str) -> Dict[str, Any]:
         """Verify Aadhaar and update user status based on provider response."""
@@ -75,13 +87,15 @@ class KYCService:
     async def process_video_kyc(db: Session, user: User, recording_url: str) -> Dict[str, Any]:
         """Process video KYC. Queues for manual review in production."""
         if settings.ENVIRONMENT == "production":
-            logger.info(f"VIDEO_KYC: Queued for manual review - user {user.id}, url: {recording_url}")
+            logger.info("kyc.video_queued_manual_review", user_id=user.id)
             user.kyc_status = KYCStatus.PENDING
             db.add(user)
             db.commit()
             return {"liveness_score": None, "status": "PENDING_REVIEW"}
-        # Dev/test: auto-approve
-        return {"liveness_score": 0.98, "status": "APPROVED"}
+        # Dev/test: auto-approve with synthetic score (never reaches production
+        # due to the branch above).
+        logger.info("kyc.video_dev_auto_approve", user_id=user.id)
+        return {"liveness_score": 0.98, "status": "APPROVED", "_dev_mode": True}
 
     @staticmethod
     def get_rejection_reasons() -> List[Dict[str, str]]:
@@ -99,7 +113,7 @@ class KYCService:
     @staticmethod
     async def verify_utility_bill(db: Session, user_id: int, file_path: str) -> Dict[str, Any]:
         """Process utility bill for address verification."""
-        logger.info(f"Processing utility bill for user {user_id}: {file_path}")
+        logger.info("kyc.utility_bill_processing", user_id=user_id, file_path=file_path)
 
         from app.models.kyc import KYCRecord
         record = db.exec(select(KYCRecord).where(KYCRecord.user_id == user_id)).first()
@@ -115,8 +129,9 @@ class KYCService:
             # In production: queue for manual review or OCR service
             return {"success": True, "extracted_address": None, "match_confidence": None, "status": "PENDING_REVIEW"}
 
-        # Dev: return mock data for testing
-        return {"success": True, "extracted_address": "Dev Test Address 123", "match_confidence": 0.95}
+        # Dev/test: return synthetic data (never reaches production)
+        logger.info("kyc.utility_bill_dev_synthetic", user_id=user_id)
+        return {"success": True, "extracted_address": "Dev Test Address 123", "match_confidence": 0.95, "_dev_mode": True}
 
     @staticmethod
     def resubmit_kyc(db: Session, user_id: int):
@@ -179,5 +194,43 @@ class KYCService:
             "total_rejected_today": rejected_today,
             "submission_trend": {} # Could aggregate over last 7 days
         }
+
+    # ── P1-A-6: Document-level approve / reject ──────────────────────────
+
+    @staticmethod
+    def approve_document(db: Session, document_id: int, reviewer_id: int | None = None):
+        """Set KYCDocument status to verified with audit trail."""
+        from app.models.kyc import KYCDocument, KYCDocumentStatus
+
+        doc = db.get(KYCDocument, document_id)
+        if not doc:
+            return None
+        doc.status = KYCDocumentStatus.VERIFIED
+        doc.verified_at = datetime.now(UTC)
+        if reviewer_id is not None:
+            doc.verified_by = reviewer_id
+        doc.rejection_reason = None
+        db.add(doc)
+        db.commit()
+        db.refresh(doc)
+        return doc
+
+    @staticmethod
+    def reject_document(db: Session, document_id: int, reason: str, reviewer_id: int | None = None):
+        """Set KYCDocument status to rejected with reason."""
+        from app.models.kyc import KYCDocument, KYCDocumentStatus
+
+        doc = db.get(KYCDocument, document_id)
+        if not doc:
+            return None
+        doc.status = KYCDocumentStatus.REJECTED
+        doc.rejection_reason = reason
+        doc.verified_at = datetime.now(UTC)
+        if reviewer_id is not None:
+            doc.verified_by = reviewer_id
+        db.add(doc)
+        db.commit()
+        db.refresh(doc)
+        return doc
 
 kyc_service = KYCService()

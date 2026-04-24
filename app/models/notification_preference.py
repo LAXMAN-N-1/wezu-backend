@@ -1,6 +1,7 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, TYPE_CHECKING
-from datetime import time, datetime, UTC
+from datetime import time, datetime, timezone; UTC = timezone.utc
+
 
 if TYPE_CHECKING:
     from app.models.user import User

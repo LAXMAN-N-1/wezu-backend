@@ -1,8 +1,8 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func, col
 from typing import List, Optional
-from datetime import datetime, UTC, timedelta
-import uuid
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 
 from app.api.deps import get_db, get_current_active_admin
 from app.models.battery import Battery, BatteryStatus, BatteryHealth
@@ -24,7 +24,14 @@ router = APIRouter()
 
 from collections import defaultdict
 
-def _compute_bulk_degradation_rates(battery_ids: List[uuid.UUID], db: Session, days: int = 90) -> dict:
+def _parse_battery_id(value: str) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail="Battery ID must be an integer") from exc
+
+
+def _compute_bulk_degradation_rates(battery_ids: List[int], db: Session, days: int = 90) -> dict:
     if not battery_ids:
         return {}
     cutoff = datetime.now(UTC) - timedelta(days=days)
@@ -59,7 +66,7 @@ def _compute_bulk_degradation_rates(battery_ids: List[uuid.UUID], db: Session, d
         rates[bid] = round((drop / days_diff) * 30, 2)
     return rates
 
-def _compute_degradation_rate(battery_id: uuid.UUID, db: Session, days: int = 90) -> float:
+def _compute_degradation_rate(battery_id: int, db: Session, days: int = 90) -> float:
     return _compute_bulk_degradation_rates([battery_id], db, days).get(battery_id, 0.0)
 
 def _get_health_status(health: float) -> str:
@@ -271,8 +278,8 @@ def get_health_batteries(
 # GET /health/batteries/{battery_id} — Full detail profile
 # ============================================================
 @router.get("/batteries/{battery_id}", response_model=HealthBatteryDetailResponse)
-def get_health_battery_detail(battery_id: str, db: Session = Depends(get_db)):
-    bid = uuid.UUID(battery_id)
+def get_health_battery_detail(battery_id: int, db: Session = Depends(get_db)):
+    bid = battery_id
     battery = db.exec(select(Battery).where(Battery.id == bid)).first()
     if not battery:
         raise HTTPException(404, "Battery not found")
@@ -407,11 +414,11 @@ def get_health_battery_detail(battery_id: str, db: Session = Depends(get_db)):
 # ============================================================
 @router.get("/batteries/{battery_id}/snapshots", response_model=List[HealthSnapshotResponse])
 def get_battery_snapshots(
-    battery_id: str,
+    battery_id: int,
     days: int = Query(90, ge=1, le=365),
     db: Session = Depends(get_db),
 ):
-    bid = uuid.UUID(battery_id)
+    bid = battery_id
     cutoff = datetime.now(UTC) - timedelta(days=days)
     snapshots = db.exec(
         select(BatteryHealthSnapshot)
@@ -435,12 +442,12 @@ def get_battery_snapshots(
 # ============================================================
 @router.post("/batteries/{battery_id}/snapshot", response_model=HealthSnapshotResponse)
 def record_health_snapshot(
-    battery_id: str,
+    battery_id: int,
     data: HealthSnapshotCreate,
     db: Session = Depends(get_db),
     admin_user=Depends(get_current_active_admin),
 ):
-    bid = uuid.UUID(battery_id)
+    bid = battery_id
     battery = db.exec(select(Battery).where(Battery.id == bid)).first()
     if not battery:
         raise HTTPException(404, "Battery not found")
@@ -508,7 +515,7 @@ def record_health_snapshot(
 @router.get("/alerts", response_model=List[HealthAlertResponse])
 def get_health_alerts(
     severity: Optional[str] = Query(None),
-    battery_id: Optional[str] = Query(None),
+    battery_id: Optional[int] = Query(None),
     alert_type: Optional[str] = Query(None),
     include_resolved: bool = Query(False),
     db: Session = Depends(get_db),
@@ -520,7 +527,7 @@ def get_health_alerts(
     if severity:
         query = query.where(BatteryHealthAlert.severity == severity)
     if battery_id:
-        query = query.where(BatteryHealthAlert.battery_id == uuid.UUID(battery_id))
+        query = query.where(BatteryHealthAlert.battery_id == battery_id)
     if alert_type:
         query = query.where(BatteryHealthAlert.alert_type == alert_type)
 
@@ -580,7 +587,7 @@ def schedule_maintenance(
     db: Session = Depends(get_db),
     admin_user=Depends(get_current_active_admin),
 ):
-    bid = uuid.UUID(data.battery_id)
+    bid = _parse_battery_id(data.battery_id)
     battery = db.exec(select(Battery).where(Battery.id == bid)).first()
     if not battery:
         raise HTTPException(404, "Battery not found")

@@ -1,9 +1,10 @@
+from __future__ import annotations
 """
 Analytics-related Pydantic schemas
 Advanced analytics, forecasting, and insights
 """
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Union
 from datetime import datetime, date
 
 # Request Models
@@ -11,7 +12,7 @@ class AnalyticsDateRange(BaseModel):
     """Date range for analytics"""
     start_date: date
     end_date: date
-    granularity: str = Field("DAILY", pattern=r'^(HOURLY|DAILY|WEEKLY|MONTHLY)$')
+    granularity: str = Field("DAILY", pattern=r'^(Union[HOURLY, DAILY|WEEKLY|MONTHLY])$')
 
 class DemandForecastRequest(BaseModel):
     """Request demand forecast"""
@@ -24,7 +25,7 @@ class DemandForecastRequest(BaseModel):
 class ChurnPredictionRequest(BaseModel):
     """Request churn prediction"""
     user_ids: Optional[List[int]] = None
-    min_risk_level: str = Field("MEDIUM", pattern=r'^(LOW|MEDIUM|HIGH)$')
+    min_risk_level: str = Field("MEDIUM", pattern=r'^(Union[LOW, MEDIUM|HIGH])$')
     include_recommendations: bool = True
 
 class PricingOptimizationRequest(BaseModel):
@@ -102,6 +103,8 @@ class StationAnalyticsResponse(BaseModel):
 
 class DemandForecastResponse(BaseModel):
     """Demand forecast response"""
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
     id: int
     forecast_date: date
     station_id: Optional[int]
@@ -117,10 +120,10 @@ class DemandForecastResponse(BaseModel):
     accuracy_score: Optional[float]
     generated_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
-
 class ChurnPredictionResponse(BaseModel):
     """Churn prediction response"""
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
     id: int
     user_id: int
     user_email: Optional[str]
@@ -132,8 +135,6 @@ class ChurnPredictionResponse(BaseModel):
     prediction_date: date
     model_version: str
     confidence_score: float
-
-    model_config = ConfigDict(from_attributes=True)
 
 class PricingRecommendationResponse(BaseModel):
     """Pricing recommendation response"""

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Schemas for Dealer Portal User Management (Credentials & Login Flow).
 """

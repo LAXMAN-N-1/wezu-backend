@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Firebase Cloud Messaging Integration
 Handles push notifications to mobile devices

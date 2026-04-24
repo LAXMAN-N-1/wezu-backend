@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 AWS S3 Integration
 Handles file upload, download, and storage

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Late fee, chargeback, refund, and promo code schemas
 """

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Master seed script for Admin Portal screens.
 Seeds: audit_logs, maintenance_records, dealer_profiles, dealer_applications,
@@ -6,7 +7,7 @@ Seeds: audit_logs, maintenance_records, dealer_profiles, dealer_applications,
 import sys, os, random, json
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from sqlmodel import Session, select, text
 from app.core.database import engine
 

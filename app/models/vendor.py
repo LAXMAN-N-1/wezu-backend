@@ -1,5 +1,5 @@
 from typing import Optional, List
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from sqlmodel import SQLModel, Field, Relationship
 from app.models.location import Zone
 

@@ -1,6 +1,21 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
+from enum import Enum
+
+
+class NotificationStatus(str, Enum):
+    PENDING = "pending"
+    QUEUED = "queued"
+    SENT = "sent"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+    DEAD_LETTER = "dead_letter"
+
+    @classmethod
+    def is_valid(cls, value: str) -> bool:
+        return value in cls._value2member_map_
+
 
 class Notification(SQLModel, table=True):
     __tablename__ = "notifications"

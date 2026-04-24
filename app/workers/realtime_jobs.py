@@ -1,9 +1,10 @@
+from __future__ import annotations
 """
 Real-time / Event-driven Jobs
 These are called from API endpoints or webhooks, not scheduled
 """
 from sqlmodel import Session
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from app.core.database import engine
 import logging
 

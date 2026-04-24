@@ -1,4 +1,6 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status, Body, Response
+from fastapi.responses import FileResponse
 from sqlmodel import Session, select
 from typing import List, Optional, Any
 from datetime import datetime
@@ -15,6 +17,7 @@ from app.schemas.dealer import (
 from app.schemas.dealer_ledger import LedgerResponse, LedgerDetailResponse
 from app.services.dealer_ledger_service import DealerLedgerService
 from pydantic import BaseModel
+from app.schemas.input_contracts import DealerPromotionCreate, DealerPromotionUpdate, BankAccountUpdate
 
 class StageUpdate(BaseModel):
     stage: str
@@ -47,7 +50,7 @@ def create_dealer_profile(
 def read_dealers(
     skip: int = 0,
     limit: int = 100,
-    current_user: User = Depends(deps.get_current_user), # Should be Admin only
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(deps.get_db)
 ):
     """Retrieve all dealers."""
@@ -81,7 +84,7 @@ def get_dealer_dashboard(
     if not profile:
         raise HTTPException(status_code=403, detail="Access denied")
         
-    stats = DealerService.get_dashboard_stats(profile.id)
+    stats = DealerService.get_dashboard_stats(session, profile.id)
     return DataResponse(data=stats)
 
 # Admin Endpoints (Should be protected by superuser dependency in real app)
@@ -89,11 +92,11 @@ def get_dealer_dashboard(
 def update_stage(
     app_id: int, 
     update_in: DealerApplicationUpdate,
-    current_user: User = Depends(get_current_user), # Check Is Admin
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
     try:
-        app = DealerService.update_application_stage(app_id, update_in.stage, update_in.note)
+        app = DealerService.update_application_stage(session, app_id, update_in.stage, update_in.notes or "")
         return DataResponse(data=app)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -101,14 +104,15 @@ def update_stage(
 @router.post("/visits/schedule", response_model=DataResponse[FieldVisit])
 def schedule_visit(
     visit_in: FieldVisitSchedule,
-    current_user: User = Depends(get_current_user), # Check Is Admin
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(get_db)
 ):
-    visit = DealerService.schedule_field_visit(visit_in.application_id, visit_in.officer_id, visit_in.date)
+    visit = DealerService.schedule_field_visit(session, visit_in.application_id, visit_in.officer_id, visit_in.date)
     return DataResponse(data=visit)
 
 from app.services.financial_service import FinancialService
 from app.models.settlement import Settlement
+from app.services.settlement_service import SettlementService
 
 class SettlementRequest(BaseModel):
     dealer_id: int
@@ -118,7 +122,7 @@ class SettlementRequest(BaseModel):
 @router.post("/settlements/generate", response_model=DataResponse[Settlement])
 def generate_settlement(
     req: SettlementRequest,
-    current_user: User = Depends(get_current_user), # Admin check
+    current_user: User = Depends(deps.get_current_active_admin),
 ):
     # In real app verify admin
     settlement = FinancialService.generate_settlement(req.dealer_id, req.start_date, req.end_date)
@@ -274,10 +278,36 @@ def get_dealer_commissions(
     history = DealerService.get_commission_history(session, profile.id, skip, limit)
     return DataResponse(success=True, data=history)
 
+
+@router.get("/me/commissions/{settlement_id}/settlement-pdf")
+def get_dealer_settlement_pdf(
+    settlement_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db),
+):
+    """Dealer: download settlement PDF by settlement id."""
+    profile = DealerService.get_dealer_by_user(session, current_user.id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="Not a dealer")
+
+    settlement = session.get(Settlement, settlement_id)
+    if not settlement or settlement.dealer_id != profile.id:
+        raise HTTPException(status_code=404, detail="Settlement not found")
+
+    path = SettlementService.generate_settlement_pdf(session, settlement_id)
+    if not path:
+        raise HTTPException(status_code=500, detail="Unable to generate settlement PDF")
+
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        filename=f"settlement_{settlement_id}.pdf",
+    )
+
 @router.get("/{id}", response_model=DataResponse[DealerProfileResponse])
 def read_dealer(
     id: int,
-    current_user: User = Depends(deps.get_current_user),
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(deps.get_db)
 ):
     """Get dealer by ID."""
@@ -304,7 +334,7 @@ def update_my_profile(
 def update_dealer(
     id: int,
     profile_in: DealerProfileUpdate,
-    current_user: User = Depends(deps.get_current_user), # Should be Admin
+    current_user: User = Depends(deps.get_current_active_admin),
     session: Session = Depends(deps.get_db)
 ):
     """Update a specific dealer profile (Admin)."""
@@ -367,7 +397,7 @@ def delete_dealer_document(
 
 @router.post("/me/promotions", response_model=DataResponse[dict])
 def create_dealer_promotion(
-    request: dict = Body(...),
+    request: DealerPromotionCreate = Body(...),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
@@ -375,9 +405,9 @@ def create_dealer_promotion(
     profile = DealerService.get_dealer_by_user(session, current_user.id)
     if not profile:
         raise HTTPException(status_code=404, detail="Not a dealer")
-    
+
     from app.models.dealer_promotion import DealerPromotion
-    promo = DealerPromotion(dealer_id=profile.id, **request)
+    promo = DealerPromotion(dealer_id=profile.id, **request.model_dump(exclude_unset=True))
     session.add(promo)
     session.commit()
     return DataResponse(success=True, data={"id": promo.id, "promo_code": promo.promo_code})
@@ -435,7 +465,7 @@ def get_dealer_sales(
 @router.put("/me/promotions/{id}", response_model=DataResponse[dict])
 def update_dealer_promotion(
     id: int,
-    request: dict = Body(...),
+    request: DealerPromotionUpdate = Body(...),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
@@ -463,7 +493,7 @@ def get_bank_account(
 
 @router.post("/me/bank-account", response_model=DataResponse[dict])
 def update_bank_account(
-    request: dict = Body(...),
+    request: BankAccountUpdate = Body(...),
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db)
 ):
@@ -472,11 +502,11 @@ def update_bank_account(
     if not profile:
         raise HTTPException(status_code=404, detail="Not a dealer")
     
-    # Inject verified status default
-    request["verified"] = False
+    bank_data = request.model_dump()
+    bank_data["verified"] = False
     
-    profile.bank_details = request
+    profile.bank_details = bank_data
     session.add(profile)
     session.commit()
     
-    return DataResponse(success=True, data={"message": "Bank account updated", "bank_details": request})
+    return DataResponse(success=True, data={"message": "Bank account updated", "bank_details": bank_data})

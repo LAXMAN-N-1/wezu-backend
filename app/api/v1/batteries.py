@@ -1,9 +1,10 @@
+from __future__ import annotations
 from typing import Any, List, Optional, Dict
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect, UploadFile, File
 from sqlmodel import Session, select
 from pydantic import BaseModel
 from sqlalchemy.orm import selectinload
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 import csv
 import io
 
@@ -243,8 +244,9 @@ def verify_qr_code(
 
 @router.get("/", response_model=List[BatteryResponse])
 def read_batteries(
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    include_pagination: bool = False,
     current_user: User = Depends(deps.require_permission("battery:read")),
     session: Session = Depends(get_session),
 ) -> Any:
@@ -254,6 +256,12 @@ def read_batteries(
     - Dealer: only batteries at their stations
     - Driver: only batteries assigned to them
     """
+    # NOTE:
+    # `include_pagination` is accepted for client compatibility with generic
+    # table widgets used by multiple portals. This endpoint intentionally
+    # returns a plain list response model.
+    _ = include_pagination
+
     query = select(Battery)
     
     if not current_user.is_superuser:
@@ -270,7 +278,7 @@ def read_batteries(
                 Station.dealer_id == current_user.dealer_profile.id
             )
     
-    batteries = session.exec(query.offset(skip).limit(limit)).all()
+    batteries = session.exec(query.order_by(Battery.id.desc()).offset(skip).limit(limit)).all()
     return batteries
 
 @router.post("/", response_model=BatteryResponse)

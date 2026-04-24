@@ -1,88 +1,84 @@
-# ============================================================
-# WEZU Backend — Production Requirements
-# Only packages actually imported by the FastAPI application.
-# Generated from import analysis on 2026-04-02.
-# ============================================================
-
-# --- Core Framework ---
+# ── Core framework ────────────────────────────────────────────────────────────
 fastapi==0.104.1
-uvicorn[standard]==0.24.0
-starlette==0.27.0
-python-multipart==0.0.6
+uvicorn==0.24.0
 gunicorn==21.2.0
+starlette==0.27.0
 
-# --- Database ---
-sqlmodel==0.0.14
+# ── Database ──────────────────────────────────────────────────────────────────
+sqlmodel>=0.0.16
 SQLAlchemy==2.0.48
-alembic==1.12.1
+asyncpg==0.29.0
 psycopg2-binary==2.9.9
-greenlet==3.2.3
+alembic==1.12.1
 
-# --- Pydantic / Validation ---
-pydantic==2.5.0
-pydantic-settings==2.2.1
-pydantic_core==2.14.1
-annotated-types==0.7.0
-email_validator==2.2.0
-
-# --- Auth / Security ---
-python-jose[cryptography]==3.5.0
-passlib[bcrypt]==1.7.4
+# ── Auth & Security ───────────────────────────────────────────────────────────
+passlib==1.7.4
 bcrypt==3.2.2
+python-jose==3.5.0
+PyJWT==2.11.0
 cryptography==46.0.5
 pyotp==2.9.0
-
-# --- Redis / Cache ---
-redis==5.0.1
+webauthn>=2.7.1
 slowapi==0.1.9
 
-# --- MongoDB ---
-pymongo==4.16.0
-motor==3.7.1
+# ── Data validation ───────────────────────────────────────────────────────────
+pydantic==2.5.0
+pydantic-settings==2.2.1
+email_validator==2.2.0
+python-multipart==0.0.6
 
-# --- HTTP / Async ---
+# ── Async / HTTP ──────────────────────────────────────────────────────────────
 httpx==0.27.2
-anyio==3.7.1
 requests==2.32.5
-aiofiles==23.2.1
+anyio==3.7.1
 
-# --- Background Tasks ---
+# ── Background tasks ─────────────────────────────────────────────────────────
+celery==5.5.3
 APScheduler==3.11.2
+redis==5.0.1
 
-# --- Configuration ---
+# ── Configuration ─────────────────────────────────────────────────────────────
 python-dotenv==1.0.0
 Mako==1.3.10
 
-# --- Observability ---
+# ── Observability ─────────────────────────────────────────────────────────────
 structlog==23.2.0
 sentry-sdk[fastapi]==1.39.1
 prometheus-fastapi-instrumentator==6.1.0
 prometheus_client==0.23.1
+psutil==7.0.0
 
-# --- Cloud / External Services ---
-boto3==1.39.0
+# ── Third-party services ──────────────────────────────────────────────────────
+
 firebase-admin==6.8.0
-sendgrid==6.12.5
 twilio==9.4.1
+sendgrid==6.12.5
 razorpay==2.0.0
+boto3==1.39.0
+googlemaps>=4.10.0
 paho-mqtt==1.6.1
 
-# --- Google APIs ---
-google-api-python-client==2.190.0
-google-auth>=2.29.0
+# ── Google Auth ───────────────────────────────────────────────────────────────
+google-auth==2.39.0
+google-auth-httplib2==0.3.0
+google-auth-oauthlib==1.3.0
 
-# --- Data / Reports ---
-pandas==2.2.2
-Pillow==10.3.0
+# ── PDF / Reports ─────────────────────────────────────────────────────────────
 reportlab==4.4.10
 fpdf2==2.8.5
-qrcode==8.2
+Pillow>=10.3.0
 
-# --- Utilities ---
+# ── ML / Analytics ───────────────────────────────────────────────────────────
+pandas==2.2.3
+scikit-learn==1.6.1
+joblib==1.5.1
+
+# ── Observability ─────────────────────────────────────────────────────────────
+sentry-sdk==1.39.1
+structlog==23.2.0
 psutil==7.0.0
-joblib==1.4.2
 
-# --- Dev / Test (CI) ---
-flake8>=7.0
-pytest>=8.0
-faker>=22.0
+# ── Utilities ─────────────────────────────────────────────────────────────────
+python-dotenv==1.0.0
+qrcode==8.2
+aio-pika==9.6.1

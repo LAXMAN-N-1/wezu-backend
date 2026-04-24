@@ -11,7 +11,10 @@ This backend is configured for Coolify/Traefik ingress.
 
 1. Create a new service in Coolify from this repository.
 2. Track branch `main`.
-3. Use Docker Compose deployment (root `docker-compose.yml`).
+3. Use Docker Compose deployment with:
+   - `docker-compose.yml`
+   - `docker-compose.prod.yml`
+   - keep `local-db` profile disabled when using external Neon/Postgres
 4. Set the public domain on the API service (for example `api1.powerfrill.com`).
 5. In Coolify, map the service internal port to `8000`.
 
@@ -41,6 +44,11 @@ DB_INIT_ON_STARTUP=false
 RUN_BACKGROUND_TASKS=false
 SCHEDULER_ENABLED=false
 MQTT_ENABLED=false
+ENFORCE_PRODUCTION_SAFETY=false
+STRICT_STARTUP_DEPENDENCY_CHECKS=false
+ALLOW_START_WITHOUT_DB=true
+WAIT_FOR_DB=false
+WAIT_FOR_REDIS=false
 ```
 
 Notes:
@@ -51,9 +59,12 @@ Notes:
 
 ## 3. Compose Behavior in This Repo
 
-- API service uses `expose: ["8000"]` (not `ports`).
+- API service uses `expose: ["8000"]` (not `ports`) in production mode.
 - Internal nginx service is removed.
 - Production compose no longer publishes `80/443` from a bundled nginx.
+- Local database can be enabled via the optional `local-db` profile in `docker-compose.prod.yml`.
+- Root compose keeps Postgres behind `local-db` profile; default stack is API + Redis.
+- In Coolify, assign a public domain only to `api`; keep all other services internal/private.
 
 ## 4. Deploy
 
@@ -92,3 +103,79 @@ If client IPs are wrong in logs/rate limits:
 If deployment fails from env conflicts in Coolify:
 - Remove stale variables from compose-level environment blocks first.
 - Re-add them only in Coolify Environment Variables.
+
+If API container keeps restarting:
+- Temporarily keep `ENFORCE_PRODUCTION_SAFETY=false` and `STRICT_STARTUP_DEPENDENCY_CHECKS=false` until all production host/CORS/payment/sms settings are verified.
+- Keep `WAIT_FOR_DB=false` and `WAIT_FOR_REDIS=false` so transient dependency startup does not hard-exit PID 1.
+- Ensure only `api` (and optionally `redis`) are running in Coolify unless you explicitly need workers.
+
+## 7. Hostinger VPS Performance Tuning
+
+### Recommended VPS Specs (India region)
+| Component | Minimum | Recommended |
+|---|---|---|
+| vCPUs | 2 | 4 |
+| RAM | 4 GB | 8 GB |
+| Storage | 40 GB SSD | 80 GB NVMe |
+| Region | Mumbai (ap-south-1) | Mumbai or Singapore |
+
+### Gunicorn Workers
+Workers default to **2** (env: `GUNICORN_WORKERS`). Each Uvicorn worker uses ~150–250 MB.
+
+| VPS RAM | Workers | Approx Memory |
+|---|---|---|
+| 4 GB | 2 | ~400–500 MB |
+| 8 GB | 3–4 | ~600–1000 MB |
+
+Set in Coolify environment:
+```env
+GUNICORN_WORKERS=2
+GUNICORN_KEEPALIVE=65
+GUNICORN_TIMEOUT=120
+```
+
+### Database Pool Sizing
+Pool is **per worker process**. Total connections = `pool_size × workers + max_overflow × workers`.
+
+| Setting | Value | Rationale |
+|---|---|---|
+| `DB_POOL_SIZE` | 3 | 3 conns × 2 workers = 6 base |
+| `DB_MAX_OVERFLOW` | 3 | 6 + 6 overflow = 12 max total |
+| `DB_POOL_TIMEOUT` | 20 | Fail fast on pool exhaustion |
+| `DB_POOL_RECYCLE` | 900 | 15 min — avoids stale Neon connections |
+| `DB_POOL_PRE_PING` | true | Detects closed connections before use |
+| `DB_POOL_USE_LIFO` | true | Reuses hot connections first |
+| `SQL_SLOW_QUERY_LOG_MS` | 500 | Logs queries > 500 ms to stdout |
+
+> **Neon free tier**: 25 connection limit. Keep `pool_size × workers` ≤ 12.
+
+### Redis
+Redis should be in the same Docker network. Use `redis:7-alpine` with AOF persistence:
+```yaml
+redis:
+  image: redis:7-alpine
+  command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+```
+
+### Traefik Connection Tuning
+Add these labels in Coolify for Traefik transport optimization:
+```env
+# In Coolify service labels / environment
+traefik.http.services.api.loadbalancer.server.scheme=http
+traefik.http.middlewares.api-compress.compress=true
+```
+
+The backend's `GUNICORN_KEEPALIVE=65` is set above Traefik's default idle timeout (60s) to prevent premature connection drops.
+
+### Response Caching
+The `SecureHeadersMiddleware` applies `Cache-Control` headers automatically:
+- **Cacheable** (60s TTL): `/live`, `/api/v1/stations/map`, `/api/v1/faqs`, `/api/v1/catalog`, `/api/v1/locations`, `/api/v1/i18n`
+- **No-store**: All other endpoints (mutations, user-specific data)
+
+### GZip Compression
+Enabled for responses ≥ 1000 bytes via `GZipMiddleware(minimum_size=1000)`. JSON API responses are typically 2–10× smaller after compression.
+
+### Monitoring
+- `Server-Timing` header on every response (`app;dur=X.XXms`) — visible in browser DevTools waterfall
+- Slow query logging: set `SQL_SLOW_QUERY_LOG_MS=200` for aggressive monitoring during rollout
+- Sentry integration: set `SENTRY_DSN` for error tracking + `SENTRY_TRACES_SAMPLE_RATE=0.1` for 10% performance tracing

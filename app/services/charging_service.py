@@ -1,9 +1,10 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from app.models.battery import Battery
 from app.models.battery_reservation import BatteryReservation
 from app.schemas.station_monitoring import OptimizedQueueItem, OptimizationBattery
 from app.services.demand_predictor import MockDemandPredictor
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from typing import List, Optional
 
 class ChargingService:
@@ -98,14 +99,12 @@ class ChargingService:
         
         opt_batteries = []
         for slot in slots:
-            if slot.battery_id:
-                battery = db.get(Battery, slot.battery_id)
-                if battery:
-                    opt_batteries.append(OptimizationBattery(
-                        battery_id=str(battery.id),
-                        current_charge=battery.current_charge or 0.0,
-                        state_of_health=battery.health_percentage or 100.0,
-                    ))
+            if slot.battery:
+                opt_batteries.append(OptimizationBattery(
+                    battery_id=str(slot.battery.id),
+                    current_charge=slot.battery.current_charge,
+                    state_of_health=slot.battery.health_percentage
+                ))
         
         if not opt_batteries:
             return []

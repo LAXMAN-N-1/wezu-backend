@@ -1,8 +1,9 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from app.core.database import get_db
 from app.models.station import Station, StationStatus
 from app.services.alert_service import AlertService
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 import logging
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ def monitor_stations():
             threshold = datetime.now(UTC) - timedelta(days=365)
             
             offline_query = select(Station).where(
-                Station.status == StationStatus.OPERATIONAL,
+                Station.status == StationStatus.ACTIVE,
                 Station.updated_at < threshold
             )
             offline_stations = session.exec(offline_query).all()

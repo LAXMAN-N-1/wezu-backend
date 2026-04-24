@@ -1,8 +1,9 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from app.models.alert import Alert
 from app.models.station import Station
 from app.services.notification_service import NotificationService
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from typing import List, Optional
 
 class AlertService:

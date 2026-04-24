@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
@@ -34,3 +35,7 @@ class TelematicsDataResponse(TelematicsDataBase):
 
 class TelematicsHistoryResponse(BaseModel):
     items: List[TelematicsDataResponse]
+
+# Backward-compat aliases (hardened repo used this spelling)
+TelemeticsDataIngest = TelematicsDataIngest
+TelemeticsDataResponse = TelematicsDataResponse

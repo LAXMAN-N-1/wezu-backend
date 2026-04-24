@@ -1,3 +1,4 @@
+from __future__ import annotations
 from app.repositories.base_repository import BaseRepository
 from app.models.warehouse import Warehouse
 from app.schemas.warehouse import WarehouseCreate, WarehouseUpdate

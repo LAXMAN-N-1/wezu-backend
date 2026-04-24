@@ -1,8 +1,10 @@
+from __future__ import annotations
 """Security Settings Admin API endpoints."""
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
-from typing import List, Optional
-from datetime import datetime, UTC, timedelta
+from sqlalchemy import case, or_
+from typing import Optional
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 
 from app.core.database import get_db
 from app.api.deps import get_current_active_admin
@@ -11,6 +13,97 @@ from app.models.audit_log import AuditLog, SecurityEvent
 from app.models.system import SystemConfig
 
 router = APIRouter()
+
+
+def _failed_login_predicate():
+    lowered_details = func.lower(func.coalesce(AuditLog.details, ""))
+    return or_(
+        AuditLog.action == "FAILED_LOGIN",
+        lowered_details.like("%status: failure%"),
+        lowered_details.like("%failed%"),
+        lowered_details.like("%failure%"),
+    )
+
+
+def _classify_origin(ip_address: str) -> tuple[str, str, str]:
+    ip = (ip_address or "").strip()
+    if not ip or ip.lower() == "unknown":
+        return "UNK", "Unknown", "🌐"
+    if ip.startswith("127.") or ip in {"::1", "localhost"}:
+        return "LOCAL", "Localhost", "🏠"
+
+    try:
+        first_octet = int(ip.split(".")[0])
+    except (TypeError, ValueError, IndexError):
+        return "UNK", "Unknown", "🌐"
+
+    if first_octet < 50:
+        return "NA", "North America", "🌎"
+    if first_octet < 100:
+        return "EU", "Europe", "🌍"
+    if first_octet < 150:
+        return "AS", "Asia", "🌏"
+    if first_octet < 200:
+        return "AF", "Africa", "🌍"
+    return "OC", "Oceania", "🌏"
+
+
+def _origin_layout_seed(seed_value: str) -> tuple[float, float]:
+    seed = sum(ord(char) for char in seed_value)
+    angle = round((seed % 360) * 3.141592653589793 / 180.0, 6)
+    dist = round(0.25 + ((seed * 17) % 60) / 100.0, 3)
+    return angle, dist
+
+
+def _build_origin_metrics(session: Session, since: datetime, limit: int) -> list[dict]:
+    failed_case = case((_failed_login_predicate(), 1), else_=0)
+    rows = session.exec(
+        select(
+            AuditLog.ip_address,
+            func.count(AuditLog.id),
+            func.coalesce(func.sum(failed_case), 0),
+        )
+        .where(AuditLog.timestamp >= since)
+        .group_by(AuditLog.ip_address)
+        .order_by(func.count(AuditLog.id).desc())
+        .limit(limit)
+    ).all()
+
+    items: list[dict] = []
+    for index, row in enumerate(rows):
+        ip_address = (row[0] or "unknown").strip() if row[0] else "unknown"
+        attempts = int(row[1] or 0)
+        failed = int(row[2] or 0)
+        successful = max(attempts - failed, 0)
+        success_rate = round((successful / attempts) * 100.0, 1) if attempts else 0.0
+
+        code, country, flag = _classify_origin(ip_address)
+        risk = (
+            "critical"
+            if failed >= 100 or success_rate < 40
+            else "warning"
+            if failed >= 25 or success_rate < 70
+            else "low"
+        )
+        angle, dist = _origin_layout_seed(f"{ip_address}:{index}:{code}")
+
+        items.append(
+            {
+                "code": code,
+                "country": country,
+                "flag": flag,
+                "attempts": attempts,
+                "failed": failed,
+                "rate": success_rate,
+                "risk": risk,
+                "blocked": False,
+                "angle": angle,
+                "dist": dist,
+                "ip_address": ip_address,
+            }
+        )
+
+    return items
 
 # ============================================================================
 # Audit Logs (enhanced)
@@ -136,6 +229,58 @@ def resolve_security_event(
     session.add(event)
     session.commit()
     return {"message": "Security event resolved"}
+
+
+@router.get("/dashboard/origins")
+def get_security_dashboard_origins(
+    session: Session = Depends(get_db),
+    days: int = Query(7, ge=1, le=90),
+    limit: int = Query(12, ge=1, le=50),
+    current_user: User = Depends(get_current_active_admin),
+):
+    since = datetime.now(UTC) - timedelta(days=days)
+    return {"items": _build_origin_metrics(session, since, limit)}
+
+
+@router.get("/dashboard")
+def get_security_dashboard(
+    session: Session = Depends(get_db),
+    days: int = Query(7, ge=1, le=90),
+    current_user: User = Depends(get_current_active_admin),
+):
+    now = datetime.now(UTC)
+    since_days = now - timedelta(days=days)
+    since_24h = now - timedelta(hours=24)
+    failed_predicate = _failed_login_predicate()
+
+    total_events = session.exec(select(func.count(SecurityEvent.id))).one()
+    unresolved_events = session.exec(
+        select(func.count(SecurityEvent.id)).where(SecurityEvent.is_resolved.is_(False))
+    ).one()
+    critical_events = session.exec(
+        select(func.count(SecurityEvent.id)).where(func.lower(SecurityEvent.severity) == "critical")
+    ).one()
+    total_audit_24h = session.exec(
+        select(func.count(AuditLog.id)).where(AuditLog.timestamp >= since_24h)
+    ).one()
+    failed_logins_24h = session.exec(
+        select(func.count(AuditLog.id))
+        .where(AuditLog.timestamp >= since_24h)
+        .where(failed_predicate)
+    ).one()
+
+    return {
+        "generated_at": now.isoformat(),
+        "period_days": days,
+        "kpis": {
+            "total_events": total_events,
+            "critical_events": critical_events,
+            "unresolved_events": unresolved_events,
+            "failed_logins_24h": failed_logins_24h,
+            "total_audit_24h": total_audit_24h,
+        },
+        "origins": _build_origin_metrics(session, since_days, 5),
+    }
 
 
 # ============================================================================

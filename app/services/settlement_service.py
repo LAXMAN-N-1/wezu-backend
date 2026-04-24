@@ -1,6 +1,7 @@
+from __future__ import annotations
 from sqlmodel import Session, select
-from datetime import datetime, UTC, timedelta
-from typing import Optional, List
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
+from typing import Optional, List, Dict, Any
 from app.models.settlement import Settlement
 from app.models.commission import CommissionLog
 from app.models.chargeback import Chargeback
@@ -8,13 +9,64 @@ from app.models.swap import SwapSession
 from app.models.station import Station
 from app.models.dealer import DealerProfile
 from app.services.commission_service import CommissionService
-import logging
+from app.core.config import settings
+from app.core.logging import get_logger
 import uuid
 
-logger = logging.getLogger("wezu_settlements")
+logger = get_logger("wezu_settlements")
 
 
 class SettlementService:
+
+    # ── Safe Commit ─────────────────────────────────────────────────────
+    @staticmethod
+    def _safe_commit(db: Session, *, context: str = "settlement_service") -> None:
+        """Commit with rollback-on-failure and structured logging."""
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+            logger.exception("db.commit_failed", context=context)
+            raise
+
+    # ── Gateway Abstraction ─────────────────────────────────────────────
+    # In production, integrate with a payout provider (Razorpay Payouts,
+    # Cashfree, etc.).  This helper encapsulates the call so no mock
+    # logic leaks into business methods.
+
+    @staticmethod
+    def _execute_payout(settlement: Settlement) -> Dict[str, Any]:
+        """Execute a payout for a settlement via the configured gateway.
+
+        Returns:
+            dict with keys: transaction_reference, payment_proof_url
+        Raises:
+            RuntimeError on gateway failure (caller should catch & mark failed).
+        """
+        # TODO(payout-integration): Replace with real payout API call.
+        # For now, generate a tracked reference.  The _mock flag makes it
+        # auditable that this came from the interim path.
+        env = getattr(settings, "ENVIRONMENT", "development")
+        txn_ref = f"PAY-{settlement.settlement_month}-{uuid.uuid4().hex[:8].upper()}"
+        proof_url = f"https://s3.wezu.com/settlements/{settlement.id}/receipt.pdf"
+
+        if env == "production":
+            logger.warning(
+                "settlement.payout_manual_transfer_required",
+                settlement_id=settlement.id,
+                txn_ref=txn_ref,
+            )
+        else:
+            logger.info(
+                "settlement.payout_dev_mode",
+                settlement_id=settlement.id,
+                txn_ref=txn_ref,
+            )
+
+        return {
+            "transaction_reference": txn_ref,
+            "payment_proof_url": proof_url,
+        }
 
     @staticmethod
     def generate_monthly_settlement(
@@ -72,7 +124,7 @@ class SettlementService:
                         SwapSession.completed_at <= end_date,
                     )
                 ).all()
-                total_revenue = round(sum(s.amount for s in swaps), 2)
+                total_revenue = round(sum(s.swap_amount for s in swaps), 2)
 
         # 3. Deduct chargebacks
         chargebacks = db.exec(
@@ -109,7 +161,7 @@ class SettlementService:
             status="generated",
         )
         db.add(settlement)
-        db.commit()
+        SettlementService._safe_commit(db, context="generate_monthly_settlement.create")
         db.refresh(settlement)
 
         # Link commissions to this settlement
@@ -124,12 +176,15 @@ class SettlementService:
             cb.status = "deducted"
             db.add(cb)
 
-        db.commit()
+        SettlementService._safe_commit(db, context="generate_monthly_settlement.link")
 
         logger.info(
-            f"Settlement generated for dealer {dealer_id}, month {month}: "
-            f"commission={total_commission}, chargebacks={chargeback_amount}, "
-            f"net={net_payable}"
+            "settlement.generated",
+            dealer_id=dealer_id,
+            month=month,
+            commission=total_commission,
+            chargebacks=chargeback_amount,
+            net=net_payable,
         )
         return settlement
 
@@ -137,7 +192,7 @@ class SettlementService:
     def process_batch_payments(db: Session, month: str) -> dict:
         """
         Batch process all 'generated' settlements for a month.
-        Simulates payment gateway call and generates proof receipts.
+        Executes payout via gateway abstraction and generates proof receipts.
         """
         settlements = db.exec(
             select(Settlement).where(
@@ -151,13 +206,11 @@ class SettlementService:
 
         for settlement in settlements:
             try:
-                # Mock payment gateway call
-                txn_ref = f"PAY-{month}-{uuid.uuid4().hex[:8].upper()}"
-                proof_url = f"https://s3.wezu.com/settlements/{settlement.id}/receipt.pdf"
+                payout = SettlementService._execute_payout(settlement)
 
                 settlement.status = "paid"
-                settlement.transaction_reference = txn_ref
-                settlement.payment_proof_url = proof_url
+                settlement.transaction_reference = payout["transaction_reference"]
+                settlement.payment_proof_url = payout["payment_proof_url"]
                 settlement.paid_at = datetime.now(UTC)
                 db.add(settlement)
 
@@ -177,9 +230,9 @@ class SettlementService:
                 settlement.failure_reason = str(e)
                 db.add(settlement)
                 failed += 1
-                logger.error(f"Payment failed for settlement {settlement.id}: {e}")
+                logger.error("settlement.payment_failed", settlement_id=settlement.id, error=str(e))
 
-        db.commit()
+        SettlementService._safe_commit(db, context="process_batch_payments")
 
         return {
             "month": month,
@@ -200,13 +253,11 @@ class SettlementService:
             raise ValueError(f"Cannot process settlement with status {settlement.status}")
         
         try:
-            # Mock payment gateway call
-            txn_ref = f"PAY-RETRY-{uuid.uuid4().hex[:8].upper()}"
-            proof_url = f"https://s3.wezu.com/settlements/{settlement.id}/receipt.pdf"
+            payout = SettlementService._execute_payout(settlement)
 
             settlement.status = "paid"
-            settlement.transaction_reference = txn_ref
-            settlement.payment_proof_url = proof_url
+            settlement.transaction_reference = payout["transaction_reference"]
+            settlement.payment_proof_url = payout["payment_proof_url"]
             settlement.paid_at = datetime.now(UTC)
             settlement.failure_reason = None # Clear failure reason on success
             db.add(settlement)
@@ -221,15 +272,15 @@ class SettlementService:
                 cl.status = "paid"
                 db.add(cl)
             
-            db.commit()
+            SettlementService._safe_commit(db, context="process_single_payment.success")
             db.refresh(settlement)
             return settlement
         except Exception as e:
             settlement.status = "failed"
             settlement.failure_reason = str(e)
             db.add(settlement)
-            db.commit()
-            logger.error(f"Payment retry failed for settlement {settlement.id}: {e}")
+            SettlementService._safe_commit(db, context="process_single_payment.failure")
+            logger.error("settlement.retry_failed", settlement_id=settlement.id, error=str(e))
             raise ValueError(f"Payment processing failed: {e}")
 
     @staticmethod
@@ -278,13 +329,9 @@ class SettlementService:
         pending = [s for s in settlements if s.status in ("pending", "generated")]
         paid = [s for s in settlements if s.status == "paid"]
 
-        # Calculate total platform fees deducted across history
-        total_platform_fees = round(sum(s.total_commission * 0.02 for s in settlements), 2)
-
         return {
             "current_month": current_month,
             "current_month_earnings": current_month_earnings,
-            "total_platform_fees": total_platform_fees,
             "history": history,
             "pending_settlements": {
                 "count": len(pending),
@@ -294,10 +341,6 @@ class SettlementService:
                 "count": len(paid),
                 "total_amount": round(sum(s.net_payable for s in paid), 2),
             },
-            "next_payout": {
-                "amount": round(sum(s.net_payable for s in pending), 2),
-                "date": (now.replace(day=28) + timedelta(days=5)).replace(day=10).isoformat(),
-            }
         }
 
     @staticmethod

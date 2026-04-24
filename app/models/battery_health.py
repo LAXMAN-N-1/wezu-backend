@@ -1,4 +1,5 @@
-from datetime import datetime, UTC
+from __future__ import annotations
+from datetime import datetime, timezone; UTC = timezone.utc
 from typing import Optional, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum

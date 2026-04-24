@@ -1,0 +1,40 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev-runtime
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    ports:
+      - "8000:8000"
+    environment:
+      ENVIRONMENT: development
+      DEBUG: "true"
+      ENABLE_API_DOCS: "true"
+      ENFORCE_PRODUCTION_SAFETY: "false"
+      LOG_LEVEL: DEBUG
+      DB_INIT_ON_STARTUP: "false"
+      RUN_DB_MIGRATIONS: "true"
+      LOGISTICS_SCHEMA_CHECK_ENABLED: "false"
+      ALLOW_TEST_OTP_BYPASS: "true"
+      WAIT_FOR_DB: "true"
+      WAIT_FOR_REDIS: "true"
+    volumes:
+      - ./:/app
+      - uploads_data:/app/uploads
+    security_opt: []
+    cap_drop: []
+    tmpfs: []
+
+  db:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  mqtt:
+    ports:
+      - "1883:1883"
+      - "9001:9001"

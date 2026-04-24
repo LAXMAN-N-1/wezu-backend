@@ -1,6 +1,7 @@
+from __future__ import annotations
 from typing import List, Dict, Any
 from sqlmodel import Session, select
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from io import StringIO
 import csv
 

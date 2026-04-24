@@ -4,7 +4,7 @@ if TYPE_CHECKING:
     from app.models.user import User
     from app.models.organization import Organization
     from app.models.warehouse import Warehouse
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 class Branch(SQLModel, table=True):
     __tablename__ = "branches"

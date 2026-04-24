@@ -1,6 +1,6 @@
-from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, desc, extract
-from datetime import datetime, timedelta
+from __future__ import annotations
+from sqlmodel import Session, select, func, and_, desc, extract
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from typing import Dict, List, Any
 
 from app.schemas.analytics.dealer import DealerOverviewResponse
@@ -20,7 +20,7 @@ class AnalyticsDealerService(BaseAnalyticsService):
     @staticmethod
     async def get_overview(db: Session, period: str = "30d", dealer_profile_id: int = None) -> DealerOverviewResponse:
         days = BaseAnalyticsService.parse_period(period)
-        target_date = datetime.utcnow() - timedelta(days=days)
+        target_date = datetime.now(UTC) - timedelta(days=days)
         
         # d_id logic: if not provided, we might be in a system context or demo
         # Real impl would get this from current_user
@@ -36,22 +36,22 @@ class AnalyticsDealerService(BaseAnalyticsService):
         }
 
         # 2. Rental Analytics
-        total_bswaps = db.query(func.count(SwapSession.id)).join(Station, SwapSession.station_id == Station.id).filter(
+        total_bswaps = db.exec(select(func.count(SwapSession.id)).join(Station, SwapSession.station_id == Station.id).where(
             Station.dealer_id == d_id,
-            SwapSession.created_at >= datetime.utcnow().replace(hour=0, minute=0, second=0)
-        ).scalar() or 0
+            SwapSession.created_at >= datetime.now(UTC).replace(hour=0, minute=0, second=0)
+        )).one() or 0
         
-        avg_dur = db.query(func.avg(extract('epoch', Rental.end_time - Rental.start_time) / 3600)).join(Station, Rental.start_station_id == Station.id).filter(
+        avg_dur = db.exec(select(func.avg(extract('epoch', Rental.end_time - Rental.start_time) / 3600)).join(Station, Rental.start_station_id == Station.id).where(
             Station.dealer_id == d_id,
             Rental.status == RentalStatus.COMPLETED,
-            Rental.start_time >= datetime.utcnow().replace(hour=0, minute=0, second=0)
-        ).scalar() or 0.0
+            Rental.start_time >= datetime.now(UTC).replace(hour=0, minute=0, second=0)
+        )).one() or 0.0
         
         # 3. Operations Analytics
-        peak_hours_query_results = db.query(extract('hour', Rental.start_time), func.count(Rental.id)) \
-            .join(Station, Rental.start_station_id == Station.id) \
-            .filter(Station.dealer_id == d_id, Rental.start_time >= target_date) \
-            .group_by(extract('hour', Rental.start_time)).all()
+        peak_hours_query_results = db.exec(select(extract('hour', Rental.start_time), func.count(Rental.id))
+            .join(Station, Rental.start_station_id == Station.id)
+            .where(Station.dealer_id == d_id, Rental.start_time >= target_date)
+            .group_by(extract('hour', Rental.start_time))).all()
 
         rental_analytics = {
             "rentals_today": total_bswaps, # Changed to total_bswaps
@@ -62,9 +62,9 @@ class AnalyticsDealerService(BaseAnalyticsService):
         }
 
         # 4. Fleet & Inventory Analytics
-        total_batt = db.query(func.count(Battery.id)).join(Station, Battery.location_id == Station.id).filter(Station.dealer_id == d_id).scalar() or 0
-        rented_batt = db.query(func.count(Battery.id)).join(Station, Battery.location_id == Station.id).filter(Station.dealer_id == d_id, Battery.status == BatteryStatus.RENTED).scalar() or 0
-        maint_batt = db.query(func.count(Battery.id)).join(Station, Battery.location_id == Station.id).filter(Station.dealer_id == d_id, Battery.status == BatteryStatus.MAINTENANCE).scalar() or 0
+        total_batt = db.exec(select(func.count(Battery.id)).join(Station, Battery.location_id == Station.id).where(Station.dealer_id == d_id)).one() or 0
+        rented_batt = db.exec(select(func.count(Battery.id)).join(Station, Battery.location_id == Station.id).where(Station.dealer_id == d_id, Battery.status == BatteryStatus.RENTED)).one() or 0
+        maint_batt = db.exec(select(func.count(Battery.id)).join(Station, Battery.location_id == Station.id).where(Station.dealer_id == d_id, Battery.status == BatteryStatus.MAINTENANCE)).one() or 0
 
         inventory_analytics = {
             "total_batteries": total_batt,
@@ -74,10 +74,10 @@ class AnalyticsDealerService(BaseAnalyticsService):
         }
 
         # 4. Revenue Analytics
-        dealer_rev = db.query(func.sum(Rental.total_amount)).join(Station, Rental.start_station_id == Station.id).filter(
+        dealer_rev = db.exec(select(func.sum(Rental.total_amount)).join(Station, Rental.start_station_id == Station.id).where(
             Station.dealer_id == d_id,
             Rental.start_time >= target_date
-        ).scalar() or 0.0
+        )).one() or 0.0
         
         revenue_analytics = {
             "revenue_generated": float(dealer_rev),
@@ -95,7 +95,7 @@ class AnalyticsDealerService(BaseAnalyticsService):
         }
 
         # 6. Customer Analytics
-        ratings = db.query(func.avg(Review.rating)).join(Station, Review.station_id == Station.id).filter(Station.dealer_id == d_id).scalar() or 4.5
+        ratings = db.exec(select(func.avg(Review.rating)).join(Station, Review.station_id == Station.id).where(Station.dealer_id == d_id)).one() or 4.5
         
         customer_analytics = {
             "returning_customers": 12,
@@ -104,12 +104,12 @@ class AnalyticsDealerService(BaseAnalyticsService):
         }
 
         # 7. Promotion Analytics
-        active_promos = db.query(func.count(DealerPromotion.id)).filter(DealerPromotion.dealer_id == d_id, DealerPromotion.is_active == True).scalar() or 0
-        promo_rev = db.query(func.sum(PromotionUsage.final_amount)).join(DealerPromotion, PromotionUsage.promotion_id == DealerPromotion.id).filter(DealerPromotion.dealer_id == d_id).scalar() or 0.0
+        active_promos = db.exec(select(func.count(DealerPromotion.id)).where(DealerPromotion.dealer_id == d_id, DealerPromotion.is_active == True)).one() or 0
+        promo_rev = db.exec(select(func.sum(PromotionUsage.final_amount)).join(DealerPromotion, PromotionUsage.promotion_id == DealerPromotion.id).where(DealerPromotion.dealer_id == d_id)).one() or 0.0
 
         promotion_analytics = {
             "active_campaigns": active_promos,
-            "coupon_usage": db.query(func.count(PromotionUsage.id)).join(DealerPromotion, PromotionUsage.promotion_id == DealerPromotion.id).filter(DealerPromotion.dealer_id == d_id).scalar() or 0,
+            "coupon_usage": db.exec(select(func.count(PromotionUsage.id)).join(DealerPromotion, PromotionUsage.promotion_id == DealerPromotion.id).where(DealerPromotion.dealer_id == d_id)).one() or 0,
             "revenue_from_promotions": float(promo_rev)
         }
 

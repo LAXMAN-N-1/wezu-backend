@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Dealer Portal Inventory API — All endpoints for the dealer inventory screen.
 
@@ -23,6 +24,7 @@ from app.db.session import get_session
 from app.api.deps import get_current_user
 from app.models.user import User
 from app.models.dealer import DealerProfile
+from app.models.dealer_stock_request import DealerStockRequest
 from app.schemas.dealer_portal_inventory import (
     BatteryStatusUpdateRequest,
     BatteryCreateRequest,
@@ -392,3 +394,49 @@ def create_stock_request(
         "message": "Stock request submitted successfully",
         "data": data,
     }
+
+
+# ══════════════════════════════════════════════════
+# 11. GET /stock-requests — Dealer request history
+# ══════════════════════════════════════════════════
+
+@router.get("/stock-requests")
+def list_stock_requests(
+    status: Optional[str] = Query(None, description="pending, approved, rejected, fulfilled, cancelled"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    dealer_id = _get_dealer_id(db, current_user.id)
+    statement = (
+        select(DealerStockRequest)
+        .where(DealerStockRequest.dealer_id == dealer_id)
+        .order_by(DealerStockRequest.created_at.desc())
+    )
+    if status:
+        statement = statement.where(DealerStockRequest.status == status.strip().lower())
+
+    rows = db.exec(statement.offset(offset).limit(limit)).all()
+    data = [
+        {
+            "request_id": row.id,
+            "model_id": row.model_id,
+            "model_name": row.model_name,
+            "quantity": row.quantity,
+            "priority": row.priority.value if hasattr(row.priority, "value") else str(row.priority),
+            "status": row.status.value if hasattr(row.status, "value") else str(row.status),
+            "delivery_date": row.delivery_date.isoformat() if row.delivery_date else None,
+            "reason": row.reason,
+            "notes": row.notes,
+            "admin_notes": row.admin_notes,
+            "rejected_reason": row.rejected_reason,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "approved_at": row.approved_at.isoformat() if row.approved_at else None,
+            "fulfilled_at": row.fulfilled_at.isoformat() if row.fulfilled_at else None,
+            "fulfilled_quantity": row.fulfilled_quantity,
+        }
+        for row in rows
+    ]
+
+    return {"success": True, "data": data}

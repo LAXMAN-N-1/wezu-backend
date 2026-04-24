@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File
 from sqlmodel import Session, select
 from typing import List, Optional
@@ -21,15 +22,17 @@ from app.services.review_service import ReviewService
 from app.models.station import StationStatus, Station, StationImage
 from app.models.battery import Battery
 from app.models.favorite import Favorite
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
+from app.schemas.input_contracts import MaintenanceTaskCreate
 
 router = APIRouter()
 
 @router.get("/", response_model=List[StationResponse])
 async def read_stations(
     request: Request,
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    include_pagination: bool = Query(False),
     current_user: User = Depends(deps.require_permission("station:read")),
     db: Session = Depends(deps.get_db),
 ):
@@ -38,6 +41,10 @@ async def read_stations(
     """
     from app.models.roles import RoleEnum
     
+    # `include_pagination` is accepted to stay compatible with shared list
+    # clients that always send this query param.
+    _ = include_pagination
+
     query = select(Station)
     
     # Row-level filtering: Dealers only see their own stations using Request Context Role
@@ -54,7 +61,7 @@ async def search_nearby_stations(
     lat: float,
     lon: float,
     radius: float = 50.0,
-    filters: NearbyFilterSchema = Depends(),
+    filters: NearbyFilterSchema = Depends(NearbyFilterSchema),
     status: Optional[str] = Query(None, description="Station status (active, maintenance)"),
     is_24x7: Optional[bool] = Query(None, description="Filter only 24x7 stations"),
     sort_by: str = Query("distance", description="Sort by: distance, rating, availability"),
@@ -194,12 +201,13 @@ async def read_station_maintenance_schedule(
 @router.post("/{station_id}/maintenance-schedule")
 async def create_station_maintenance_task(
     station_id: int,
-    data: dict, # Simplified for now, should use schema
+    data: MaintenanceTaskCreate,
     current_user: User = Depends(deps.get_current_active_superuser),
     db: Session = Depends(deps.get_db),
 ):
-    data.update({"entity_type": "station", "entity_id": station_id})
-    return MaintenanceService.record_maintenance(db, current_user.id, data)
+    task_data = data.model_dump(exclude_unset=True)
+    task_data.update({"entity_type": "station", "entity_id": station_id})
+    return MaintenanceService.record_maintenance(db, current_user.id, task_data)
 
 @router.put("/{station_id}/maintenance-schedule/{task_id}")
 async def update_station_maintenance_task(
@@ -224,10 +232,12 @@ async def update_station_maintenance_task(
 
 @router.get("/map", response_model=List[StationMapResponse])
 async def get_stations_map(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(200, ge=1, le=500),
     db: Session = Depends(deps.get_db),
 ):
-    """Return all station coordinates and status for map rendering."""
-    stations = db.exec(select(Station)).all()
+    """Return station coordinates and status for map rendering."""
+    stations = db.exec(select(Station).offset(skip).limit(limit)).all()
     return stations
 
 @router.get("/heatmap", response_model=List[HeatmapPoint])
@@ -308,14 +318,15 @@ async def unfavorite_station(
 @router.get("/{station_id}/batteries", response_model=List[BatteryResponse])
 async def read_station_batteries(
     station_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(deps.get_db),
 ):
     try:
-        # Assuming we just need to query by station_id since location_id doesn't exist anymore
-        query = select(Battery).where(Battery.station_id == station_id)
+        query = select(Battery).where(Battery.station_id == station_id).offset(skip).limit(limit)
         results = db.exec(query).all()
         return results
     except Exception as e:
         import logging
-        logging.error(f"DATABASE_ERROR: Failed to fetch batteries for station {station_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+        logging.getLogger(__name__).exception("fetch_station_batteries_failed", extra={"station_id": station_id})
+        raise HTTPException(status_code=500, detail="Failed to fetch station batteries")

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Commission schemas: CommissionConfig, CommissionTier, CommissionLog
 """

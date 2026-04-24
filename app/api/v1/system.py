@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 System Health and Version Endpoints
 Provides health checks and system information
@@ -6,7 +7,7 @@ from fastapi import APIRouter, Depends
 from sqlmodel import Session
 from app.core.config import settings
 from app.api import deps
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 import psutil
 import platform
 

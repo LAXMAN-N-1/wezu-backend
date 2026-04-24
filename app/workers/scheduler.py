@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Main Scheduler Configuration
 APScheduler setup with job registration
@@ -211,3 +212,14 @@ def get_job_status():
             'trigger': str(job.trigger)
         })
     return jobs
+
+
+def get_scheduler_runtime_state() -> dict:
+    """Return scheduler runtime state for diagnostics."""
+    from datetime import datetime, timezone; UTC = timezone.utc
+    return {
+        "running": scheduler.running if scheduler else False,
+        "job_count": len(scheduler.get_jobs()) if scheduler and scheduler.running else 0,
+        "jobs": get_job_status() if scheduler and scheduler.running else [],
+        "checked_at": datetime.now(UTC).isoformat(),
+    }

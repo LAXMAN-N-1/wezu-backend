@@ -1,10 +1,11 @@
+from __future__ import annotations
 """
 GPS Tracking Log Model
 Stores location history for active rentals
 """
 from sqlmodel import SQLModel, Field
 from typing import Optional
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 class GPSTrackingLog(SQLModel, table=True):
     """GPS location tracking for rentals"""

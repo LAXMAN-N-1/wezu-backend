@@ -1,19 +1,21 @@
+from __future__ import annotations
 """
 Customer-specific authentication endpoints.
 JSON-based login/register for the Flutter customer app.
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from sqlalchemy import text
 from sqlmodel import Session, select
 from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
 from typing import Optional
 import logging
 import uuid
 import re
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 from app.api import deps
 from app.db.session import get_session
-from app.models.user import User, UserStatus
+from app.models.user import User, UserStatus, UserType
 from app.models.rbac import Role
 from app.core.security import (
     create_access_token,
@@ -26,6 +28,46 @@ from app.services.auth_service import AuthService
 
 router = APIRouter()
 logger = logging.getLogger("wezu_customer_auth")
+
+
+_LEGACY_USER_TYPE_VALUES = (
+    "customer",
+    "admin",
+    "dealer",
+    "dealer_staff",
+    "support_agent",
+    "logistics",
+)
+
+
+def _normalize_legacy_user_type_values(db: Session) -> None:
+    """
+    Repair lowercase legacy enum values so SQLAlchemy can hydrate User rows safely.
+    """
+    legacy_values_sql = ", ".join(f"'{value}'" for value in _LEGACY_USER_TYPE_VALUES)
+    legacy_rows = db.execute(
+        text(
+            f"""
+            SELECT id, CAST(user_type AS TEXT) AS user_type_text
+            FROM users
+            WHERE LOWER(CAST(user_type AS TEXT)) IN ({legacy_values_sql})
+            """
+        )
+    ).all()
+    if not legacy_rows:
+        return
+
+    for row in legacy_rows:
+        db.execute(
+            text("UPDATE users SET user_type = :normalized_value WHERE id = :user_id"),
+            {"normalized_value": str(row.user_type_text).upper(), "user_id": row.id},
+        )
+
+    db.commit()
+    logger.warning(
+        "Normalized legacy lowercase user_type values before customer login",
+        extra={"updated_rows": len(legacy_rows)},
+    )
 
 
 # ── Schemas ────────────────────────────────────────────────────────
@@ -72,15 +114,48 @@ class CustomerAuthResponse(BaseModel):
 
 @router.post("/login", response_model=CustomerAuthResponse)
 async def customer_login(
-    login_data: CustomerLoginRequest,
     request: Request,
     db: Session = Depends(deps.get_db),
 ):
     """
-    Customer JSON login. Accepts email or phone as the 'email' field.
+    Customer login. Supports JSON and form payloads.
+    Accepted identifier keys: email, username, phone_number.
     """
-    identifier = login_data.email.strip()
+    payload: dict = {}
+    content_type = (request.headers.get("content-type") or "").lower()
+
+    if "application/json" in content_type:
+        try:
+            body = await request.json()
+            payload = body if isinstance(body, dict) else {}
+        except Exception:
+            payload = {}
+    elif "application/x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+        form_data = await request.form()
+        payload = dict(form_data)
+    else:
+        # Best effort for unknown content types
+        try:
+            body = await request.json()
+            payload = body if isinstance(body, dict) else {}
+        except Exception:
+            payload = {}
+
+    identifier = str(
+        payload.get("email")
+        or payload.get("username")
+        or payload.get("phone_number")
+        or ""
+    ).strip()
+    password = str(payload.get("password") or "")
+
+    if not identifier or not password:
+        raise HTTPException(status_code=422, detail="email/username and password are required")
+
     logger.info(f"Customer login attempt: {identifier}")
+
+    # Repair known legacy enum values written by older releases.
+    _normalize_legacy_user_type_values(db)
 
     # Look up by email first, then phone
     user = user_repository.get_by_email(db, identifier)
@@ -90,7 +165,7 @@ async def customer_login(
     if not user or not user.hashed_password:
         raise HTTPException(status_code=401, detail="Invalid email/phone or password")
 
-    if not verify_password(login_data.password, user.hashed_password):
+    if not verify_password(password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email/phone or password")
 
     if user.status != UserStatus.ACTIVE:
@@ -156,7 +231,7 @@ async def customer_register(
         phone_number=register_data.phone_number,
         full_name=register_data.full_name,
         hashed_password=get_password_hash(register_data.password),
-        user_type="customer",
+        user_type=UserType.CUSTOMER,
         status=UserStatus.ACTIVE,
     )
     db.add(user)

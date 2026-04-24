@@ -1,9 +1,10 @@
+from __future__ import annotations
 """
 Hourly Scheduled Jobs
 Run every hour
 """
 from sqlmodel import Session, select
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from app.core.database import engine
 from app.workers.daily_jobs import create_job_execution, complete_job_execution
 import logging
@@ -23,7 +24,7 @@ def battery_health_checks():
         with Session(engine) as session:
             # Get all batteries with IoT devices
             batteries = session.exec(
-                select(Battery).where(Battery.status.in_(["AVAILABLE", "RENTED"]))
+                select(Battery).where(Battery.status.in_(["available", "rented"]))
             ).all()
             
             checked_count = 0

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from enum import Enum
 
 class UserRole(str, Enum):
@@ -14,7 +15,10 @@ class BatteryStatus(str, Enum):
 
 class StationStatus(str, Enum):
     ACTIVE = "active"
+    INACTIVE = "inactive"
     MAINTENANCE = "maintenance"
+    CLOSED = "closed"
+    ERROR = "error"
     OFFLINE = "offline"
 
 class RentalStatus(str, Enum):

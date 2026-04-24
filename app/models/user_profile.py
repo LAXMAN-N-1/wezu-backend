@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, Dict, Any, TYPE_CHECKING
-from datetime import date, datetime, UTC
+from datetime import date, datetime, timezone; UTC = timezone.utc
 import uuid
 from sqlalchemy import Column, JSON
 

@@ -1,6 +1,7 @@
+from __future__ import annotations
 from sqlmodel import SQLModel, Field
 from typing import Optional, List
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 class FeatureFlag(SQLModel, table=True):
     __tablename__ = "feature_flags"

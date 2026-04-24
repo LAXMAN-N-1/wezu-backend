@@ -1,9 +1,11 @@
+from __future__ import annotations
 """
 Admin: Dealer Management
 Full CRUD + application pipeline + KYC + commission management for admin portal.
 """
 from typing import Any, Optional, List, Dict
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
+import secrets
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func, or_
 from pydantic import BaseModel
@@ -13,6 +15,7 @@ from app.models.dealer import DealerProfile, DealerApplication, DealerDocument
 from app.models.user import User
 from app.models.station import Station
 from app.models.commission import CommissionConfig, CommissionLog
+from app.models.rbac import Role
 
 router = APIRouter()
 
@@ -20,12 +23,12 @@ router = APIRouter()
 # ─── Schemas ───────────────────────────────────────────────────────────────
 
 class DealerCreateRequest(BaseModel):
-    email: str
-    full_name: str
-    password: str
+    email: Optional[str] = None
+    full_name: Optional[str] = None
+    password: Optional[str] = None
     business_name: str
     contact_person: str
-    contact_email: str
+    contact_email: Optional[str] = None
     contact_phone: str
     address_line1: str
     city: str
@@ -127,9 +130,13 @@ def list_dealers(
     total = db.exec(count_query).one()
     dealers = db.exec(query.offset(skip).limit(limit).order_by(DealerProfile.created_at.desc())).all()
 
+    # Batch-load users for this page (eliminates N+1 db.get per dealer)
+    user_ids = list({dp.user_id for dp in dealers if dp.user_id})
+    users_map = {u.id: u for u in db.exec(select(User).where(User.id.in_(user_ids))).all()} if user_ids else {}
+
     results = []
     for dp in dealers:
-        user = db.get(User, dp.user_id)
+        user = users_map.get(dp.user_id)
         results.append(_dealer_to_dict(dp, user))
 
     return {"dealers": results, "total_count": total}
@@ -161,48 +168,6 @@ def get_dealer_stats(db: Session = Depends(deps.get_db)):
     }
 
 
-@router.get("/{dealer_id}")
-def get_dealer_detail(dealer_id: int, db: Session = Depends(deps.get_db)):
-    """Full dealer detail including profile, user, application, stations."""
-    dp = db.get(DealerProfile, dealer_id)
-    if not dp:
-        raise HTTPException(404, "Dealer not found")
-
-    user = db.get(User, dp.user_id)
-    result = _dealer_to_dict(dp, user)
-
-    # Application status
-    app = db.exec(select(DealerApplication).where(DealerApplication.dealer_id == dp.id)).first()
-    if app:
-        result["application"] = {
-            "id": app.id,
-            "current_stage": app.current_stage,
-            "risk_score": app.risk_score,
-            "status_history": app.status_history or [],
-            "created_at": app.created_at.isoformat() if app.created_at else None,
-        }
-
-    # Stations
-    stations = db.exec(select(Station).where(Station.dealer_id == dp.id)).all()
-    result["stations"] = [
-        {"id": s.id, "name": s.name, "status": s.status, "city": s.city}
-        for s in stations
-    ]
-
-    # Documents
-    docs = db.exec(select(DealerDocument).where(DealerDocument.dealer_id == dp.id)).all()
-    result["documents"] = [
-        {
-            "id": d.id, "document_type": d.document_type,
-            "status": d.status, "is_verified": d.is_verified,
-            "uploaded_at": d.uploaded_at.isoformat() if d.uploaded_at else None,
-        }
-        for d in docs
-    ]
-
-    return result
-
-
 @router.post("/create")
 def create_dealer(
     data: DealerCreateRequest,
@@ -211,18 +176,40 @@ def create_dealer(
     """Admin-initiated dealer creation."""
     from app.core.security import get_password_hash
 
+    email = (data.email or data.contact_email or "").strip().lower()
+    if not email:
+        raise HTTPException(
+            status_code=422,
+            detail="Either email or contact_email is required",
+        )
+    full_name = (data.full_name or data.contact_person or data.business_name).strip()
+    if not full_name:
+        full_name = "Dealer User"
+
+    raw_password = (data.password or "").strip()
+    auto_generated_password = not bool(raw_password)
+    if auto_generated_password:
+        raw_password = secrets.token_urlsafe(12)
+
     # Check duplicate email
-    existing = db.exec(select(User).where(User.email == data.email)).first()
+    existing = db.exec(select(User).where(User.email == email)).first()
     if existing:
         raise HTTPException(400, "User with this email already exists")
 
+    dealer_role = db.exec(
+        select(Role)
+        .where(Role.name.ilike("dealer"))
+        .order_by(Role.id.asc())
+    ).first()
+
     # Create user
     user = User(
-        email=data.email,
-        full_name=data.full_name,
-        hashed_password=get_password_hash(data.password),
+        email=email,
+        full_name=full_name,
+        hashed_password=get_password_hash(raw_password),
         user_type="DEALER",
-        role_id=32,  # dealer role
+        role_id=dealer_role.id if dealer_role else None,
+        force_password_change=auto_generated_password,
     )
     db.add(user)
     db.flush()
@@ -232,7 +219,7 @@ def create_dealer(
         user_id=user.id,
         business_name=data.business_name,
         contact_person=data.contact_person,
-        contact_email=data.contact_email,
+        contact_email=(data.contact_email or email),
         contact_phone=data.contact_phone,
         address_line1=data.address_line1,
         city=data.city,
@@ -252,7 +239,10 @@ def create_dealer(
     db.commit()
     db.refresh(dp)
 
-    return {"status": "success", "dealer_id": dp.id, "user_id": user.id}
+    response = {"status": "success", "dealer_id": dp.id, "user_id": user.id}
+    if auto_generated_password:
+        response["temporary_password"] = raw_password
+    return response
 
 
 @router.put("/{dealer_id}")
@@ -283,18 +273,34 @@ def update_dealer(
 @router.get("/applications")
 def list_applications(
     stage: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(deps.get_db),
 ):
     """List all dealer applications, optionally filtered by stage."""
     query = select(DealerApplication)
     if stage:
         query = query.where(DealerApplication.current_stage == stage)
-    apps = db.exec(query.order_by(DealerApplication.updated_at.desc())).all()
+    apps = db.exec(
+        query.order_by(DealerApplication.updated_at.desc()).offset(skip).limit(limit)
+    ).all()
+
+    if not apps:
+        return {"applications": [], "count": 0}
+
+    # Batch-load DealerProfiles and Users to avoid N+1
+    dealer_ids = list({a.dealer_id for a in apps if a.dealer_id})
+    profiles = db.exec(select(DealerProfile).where(DealerProfile.id.in_(dealer_ids))).all() if dealer_ids else []
+    profile_map = {dp.id: dp for dp in profiles}
+
+    user_ids = list({dp.user_id for dp in profiles if dp.user_id})
+    users = db.exec(select(User).where(User.id.in_(user_ids))).all() if user_ids else []
+    user_map = {u.id: u for u in users}
 
     results = []
     for a in apps:
-        dp = db.get(DealerProfile, a.dealer_id)
-        user = db.get(User, dp.user_id) if dp else None
+        dp = profile_map.get(a.dealer_id)
+        user = user_map.get(dp.user_id) if dp else None
         results.append({
             "id": a.id,
             "dealer_id": a.dealer_id,
@@ -307,7 +313,7 @@ def list_applications(
             "updated_at": a.updated_at.isoformat() if a.updated_at else None,
             "user_name": user.full_name if user else "",
         })
-    return results
+    return {"applications": results, "count": len(results)}
 
 
 @router.put("/applications/{app_id}/stage")
@@ -359,17 +365,38 @@ def update_application_stage(
 def list_kyc_documents(
     search: Optional[str] = None,
     doc_type: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(deps.get_db),
 ):
     """List all KYC documents across dealers."""
     query = select(DealerDocument)
     if doc_type:
         query = query.where(DealerDocument.document_type == doc_type)
-    docs = db.exec(query.order_by(DealerDocument.uploaded_at.desc())).all()
+    if search:
+        # Push search into SQL instead of post-filter
+        pattern = f"%{search}%"
+        dealer_ids_q = select(DealerProfile.id).where(
+            DealerProfile.business_name.ilike(pattern)
+        )
+        query = query.where(
+            or_(
+                DealerDocument.document_type.ilike(pattern),
+                DealerDocument.dealer_id.in_(dealer_ids_q),
+            )
+        )
+    docs = db.exec(
+        query.order_by(DealerDocument.uploaded_at.desc()).offset(skip).limit(limit)
+    ).all()
+
+    # Batch-load dealer profiles to avoid N+1
+    dealer_ids = list({d.dealer_id for d in docs if d.dealer_id})
+    profiles = db.exec(select(DealerProfile).where(DealerProfile.id.in_(dealer_ids))).all() if dealer_ids else []
+    profile_map = {dp.id: dp for dp in profiles}
 
     results = []
     for d in docs:
-        dp = db.get(DealerProfile, d.dealer_id)
+        dp = profile_map.get(d.dealer_id)
         results.append({
             "id": d.id,
             "dealer_id": d.dealer_id,
@@ -381,10 +408,6 @@ def list_kyc_documents(
             "is_verified": d.is_verified,
             "uploaded_at": d.uploaded_at.isoformat() if d.uploaded_at else None,
         })
-
-    if search:
-        pattern = search.lower()
-        results = [r for r in results if pattern in r["business_name"].lower() or pattern in r["document_type"].lower()]
 
     return results
 
@@ -411,17 +434,32 @@ def verify_document(
 def list_all_documents(
     search: Optional[str] = None,
     doc_type: Optional[str] = None,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(deps.get_db),
 ):
     """List all dealer documents with optional filters."""
     query = select(DealerDocument)
     if doc_type:
         query = query.where(DealerDocument.document_type == doc_type)
-    docs = db.exec(query.order_by(DealerDocument.uploaded_at.desc())).all()
+    if search:
+        pattern = f"%{search}%"
+        dealer_ids_q = select(DealerProfile.id).where(
+            DealerProfile.business_name.ilike(pattern)
+        )
+        query = query.where(DealerDocument.dealer_id.in_(dealer_ids_q))
+    docs = db.exec(
+        query.order_by(DealerDocument.uploaded_at.desc()).offset(skip).limit(limit)
+    ).all()
+
+    # Batch-load dealer profiles to avoid N+1
+    dealer_ids = list({d.dealer_id for d in docs if d.dealer_id})
+    profiles = db.exec(select(DealerProfile).where(DealerProfile.id.in_(dealer_ids))).all() if dealer_ids else []
+    profile_map = {dp.id: dp for dp in profiles}
 
     results = []
     for d in docs:
-        dp = db.get(DealerProfile, d.dealer_id)
+        dp = profile_map.get(d.dealer_id)
         results.append({
             "id": d.id,
             "dealer_id": d.dealer_id,
@@ -433,10 +471,6 @@ def list_all_documents(
             "uploaded_at": d.uploaded_at.isoformat() if d.uploaded_at else None,
         })
 
-    if search:
-        pattern = search.lower()
-        results = [r for r in results if pattern in r["business_name"].lower()]
-
     return results
 
 
@@ -445,17 +479,31 @@ def list_all_documents(
 # ═══════════════════════════════════════════════════════════════════════════
 
 @router.get("/commissions/configs")
-def list_commission_configs(db: Session = Depends(deps.get_db)):
+def list_commission_configs(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(deps.get_db),
+):
     """List all commission configurations."""
-    configs = db.exec(select(CommissionConfig).order_by(CommissionConfig.created_at.desc())).all()
+    configs = db.exec(
+        select(CommissionConfig).order_by(CommissionConfig.created_at.desc()).offset(skip).limit(limit)
+    ).all()
+
+    # Batch-load dealer names to avoid N+1
+    dealer_ids = list({c.dealer_id for c in configs if c.dealer_id})
+    users = db.exec(select(User).where(User.id.in_(dealer_ids))).all() if dealer_ids else []
+    user_map = {u.id: u for u in users}
+    user_ids_list = [u.id for u in users]
+    profiles = db.exec(select(DealerProfile).where(DealerProfile.user_id.in_(user_ids_list))).all() if user_ids_list else []
+    profile_by_user = {dp.user_id: dp for dp in profiles}
+
     results = []
     for c in configs:
-        # Resolve dealer name
         dealer_name = "Global"
         if c.dealer_id:
-            user = db.get(User, c.dealer_id)
+            user = user_map.get(c.dealer_id)
             if user:
-                dp = db.exec(select(DealerProfile).where(DealerProfile.user_id == user.id)).first()
+                dp = profile_by_user.get(user.id)
                 dealer_name = dp.business_name if dp else user.full_name
 
         results.append({
@@ -554,3 +602,47 @@ def get_commission_stats(db: Session = Depends(deps.get_db)):
         "total_pending": float(total_pending),
         "active_configs": active_configs,
     }
+
+
+# Keep the dynamic dealer-id route after all static routes above. FastAPI route
+# matching is order-sensitive; declaring /{dealer_id} earlier causes static
+# paths like /applications or /kyc to be parsed as a dealer_id and return 422.
+@router.get("/{dealer_id}")
+def get_dealer_detail(dealer_id: int, db: Session = Depends(deps.get_db)):
+    """Full dealer detail including profile, user, application, stations."""
+    dp = db.get(DealerProfile, dealer_id)
+    if not dp:
+        raise HTTPException(404, "Dealer not found")
+
+    user = db.get(User, dp.user_id)
+    result = _dealer_to_dict(dp, user)
+
+    app = db.exec(select(DealerApplication).where(DealerApplication.dealer_id == dp.id)).first()
+    if app:
+        result["application"] = {
+            "id": app.id,
+            "current_stage": app.current_stage,
+            "risk_score": app.risk_score,
+            "status_history": app.status_history or [],
+            "created_at": app.created_at.isoformat() if app.created_at else None,
+        }
+
+    stations = db.exec(select(Station).where(Station.dealer_id == dp.id)).all()
+    result["stations"] = [
+        {"id": s.id, "name": s.name, "status": s.status, "city": s.city}
+        for s in stations
+    ]
+
+    docs = db.exec(select(DealerDocument).where(DealerDocument.dealer_id == dp.id)).all()
+    result["documents"] = [
+        {
+            "id": d.id,
+            "document_type": d.document_type,
+            "status": d.status,
+            "is_verified": d.is_verified,
+            "uploaded_at": d.uploaded_at.isoformat() if d.uploaded_at else None,
+        }
+        for d in docs
+    ]
+
+    return result

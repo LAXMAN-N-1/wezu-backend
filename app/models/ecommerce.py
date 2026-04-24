@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 class EcommerceProduct(SQLModel, table=True):
     __tablename__ = "ecommerce_products"

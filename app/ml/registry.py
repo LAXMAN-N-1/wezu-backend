@@ -1,6 +1,7 @@
+from __future__ import annotations
 import os
 import joblib
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from typing import Dict, Any, Optional
 
 class ModelRegistry:

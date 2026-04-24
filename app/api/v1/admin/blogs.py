@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
@@ -6,7 +7,7 @@ from app.models.user import User
 from app.models.blog import Blog
 from app.schemas.blog import BlogCreate, BlogUpdate, BlogRead
 from app.api.deps import get_current_active_admin
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 router = APIRouter()
 

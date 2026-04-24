@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Audit Logging System — Core Module
 
@@ -10,7 +11,7 @@ Provides:
 import asyncio
 import functools
 import logging
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from typing import Any, Callable, Dict, Optional
 
 from fastapi import Request
@@ -18,6 +19,7 @@ from sqlmodel import select, Session
 
 from app.core.proxy import get_client_ip
 from app.models.audit_log import AuditLog
+from app.utils.endpoint_signature import preserve_endpoint_signature
 
 logger = logging.getLogger(__name__)
 
@@ -109,8 +111,8 @@ def audit_log(action: str, resource_type: str, resource_id_param: Optional[str] 
             return result
 
         if asyncio.iscoroutinefunction(func):
-            return async_wrapper
-        return sync_wrapper
+            return preserve_endpoint_signature(async_wrapper, func)
+        return preserve_endpoint_signature(sync_wrapper, func)
 
     return decorator
 

@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship, UniqueConstraint
 from typing import Optional
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 class RoleRight(SQLModel, table=True):
     __tablename__ = "role_rights"

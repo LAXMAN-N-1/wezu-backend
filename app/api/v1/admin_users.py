@@ -1,5 +1,6 @@
+from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 from app.api import deps
@@ -10,6 +11,42 @@ from app.core.audit import AuditLogger
 from datetime import datetime
 
 router = APIRouter()
+
+
+# ─── List Users (GET /) ─────────────────────────────────────────────────
+# The canonical list_users implementation lives in app.api.admin.users.
+# We re-export it here so the route is available at the prefix where this
+# router is mounted (``/api/v1/admin/users``) *without* requiring a
+# trailing slash that the nested global_admin_router mount adds.
+# Using "" (empty string) instead of "/" ensures the path matches both
+# /api/v1/admin/users AND /api/v1/admin/users/ (the trailing-slash
+# variant is already covered by the global_admin_router).
+
+@router.get("")
+def list_users(
+    skip: int = 0,
+    limit: int = 100,
+    search: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    user_type: Optional[str] = None,
+    kyc_status: Optional[str] = None,
+    current_user: User = Depends(deps.get_current_active_admin),
+    db: Session = Depends(get_session),
+) -> Any:
+    """List all users with pagination, search, and filters."""
+    from app.api.admin.users import list_users as _canonical_list
+
+    return _canonical_list(
+        skip=skip,
+        limit=limit,
+        search=search,
+        status=status_filter,
+        user_type=user_type,
+        kyc_status=kyc_status,
+        current_user=current_user,
+        db=db,
+    )
+
 
 @router.post("/{user_id}/force-logout")
 async def force_logout_user(

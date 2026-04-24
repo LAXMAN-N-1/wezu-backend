@@ -1,6 +1,9 @@
 import pytest
-from datetime import datetime, date, timedelta, UTC
+from datetime import datetime, date, timedelta, timezone
+
 from sqlmodel import Session, select
+
+UTC = timezone.utc
 
 from app.models.user import User
 from app.models.roles import RoleEnum

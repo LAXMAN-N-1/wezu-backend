@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import Request
 import functools
 import json
@@ -20,7 +21,7 @@ def cache(expire: int = 60):
             
             # For demonstration, we just log and pass through
             # Since Redis isn't fully mocked here, this stands as the architectural hook.
-            app_logger.info(f"Cache miss for {func.__name__}")
+            app_logger.info("cache.miss", function=func.__name__)
             result = await func(*args, **kwargs)
             return result
         return wrapper

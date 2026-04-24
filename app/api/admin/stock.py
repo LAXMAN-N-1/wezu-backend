@@ -1,18 +1,26 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
 from typing import List, Optional
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 import uuid
 
 from app.api.deps import get_db, get_current_active_admin
 from app.models.battery import Battery, BatteryStatus, LocationType
+from app.models.dealer import DealerProfile
+from app.models.dealer_stock_request import DealerStockRequest, StockRequestStatus
+from app.models.driver_profile import DriverProfile
+from app.models.rental import Rental
 from app.models.station import Station
 from app.models.station_stock import StationStockConfig, ReorderRequest, StockAlertDismissal
+from app.models.warehouse import Warehouse
 from app.schemas.station_stock import (
     StockOverviewResponse, StationStockResponse, StationStockConfigResponse,
     StationStockConfigUpdate, ReorderRequestCreate, ReorderRequestResponse,
     StockAlertResponse, StationStockDetailResponse, StockForecastResponse,
-    LocationStockResponse
+    LocationStockResponse, DealerStockRequestResponse,
+    DealerStockRequestReview, DealerStockRequestFulfillRequest,
+    DealerStockRequestFulfillResponse,
 )
 
 router = APIRouter()
@@ -43,6 +51,67 @@ def get_station_stock_stats(db: Session, station_id: int):
         "config": config,
         "batteries": batteries
     }
+
+
+def _status_value(value: object) -> str:
+    if hasattr(value, "value"):
+        return str(getattr(value, "value"))
+    return str(value)
+
+
+def _serialize_dealer_stock_request(
+    db: Session,
+    request_row: DealerStockRequest,
+) -> DealerStockRequestResponse:
+    dealer = db.get(DealerProfile, request_row.dealer_id)
+    return DealerStockRequestResponse(
+        id=request_row.id or 0,
+        dealer_id=request_row.dealer_id,
+        dealer_name=dealer.business_name if dealer else None,
+        model_id=request_row.model_id,
+        model_name=request_row.model_name,
+        quantity=request_row.quantity,
+        priority=_status_value(request_row.priority),
+        status=_status_value(request_row.status),
+        reason=request_row.reason,
+        notes=request_row.notes,
+        admin_notes=request_row.admin_notes,
+        rejected_reason=request_row.rejected_reason,
+        delivery_date=request_row.delivery_date,
+        created_at=request_row.created_at,
+        approved_at=request_row.approved_at,
+        fulfilled_at=request_row.fulfilled_at,
+        fulfilled_quantity=request_row.fulfilled_quantity,
+    )
+
+
+def _select_dealer_destination_station(db: Session, dealer_id: int) -> Optional[Station]:
+    return db.exec(
+        select(Station)
+        .where(Station.dealer_id == dealer_id)
+        .where(Station.is_deleted == False)
+        .order_by(Station.created_at.asc())
+    ).first()
+
+
+def _select_fulfillment_batteries(
+    db: Session,
+    *,
+    quantity: int,
+    model_id: Optional[int],
+    warehouse_id: Optional[int],
+) -> list[Battery]:
+    statement = (
+        select(Battery)
+        .where(Battery.location_type == LocationType.WAREHOUSE)
+        .where(Battery.status == BatteryStatus.AVAILABLE)
+        .order_by(Battery.updated_at.asc(), Battery.id.asc())
+    )
+    if model_id is not None:
+        statement = statement.where(Battery.sku_id == model_id)
+    if warehouse_id is not None:
+        statement = statement.where(Battery.location_id == warehouse_id)
+    return db.exec(statement.limit(quantity)).all()
 
 @router.get("/overview", response_model=StockOverviewResponse)
 def get_stock_overview(db: Session = Depends(get_db)):
@@ -167,49 +236,94 @@ def get_stations_stock(
 
 @router.get("/locations", response_model=List[LocationStockResponse])
 def get_locations_stock(db: Session = Depends(get_db)):
-    """Returns summaries for non-station locations (Warehouse, Service Center)"""
-    results = []
-    # Identify non-station types in use
+    """Returns summaries for non-station locations (Warehouse, Service Center)."""
     location_types = [LocationType.WAREHOUSE, LocationType.SERVICE_CENTER]
-    
+
     counts = db.exec(
-        select(Battery.location_type, Battery.status, func.count(Battery.id))
+        select(
+            Battery.location_type,
+            Battery.location_id,
+            Battery.status,
+            func.count(Battery.id),
+        )
         .where(Battery.location_type.in_(location_types))
-        .group_by(Battery.location_type, Battery.status)
+        .group_by(Battery.location_type, Battery.location_id, Battery.status)
     ).all()
-    
-    count_map = {}
-    for l_type, status, count in counts:
-        if l_type not in count_map: count_map[l_type] = {"AVAILABLE": 0, "RENTED": 0, "MAINTENANCE": 0}
-        if status == BatteryStatus.AVAILABLE: count_map[l_type]["AVAILABLE"] = count
-        elif status == BatteryStatus.RENTED: count_map[l_type]["RENTED"] = count
-        elif status == BatteryStatus.MAINTENANCE: count_map[l_type]["MAINTENANCE"] = count
-    
-    for loc_type in location_types:
-        stat = count_map.get(loc_type, {"AVAILABLE": 0, "RENTED": 0, "MAINTENANCE": 0})
-        
-        available = stat["AVAILABLE"]
-        rented = stat["RENTED"]
-        maintenance = stat["MAINTENANCE"]
-            
+
+    status_map: dict[tuple[LocationType, Optional[int]], dict[str, int]] = {}
+    for location_type, location_id, status, count in counts:
+        key = (location_type, location_id)
+        if key not in status_map:
+            status_map[key] = {"AVAILABLE": 0, "RENTED": 0, "MAINTENANCE": 0}
+        if status == BatteryStatus.AVAILABLE:
+            status_map[key]["AVAILABLE"] = int(count)
+        elif status == BatteryStatus.RENTED:
+            status_map[key]["RENTED"] = int(count)
+        elif status == BatteryStatus.MAINTENANCE:
+            status_map[key]["MAINTENANCE"] = int(count)
+
+    warehouse_ids = {
+        location_id
+        for location_type, location_id in status_map.keys()
+        if location_type == LocationType.WAREHOUSE and location_id is not None
+    }
+    warehouse_name_map: dict[int, str] = {}
+    if warehouse_ids:
+        warehouse_rows = db.exec(
+            select(Warehouse.id, Warehouse.name).where(Warehouse.id.in_(warehouse_ids))
+        ).all()
+        warehouse_name_map = {
+            int(warehouse_id): warehouse_name
+            for warehouse_id, warehouse_name in warehouse_rows
+            if warehouse_id is not None and warehouse_name
+        }
+
+    results: list[LocationStockResponse] = []
+    for (location_type, location_id), stats in sorted(
+        status_map.items(),
+        key=lambda item: (
+            item[0][0].value,
+            item[0][1] if item[0][1] is not None else 0,
+        ),
+    ):
+        available = stats["AVAILABLE"]
+        rented = stats["RENTED"]
+        maintenance = stats["MAINTENANCE"]
         total = available + rented + maintenance
-        if total > 0:
-            name = "Warehouse Central" if loc_type == LocationType.WAREHOUSE else "Service Center 1"
-            results.append(LocationStockResponse(
-                location_name=name,
-                location_type=loc_type.value,
+        if total <= 0:
+            continue
+
+        if location_type == LocationType.WAREHOUSE:
+            if location_id is not None:
+                location_name = warehouse_name_map.get(location_id, f"Warehouse #{location_id}")
+            else:
+                location_name = "Warehouse (Unassigned)"
+        elif location_type == LocationType.SERVICE_CENTER:
+            location_name = (
+                f"Service Center #{location_id}"
+                if location_id is not None
+                else "Service Center (Unassigned)"
+            )
+        else:
+            location_name = location_type.value.replace("_", " ").title()
+
+        results.append(
+            LocationStockResponse(
+                location_name=location_name,
+                location_type=location_type.value,
                 available_count=available,
                 rented_count=rented,
                 maintenance_count=maintenance,
                 total_assigned=total,
-                utilization_percentage=(rented/total*100)
-            ))
-            
+                utilization_percentage=(rented / total * 100),
+            )
+        )
+
     return results
 
 @router.get("/stations/{station_id}", response_model=StationStockDetailResponse)
 def get_station_stock_detail(station_id: int, db: Session = Depends(get_db)):
-    """Deep detail for a specific station including 30-day forecast mock"""
+    """Deep detail for a specific station including demand forecast."""
     station = db.get(Station, station_id)
     if not station:
         raise HTTPException(status_code=404, detail="Station not found")
@@ -231,20 +345,27 @@ def get_station_stock_detail(station_id: int, db: Session = Depends(get_db)):
         config=stats["config"]
     )
     
-    # Logic for FR-ADMIN-INV-003 requirements - Spread demand evenly over 30 days
-    # Default avg 0.5 if no history, otherwise use a realistic rate based on rented
-    avg_rentals_per_day = 0.5 if stats["rented"] == 0 else (stats["rented"] / 3.0)
-    projected_demand = int(avg_rentals_per_day * 30)
+    now = datetime.now(UTC)
+    thirty_days_ago = now - timedelta(days=30)
+    rentals_last_30_days = db.exec(
+        select(func.count(Rental.id)).where(
+            Rental.start_station_id == station_id,
+            Rental.start_time >= thirty_days_ago,
+        )
+    ).one() or 0
+
+    avg_rentals_per_day = round(float(rentals_last_30_days) / 30.0, 2)
+    projected_demand = int(round(avg_rentals_per_day * 30))
     
     reorder_qty = stats["config"].reorder_quantity if stats["config"] else 20
     
     stockout_days = None
-    if stats["available"] < projected_demand:
-        stockout_days = int(stats["available"] / avg_rentals_per_day) if avg_rentals_per_day > 0 else None
+    if avg_rentals_per_day > 0 and stats["available"] < projected_demand:
+        stockout_days = max(0, int(stats["available"] / avg_rentals_per_day))
         
     recommended_date = None
     if stockout_days is not None:
-        recommended_date = datetime.now(UTC) + timedelta(days=stockout_days)
+        recommended_date = now + timedelta(days=stockout_days)
 
     forecast = StockForecastResponse(
         avg_rentals_per_day=avg_rentals_per_day,
@@ -264,10 +385,32 @@ def get_station_stock_detail(station_id: int, db: Session = Depends(get_db)):
         "updated_at": b.updated_at.isoformat() if hasattr(b, 'updated_at') else None
     } for b in stats["batteries"]]
     
-    # Mocking a realistic 7-day utilization trend ending at current utilization
-    base_util = stats["utilization"]
-    trend = [max(0.0, min(100.0, base_util + (i * 5) - 15)) for i in range(6)]
-    trend.append(base_util)
+    seven_days_ago = (now - timedelta(days=6)).date()
+    rental_rows = db.exec(
+        select(func.date(Rental.start_time), func.count(Rental.id))
+        .where(
+            Rental.start_station_id == station_id,
+            Rental.start_time >= datetime.combine(
+                seven_days_ago,
+                datetime.min.time(),
+                tzinfo=UTC,
+            ),
+        )
+        .group_by(func.date(Rental.start_time))
+    ).all()
+    rental_day_map = {}
+    for day, count in rental_rows:
+        if isinstance(day, str):
+            normalized_day = datetime.fromisoformat(day).date()
+        else:
+            normalized_day = day
+        rental_day_map[normalized_day] = int(count)
+    base_capacity = max(1, stats["total"])
+    trend = []
+    for offset in range(7):
+        day = seven_days_ago + timedelta(days=offset)
+        daily_rentals = rental_day_map.get(day, 0)
+        trend.append(round(min(100.0, (daily_rentals / base_capacity) * 100), 2))
 
     return StationStockDetailResponse(
         station=station_resp,
@@ -336,6 +479,179 @@ def create_reorder_request(
     db.refresh(new_request)
     # Background task would send SMS/Email here
     return new_request
+
+
+@router.get("/dealer-requests", response_model=List[DealerStockRequestResponse])
+def list_dealer_stock_requests(
+    status: Optional[str] = Query(default=None),
+    dealer_id: Optional[int] = Query(default=None),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    admin_user = Depends(get_current_active_admin),
+):
+    statement = select(DealerStockRequest).order_by(DealerStockRequest.created_at.desc())
+    if dealer_id is not None:
+        statement = statement.where(DealerStockRequest.dealer_id == dealer_id)
+    if status:
+        normalized = status.strip().lower()
+        statement = statement.where(DealerStockRequest.status == normalized)
+
+    rows = db.exec(statement.offset(skip).limit(limit)).all()
+    return [_serialize_dealer_stock_request(db, row) for row in rows]
+
+
+@router.post("/dealer-requests/{request_id}/review", response_model=DealerStockRequestResponse)
+def review_dealer_stock_request(
+    request_id: int,
+    body: DealerStockRequestReview,
+    db: Session = Depends(get_db),
+    admin_user = Depends(get_current_active_admin),
+):
+    stock_request = db.get(DealerStockRequest, request_id)
+    if not stock_request:
+        raise HTTPException(status_code=404, detail="Dealer stock request not found")
+
+    current_status = _status_value(stock_request.status)
+    if current_status in {"fulfilled", "cancelled"}:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot review a {current_status} stock request",
+        )
+
+    if body.action == "approve":
+        stock_request.status = StockRequestStatus.APPROVED
+        stock_request.approved_by = admin_user.id
+        stock_request.approved_at = datetime.now(UTC)
+        stock_request.rejected_reason = None
+    else:
+        stock_request.status = StockRequestStatus.REJECTED
+        stock_request.rejected_reason = (body.rejected_reason or "").strip() or "Rejected by admin"
+
+    if body.admin_notes is not None:
+        stock_request.admin_notes = body.admin_notes.strip() or None
+
+    stock_request.updated_at = datetime.now(UTC)
+    db.add(stock_request)
+    db.commit()
+    db.refresh(stock_request)
+    return _serialize_dealer_stock_request(db, stock_request)
+
+
+@router.post("/dealer-requests/{request_id}/fulfill", response_model=DealerStockRequestFulfillResponse)
+def fulfill_dealer_stock_request(
+    request_id: int,
+    body: DealerStockRequestFulfillRequest,
+    db: Session = Depends(get_db),
+    admin_user = Depends(get_current_active_admin),
+):
+    stock_request = db.get(DealerStockRequest, request_id)
+    if not stock_request:
+        raise HTTPException(status_code=404, detail="Dealer stock request not found")
+
+    current_status = _status_value(stock_request.status)
+    if current_status == "fulfilled":
+        raise HTTPException(status_code=409, detail="Dealer stock request is already fulfilled")
+    if current_status in {"rejected", "cancelled"}:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot fulfill a {current_status} stock request",
+        )
+
+    if body.warehouse_id is not None and db.get(Warehouse, body.warehouse_id) is None:
+        raise HTTPException(status_code=404, detail="Warehouse not found")
+
+    if body.assigned_driver_id is not None:
+        driver = db.get(DriverProfile, body.assigned_driver_id)
+        if driver is None:
+            raise HTTPException(status_code=404, detail="Assigned driver not found")
+        if (driver.status or "").strip().lower() in {"inactive", "suspended"}:
+            raise HTTPException(status_code=400, detail="Assigned driver is not active")
+
+    requested_qty = body.fulfilled_quantity or stock_request.quantity
+    if requested_qty <= 0:
+        raise HTTPException(status_code=400, detail="fulfilled_quantity must be greater than zero")
+
+    destination_station = _select_dealer_destination_station(db, stock_request.dealer_id)
+    if destination_station is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Dealer has no active station configured for stock fulfillment",
+        )
+
+    fulfillment_batteries = _select_fulfillment_batteries(
+        db,
+        quantity=requested_qty,
+        model_id=stock_request.model_id,
+        warehouse_id=body.warehouse_id,
+    )
+    if len(fulfillment_batteries) < requested_qty:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Only {len(fulfillment_batteries)} batteries available in warehouse "
+                f"for requested quantity {requested_qty}"
+            ),
+        )
+
+    dealer = db.get(DealerProfile, stock_request.dealer_id)
+    order_note = f"Dealer stock fulfillment for request #{stock_request.id}"
+    if body.admin_notes:
+        order_note = f"{order_note}. {body.admin_notes.strip()}"
+
+    from app.api.v1.orders import create_order as create_logistics_order
+    from app.schemas.order import OrderCreate
+
+    order_payload = OrderCreate(
+        units=requested_qty,
+        destination=destination_station.address,
+        notes=order_note,
+        customer_name=dealer.business_name if dealer else f"Dealer {stock_request.dealer_id}",
+        customer_phone=dealer.contact_phone if dealer else None,
+        priority="urgent" if _status_value(stock_request.priority) == "urgent" else "normal",
+        total_value=0.0,
+        assigned_battery_ids=[str(row.serial_number) for row in fulfillment_batteries],
+        assigned_driver_id=body.assigned_driver_id,
+        latitude=destination_station.latitude,
+        longitude=destination_station.longitude,
+    )
+
+    order_response = create_logistics_order(
+        order_data=order_payload,
+        current_user=admin_user,
+        session=db,
+        idempotency_key=None,
+    )
+    order_id = getattr(order_response.data, "id", None) if order_response else None
+    if not order_id:
+        raise HTTPException(status_code=500, detail="Failed to create logistics fulfillment order")
+
+    now = datetime.now(UTC)
+    if _status_value(stock_request.status) == "pending":
+        stock_request.status = StockRequestStatus.APPROVED
+        stock_request.approved_by = admin_user.id
+        stock_request.approved_at = now
+
+    stock_request.status = StockRequestStatus.FULFILLED
+    stock_request.fulfilled_at = now
+    stock_request.fulfilled_quantity = requested_qty
+    stock_request.updated_at = now
+    merged_notes = (stock_request.admin_notes or "").strip()
+    fulfillment_note = f"Fulfilled via logistics order {order_id}"
+    if body.admin_notes:
+        fulfillment_note = f"{fulfillment_note}. {body.admin_notes.strip()}"
+    stock_request.admin_notes = f"{merged_notes}\n{fulfillment_note}".strip() if merged_notes else fulfillment_note
+
+    db.add(stock_request)
+    db.commit()
+
+    return DealerStockRequestFulfillResponse(
+        request_id=stock_request.id or request_id,
+        status="fulfilled",
+        fulfilled_quantity=requested_qty,
+        logistics_order_id=str(order_id),
+    )
+
 
 @router.get("/alerts", response_model=List[StockAlertResponse])
 def get_active_stock_alerts(db: Session = Depends(get_db)):

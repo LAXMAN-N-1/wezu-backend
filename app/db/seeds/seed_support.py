@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Seed script for Support Module.
 Seeds: Tickets (from customers, dealers, drivers), Knowledge Base articles, Ticket Messages
@@ -5,7 +6,7 @@ Seeds: Tickets (from customers, dealers, drivers), Knowledge Base articles, Tick
 import sys, os, random
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from sqlmodel import Session, select
 from app.core.database import engine
 from app.models.user import User

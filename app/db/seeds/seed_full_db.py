@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 from sqlmodel import Session, select
 from app.db.session import engine
@@ -10,7 +11,7 @@ from app.models import (
     TransactionType, TransactionStatus, Device, Vehicle, 
     DealerProfile, DriverProfile, StaffProfile
 )
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -156,7 +157,7 @@ def seed_db():
                     total_slots=10,
                     available_slots=5,
                     available_batteries=5,
-                    status=StationStatus.OPERATIONAL,
+                    status=StationStatus.ACTIVE,
                     image_url="https://images.unsplash.com/photo-1593941707882-a5bba14938c7?auto=format&fit=crop&q=80&w=2072"
                 )
                 session.add(station)

@@ -1,4 +1,5 @@
-from datetime import datetime, UTC
+from __future__ import annotations
+from datetime import datetime, timezone; UTC = timezone.utc
 from sqlmodel import Session, select
 from app.models.battery import Battery, BatteryLifecycleEvent
 from app.services.geofence_service import GeofenceService

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Financial Reporting Service — Revenue aggregation, reconciliation, and export.
 """

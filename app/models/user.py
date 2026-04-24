@@ -1,25 +1,26 @@
 from sqlmodel import SQLModel, Field, Relationship
-from app.models.kyc import KYCRecord
+# NOTE: These eager imports are REQUIRED for SQLAlchemy mapper registration.
+# The models below define tables referenced by User's Relationship() declarations.
+# Without them, SQLAlchemy cannot resolve back_populates at class-init time.
+from app.models.kyc import KYCRecord, KYCDocument
 from app.models.rbac import UserRole
 from app.models.two_factor_auth import TwoFactorAuth
+from app.models.device import Device
+from app.models.dealer import DealerProfile
+from app.models.staff import StaffProfile
 
 from typing import Optional, List, TYPE_CHECKING
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from enum import Enum
 import sqlalchemy as sa
-
-from app.models.two_factor_auth import TwoFactorAuth
+from app.core.rbac import canonicalize_permission_set, canonicalize_permission_slug
 
 if TYPE_CHECKING:
     from app.models.session import UserSession
     from app.models.financial import Wallet
     from app.models.location import Address
-    from app.models.kyc import KYCDocument, KYCRecord
-    from app.models.iot import Device
     from app.models.vehicle import Vehicle
-    from app.models.dealer import DealerProfile
     from app.models.driver_profile import DriverProfile
-    from app.models.staff import StaffProfile
     from app.models.rbac import Role, UserAccessPath
     from app.models.token import SessionToken
     from app.models.user_profile import UserProfile
@@ -30,31 +31,31 @@ if TYPE_CHECKING:
     from app.models.logistics import DeliveryOrder
 
 class UserType(str, Enum):
-    CUSTOMER = "customer"
-    ADMIN = "admin"
-    DEALER = "dealer"
-    DEALER_STAFF = "dealer_staff"
-    SUPPORT_AGENT = "support_agent"
-    LOGISTICS = "logistics"
+    CUSTOMER = "CUSTOMER"
+    ADMIN = "ADMIN"
+    DEALER = "DEALER"
+    DEALER_STAFF = "DEALER_STAFF"
+    SUPPORT_AGENT = "SUPPORT_AGENT"
+    LOGISTICS = "LOGISTICS"
 
 class UserStatus(str, Enum):
-    ACTIVE = "active"
-    SUSPENDED = "suspended"
-    PENDING_VERIFICATION = "pending_verification"
-    PENDING = "pending"
-    INACTIVE = "inactive"
-    DELETED = "deleted"
+    ACTIVE = "ACTIVE"
+    SUSPENDED = "SUSPENDED"
+    PENDING_VERIFICATION = "PENDING_VERIFICATION"
+    PENDING = "PENDING"
+    INACTIVE = "INACTIVE"
+    VERIFIED = "VERIFIED"
+    DELETED = "DELETED"
 
 class KYCStatus(str, Enum):
-    NOT_SUBMITTED = "not_submitted"
-    PENDING = "pending"
-    APPROVED = "approved"
-    REJECTED = "rejected"
+    NOT_SUBMITTED = "NOT_SUBMITTED"
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
 
 class User(SQLModel, table=True):
 
     __tablename__ = "users"
-    # __table_args__ = {"schema": "public"}
     
     id: Optional[int] = Field(default=None, primary_key=True)
     
@@ -123,8 +124,10 @@ class User(SQLModel, table=True):
     
 
     # Relationship
-    role: Optional["Role"] = Relationship(sa_relationship_kwargs={"viewonly": True}) # Legacy/Primary role. Viewonly to prevent conflict with roles list
-    roles: List["Role"] = Relationship(back_populates="users", link_model=UserRole)
+    role: Optional["Role"] = Relationship(
+        back_populates="users",
+        sa_relationship_kwargs={"foreign_keys": "[User.role_id]"}
+    ) # Primary role relationship
     wallet: Optional["Wallet"] = Relationship(back_populates="user")
     user_profile: Optional["UserProfile"] = Relationship(back_populates="user")
     addresses: List["Address"] = Relationship(back_populates="user")
@@ -160,7 +163,10 @@ class User(SQLModel, table=True):
     sessions: List["UserSession"] = Relationship(back_populates="user")
     session_tokens: List["SessionToken"] = Relationship(back_populates="user")
     two_factor_auth: Optional["TwoFactorAuth"] = Relationship(back_populates="user")
-    notification_preference: Optional["NotificationPreference"] = Relationship(back_populates="user")
+    notification_preference: Optional["NotificationPreference"] = Relationship(
+        back_populates="user",
+        sa_relationship_kwargs={"uselist": False}
+    )
 
     @property
     def is_active(self) -> bool:
@@ -169,13 +175,26 @@ class User(SQLModel, table=True):
 
     @is_active.setter
     def is_active(self, value: bool):
-        """Setter to maintain compatibility with legacy code setting is_active directly."""
         if value:
-            if self.status in [UserStatus.SUSPENDED, UserStatus.INACTIVE, UserStatus.PENDING]:
-                 self.status = UserStatus.ACTIVE
+            # Only change if currently inactive/suspended
+            if self.status in [UserStatus.INACTIVE, UserStatus.SUSPENDED]:
+                self.status = UserStatus.ACTIVE
         else:
-            if self.status == UserStatus.ACTIVE:
-                 self.status = UserStatus.SUSPENDED
+            # Only change if currently active/verified
+            if self.status in [UserStatus.ACTIVE, UserStatus.VERIFIED]:
+                self.status = UserStatus.SUSPENDED
+
+    @property
+    def roles(self) -> List["Role"]:
+        """
+        Runtime active roles.
+        `_active_roles_cache` is populated by auth dependencies from `user_roles`
+        and falls back to primary `role_id` when unavailable.
+        """
+        cached_roles = getattr(self, "_active_roles_cache", None)
+        if cached_roles is not None:
+            return cached_roles
+        return [self.role] if self.role else []
 
     # --- Granular RBAC Helpers ---
     @property
@@ -185,10 +204,10 @@ class User(SQLModel, table=True):
         for role in self.roles:
             for perm in role.permissions:
                 perms.add(perm.slug)
-        return perms
+        return canonicalize_permission_set(perms)
 
     def has_permission(self, slug: str) -> bool:
         """Check if user has a specific permission (superusers always pass)."""
         if self.is_superuser:
             return True
-        return slug in self.all_permissions
+        return canonicalize_permission_slug(slug) in self.all_permissions

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
@@ -26,7 +27,7 @@ class TicketResponse(BaseModel):
     priority: str
     status: str
     created_at: datetime
-    assigned_to_id: Optional[int] = None
+    assigned_to: Optional[int] = None
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -51,7 +52,7 @@ class SupportTicketResponse(BaseModel):
     priority: str
     status: str
     created_at: datetime
-    assigned_to_id: Optional[int] = None
+    assigned_to: Optional[int] = None
     
     model_config = ConfigDict(from_attributes=True)
 

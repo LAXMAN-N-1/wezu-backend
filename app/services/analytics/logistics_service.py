@@ -1,6 +1,7 @@
+from __future__ import annotations
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, desc, extract
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from typing import Dict, List, Any
 
 from app.schemas.analytics.logistics import LogisticsOverviewResponse

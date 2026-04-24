@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Catalog Service
 CatalogProduct catalog management with search and filtering
@@ -6,7 +7,7 @@ from sqlmodel import Session, select, or_, and_
 from typing import List, Optional, Dict, Any
 from app.models.catalog import CatalogProduct, CatalogProductImage, CatalogProductVariant
 from app.schemas.catalog import ProductCreate, ProductUpdate
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 import logging
 
 logger = logging.getLogger(__name__)

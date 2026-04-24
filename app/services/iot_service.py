@@ -1,6 +1,7 @@
+from __future__ import annotations
 import json
 import logging
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 import random
 import paho.mqtt.client as mqtt
 from sqlmodel import Session, select
@@ -114,8 +115,8 @@ class IoTService:
                     meta["last_lat"] = telemetry.latitude
                     meta["last_lng"] = telemetry.longitude
                     active_rental.metadata = json.dumps(meta)
-                except:
-                    pass
+                except Exception:
+                    logger.warning("iot.rental_metadata_update_failed rental_id=%s", active_rental.id, exc_info=True)
                 
                 session.add(active_rental)
 

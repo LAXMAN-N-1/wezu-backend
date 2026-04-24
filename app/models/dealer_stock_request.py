@@ -1,10 +1,11 @@
+from __future__ import annotations
 """
 Dealer Stock Request model — tracks stock replenishment requests
 from dealers to admin/platform.
 """
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from enum import Enum
 
 
@@ -25,6 +26,7 @@ class StockRequestPriority(str, Enum):
 
 class DealerStockRequest(SQLModel, table=True):
     __tablename__ = "dealer_stock_requests"
+    model_config = {"protected_namespaces": ()}
 
     id: Optional[int] = Field(default=None, primary_key=True)
     dealer_id: int = Field(foreign_key="dealer_profiles.id", index=True)

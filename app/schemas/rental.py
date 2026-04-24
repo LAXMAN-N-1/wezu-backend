@@ -1,4 +1,5 @@
-from pydantic import BaseModel, ConfigDict, Field, AliasChoices
+from __future__ import annotations
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 from app.schemas.battery import BatteryResponse
@@ -6,7 +7,7 @@ from app.schemas.station import StationResponse
 
 class RentalBase(BaseModel):
     battery_id: int
-    pickup_station_id: int = Field(validation_alias=AliasChoices("pickup_station_id", "start_station_id"))
+    start_station_id: int
     duration_days: int = 1
 
 class RentalCreate(RentalBase):
@@ -21,26 +22,27 @@ class RentalResponse(BaseModel):
     id: int
     user_id: int
     battery: BatteryResponse
-    pickup_station_id: int = Field(validation_alias=AliasChoices("pickup_station_id", "start_station_id"))
+    start_station_id: int
     status: str
     start_time: datetime
-    end_time: Optional[datetime]
+    expected_end_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
     
-    rental_duration_days: int = 1
-    daily_rate: float = 0.0
-    damage_deposit: float = 0.0
-    discount_amount: float = 0.0
-    total_price: float = Field(validation_alias=AliasChoices("total_price", "total_amount"))
+    total_amount: float = 0.0
+    security_deposit: float = 0.0
+    late_fee: float = 0.0
+    currency: str = "INR"
+    is_deposit_refunded: bool = False
     
-    late_fee_amount: float = 0.0
-    is_overdue: bool = False
+    start_battery_level: float = 100.0
+    end_battery_level: float = 0.0
+    distance_traveled_km: float = 0.0
     
-    swap_station_id: Optional[int] = None
-    swap_requested_at: Optional[datetime] = None
+    end_station_id: Optional[int] = None
     
     events: List[RentalEventResponse] = []
     
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+    model_config = ConfigDict(from_attributes=True)
 
 class ActiveRentalResponse(RentalResponse):
     pass

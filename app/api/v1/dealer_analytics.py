@@ -1,20 +1,20 @@
+from __future__ import annotations
 """
 Dealer Analytics API — Performance overview, trends, station metrics,
 customer insights, peak hours, and export.
 All endpoints require dealer role.
 """
 
-from typing import Any, Optional, List
-from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import PlainTextResponse, JSONResponse
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from app.db.session import get_session
+from app.api import deps
 from app.api.deps import get_current_user
 from app.models.user import User
-from app.models.dealer import DealerProfile
 from app.services.dealer_analytics_service import DealerAnalyticsService
 
 router = APIRouter()
@@ -22,38 +22,21 @@ router = APIRouter()
 
 def _get_dealer_id(db: Session, user_id: int) -> int:
     """Resolve dealer_id from current user, or raise 403."""
-    dealer = db.exec(
-        select(DealerProfile).where(DealerProfile.user_id == user_id)
-    ).first()
-    if not dealer:
-        raise HTTPException(status_code=403, detail="Not a dealer")
+    dealer = deps.get_dealer_profile_or_403(db, user_id, detail="Not a dealer")
     return dealer.id
 
 
 @router.get("/overview")
 def get_overview(
-    start_date: Optional[datetime] = None,
-    end_date: Optional[datetime] = None,
-    station_id: Optional[int] = None,
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """
-    Performance overview: swap counts, revenue, avg rating.
+    Performance overview: swap counts (today/month), revenue,
+    avg rating, active batteries, station count.
     """
     dealer_id = _get_dealer_id(db, current_user.id)
-    return DealerAnalyticsService.get_overview(
-        db, dealer_id, start_date=start_date, end_date=end_date, station_id=station_id
-    )
-
-@router.get("/kpis")
-def get_kpis(
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-) -> Any:
-    """Get the 4 standard financial KPI cards."""
-    dealer_id = _get_dealer_id(db, current_user.id)
-    return DealerAnalyticsService.get_sales_kpis(db, dealer_id)
+    return DealerAnalyticsService.get_overview(db, dealer_id)
 
 
 @router.get("/trends")
@@ -63,31 +46,22 @@ def get_trends(
     current_user: User = Depends(get_current_user),
     period: str = Query("daily", description="daily, weekly, or monthly"),
     periods: int = Query(7, ge=1, le=30),
-    start_date: Optional[datetime] = None,
-    end_date: Optional[datetime] = None,
-    station_id: Optional[int] = None,
 ) -> Any:
-    """Revenue + swap volume trends for the last N periods or range."""
+    """Revenue + swap volume trends for the last N periods."""
     if period not in ("daily", "weekly", "monthly"):
         raise HTTPException(status_code=400, detail="period must be daily, weekly, or monthly")
     dealer_id = _get_dealer_id(db, current_user.id)
-    return DealerAnalyticsService.get_trends(
-        db, dealer_id, period, periods, start_date=start_date, end_date=end_date, station_id=station_id
-    )
+    return DealerAnalyticsService.get_trends(db, dealer_id, period, periods)
 
 
 @router.get("/stations")
 def get_station_metrics(
-    start_date: Optional[datetime] = None,
-    end_date: Optional[datetime] = None,
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> Any:
-    """Per-station metrics within a range."""
+    """Per-station: swaps, revenue, utilization %, rating."""
     dealer_id = _get_dealer_id(db, current_user.id)
-    return DealerAnalyticsService.get_station_metrics(
-        db, dealer_id, start_date=start_date, end_date=end_date
-    )
+    return DealerAnalyticsService.get_station_metrics(db, dealer_id)
 
 @router.get("/comparison")
 def get_comparison(
@@ -102,17 +76,13 @@ def get_comparison(
 
 @router.get("/revenue-breakdown")
 def get_revenue_breakdown(
-    start_date: Optional[datetime] = None,
-    end_date: Optional[datetime] = None,
-    station_id: Optional[int] = None,
+    period: str = "month",
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ) -> Any:
     """Breakdown of revenue for Stacked Bar Charts."""
     dealer_id = _get_dealer_id(db, current_user.id)
-    return DealerAnalyticsService.get_revenue_breakdown(
-        db, dealer_id, start_date=start_date, end_date=end_date, station_id=station_id
-    )
+    return DealerAnalyticsService.get_revenue_breakdown(db, dealer_id, period)
 
 
 @router.get("/revenue-chart")
@@ -205,17 +175,12 @@ def get_margin_by_battery(
 
 @router.get("/export/csv")
 def export_csv(
-    start_date: Optional[datetime] = None,
-    end_date: Optional[datetime] = None,
-    station_id: Optional[int] = None,
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> Any:
     """Download performance overview as CSV."""
     dealer_id = _get_dealer_id(db, current_user.id)
-    data = DealerAnalyticsService.get_overview(
-        db, dealer_id, start_date=start_date, end_date=end_date, station_id=station_id
-    )
+    data = DealerAnalyticsService.get_overview(db, dealer_id)
     csv_content = DealerAnalyticsService.export_csv(data)
     return PlainTextResponse(
         content=csv_content,
@@ -264,56 +229,3 @@ def email_report(
     """Email the performance report to the dealer."""
     dealer_id = _get_dealer_id(db, current_user.id)
     return DealerAnalyticsService.email_report(db, dealer_id)
-
-@router.get("/commission-summary")
-def get_commission_summary(
-    from_date: str = Query(None),
-    to_date: str = Query(None),
-    db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
-) -> Any:
-    """Aggregates Commission and Settlements for the Settlement Command Center."""
-    from app.models.settlement import Settlement
-    from app.models.commission import CommissionLog
-    from sqlalchemy import func
-    from datetime import datetime
-    
-    dealer_id = _get_dealer_id(db, current_user.id)
-    
-    settlement_q = select(Settlement).where(Settlement.dealer_id == dealer_id)
-    
-    if from_date:
-        try:
-            fd = datetime.fromisoformat(from_date.replace("Z", "+00:00"))
-            settlement_q = settlement_q.where(Settlement.created_at >= fd)
-        except: pass
-    if to_date:
-        try:
-            td = datetime.fromisoformat(to_date.replace("Z", "+00:00"))
-            settlement_q = settlement_q.where(Settlement.created_at <= td)
-        except: pass
-        
-    settlements = db.exec(settlement_q).all()
-    
-    gross_revenue = sum(s.total_revenue for s in settlements)
-    platform_fees = sum(s.platform_fee for s in settlements)
-    net_payout = sum(s.net_payable for s in settlements)
-    commission_earned = sum(s.total_commission for s in settlements)
-    
-    # Determine commission rate from config if possible
-    from app.models.commission import CommissionConfig
-    config = db.exec(
-        select(CommissionConfig)
-        .where(CommissionConfig.dealer_id == current_user.id)
-        .order_by(CommissionConfig.created_at.desc())
-    ).first()
-    
-    current_rate = config.percentage if config else 15.0
-    
-    return {
-        "gross_revenue": gross_revenue,
-        "platform_fees_deducted": platform_fees,
-        "commission_earned": commission_earned,
-        "net_payout": net_payout,
-        "current_commission_rate": current_rate
-    }

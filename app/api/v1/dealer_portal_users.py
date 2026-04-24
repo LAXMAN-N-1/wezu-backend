@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Dealer Portal — User Management API
 Full CRUD for dealer staff users, invite flow, sessions, password management.
@@ -5,12 +6,13 @@ Full CRUD for dealer staff users, invite flow, sessions, password management.
 from typing import List, Optional, Dict
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlmodel import Session, select, func, or_
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 import secrets
 import logging
 
 from app.db.session import get_session
 from app.api import deps
+from app.api.deps import invalidate_user_token_cache
 from app.models.user import User, UserStatus, UserType
 from app.models.dealer import DealerProfile
 from app.models.rbac import Role
@@ -35,10 +37,7 @@ INVITE_TOKEN_EXPIRY_HOURS = 72
 # ── Helpers ──────────────────────────────────────────────
 
 def _get_dealer(db: Session, user_id: int) -> DealerProfile:
-    dealer = db.exec(select(DealerProfile).where(DealerProfile.user_id == user_id)).first()
-    if not dealer:
-        raise HTTPException(status_code=403, detail="Not a dealer account")
-    return dealer
+    return deps.get_dealer_profile_or_403(db, user_id, detail="Not a dealer account")
 
 
 def _user_to_read(user: User, db: Session) -> DealerUserRead:
@@ -634,6 +633,7 @@ def terminate_all_sessions(
     _audit(db, current_user.id, dealer.id, AuditActionType.SESSION_TERMINATED,
            target_id=user.id, details=f"Terminated all {count} sessions for {user.email}")
     db.commit()
+    invalidate_user_token_cache(user.id)
 
     return {"success": True, "terminated": count}
 
@@ -662,6 +662,7 @@ def terminate_session(
     _audit(db, current_user.id, dealer.id, AuditActionType.SESSION_TERMINATED,
            target_id=user.id, details=f"Terminated session {session_id} for {user.email}")
     db.commit()
+    invalidate_user_token_cache(user.id)
 
     return {"success": True}
 
@@ -677,8 +678,12 @@ def bulk_action(
     dealer = _get_dealer(db, current_user.id)
     results = {"success": 0, "failed": 0, "errors": []}
 
+    # Batch-load all users at once (eliminates per-user db.get N+1)
+    batch_users = db.exec(select(User).where(User.id.in_(data.user_ids))).all()
+    batch_users_map = {u.id: u for u in batch_users}
+
     for uid in data.user_ids:
-        user = db.get(User, uid)
+        user = batch_users_map.get(uid)
         if not user or user.created_by_dealer_id != dealer.id or user.id == current_user.id:
             results["failed"] += 1
             results["errors"].append(f"User {uid}: not found or cannot modify")

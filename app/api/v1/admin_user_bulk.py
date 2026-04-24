@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Admin Bulk User Operations API — CSV import, bulk deactivate, bulk role change.
 """
@@ -129,11 +130,15 @@ def bulk_deactivate_users(
     """Deactivate multiple users and revoke their sessions."""
     from app.services.auth_service import AuthService
 
+    # Batch-load all users at once (eliminates per-user db.get N+1)
+    users_list = db.exec(select(User).where(User.id.in_(request.user_ids))).all()
+    users_map = {u.id: u for u in users_list}
+
     deactivated = 0
     errors = []
 
     for user_id in request.user_ids:
-        user = db.get(User, user_id)
+        user = users_map.get(user_id)
         if not user:
             errors.append(f"User {user_id} not found")
             continue
@@ -173,11 +178,15 @@ def bulk_role_change(
     if not role:
         raise HTTPException(status_code=404, detail=f"Role '{request.role}' not found")
 
+    # Batch-load all users at once (eliminates per-user db.get N+1)
+    users_list = db.exec(select(User).where(User.id.in_(request.user_ids))).all()
+    users_map = {u.id: u for u in users_list}
+
     changed = 0
     errors = []
 
     for user_id in request.user_ids:
-        user = db.get(User, user_id)
+        user = users_map.get(user_id)
         if not user:
             errors.append(f"User {user_id} not found")
             continue

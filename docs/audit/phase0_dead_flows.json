@@ -1,0 +1,61 @@
+{
+  "generated_at": "2026-04-10T11:14:16.991029+00:00",
+  "dead_flow_files": [
+    {
+      "file": "app/api/admin/admin_alerts.py",
+      "route_count": 0,
+      "path_conflicts_with_live": [],
+      "recommended_prefix": "/api/v1/admin/admin-alerts",
+      "status": "safe_to_mount"
+    },
+    {
+      "file": "app/api/admin/admin_analytics.py",
+      "route_count": 0,
+      "path_conflicts_with_live": [],
+      "recommended_prefix": "/api/v1/admin/admin-analytics",
+      "status": "safe_to_mount"
+    },
+    {
+      "file": "app/api/admin/admin_roles.py",
+      "route_count": 0,
+      "path_conflicts_with_live": [],
+      "recommended_prefix": "/api/v1/admin/admin-roles",
+      "status": "safe_to_mount"
+    },
+    {
+      "file": "app/api/admin/admin_user_bulk.py",
+      "route_count": 0,
+      "path_conflicts_with_live": [],
+      "recommended_prefix": "/api/v1/admin/admin-user-bulk",
+      "status": "safe_to_mount"
+    },
+    {
+      "file": "app/api/v1/dealer_commission.py",
+      "route_count": 13,
+      "path_conflicts_with_live": [],
+      "recommended_prefix": "/api/v1/dealer-commission",
+      "status": "safe_to_mount"
+    },
+    {
+      "file": "app/api/v1/dealer_documents.py",
+      "route_count": 4,
+      "path_conflicts_with_live": [],
+      "recommended_prefix": "/api/v1/dealer-documents",
+      "status": "safe_to_mount"
+    },
+    {
+      "file": "app/api/v1/dealer_kyc.py",
+      "route_count": 5,
+      "path_conflicts_with_live": [],
+      "recommended_prefix": "/api/v1/dealer-kyc",
+      "status": "safe_to_mount"
+    },
+    {
+      "file": "app/api/v1/vendors.py",
+      "route_count": 4,
+      "path_conflicts_with_live": [],
+      "recommended_prefix": "/api/v1/vendors",
+      "status": "safe_to_mount"
+    }
+  ]
+}

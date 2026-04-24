@@ -1,8 +1,9 @@
+from __future__ import annotations
 import sys
 import os
 import random
 import uuid
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from sqlalchemy import text, inspect
 
 # Disable background tasks during seeding
@@ -164,7 +165,7 @@ def seed():
                     total_slots=12,
                     available_slots=12,
                     available_batteries=0,
-                    status=StationStatus.OPERATIONAL
+                    status=StationStatus.ACTIVE
                 )
                 db.add(s)
             db.commit()

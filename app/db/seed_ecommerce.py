@@ -1,3 +1,4 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from app.db.session import engine
 from app.models.catalog import CatalogProduct, CatalogProductImage, CatalogProductVariant

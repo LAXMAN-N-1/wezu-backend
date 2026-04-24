@@ -1,7 +1,10 @@
+from __future__ import annotations
 from typing import List
 from sqlmodel import Session, select
+from sqlalchemy import or_
+from sqlalchemy import update as sa_update
 from app.models.promo_code import PromoCode
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from fastapi import HTTPException
 from typing import List
 
@@ -50,14 +53,25 @@ class PromoService:
     
     @staticmethod
     def apply_promo(db: Session, promo_id: int):
-        """Apply validated coupon to an active order"""
-        promo = db.get(PromoCode, promo_id)
-        if promo:
-            promo.usage_count += 1
-            db.add(promo)
-            db.commit()
-            return True
-        return False
+        """Apply validated coupon to an active order.
+
+        Uses an atomic compare-and-set UPDATE so concurrent applications
+        cannot exceed ``usage_limit``. Returns False if the promo is
+        missing OR the usage limit was already reached (race loser).
+        """
+        result = db.execute(
+            sa_update(PromoCode)
+            .where(
+                PromoCode.id == promo_id,
+                or_(
+                    PromoCode.usage_limit == 0,
+                    PromoCode.usage_count < PromoCode.usage_limit,
+                ),
+            )
+            .values(usage_count=PromoCode.usage_count + 1)
+        )
+        db.commit()
+        return result.rowcount > 0
     
     @staticmethod
     def create_promo(db: Session, promo_in: PromoCode) -> PromoCode:

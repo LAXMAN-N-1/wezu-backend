@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Dealer Campaign Service — Manage promotional campaigns, validate at checkout,
 collect analytics, and handle bulk operations.
@@ -8,10 +9,12 @@ import io
 import json
 import logging
 import uuid
-from datetime import datetime, UTC, date
+from datetime import datetime, date, timezone; UTC = timezone.utc
 from typing import Dict, Any, List, Optional
 
 from sqlmodel import Session, select, func, col
+from sqlalchemy import or_
+from sqlalchemy import update as sa_update
 from fastapi import HTTPException
 
 from app.models.dealer_promotion import DealerPromotion, PromotionUsage
@@ -178,8 +181,10 @@ class CampaignService:
                 allowed_stations = json.loads(promo.applicable_station_ids)
                 if allowed_stations and station_id not in allowed_stations:
                     raise HTTPException(status_code=400, detail="Promo code not applicable at this station")
+            except HTTPException:
+                raise
             except Exception:
-                pass
+                logger.warning("campaign.station_ids_parse_failed promo_id=%s", promo.id, exc_info=True)
 
         # Minimum order
         if promo.min_purchase_amount and order_amount < promo.min_purchase_amount:
@@ -245,13 +250,52 @@ class CampaignService:
 
     @staticmethod
     def apply_promo(
-        db: Session, promo_id: int, user_id: int, order_amount: float, 
+        db: Session, promo_id: int, user_id: int, order_amount: float,
         discount_applied: float, final_amount: float
     ) -> PromotionUsage:
-        """Record the usage of a promo code when an order is finalized."""
+        """Record the usage of a promo code when an order is finalized.
+
+        The counter bump is an atomic compare-and-set UPDATE so concurrent
+        checkouts cannot exceed ``usage_limit_total`` or over-spend the
+        budget. The loser of the race raises HTTP 400 so the checkout path
+        fails closed instead of silently over-issuing discounts.
+        """
         promo = db.get(DealerPromotion, promo_id)
         if not promo:
             raise HTTPException(status_code=404, detail="Promo not found")
+
+        # Atomic CAS on usage_count + total_discount_given. Two predicates:
+        #  - usage_limit_total is NULL (unlimited) OR usage_count is still
+        #    below the limit.
+        #  - budget_limit is NULL (unlimited) OR (total_discount_given +
+        #    this discount) stays within budget.
+        stmt = (
+            sa_update(DealerPromotion)
+            .where(DealerPromotion.id == promo_id)
+            .where(
+                or_(
+                    DealerPromotion.usage_limit_total.is_(None),
+                    DealerPromotion.usage_count < DealerPromotion.usage_limit_total,
+                )
+            )
+            .where(
+                or_(
+                    DealerPromotion.budget_limit.is_(None),
+                    (func.coalesce(DealerPromotion.total_discount_given, 0.0) + discount_applied)
+                    <= DealerPromotion.budget_limit,
+                )
+            )
+            .values(
+                usage_count=DealerPromotion.usage_count + 1,
+                total_discount_given=func.coalesce(DealerPromotion.total_discount_given, 0.0) + discount_applied,
+            )
+        )
+        result = db.execute(stmt)
+        if result.rowcount == 0:
+            raise HTTPException(
+                status_code=400,
+                detail="Promo code usage limit or budget reached",
+            )
 
         usage = PromotionUsage(
             promotion_id=promo.id,
@@ -262,14 +306,6 @@ class CampaignService:
             used_at=datetime.now(UTC)
         )
         db.add(usage)
-
-        # Update counters
-        promo.usage_count += 1
-        if not hasattr(promo, "total_discount_given"):
-             promo.total_discount_given = 0.0
-        promo.total_discount_given += discount_applied
-
-        db.add(promo)
         db.commit()
         db.refresh(usage)
         return usage

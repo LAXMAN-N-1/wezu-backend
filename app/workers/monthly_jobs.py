@@ -1,9 +1,10 @@
+from __future__ import annotations
 """
 Monthly Scheduled Jobs
 Run on 1st of each month
 """
 from sqlmodel import Session, select, func
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from app.core.database import engine
 from app.workers.daily_jobs import create_job_execution, complete_job_execution
 import logging
@@ -119,7 +120,7 @@ def financial_reconciliation():
                 select(Transaction)
                 .where(Transaction.created_at >= last_month_start)
                 .where(Transaction.created_at < first_of_month)
-                .where(Transaction.status == "completed")
+                .where(Transaction.status == "success")
             ).all()
             
             total_transactions = len(transactions)

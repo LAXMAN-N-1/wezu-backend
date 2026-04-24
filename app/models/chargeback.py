@@ -1,5 +1,6 @@
+from __future__ import annotations
 from typing import Optional
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from sqlmodel import SQLModel, Field
 
 

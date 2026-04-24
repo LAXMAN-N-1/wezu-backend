@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Invoice schemas
 """
@@ -11,8 +12,8 @@ class InvoiceCreate(BaseModel):
     invoice_number: Optional[str] = None
     amount: float
     tax_amount: float = 0.0
-    total_amount: float = 0.0
-    currency: str = "INR"
+    subtotal: float = 0.0
+    total: float = 0.0
     notes: Optional[str] = None
 
 class InvoiceResponse(BaseModel):
@@ -20,10 +21,9 @@ class InvoiceResponse(BaseModel):
     transaction_id: int
     invoice_number: Optional[str] = None
     amount: float
+    subtotal: float = 0.0
     tax_amount: float = 0.0
-    total_amount: float = 0.0
-    currency: str = "INR"
-    status: str = "generated"
+    total: float = 0.0
     pdf_url: Optional[str] = None
     notes: Optional[str] = None
     created_at: datetime

@@ -1,8 +1,9 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from app.models.commission import CommissionConfig, CommissionLog, CommissionTier
 from app.models.financial import Transaction
 from typing import Optional
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 import logging
 
 logger = logging.getLogger("wezu_commissions")
@@ -67,10 +68,18 @@ class CommissionService:
         """
         Calculate commissions for a given transaction based on transaction_type.
         Uses tiered rate resolution.
+
+        Idempotency: webhooks / retry loops may call this more than once for
+        the same Transaction. We serialize concurrent callers by locking the
+        parent Transaction row, then guard against duplicate CommissionLog
+        rows with an explicit existence check. A follow-up migration should
+        add a partial unique index on
+        ``commission_logs(transaction_id) WHERE status IN ('pending','paid')``
+        to make this race-free at the DB layer as well.
         """
         rate = CommissionService.get_applicable_rate(
             db,
-            transaction_type=transaction.type,
+            transaction_type=transaction.transaction_type.value if transaction.transaction_type else "unknown",
         )
 
         amount = 0.0
@@ -81,18 +90,54 @@ class CommissionService:
 
         amount = round(amount, 2)
 
-        if amount > 0:
-            log = CommissionLog(
-                transaction_id=transaction.id,
-                dealer_id=None,  # Determined by config context
-                vendor_id=None,
-                amount=amount,
-                status="pending",
+        if amount <= 0:
+            db.commit()
+            return None
+
+        # Serialize concurrent calculators on the same parent transaction.
+        locked_txn = db.exec(
+            select(Transaction).where(Transaction.id == transaction.id).with_for_update()
+        ).first()
+        if not locked_txn:
+            logger.warning(
+                "commission.parent_transaction_missing",
+                extra={"transaction_id": transaction.id},
             )
-            db.add(log)
-            logger.info(f"Commission logged: {amount} for Transaction {transaction.id}")
+            db.commit()
+            return None
+
+        # Duplicate guard — return the existing non-reversed log if any.
+        existing = db.exec(
+            select(CommissionLog).where(
+                CommissionLog.transaction_id == transaction.id,
+                CommissionLog.status.in_(["pending", "paid"]),
+            )
+        ).first()
+        if existing:
+            logger.info(
+                "commission.duplicate_skipped",
+                extra={
+                    "transaction_id": transaction.id,
+                    "existing_log_id": existing.id,
+                    "existing_status": existing.status,
+                },
+            )
+            db.commit()
+            return existing
+
+        log = CommissionLog(
+            transaction_id=transaction.id,
+            dealer_id=None,  # Determined by config context
+            vendor_id=None,
+            amount=amount,
+            status="pending",
+        )
+        db.add(log)
+        logger.info(f"Commission logged: {amount} for Transaction {transaction.id}")
 
         db.commit()
+        db.refresh(log)
+        return log
 
     @staticmethod
     def process_payout(db: Session, log_id: int):

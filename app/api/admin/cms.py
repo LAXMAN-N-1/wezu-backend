@@ -1,6 +1,7 @@
+from __future__ import annotations
 """Comprehensive CMS Admin API — Blogs, FAQs, Banners, Legal Docs, Media Assets."""
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from sqlmodel import Session, select, func
 from typing import List, Any, Optional
 from app.core.database import get_db

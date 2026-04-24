@@ -1,4 +1,4 @@
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from typing import Optional, List, TYPE_CHECKING
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
@@ -29,7 +29,7 @@ class Rental(SQLModel, table=True):
     battery_id: int = Field(foreign_key="batteries.id", index=True)
     
     # Location
-    start_station_id: int = Field(foreign_key="stations.id")
+    start_station_id: int = Field(foreign_key="stations.id", index=True)
     end_station_id: Optional[int] = Field(default=None, foreign_key="stations.id")
     
     # Timings

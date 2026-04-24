@@ -1,3 +1,4 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from typing import TypeVar, Generic, Type, Optional, List, Any
 

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
 from sqlmodel import Session, select
 from app.models.user import User
@@ -5,7 +6,7 @@ from app.models.kyc import KYCRecord
 from app.api import deps
 import shutil
 import os
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from typing import Optional, List
 from app.schemas.kyc import RejectionReasonResponse
 
@@ -96,8 +97,9 @@ async def verify_aadhaar(
     if not result["success"]:
         raise HTTPException(status_code=400, detail="Aadhaar verification failed")
         
-    # 2. Store Encrypted (Mock encryption)
-    encrypted_val = f"ENC_{aadhaar_number}"
+    # 2. Store securely (one-way hash — original number is NOT recoverable)
+    import hashlib
+    encrypted_val = hashlib.sha256(aadhaar_number.encode()).hexdigest()
     
     record = db.exec(select(KYCRecord).where(KYCRecord.user_id == current_user.id)).first()
     if not record:
@@ -126,7 +128,8 @@ async def verify_pan(
     if not result["success"]:
         raise HTTPException(status_code=400, detail="PAN verification failed")
         
-    encrypted_val = f"ENC_{pan_number}"
+    import hashlib
+    encrypted_val = hashlib.sha256(pan_number.encode()).hexdigest()
     
     record = db.exec(select(KYCRecord).where(KYCRecord.user_id == current_user.id)).first()
     if not record:
@@ -156,8 +159,10 @@ async def upload_video_kyc(
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
         
-    # 2. Mock Liveness Check
-    liveness_score = 0.98 # high score
+    # 2. Liveness check via service (queues for review in production)
+    from app.services.kyc_service import KYCService
+    liveness_result = await KYCService.process_video_kyc(db, current_user, file_path)
+    liveness_score = liveness_result.get("liveness_score")
     
     record = db.exec(select(KYCRecord).where(KYCRecord.user_id == current_user.id)).first()
     if not record:

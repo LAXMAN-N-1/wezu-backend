@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Enhanced Payment and Invoice API
 Invoice generation, refunds, and payment methods
@@ -5,13 +6,12 @@ Invoice generation, refunds, and payment methods
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 
 from app.api import deps
 from app.core.audit import audit_log
-from app.db.session import get_session
 from app.models.user import User
 from app.models.catalog import CatalogOrder
 from app.models.rental import Rental
@@ -19,6 +19,7 @@ from app.models.financial import Transaction
 from app.services.invoice_service import InvoiceService
 from app.services.analytics_service import AnalyticsService
 from app.services.payment_service import PaymentService
+from app.services.payment_method_service import PaymentMethodService
 from app.schemas.common import DataResponse
 from app.schemas.payment import (
     RevenueSummary, StationRevenueResponse, 
@@ -36,7 +37,10 @@ class RefundRequest(BaseModel):
 
 class PaymentMethodCreate(BaseModel):
     type: str  # card, upi, netbanking
-    details: dict
+    provider_token: str
+    provider: str = "razorpay"
+    is_default: bool = False
+    details: dict = Field(default_factory=dict)
 
 # Payment Method Endpoints
 @router.post("/methods")
@@ -46,19 +50,31 @@ async def add_payment_method(
     session: Session = Depends(deps.get_db)
 ):
     """Add a new payment method"""
+    method_row, created = PaymentMethodService.add_method(
+        session,
+        user_id=current_user.id,
+        method_type=method.type,
+        provider_token=method.provider_token,
+        provider=method.provider,
+        is_default=method.is_default,
+        details=method.details,
+    )
     return {
-        "message": "Payment method added successfully",
-        "method_id": "pm_" + str(current_user.id)
+        "message": "Payment method added successfully" if created else "Payment method already exists",
+        "created": created,
+        "method_id": method_row.id,
+        "method": PaymentMethodService.serialize(method_row),
     }
 
 @router.delete("/methods/{method_id}")
 async def delete_payment_method(
-    method_id: str,
+    method_id: int,
     current_user: User = Depends(deps.get_current_user),
     session: Session = Depends(deps.get_db)
 ):
     """Delete a payment method"""
-    return {"message": "Payment method deleted successfully"}
+    PaymentMethodService.delete_method(session, user_id=current_user.id, method_id=method_id)
+    return {"message": "Payment method deleted successfully", "method_id": method_id}
 
 # Invoice Endpoints
 @router.get("/orders/{order_id}/invoice", response_class=StreamingResponse)
@@ -145,41 +161,19 @@ def get_user_all_payments(
 
 # Moved up to avoid route precedence issues with /{id}
 @router.get("/payment-methods", response_model=DataResponse[dict])
-def get_payment_methods(current_user: User = Depends(deps.get_current_user)):
+def get_payment_methods(
+    current_user: User = Depends(deps.get_current_user),
+    session: Session = Depends(deps.get_db),
+):
     """Get available payment methods"""
+    saved_methods = PaymentMethodService.list_serialized_methods(session, current_user.id)
+    default_method_id = next((item["id"] for item in saved_methods if item.get("is_default")), None)
     return DataResponse(
         success=True,
         data={
-            "methods": [
-                {
-                    "id": "UPI",
-                    "name": "UPI",
-                    "description": "Google Pay, PhonePe, Paytm, etc.",
-                    "icon": "upi",
-                    "enabled": True
-                },
-                {
-                    "id": "CARD",
-                    "name": "Credit/Debit Card",
-                    "description": "Visa, Mastercard, RuPay",
-                    "icon": "card",
-                    "enabled": True
-                },
-                {
-                    "id": "WALLET",
-                    "name": "Digital Wallet",
-                    "description": "Paytm, Amazon Pay, etc.",
-                    "icon": "wallet",
-                    "enabled": True
-                },
-                {
-                    "id": "NETBANKING",
-                    "name": "Net Banking",
-                    "description": "All major banks",
-                    "icon": "bank",
-                    "enabled": True
-                }
-            ]
+            "methods": PaymentMethodService.available_method_catalog(),
+            "saved_methods": saved_methods,
+            "default_method_id": default_method_id,
         }
     )
 
@@ -325,7 +319,7 @@ def request_refund(
     
     # Create refund transaction
     from app.models.financial import Transaction
-    from datetime import datetime, UTC
+    from datetime import datetime, timezone; UTC = timezone.utc
     
     refund_amount = request.amount or order.total_amount
     

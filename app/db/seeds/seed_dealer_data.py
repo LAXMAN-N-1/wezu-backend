@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Final ultra-robust seed script: Seeds for all dealers using raw SQL and uppercase Enums.
 """

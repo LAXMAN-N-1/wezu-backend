@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Response, UploadFile, File
+from __future__ import annotations
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status, Response, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select, func
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 import csv
 import io
 import secrets
@@ -11,7 +12,9 @@ from app.api import deps
 from app.services.user_service import UserService
 from app.services.email_service import EmailService
 from app.core.security import get_password_hash
+from app.core.rbac import canonical_role_name
 from app.models.rbac import Role
+from app.models.rbac import UserRole
 from app.schemas.admin_user import (
     UserSuspensionRequest, 
     UserRoleUpdateRequest, 
@@ -23,8 +26,8 @@ from app.schemas.admin_user import (
     BulkInviteResponse,
 )
 from app.schemas.user import UserSearchResponse, UserSearchItem
-from app.models.user import User
-from datetime import datetime, UTC, timedelta
+from app.models.user import User, UserStatus, UserType
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 
 logger = logging.getLogger("wezu_admin")
 
@@ -44,7 +47,7 @@ async def list_users(
     user_type: Optional[str] = None,
     kyc_status: Optional[str] = None,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
 ):
     """Admin: List all users with filtering and pagination."""
     query = select(User)
@@ -58,18 +61,24 @@ async def list_users(
         )
     
     if status is not None:
-        if status.lower() == "active":
-            query = query.where(User.status == "active")
-        elif status.lower() == "suspended":
-            query = query.where(User.status == "suspended")
-        elif status.lower() == "pending_verification":
-            query = query.where(User.status == "pending_verification")
+        status_upper = status.strip().upper()
+        if status_upper == "ACTIVE":
+            query = query.where(User.status == UserStatus.ACTIVE)
+        elif status_upper == "SUSPENDED":
+            query = query.where(User.status == UserStatus.SUSPENDED)
+        elif status_upper in ("PENDING_VERIFICATION", "PENDING"):
+            query = query.where(User.status == UserStatus.PENDING_VERIFICATION)
             
     if user_type:
-        query = query.where(User.user_type == user_type)
+        # Normalize: accept lowercase from frontend (e.g. "admin") -> uppercase enum value
+        try:
+            ut = UserType(user_type.strip().upper())
+            query = query.where(User.user_type == ut)
+        except ValueError:
+            pass  # ignore invalid user_type filter
         
     if kyc_status:
-        query = query.where(User.kyc_status == kyc_status)
+        query = query.where(User.kyc_status == kyc_status.strip().upper())
         
     query = query.order_by(User.created_at.desc())
     
@@ -88,10 +97,10 @@ async def list_suspended_users(
     limit: int = 100,
     search: Optional[str] = None,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
 ):
     """Admin: List all suspended users."""
-    query = select(User).where(User.status == "suspended")
+    query = select(User).where(User.status == UserStatus.SUSPENDED)
     
     if search:
         search_term = f"%{search}%"
@@ -122,11 +131,141 @@ def _generate_temp_password(length: int = 12) -> str:
     return "".join(secrets.choice(alphabet) for _ in range(length))
 
 
+def _generate_invite_token() -> str:
+    return secrets.token_urlsafe(24)
+
+
+def _resolve_role(db: Session, role_name: str) -> Role:
+    role = db.exec(select(Role).where(func.lower(Role.name) == role_name.lower())).first()
+    if not role:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Role '{role_name}' not found.",
+        )
+    return role
+
+
+def _derive_user_type(role_name: str) -> UserType:
+    role_value = canonical_role_name(role_name)
+    if role_value in {"super_admin", "operations_admin", "security_admin", "finance_admin", "support_manager", "support_agent"}:
+        return UserType.ADMIN
+    if role_value == "dealer_owner":
+        return UserType.DEALER
+    if role_value in {"logistics_manager", "dispatcher", "fleet_manager", "warehouse_manager", "driver"}:
+        return UserType.LOGISTICS
+    if role_value in {"dealer_manager", "dealer_inventory_staff", "dealer_finance_staff", "dealer_support_staff"}:
+        return UserType.DEALER_STAFF
+    return UserType.CUSTOMER
+
+
+def _issue_invite(
+    *,
+    db: Session,
+    user: User,
+    role: Role,
+    raw_password: str,
+    current_user: User,
+) -> bool:
+    user.role_id = role.id
+    user.user_type = _derive_user_type(role.name)
+    user.status = UserStatus.ACTIVE
+    user.force_password_change = True
+    user.invite_token = _generate_invite_token()
+    user.invite_token_expires = datetime.now(UTC) + timedelta(hours=72)
+    user.invite_sent_at = datetime.now(UTC)
+    user.created_by_user_id = current_user.id
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    existing_link = db.exec(
+        select(UserRole).where(
+            UserRole.user_id == user.id,
+            UserRole.role_id == role.id,
+        )
+    ).first()
+    if not existing_link:
+        db.add(
+            UserRole(
+                user_id=user.id,
+                role_id=role.id,
+                effective_from=datetime.now(UTC),
+            )
+        )
+        db.commit()
+
+    subject = "You've Been Invited to Wezu!"
+    content = f"""
+    <h3>Welcome to Wezu, {user.full_name}!</h3>
+    <p>You have been invited as a <strong>{role.name}</strong>.</p>
+    <p>Your temporary password is: <strong>{raw_password}</strong></p>
+    <p>Please log in and change your password immediately.</p>
+    """
+    email_sent = EmailService.send_email(user.email, subject, content)
+    if not email_sent:
+        logger.error("Failed to send invite email to %s", user.email)
+    return email_sent
+
+
+def _invite_status(user: User) -> str:
+    if user.last_login or user.password_changed_at:
+        return "accepted"
+    if user.status == UserStatus.INACTIVE and user.invite_sent_at:
+        return "revoked"
+    if user.invite_token_expires and user.invite_token_expires < datetime.now(UTC):
+        return "expired"
+    return "pending"
+
+
+def _serialize_invite(db: Session, user: User) -> Dict[str, Any]:
+    role_name = None
+    if user.role_id:
+        role = db.get(Role, user.role_id)
+        role_name = role.name if role else None
+
+    invited_by_name = None
+    if user.created_by_user_id:
+        invited_by = db.get(User, user.created_by_user_id)
+        invited_by_name = invited_by.full_name if invited_by and invited_by.full_name else invited_by.email if invited_by else None
+
+    accepted_at = user.password_changed_at or user.last_login
+
+    return {
+        "id": user.id,
+        "email": user.email,
+        "full_name": user.full_name,
+        "role": role_name or (user.user_type.value if user.user_type else "customer"),
+        "status": _invite_status(user),
+        "token": user.invite_token,
+        "created_at": user.invite_sent_at.isoformat() if user.invite_sent_at else None,
+        "sent_at": user.invite_sent_at.isoformat() if user.invite_sent_at else None,
+        "expires_at": user.invite_token_expires.isoformat() if user.invite_token_expires else None,
+        "created_by": invited_by_name or "System",
+        "invited_by": invited_by_name,
+        "used_at": accepted_at.isoformat() if accepted_at else None,
+        "is_used": accepted_at is not None,
+    }
+
+
+def _load_bulk_invite_rows(raw_rows: List[dict]) -> List[dict]:
+    rows: List[dict] = []
+    for row in raw_rows:
+        rows.append(
+            {
+                "email": (row.get("email") or "").strip(),
+                "full_name": (row.get("full_name") or row.get("name") or "").strip(),
+                "phone_number": (row.get("phone_number") or "").strip(),
+                "role": (row.get("role") or row.get("role_name") or "customer").strip(),
+            }
+        )
+    return rows
+
+
 @router.post("/create", response_model=dict)
 async def admin_create_user(
     payload: AdminUserCreateRequest,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
 ):
     """
     Admin: Create a new user directly.
@@ -153,12 +292,7 @@ async def admin_create_user(
     # 2. Resolve role (optional)
     role = None
     if payload.role_name:
-        role = db.exec(select(Role).where(Role.name == payload.role_name)).first()
-        if not role:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Role '{payload.role_name}' not found.",
-            )
+        role = _resolve_role(db, payload.role_name)
 
     # 3. Password
     raw_password = payload.password or _generate_temp_password()
@@ -175,6 +309,7 @@ async def admin_create_user(
     )
     if role:
         new_user.role_id = role.id
+        new_user.user_type = _derive_user_type(role.name)
 
     db.add(new_user)
     db.commit()
@@ -206,7 +341,7 @@ async def admin_create_user(
 async def admin_invite_user(
     payload: AdminInviteRequest,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
 ):
     """
     Admin: Invite a new user by email.
@@ -223,12 +358,7 @@ async def admin_invite_user(
         )
 
     # 2. Resolve role
-    role = db.exec(select(Role).where(Role.name == payload.role_name)).first()
-    if not role:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Role '{payload.role_name}' not found.",
-        )
+    role = _resolve_role(db, payload.role_name)
 
     # 3. Generate temp password
     temp_password = _generate_temp_password()
@@ -239,28 +369,16 @@ async def admin_invite_user(
         full_name=payload.full_name or "Invited User",
         phone_number=f"invited_{secrets.token_hex(4)}",  # placeholder until user updates
         hashed_password=get_password_hash(temp_password),
-        is_active=True,
         is_deleted=False,
         created_at=datetime.now(UTC),
     )
-    new_user.role_id = role.id
-
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-
-    # 5. Send invite email
-    subject = "You've Been Invited to Wezu!"
-    content = f"""
-    <h3>Welcome to Wezu, {new_user.full_name}!</h3>
-    <p>An administrator has invited you to join the Wezu platform as a <strong>{role.name}</strong>.</p>
-    <p>Your temporary password is: <strong>{temp_password}</strong></p>
-    <p>Please log in and change your password immediately.</p>
-    """
-    email_sent = EmailService.send_email(new_user.email, subject, content)
-
-    if not email_sent:
-        logger.error(f"Failed to send invite email to {new_user.email}")
+    email_sent = _issue_invite(
+        db=db,
+        user=new_user,
+        role=role,
+        raw_password=temp_password,
+        current_user=current_user,
+    )
 
     return {
         "status": "success",
@@ -268,15 +386,17 @@ async def admin_invite_user(
         "user_id": new_user.id,
         "email": new_user.email,
         "role": role.name,
+        "invite": _serialize_invite(db, new_user),
     }
 
 
 @router.post("/bulk-invite", response_model=BulkInviteResponse)
 async def admin_bulk_invite(
-    file: UploadFile = File(...),
+    request: Request,
+    file: Optional[UploadFile] = File(default=None),
     send_emails: bool = True,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
 ):
     """
     Admin: Bulk-invite users via CSV upload.
@@ -291,29 +411,43 @@ async def admin_bulk_invite(
 
     A temporary password is generated per user and emailed if `send_emails=true`.
     """
-    # 1. Validate file type
-    if not file.filename.endswith(".csv"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="File must be a .csv file.",
-        )
-
-    # 2. Parse CSV
-    try:
-        raw = await file.read()
-        reader = csv.DictReader(io.StringIO(raw.decode("utf-8")))
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to parse CSV: {e}",
-        )
-
-    required_cols = {"email", "full_name"}
-    if not required_cols.issubset(set(reader.fieldnames or [])):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"CSV must contain at least these columns: {', '.join(required_cols)}",
-        )
+    rows: List[dict]
+    if file is not None:
+        if not file.filename.endswith(".csv"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="File must be a .csv file.",
+            )
+        try:
+            raw = await file.read()
+            reader = csv.DictReader(io.StringIO(raw.decode("utf-8")))
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to parse CSV: {e}",
+            )
+        required_cols = {"email", "full_name"}
+        if not required_cols.issubset(set(reader.fieldnames or [])):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"CSV must contain at least these columns: {', '.join(required_cols)}",
+            )
+        rows = list(reader)
+    else:
+        try:
+            payload = await request.json()
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Expected CSV upload or JSON body with 'invites': {exc}",
+            )
+        raw_invites = payload.get("invites") if isinstance(payload, dict) else None
+        if not isinstance(raw_invites, list):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="JSON bulk invite payload must include an 'invites' list.",
+            )
+        rows = _load_bulk_invite_rows(raw_invites)
 
     # 3. Preload existing emails & roles
     existing_emails = {
@@ -323,11 +457,10 @@ async def admin_bulk_invite(
         r.name.lower(): r for r in db.exec(select(Role)).all()
     }
 
-    rows = list(reader)
     results: List[BulkInviteRowResult] = []
     success_count = 0
     failure_count = 0
-    emails_to_send: list = []
+    emails_sent = 0
 
     for idx, row in enumerate(rows, start=2):  # row 1 = header
         email = (row.get("email") or "").strip()
@@ -366,44 +499,39 @@ async def admin_bulk_invite(
                 full_name=full_name,
                 phone_number=phone_number or f"invited_{secrets.token_hex(4)}",
                 hashed_password=get_password_hash(temp_password),
-                is_active=True,
                 is_deleted=False,
                 created_at=datetime.now(UTC),
             )
-            new_user.role_id = role.id
-
-            db.add(new_user)
-            db.commit()
-            db.refresh(new_user)
+            email_sent = False
+            if send_emails:
+                if _issue_invite(
+                    db=db,
+                    user=new_user,
+                    role=role,
+                    raw_password=temp_password,
+                    current_user=current_user,
+                ):
+                    emails_sent += 1
+            else:
+                new_user.role_id = role.id
+                new_user.user_type = _derive_user_type(role.name)
+                new_user.status = UserStatus.ACTIVE
+                new_user.force_password_change = True
+                new_user.invite_token = _generate_invite_token()
+                new_user.invite_token_expires = datetime.now(UTC) + timedelta(hours=72)
+                new_user.invite_sent_at = datetime.now(UTC)
+                new_user.created_by_user_id = current_user.id
+                db.add(new_user)
+                db.commit()
+                db.refresh(new_user)
 
             existing_emails.add(email.lower())
             results.append(BulkInviteRowResult(row_number=idx, email=email, success=True))
             success_count += 1
-
-            if send_emails:
-                emails_to_send.append({
-                    "to": email,
-                    "name": full_name,
-                    "role": role.name,
-                    "password": temp_password,
-                })
         except Exception as exc:
             db.rollback()
             results.append(BulkInviteRowResult(row_number=idx, email=email, success=False, error=str(exc)))
             failure_count += 1
-
-    # 4. Send invite emails
-    emails_sent = 0
-    for item in emails_to_send:
-        subject = "You've Been Invited to Wezu!"
-        content = f"""
-        <h3>Welcome to Wezu, {item['name']}!</h3>
-        <p>You have been invited as a <strong>{item['role']}</strong>.</p>
-        <p>Your temporary password: <strong>{item['password']}</strong></p>
-        <p>Please log in and change your password immediately.</p>
-        """
-        if EmailService.send_email(item["to"], subject, content):
-            emails_sent += 1
 
     return BulkInviteResponse(
         success_count=success_count,
@@ -415,6 +543,91 @@ async def admin_bulk_invite(
     )
 
 
+@router.get("/invites", response_model=dict)
+async def list_admin_invites(
+    status_filter: Optional[str] = Query(default=None, alias="status"),
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_admin),
+):
+    statement = select(User).where(User.invite_sent_at != None).order_by(User.invite_sent_at.desc())
+    users = db.exec(statement).all()
+
+    invites = [_serialize_invite(db, user) for user in users]
+    if status_filter:
+        invites = [
+            invite for invite in invites
+            if invite["status"] == status_filter.lower()
+        ]
+
+    return {"items": invites, "total_count": len(invites)}
+
+
+@router.post("/{id}/invite/resend", response_model=dict)
+async def resend_admin_invite(
+    id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_admin),
+):
+    user = db.get(User, id)
+    if not user or not user.invite_sent_at:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    if _invite_status(user) == "accepted":
+        raise HTTPException(status_code=400, detail="Invite already accepted")
+    if not user.email:
+        raise HTTPException(status_code=400, detail="Invited user has no email address")
+    if not user.role_id:
+        raise HTTPException(status_code=400, detail="Invited user has no role assigned")
+
+    role = db.get(Role, user.role_id)
+    if not role:
+        raise HTTPException(status_code=400, detail="Invited user role no longer exists")
+
+    temp_password = _generate_temp_password()
+    user.hashed_password = get_password_hash(temp_password)
+    user.status = UserStatus.PENDING
+    user.force_password_change = True
+    email_sent = _issue_invite(
+        db=db,
+        user=user,
+        role=role,
+        raw_password=temp_password,
+        current_user=current_user,
+    )
+    return {
+        "status": "success",
+        "message": f"Invite resent. Email sent: {email_sent}",
+        "invite": _serialize_invite(db, user),
+    }
+
+
+@router.post("/{id}/invite/revoke", response_model=dict)
+async def revoke_admin_invite(
+    id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_admin),
+):
+    user = db.get(User, id)
+    if not user or not user.invite_sent_at:
+        raise HTTPException(status_code=404, detail="Invite not found")
+    if _invite_status(user) == "accepted":
+        raise HTTPException(status_code=400, detail="Accepted invites cannot be revoked")
+
+    user.invite_token = None
+    user.invite_token_expires = None
+    user.force_password_change = False
+    user.status = UserStatus.INACTIVE
+    user.updated_at = datetime.now(UTC)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "status": "success",
+        "message": "Invite revoked",
+        "invite": _serialize_invite(db, user),
+    }
+
+
 # =====================================================================
 #  EXISTING ENDPOINTS (unchanged)
 # =====================================================================
@@ -424,7 +637,7 @@ async def change_user_role(
     id: int,
     role_in: UserRoleUpdateRequest,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
 ):
     """Change a user's role with reason logging"""
     user = UserService.update_role(db, id, current_user.id, role_in.role_id, role_in.reason)
@@ -437,7 +650,7 @@ async def suspend_user(
     id: int,
     req: UserSuspensionRequest,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
 ):
     """Suspend account with reason and optional duration"""
     expires_at = None
@@ -453,7 +666,7 @@ async def suspend_user(
 async def reactivate_user(
     id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
 ):
     """Manually reactivate a suspended account"""
     user = UserService.reactivate_user(db, id, current_user.id)
@@ -465,7 +678,7 @@ async def reactivate_user(
 async def get_suspension_history(
     id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
 ):
     """View all suspension/reactivation events for a user"""
     logs = UserService.get_status_history(db, id)
@@ -489,7 +702,7 @@ async def get_suspension_history(
 async def bulk_user_action(
     req: BulkUserActionRequest,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
 ):
     """Bulk activate, deactivate, or message users"""
     if req.action not in ["activate", "deactivate", "message"]:
@@ -515,7 +728,7 @@ async def bulk_user_action(
 async def export_users(
     role: Optional[str] = None,
     status: Optional[str] = None,
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
     db: Session = Depends(deps.get_db),
 ):
     """Export user list to CSV with applied filters"""
@@ -548,7 +761,7 @@ async def export_users(
 async def terminate_user_sessions(
     id: int,
     db: Session = Depends(deps.get_db),
-    current_user: User = Depends(deps.get_current_active_superuser),
+    current_user: User = Depends(deps.get_current_active_admin),
 ):
     """Admin: forcibly log out a user from all devices"""
     from app.models.security import UserSession

@@ -1,4 +1,4 @@
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
 
@@ -8,7 +8,7 @@ class CommissionConfig(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
 
     # Target entity
-    dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id")
+    dealer_id: Optional[int] = Field(default=None, foreign_key="users.id")
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id")
 
     # Type of transaction
@@ -52,12 +52,12 @@ class CommissionLog(SQLModel, table=True):
     transaction_id: int = Field(foreign_key="transactions.id")
 
     # Beneficiary
-    dealer_id: Optional[int] = Field(default=None, foreign_key="dealer_profiles.id")
+    dealer_id: Optional[int] = Field(default=None, foreign_key="users.id", index=True)
     vendor_id: Optional[int] = Field(default=None, foreign_key="vendors.id")
 
     # Earnings
     amount: float
-    status: str = Field(default="pending")  # pending, paid, reversed
+    status: str = Field(default="pending", index=True)  # pending, paid, reversed
 
     # Settlement linkage
     settlement_id: Optional[int] = Field(default=None, foreign_key="settlements.id")

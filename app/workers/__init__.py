@@ -1,19 +1,14 @@
+from __future__ import annotations
 """
 Background Workers Package
 Handles all scheduled and background tasks
 """
-from app.workers.scheduler import scheduler, start_scheduler, stop_scheduler
-from app.workers.rental_expiry_worker import run_rental_expiry_job
+from app.workers.scheduler import scheduler, start_scheduler, stop_scheduler, get_scheduler_runtime_state
 
-if scheduler:
-    scheduler.add_job(
-        run_rental_expiry_job,
-        'interval',
-        minutes=15,
-        id='rental_expiry_job',
-        replace_existing=True,
-        max_instances=1,
-        coalesce=True
-    )
 
-__all__ = ['scheduler', 'start_scheduler', 'stop_scheduler', 'run_rental_expiry_job']
+def get_stream_worker_state() -> dict:
+    """Return event-stream worker state for diagnostics (stub)."""
+    return {"status": "not_configured", "events_processed": 0}
+
+
+__all__ = ['scheduler', 'start_scheduler', 'stop_scheduler', 'get_scheduler_runtime_state', 'get_stream_worker_state']

@@ -1,6 +1,7 @@
+from __future__ import annotations
 from app.models.station import Station, StationImage, StationSlot, StationStatus
 from sqlmodel import Session, select, func
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from math import radians, cos, sin, asin, sqrt
 from app.models.alert import Alert
 from app.models.station_heartbeat import StationHeartbeat
@@ -9,7 +10,7 @@ from app.models.battery import Battery
 from app.models.rental import Rental
 from app.schemas.station import StationCreate, StationUpdate, NearbyStationResponse, NearbyFilterSchema
 from typing import List, Optional, Dict, Any
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from sqlmodel import Session, select, func
 
 class StationService:
@@ -35,12 +36,14 @@ class StationService:
     ) -> List[NearbyStationResponse]:
         from app.schemas.station import NearbyStationResponse, StationImageResponse, NearbyFilterSchema
         from app.models.battery_catalog import BatteryCatalog
-        
-        # 1. Base Query
-        query = select(Station)
+        from sqlalchemy.orm import selectinload
+
+        # 1. Base Query — eager-load images to avoid N+1 in the loop below
+        # (station.images is accessed per-station during response construction).
+        query = select(Station).options(selectinload(Station.images))
         if status:
             query = query.where(Station.status == status)
-        if filters and filters.min_rating is not None:
+        if filters and getattr(filters, "min_rating", None) is not None:
             query = query.where(Station.rating >= filters.min_rating)
         if is_24x7:
              query = query.where(Station.is_24x7 == True)

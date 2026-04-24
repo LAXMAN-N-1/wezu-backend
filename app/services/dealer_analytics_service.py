@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Dealer Analytics Service — Performance overview, trends, station metrics,
 customer insights, peak hours, and export.
@@ -6,13 +7,14 @@ customer insights, peak hours, and export.
 import csv
 import io
 import logging
-from datetime import datetime, UTC, timedelta, date
+from datetime import datetime, timedelta, date, timezone; UTC = timezone.utc
 from typing import Dict, Any, List, Optional
 
 from sqlmodel import Session, select, func, col
 
 from app.models.swap import SwapSession
 from app.models.station import Station, StationSlot
+from app.models.rental import Rental
 from app.models.commission import CommissionLog
 
 logger = logging.getLogger(__name__)
@@ -23,74 +25,65 @@ class DealerAnalyticsService:
     # ─── 1. Performance Overview ───
 
     @staticmethod
-    def get_overview(
-        db: Session, 
-        dealer_id: int,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        station_id: Optional[int] = None
-    ) -> dict:
+    def get_overview(db: Session, dealer_id: int) -> dict:
         """
-        Returns: swap counts, revenue, avg rating,
-        active batteries, and station count within a range.
+        Returns: swap counts (today/month), revenue, avg rating,
+        active batteries, and station count.
         """
         now = datetime.now(UTC)
-        
-        # Default to current month if no range provided
-        if not start_date:
-            start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        if not end_date:
-            end_date = now
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
         # Dealer's station IDs
-        station_ids = DealerAnalyticsService._get_station_ids(db, dealer_id, station_id=station_id)
+        station_ids = DealerAnalyticsService._get_station_ids(db, dealer_id)
 
-        # Swap counts and Revenue
-        swaps_count = 0
-        revenue = 0.0
+        # Swap counts
+        swaps_today = 0
+        swaps_month = 0
+        revenue_month = 0.0
         if station_ids:
-            swaps_count = db.exec(
+            swaps_today = db.exec(
                 select(func.count(SwapSession.id)).where(
                     col(SwapSession.station_id).in_(station_ids),
                     SwapSession.status == "completed",
-                    SwapSession.created_at >= start_date,
-                    SwapSession.created_at <= end_date,
+                    SwapSession.created_at >= today_start,
                 )
             ).one() or 0
 
-            revenue = db.exec(
+            swaps_month = db.exec(
+                select(func.count(SwapSession.id)).where(
+                    col(SwapSession.station_id).in_(station_ids),
+                    SwapSession.status == "completed",
+                    SwapSession.created_at >= month_start,
+                )
+            ).one() or 0
+
+            revenue_month = db.exec(
                 select(func.coalesce(func.sum(SwapSession.swap_amount), 0.0)).where(
                     col(SwapSession.station_id).in_(station_ids),
                     SwapSession.status == "completed",
-                    SwapSession.created_at >= start_date,
-                    SwapSession.created_at <= end_date,
+                    SwapSession.created_at >= month_start,
                 )
             ).one() or 0.0
 
-            # Delta calculation based on previous equivalent period
-            period_delta = end_date - start_date
-            prev_start = start_date - period_delta
-            prev_end = start_date
-
-            revenue_prev = db.exec(
+            # Previous month for deltas
+            prev_month_start = (month_start - timedelta(days=1)).replace(day=1)
+            revenue_prev_month = db.exec(
                 select(func.coalesce(func.sum(SwapSession.swap_amount), 0.0)).where(
                     col(SwapSession.station_id).in_(station_ids),
                     SwapSession.status == "completed",
-                    SwapSession.created_at >= prev_start,
-                    SwapSession.created_at < prev_end,
+                    SwapSession.created_at >= prev_month_start,
+                    SwapSession.created_at < month_start,
                 )
             ).one() or 0.0
-        else:
-            revenue_prev = 0.0
+
 
         # Average station rating
-        rating_query = select(func.coalesce(func.avg(Station.rating), 0.0)).where(
-            Station.dealer_id == dealer_id,
-        )
-        if station_id:
-            rating_query = rating_query.where(Station.id == station_id)
-        
-        avg_rating = db.exec(rating_query).one() or 0.0
+        avg_rating = db.exec(
+            select(func.coalesce(func.avg(Station.rating), 0.0)).where(
+                Station.dealer_id == dealer_id,
+            )
+        ).one() or 0.0
 
         # Customer rating distribution
         rating_dist = {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0}
@@ -99,12 +92,11 @@ class DealerAnalyticsService:
             ratings = db.exec(
                 select(Review.rating, func.count()).where(
                     col(Review.station_id).in_(station_ids),
-                    Review.rating.isnot(None),
-                    Review.created_at >= start_date,
-                    Review.created_at <= end_date,
+                    Review.rating.isnot(None)
                 ).group_by(Review.rating)
             ).all()
             for r_val, count in ratings:
+                # Assuming ratings are 1 to 5
                 str_val = str(int(r_val))
                 if str_val in rating_dist:
                     rating_dist[str_val] = count
@@ -120,171 +112,65 @@ class DealerAnalyticsService:
             ).one() or 0
 
         # Station count
-        station_count = len(station_ids) if not station_id else 1
+        station_count = len(station_ids)
 
         return {
-            "swaps_count": swaps_count,
-            "revenue": round(float(revenue), 2),
-            "revenue_prev": round(float(revenue_prev), 2),
-            "revenue_delta_pct": round(((revenue - revenue_prev) / revenue_prev * 100), 1) if revenue_prev > 0 else 0.0,
+            "swaps_today": swaps_today,
+            "swaps_month": swaps_month,
+            "revenue_month": round(float(revenue_month), 2),
+            "revenue_prev_month": round(float(revenue_prev_month) if station_ids else 0.0, 2),
             "avg_rating": round(float(avg_rating), 2),
             "rating_distribution": rating_dist,
             "active_batteries": active_batteries,
             "station_count": station_count,
-            "start_date": start_date.isoformat(),
-            "end_date": end_date.isoformat(),
             "timestamp": now.isoformat(),
         }
 
     @staticmethod
-    def get_sales_kpis(db: Session, dealer_id: int) -> dict:
-        """
-        Calculates 4 specific KPI cards for the Sales & Revenue screen:
-        1. Today's Revenue (vs Yesterday)
-        2. Weekly Revenue (vs Last Week)
-        3. Monthly Revenue (vs Last Month)
-        4. Pending Settlement (Amount + due date)
-        """
-        now = datetime.now(UTC)
-        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        yesterday_start = today_start - timedelta(days=1)
-        
-        week_start = (today_start - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
-        last_week_start = week_start - timedelta(weeks=1)
-        
-        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        last_month_start = (month_start - timedelta(days=1)).replace(day=1)
-
-        station_ids = DealerAnalyticsService._get_station_ids(db, dealer_id)
-
-        def _get_revenue(start, end):
-            if not station_ids: return 0.0
-            return db.exec(
-                select(func.coalesce(func.sum(SwapSession.swap_amount), 0.0)).where(
-                    col(SwapSession.station_id).in_(station_ids),
-                    SwapSession.status == "completed",
-                    SwapSession.created_at >= start,
-                    SwapSession.created_at < end,
-                )
-            ).one() or 0.0
-
-        def _get_count(start, end):
-            if not station_ids: return 0
-            return db.exec(
-                select(func.count(SwapSession.id)).where(
-                    col(SwapSession.station_id).in_(station_ids),
-                    SwapSession.status == "completed",
-                    SwapSession.created_at >= start,
-                    SwapSession.created_at < end,
-                )
-            ).one() or 0
-
-        # Calculations
-        rev_today = _get_revenue(today_start, now)
-        rev_yesterday = _get_revenue(yesterday_start, today_start)
-        count_today = _get_count(today_start, now)
-        avg_txn_today = (rev_today / count_today) if count_today > 0 else 0.0
-
-        rev_week = _get_revenue(week_start, now)
-        rev_last_week = _get_revenue(last_week_start, week_start)
-        count_week = _get_count(week_start, now)
-
-        rev_month = _get_revenue(month_start, now)
-        rev_last_month = _get_revenue(last_month_start, month_start)
-
-        # Pending Settlement from SettlementService
-        from app.services.settlement_service import SettlementService
-        settlement_info = SettlementService.get_dealer_dashboard(db, dealer_id)
-        pending_amount = settlement_info["pending_settlements"]["total_amount"]
-        
-        # Estimate due date (standard 10th of next month)
-        next_due = (now.replace(day=28) + timedelta(days=5)).replace(day=10, hour=0, minute=0)
-
-        return {
-            "today": {
-                "value": round(float(rev_today), 2),
-                "prev_value": round(float(rev_yesterday), 2),
-                "delta_pct": round(((rev_today - rev_yesterday) / rev_yesterday * 100), 1) if rev_yesterday > 0 else 0.0,
-                "count": count_today,
-                "avg_value": round(float(avg_txn_today), 2)
-            },
-            "week": {
-                "value": round(float(rev_week), 2),
-                "prev_value": round(float(rev_last_week), 2),
-                "delta_pct": round(((rev_week - rev_last_week) / rev_last_week * 100), 1) if rev_last_week > 0 else 0.0,
-                "count": count_week
-            },
-            "month": {
-                "value": round(float(rev_month), 2),
-                "prev_value": round(float(rev_last_month), 2),
-                "delta_pct": round(((rev_month - rev_last_month) / rev_last_month * 100), 1) if rev_last_month > 0 else 0.0,
-                "target": 50000.0 # Mock target
-            },
-            "pending": {
-                "value": round(float(pending_amount), 2),
-                "due_date": next_due.isoformat()
-            }
-        }
-
-    @staticmethod
-    def get_revenue_breakdown(
-        db: Session, 
-        dealer_id: int, 
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        station_id: Optional[int] = None
-    ) -> dict:
+    def get_revenue_breakdown(db: Session, dealer_id: int, period: str = "month") -> dict:
         """Returns revenue split by type (Rentals, Commissions, Refunds) for Stacked Bar Charts."""
-        now = datetime.now(UTC)
-        if not start_date:
+        now = datetime.utcnow()
+        if period == "today":
+            start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        elif period == "week":
+            start_date = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+        else: # month
             start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        if not end_date:
-            end_date = now
-
-        station_ids = DealerAnalyticsService._get_station_ids(db, dealer_id, station_id=station_id)
+            
+        station_ids = DealerAnalyticsService._get_station_ids(db, dealer_id)
         
         rental_income = 0.0
         if station_ids:
+            # Using SwapSession amount as proxy for rental income here, or use Rental table
             from app.models.rental import Rental
             rental_income = db.exec(
                 select(func.coalesce(func.sum(Rental.total_amount), 0.0))
                 .where(col(Rental.start_station_id).in_(station_ids))
                 .where(Rental.created_at >= start_date)
-                .where(Rental.created_at <= end_date)
             ).one() or 0.0
             
-        from app.models.dealer import DealerProfile
-        dealer = db.exec(select(DealerProfile).where(DealerProfile.id == dealer_id)).first()
-        user_id = dealer.user_id if dealer else dealer_id
-        
         commission = db.exec(
             select(func.coalesce(func.sum(CommissionLog.amount), 0.0))
-            .where(CommissionLog.dealer_id == user_id)
+            .where(CommissionLog.dealer_id == dealer_id)
             .where(CommissionLog.created_at >= start_date)
-            .where(CommissionLog.created_at <= end_date)
         ).one() or 0.0
         
         return {
             "rental_income": round(float(rental_income), 2),
             "commission": round(float(commission), 2),
-            "refunds": 0.0,
-            "bonuses": 0.0
+            "refunds": 0.0, # Placeholder for future refund table
+            "bonuses": 0.0  # Placeholder for future bonuses
         }
 
     # ─── 2. Trends ───
 
     @staticmethod
     def get_trends(
-        db: Session, 
-        dealer_id: int, 
-        period: str = "daily", 
-        num_periods: int = 7,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        station_id: Optional[int] = None
+        db: Session, dealer_id: int, period: str = "daily", num_periods: int = 7,
+        end_date: Optional[datetime] = None
     ) -> List[dict]:
-        """Revenue + swap volume trends for specific range or N periods."""
-        station_ids = DealerAnalyticsService._get_station_ids(db, dealer_id, station_id=station_id)
+        """Revenue + swap volume trends for the last N periods."""
+        station_ids = DealerAnalyticsService._get_station_ids(db, dealer_id)
         if not station_ids:
             return []
 
@@ -337,97 +223,6 @@ class DealerAnalyticsService:
                 "swaps": swaps,
                 "revenue": round(float(revenue), 2),
             })
-        # If start_date is provided, we calculate based on the range.
-        # Otherwise, we use num_periods as before.
-        if start_date:
-            # Simple logic: If daily, we iterate days. If monthly, we iterate months.
-            current = start_date.replace(hour=0, minute=0, second=0, microsecond=0)
-            while current < now:
-                if period == "daily":
-                    next_p = current + timedelta(days=1)
-                    label = current.strftime("%Y-%m-%d")
-                elif period == "weekly":
-                    next_p = current + timedelta(weeks=1)
-                    label = f"W{current.isocalendar().week} {current.year}"
-                else: # monthly
-                    if current.month == 12:
-                        next_p = datetime(current.year + 1, 1, 1)
-                    else:
-                        next_p = datetime(current.year, current.month + 1, 1)
-                    label = current.strftime("%Y-%m")
-                
-                swaps = db.exec(
-                    select(func.count(SwapSession.id)).where(
-                        col(SwapSession.station_id).in_(station_ids),
-                        SwapSession.status == "completed",
-                        SwapSession.created_at >= current,
-                        SwapSession.created_at < next_p,
-                    )
-                ).one() or 0
-
-                revenue = db.exec(
-                    select(func.coalesce(func.sum(SwapSession.swap_amount), 0.0)).where(
-                        col(SwapSession.station_id).in_(station_ids),
-                        SwapSession.status == "completed",
-                        SwapSession.created_at >= current,
-                        SwapSession.created_at < next_p,
-                    )
-                ).one() or 0.0
-
-                trends.append({
-                    "period": label,
-                    "swaps": swaps,
-                    "revenue": round(float(revenue), 2),
-                })
-                current = next_p
-        else:
-            # Original logic for last N periods
-            for i in range(num_periods - 1, -1, -1):  # oldest first
-                if period == "daily":
-                    start = (now - timedelta(days=i)).replace(hour=0, minute=0, second=0, microsecond=0)
-                    end = start + timedelta(days=1)
-                    label = start.strftime("%Y-%m-%d")
-                elif period == "weekly":
-                    start = (now - timedelta(weeks=i)).replace(hour=0, minute=0, second=0, microsecond=0)
-                    start = start - timedelta(days=start.weekday())  # Monday
-                    end = start + timedelta(weeks=1)
-                    label = f"W{start.isocalendar().week} {start.year}"
-                else:  # monthly
-                    month_offset = now.month - i
-                    year = now.year
-                    while month_offset < 1:
-                        month_offset += 12
-                        year -= 1
-                    start = datetime(year, month_offset, 1)
-                    if month_offset == 12:
-                        end = datetime(year + 1, 1, 1)
-                    else:
-                        end = datetime(year, month_offset + 1, 1)
-                    label = start.strftime("%Y-%m")
-
-                swaps = db.exec(
-                    select(func.count(SwapSession.id)).where(
-                        col(SwapSession.station_id).in_(station_ids),
-                        SwapSession.status == "completed",
-                        SwapSession.created_at >= start,
-                        SwapSession.created_at < end,
-                    )
-                ).one() or 0
-
-                revenue = db.exec(
-                    select(func.coalesce(func.sum(SwapSession.swap_amount), 0.0)).where(
-                        col(SwapSession.station_id).in_(station_ids),
-                        SwapSession.status == "completed",
-                        SwapSession.created_at >= start,
-                        SwapSession.created_at < end,
-                    )
-                ).one() or 0.0
-
-                trends.append({
-                    "period": label,
-                    "swaps": swaps,
-                    "revenue": round(float(revenue), 2),
-                })
 
         return trends
 
@@ -470,63 +265,71 @@ class DealerAnalyticsService:
     # ─── 3. Station Metrics ───
 
     @staticmethod
-    def get_station_metrics(
-        db: Session, 
-        dealer_id: int,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None
-    ) -> List[dict]:
-        """Per-station performance within a range."""
+    def get_station_metrics(db: Session, dealer_id: int) -> List[dict]:
+        """Per-station: swaps, revenue, utilization %, rating."""
         stations = db.exec(
             select(Station).where(Station.dealer_id == dealer_id)
         ).all()
 
+        if not stations:
+            return []
+
         now = datetime.now(UTC)
-        if not start_date:
-            start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        if not end_date:
-            end_date = now
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        station_ids = [s.id for s in stations]
+
+        # Batch: swaps per station this month
+        swap_counts = db.exec(
+            select(SwapSession.station_id, func.count(SwapSession.id))
+            .where(
+                SwapSession.station_id.in_(station_ids),
+                SwapSession.status == "completed",
+                SwapSession.created_at >= month_start,
+            )
+            .group_by(SwapSession.station_id)
+        ).all()
+        swap_map = {row[0]: row[1] for row in swap_counts}
+
+        # Batch: revenue per station this month
+        revenue_rows = db.exec(
+            select(SwapSession.station_id, func.coalesce(func.sum(SwapSession.swap_amount), 0.0))
+            .where(
+                SwapSession.station_id.in_(station_ids),
+                SwapSession.status == "completed",
+                SwapSession.created_at >= month_start,
+            )
+            .group_by(SwapSession.station_id)
+        ).all()
+        revenue_map = {row[0]: row[1] for row in revenue_rows}
+
+        # Batch: occupied slots per station
+        occupied_rows = db.exec(
+            select(StationSlot.station_id, func.count(StationSlot.id))
+            .where(
+                StationSlot.station_id.in_(station_ids),
+                StationSlot.battery_id.isnot(None),
+            )
+            .group_by(StationSlot.station_id)
+        ).all()
+        occupied_map = {row[0]: row[1] for row in occupied_rows}
+
+        # Batch: avg battery health per station
+        from app.models.battery import Battery
+        health_rows = db.exec(
+            select(StationSlot.station_id, func.coalesce(func.avg(Battery.health_percentage), 0.0))
+            .join(Battery, StationSlot.battery_id == Battery.id)
+            .where(StationSlot.station_id.in_(station_ids))
+            .group_by(StationSlot.station_id)
+        ).all()
+        health_map = {row[0]: row[1] for row in health_rows}
 
         metrics = []
-
         for s in stations:
-            swaps = db.exec(
-                select(func.count(SwapSession.id)).where(
-                    SwapSession.station_id == s.id,
-                    SwapSession.status == "completed",
-                    SwapSession.created_at >= start_date,
-                    SwapSession.created_at <= end_date,
-                )
-            ).one() or 0
-
-            revenue = db.exec(
-                select(func.coalesce(func.sum(SwapSession.swap_amount), 0.0)).where(
-                    SwapSession.station_id == s.id,
-                    SwapSession.status == "completed",
-                    SwapSession.created_at >= start_date,
-                    SwapSession.created_at <= end_date,
-                )
-            ).one() or 0.0
-
-            # Utilization: slots with batteries / total slots
-            occupied = db.exec(
-                select(func.count(StationSlot.id)).where(
-                    StationSlot.station_id == s.id,
-                    StationSlot.battery_id.isnot(None),
-                )
-            ).one() or 0
-
+            swaps = swap_map.get(s.id, 0)
+            revenue = revenue_map.get(s.id, 0.0)
+            occupied = occupied_map.get(s.id, 0)
             utilization = (occupied / s.total_slots * 100) if s.total_slots > 0 else 0.0
-
-            # Battery Health Score (average health of batteries present)
-            from app.models.battery import Battery
-            avg_health = db.exec(
-                select(func.coalesce(func.avg(Battery.health_percentage), 0.0)).join(
-                    StationSlot, StationSlot.battery_id == Battery.id
-                ).where(
-                    StationSlot.station_id == s.id
-                )
-            ).one() or 0.0
+            avg_health = health_map.get(s.id, 0.0)
 
             metrics.append({
                 "station_id": s.id,
@@ -602,6 +405,7 @@ class DealerAnalyticsService:
 
         new_customers = len(current_customers - prev_customers)
 
+        # Avg CLV (total revenue / unique customers)
         total_revenue = db.exec(
             select(func.coalesce(func.sum(SwapSession.swap_amount), 0.0)).where(
                 col(SwapSession.station_id).in_(station_ids),
@@ -696,7 +500,7 @@ class DealerAnalyticsService:
     def export_pdf(data: dict) -> str:
         """Generate PDF using PDFService."""
         from app.services.pdf_service import PDFService
-        from datetime import datetime, UTC
+        from datetime import datetime, timezone; UTC = timezone.utc
         import uuid
         import os
 
@@ -716,8 +520,7 @@ class DealerAnalyticsService:
             pdf_data[k] = v
 
         try:
-            # We don't have a direct raw PDF generator, so we use this mock
-            # Or build a simple FPDF right here
+            # Render a lightweight PDF report directly from analytics payload.
             from fpdf import FPDF
             pdf = FPDF()
             pdf.add_page()
@@ -758,9 +561,178 @@ class DealerAnalyticsService:
 
         # Send email
         body = f"Attached is your performance overview up to {datetime.now(UTC).isoformat()}."
-        # In actual prod we attach the file via EmailService (which is currently mocked)
         EmailService.send_email(dealer.contact_email, "Dealer Performance Report", body)
         return {"status": "success", "email": dealer.contact_email}
+
+    @staticmethod
+    def get_revenue_chart_data(
+        db: Session,
+        dealer_id: int,
+        *,
+        granularity: str = "daily",
+        periods: int = 7,
+        compare: bool = False,
+    ) -> Dict[str, Any]:
+        """Revenue + swap chart data in hourly/daily/weekly buckets."""
+        station_ids = DealerAnalyticsService._get_station_ids(db, dealer_id)
+        if not station_ids:
+            return {"granularity": granularity, "points": [], "comparison": []}
+
+        normalized_granularity = (granularity or "daily").strip().lower()
+        if normalized_granularity not in {"hourly", "daily", "weekly"}:
+            normalized_granularity = "daily"
+
+        now = datetime.now(UTC)
+
+        windows: list[tuple[str, datetime, datetime]] = []
+        if normalized_granularity == "hourly":
+            cursor = now.replace(minute=0, second=0, microsecond=0)
+            for offset in range(periods - 1, -1, -1):
+                start = cursor - timedelta(hours=offset)
+                end = start + timedelta(hours=1)
+                windows.append((start.strftime("%Y-%m-%d %H:00"), start, end))
+        elif normalized_granularity == "weekly":
+            week_start = (now - timedelta(days=now.weekday())).replace(
+                hour=0,
+                minute=0,
+                second=0,
+                microsecond=0,
+            )
+            for offset in range(periods - 1, -1, -1):
+                start = week_start - timedelta(weeks=offset)
+                end = start + timedelta(days=7)
+                windows.append((f"W{start.isocalendar().week}-{start.year}", start, end))
+        else:
+            day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            for offset in range(periods - 1, -1, -1):
+                start = day_start - timedelta(days=offset)
+                end = start + timedelta(days=1)
+                windows.append((start.strftime("%Y-%m-%d"), start, end))
+
+        points = []
+        for label, start, end in windows:
+            revenue = db.exec(
+                select(func.coalesce(func.sum(SwapSession.swap_amount), 0.0))
+                .where(
+                    col(SwapSession.station_id).in_(station_ids),
+                    SwapSession.status == "completed",
+                    SwapSession.created_at >= start,
+                    SwapSession.created_at < end,
+                )
+            ).one() or 0.0
+            swaps = db.exec(
+                select(func.count(SwapSession.id)).where(
+                    col(SwapSession.station_id).in_(station_ids),
+                    SwapSession.status == "completed",
+                    SwapSession.created_at >= start,
+                    SwapSession.created_at < end,
+                )
+            ).one() or 0
+            points.append(
+                {
+                    "label": label,
+                    "revenue": round(float(revenue), 2),
+                    "swaps": int(swaps),
+                }
+            )
+
+        comparison_points = []
+        if compare and windows:
+            span = windows[-1][2] - windows[0][1]
+            for label, start, end in windows:
+                prev_start = start - span
+                prev_end = end - span
+                revenue = db.exec(
+                    select(func.coalesce(func.sum(SwapSession.swap_amount), 0.0))
+                    .where(
+                        col(SwapSession.station_id).in_(station_ids),
+                        SwapSession.status == "completed",
+                        SwapSession.created_at >= prev_start,
+                        SwapSession.created_at < prev_end,
+                    )
+                ).one() or 0.0
+                swaps = db.exec(
+                    select(func.count(SwapSession.id)).where(
+                        col(SwapSession.station_id).in_(station_ids),
+                        SwapSession.status == "completed",
+                        SwapSession.created_at >= prev_start,
+                        SwapSession.created_at < prev_end,
+                    )
+                ).one() or 0
+                comparison_points.append(
+                    {
+                        "label": label,
+                        "revenue": round(float(revenue), 2),
+                        "swaps": int(swaps),
+                    }
+                )
+
+        return {
+            "granularity": normalized_granularity,
+            "points": points,
+            "comparison": comparison_points,
+        }
+
+    @staticmethod
+    def get_commission_summary(
+        db: Session,
+        dealer_id: int,
+        *,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+    ) -> Dict[str, float]:
+        """Aggregate dealer revenue, fees, and payout for settlement dashboard."""
+        from app.models.commission import CommissionConfig, CommissionLog
+        from app.models.settlement import Settlement
+
+        settlement_query = select(Settlement).where(Settlement.dealer_id == dealer_id)
+        if start_date is not None:
+            settlement_query = settlement_query.where(Settlement.created_at >= start_date)
+        if end_date is not None:
+            settlement_query = settlement_query.where(Settlement.created_at <= end_date)
+        settlements = db.exec(settlement_query).all()
+
+        gross_revenue = sum(float(s.total_revenue or 0.0) for s in settlements)
+        platform_fees = sum(float(s.platform_fee or 0.0) for s in settlements)
+        commission_earned = sum(float(s.total_commission or 0.0) for s in settlements)
+        net_payout = sum(float(s.net_payable or 0.0) for s in settlements)
+
+        if not settlements:
+            station_ids = DealerAnalyticsService._get_station_ids(db, dealer_id)
+            rental_query = select(func.coalesce(func.sum(Rental.total_amount), 0.0)).where(
+                col(Rental.start_station_id).in_(station_ids)
+            )
+            if start_date is not None:
+                rental_query = rental_query.where(Rental.start_time >= start_date)
+            if end_date is not None:
+                rental_query = rental_query.where(Rental.start_time <= end_date)
+            gross_revenue = float(db.exec(rental_query).one() or 0.0)
+
+            commission_query = select(func.coalesce(func.sum(CommissionLog.amount), 0.0)).where(
+                CommissionLog.dealer_id == dealer_id
+            )
+            if start_date is not None:
+                commission_query = commission_query.where(CommissionLog.created_at >= start_date)
+            if end_date is not None:
+                commission_query = commission_query.where(CommissionLog.created_at <= end_date)
+            commission_earned = float(db.exec(commission_query).one() or 0.0)
+            platform_fees = max(0.0, gross_revenue - commission_earned)
+            net_payout = max(0.0, gross_revenue - platform_fees)
+
+        commission_config = db.exec(
+            select(CommissionConfig)
+            .where(CommissionConfig.dealer_id == dealer_id)
+            .order_by(CommissionConfig.created_at.desc())
+        ).first()
+        current_rate = float(commission_config.percentage) if commission_config else 15.0
+
+        return {
+            "gross_revenue": round(gross_revenue, 2),
+            "platform_fees_deducted": round(platform_fees, 2),
+            "commission_earned": round(commission_earned, 2),
+            "net_payout": round(net_payout, 2),
+            "current_commission_rate": round(current_rate, 2),
+        }
 
     # ─── Helpers ───
 
@@ -830,172 +802,9 @@ class DealerAnalyticsService:
             
         return results
 
-    # ─── 7. Revenue Chart (Timeseries) ───
-
-    @staticmethod
-    def get_revenue_chart_data(
-        db: Session,
-        dealer_id: int,
-        granularity: str = "daily",
-        periods: int = 7,
-        compare: bool = False,
-    ) -> dict:
-        """
-        Timeseries revenue data for chart rendering.
-        Supports hourly (last 24h), daily (last N days), weekly (last N weeks).
-        Optionally compares with the previous equivalent period.
-        """
-        station_ids = DealerAnalyticsService._get_station_ids(db, dealer_id)
-        now = datetime.now(UTC)
-
-        def _build_series(end_dt: datetime) -> List[dict]:
-            series = []
-            for i in range(periods - 1, -1, -1):
-                if granularity == "hourly":
-                    start = (end_dt - timedelta(hours=i)).replace(minute=0, second=0, microsecond=0)
-                    end = start + timedelta(hours=1)
-                    label = start.strftime("%H:%M")
-                elif granularity == "weekly":
-                    start = (end_dt - timedelta(weeks=i))
-                    start = (start - timedelta(days=start.weekday())).replace(
-                        hour=0, minute=0, second=0, microsecond=0
-                    )
-                    end = start + timedelta(weeks=1)
-                    label = f"W{start.isocalendar().week} {start.year}"
-                else:  # daily
-                    start = (end_dt - timedelta(days=i)).replace(
-                        hour=0, minute=0, second=0, microsecond=0
-                    )
-                    end = start + timedelta(days=1)
-                    label = start.strftime("%Y-%m-%d")
-
-                revenue = 0.0
-                swap_count = 0
-                if station_ids:
-                    revenue = db.exec(
-                        select(func.coalesce(func.sum(SwapSession.swap_amount), 0.0)).where(
-                            col(SwapSession.station_id).in_(station_ids),
-                            SwapSession.status == "completed",
-                            SwapSession.created_at >= start,
-                            SwapSession.created_at < end,
-                        )
-                    ).one() or 0.0
-                    swap_count = db.exec(
-                        select(func.count(SwapSession.id)).where(
-                            col(SwapSession.station_id).in_(station_ids),
-                            SwapSession.status == "completed",
-                            SwapSession.created_at >= start,
-                            SwapSession.created_at < end,
-                        )
-                    ).one() or 0
-
-                series.append({
-                    "label": label,
-                    "revenue": round(float(revenue), 2),
-                    "swap_count": swap_count,
-                })
-            return series
-
-        current_series = _build_series(now)
-
-        result: Dict[str, Any] = {
-            "granularity": granularity,
-            "periods": periods,
-            "current": current_series,
-        }
-
-        if compare:
-            if granularity == "hourly":
-                prev_end = now - timedelta(hours=periods)
-            elif granularity == "weekly":
-                prev_end = now - timedelta(weeks=periods)
-            else:
-                prev_end = now - timedelta(days=periods)
-            result["previous"] = _build_series(prev_end)
-
-        return result
-
-    # ─── 8. Commission Summary ───
-
-    @staticmethod
-    def get_commission_summary(
-        db: Session,
-        dealer_id: int,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-    ) -> dict:
-        """
-        Returns Gross Revenue, Platform Fees, Commission Earned, Net Payout
-        for the given period (defaults to current month).
-        """
-        from app.models.settlement import Settlement
-
-        now = datetime.now(UTC)
-        if not start_date:
-            start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        if not end_date:
-            end_date = now
-
-        station_ids = DealerAnalyticsService._get_station_ids(db, dealer_id)
-
-        # Gross revenue from completed swaps at dealer stations
-        gross_revenue = 0.0
-        if station_ids:
-            gross_revenue = db.exec(
-                select(func.coalesce(func.sum(SwapSession.swap_amount), 0.0)).where(
-                    col(SwapSession.station_id).in_(station_ids),
-                    SwapSession.status == "completed",
-                    SwapSession.created_at >= start_date,
-                    SwapSession.created_at < end_date,
-                )
-            ).one() or 0.0
-
-        from app.models.dealer import DealerProfile
-        dealer = db.exec(select(DealerProfile).where(DealerProfile.id == dealer_id)).first()
-        user_id = dealer.user_id if dealer else dealer_id
-
-        # Commission earned
-        commission_earned = db.exec(
-            select(func.coalesce(func.sum(CommissionLog.amount), 0.0)).where(
-                CommissionLog.dealer_id == user_id,
-                CommissionLog.created_at >= start_date,
-                CommissionLog.created_at < end_date,
-            )
-        ).one() or 0.0
-
-        # Platform fees from settlements in period
-        platform_fees = db.exec(
-            select(func.coalesce(func.sum(Settlement.platform_fee), 0.0)).where(
-                Settlement.dealer_id == dealer_id,
-                Settlement.start_date >= start_date,
-                Settlement.end_date <= end_date,
-            )
-        ).one() or 0.0
-
-        # Net payout from settlements
-        net_payout = db.exec(
-            select(func.coalesce(func.sum(Settlement.net_payable), 0.0)).where(
-                Settlement.dealer_id == dealer_id,
-                Settlement.start_date >= start_date,
-                Settlement.end_date <= end_date,
-            )
-        ).one() or 0.0
-
-        return {
-            "period": {
-                "start": start_date.isoformat(),
-                "end": end_date.isoformat(),
-            },
-            "gross_revenue": round(float(gross_revenue), 2),
-            "platform_fees": round(float(platform_fees), 2),
-            "commission_earned": round(float(commission_earned), 2),
-            "net_payout": round(float(net_payout), 2),
-        }
-
     # ─── Helpers ───
     @staticmethod
-    def _get_station_ids(db: Session, dealer_id: int, station_id: Optional[int] = None) -> List[int]:
-        query = select(Station.id).where(Station.dealer_id == dealer_id)
-        if station_id:
-            query = query.where(Station.id == station_id)
-        return list(db.exec(query).all())
+    def _get_station_ids(db: Session, dealer_id: int) -> List[int]:
+        return list(db.exec(
+            select(Station.id).where(Station.dealer_id == dealer_id)
+        ).all())

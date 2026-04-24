@@ -1,6 +1,7 @@
+from __future__ import annotations
 """Master seed script for all new modules — BESS, Notifications, Audit, Settings."""
 import random
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from sqlmodel import Session, select, func
 
 from app.models.bess import BessUnit, BessEnergyLog, BessGridEvent, BessReport

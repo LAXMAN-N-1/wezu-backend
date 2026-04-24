@@ -1,6 +1,6 @@
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional, List
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 class StaffProfile(SQLModel, table=True):
     __tablename__ = "staff_profiles"
@@ -24,13 +24,13 @@ class StaffProfile(SQLModel, table=True):
         back_populates="staff_profile",
         sa_relationship_kwargs={
             "foreign_keys": "StaffProfile.user_id",
-            "overlaps": "user,staff_profile,owner,owned_dealer_profile,staff_members"
+            "overlaps": "user,staff_profile,staff_members"
         }
     )
     dealer: Optional["DealerProfile"] = Relationship(
         back_populates="staff_members",
         sa_relationship_kwargs={
-            "overlaps": "dealer,staff_members,user,owner,owned_dealer_profile"
+            "overlaps": "dealer,staff_members,user"
         }
     )
     # station: Optional["Station"] = Relationship()

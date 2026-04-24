@@ -1,5 +1,6 @@
+from __future__ import annotations
 from typing import List, Optional, Tuple, Dict
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from sqlmodel import Session, select, func, and_
 from app.models.user import User, UserStatus
 from app.models.user_history import UserStatusLog
@@ -31,7 +32,7 @@ class UserService:
     @staticmethod
     def delete_account(db: Session, user: User, reason: str):
         """Soft delete the user account and revoke sessions"""
-        from datetime import datetime, UTC
+        from datetime import datetime, timezone; UTC = timezone.utc
         from app.services.auth_service import AuthService
         
         user.is_deleted = True
@@ -66,7 +67,7 @@ class UserService:
         if not user:
             return None
         
-        user.status = "suspended"
+        user.status = UserStatus.SUSPENDED
         user.is_active = False
         db.add(user)
         
@@ -89,7 +90,7 @@ class UserService:
         if not user:
             return None
             
-        user.status = "active"
+        user.status = UserStatus.ACTIVE
         user.is_active = True
         db.add(user)
         

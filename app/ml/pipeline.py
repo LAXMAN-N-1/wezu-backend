@@ -1,3 +1,4 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from app.ml.feature_store import FeatureStore
 from app.ml.registry import ModelRegistry

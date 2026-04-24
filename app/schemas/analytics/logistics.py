@@ -1,3 +1,4 @@
+from __future__ import annotations
 from pydantic import BaseModel
 from typing import Dict, List, Any
 from .base import KpiCard, TrendPoint

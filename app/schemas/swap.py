@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
@@ -7,7 +8,10 @@ class SwapSessionBase(BaseModel):
     old_battery_serial: Optional[str] = None # User might provide serial or system detects it via slot
 
 class SwapInitRequest(SwapSessionBase):
-    pass
+    rental_id: Optional[int] = None
+    new_battery_id: Optional[int] = None
+    duration_days: Optional[int] = None
+    preferred_battery_type: Optional[str] = None
 
 class SwapResponse(BaseModel):
     id: int

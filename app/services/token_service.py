@@ -1,8 +1,13 @@
-from datetime import datetime, UTC
+from __future__ import annotations
+from datetime import datetime, timezone; UTC = timezone.utc
 from jose import jwt
 from sqlmodel import func, select, Session
 from app.models.oauth import BlacklistedToken
 from app.core.config import settings
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 class TokenService:
     @staticmethod
@@ -28,8 +33,7 @@ class TokenService:
                 db.add(blacklisted)
                 db.commit()
         except Exception:
-            # If token is already invalid, just ignore
-            pass
+            logger.warning("token.blacklist_failed token=%s...", token[:12] if token else "?", exc_info=True)
 
     @staticmethod
     def cleanup_expired_tokens(db: Session):

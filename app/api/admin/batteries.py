@@ -1,9 +1,9 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlmodel import Session, select, func, or_, and_
 from typing import List, Optional
-import uuid
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 import csv
 import io
 
@@ -186,7 +186,7 @@ def bulk_update_batteries(
 
 @router.get("/{battery_id}", response_model=BatteryDetailResponse)
 def get_battery_detail(
-    battery_id: uuid.UUID,
+    battery_id: int,
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_admin)
 ):
@@ -197,7 +197,7 @@ def get_battery_detail(
 
 @router.get("/{battery_id}/history", response_model=List[BatteryAuditLogResponse])
 def get_battery_audit_logs(
-    battery_id: uuid.UUID,
+    battery_id: int,
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_admin)
 ):
@@ -209,7 +209,7 @@ def get_battery_audit_logs(
 
 @router.get("/{battery_id}/health-history", response_model=List[BatteryHealthHistoryResponse])
 def get_battery_health_history(
-    battery_id: uuid.UUID,
+    battery_id: int,
     days: int = Query(90, description="Number of days of history"),
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_admin)
@@ -232,9 +232,10 @@ def create_battery(
     if existing:
         raise HTTPException(status_code=400, detail="Serial number already exists")
 
-    db_battery = Battery.from_orm(battery_in)
+    db_battery = Battery.model_validate(battery_in)
     db_battery.created_by = current_user.id
     session.add(db_battery)
+    session.flush()
 
     audit_log = BatteryAuditLog(
         battery_id=db_battery.id,
@@ -250,7 +251,7 @@ def create_battery(
 
 @router.patch("/{battery_id}", response_model=BatteryResponse)
 def update_battery(
-    battery_id: uuid.UUID,
+    battery_id: int,
     battery_in: BatteryUpdate,
     session: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_admin)

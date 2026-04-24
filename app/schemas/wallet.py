@@ -1,3 +1,4 @@
+from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 from datetime import datetime
@@ -26,6 +27,14 @@ class TransactionResponse(BaseModel):
     payment_method: Optional[str] = None
     payment_gateway_ref: Optional[str] = None
     
+    # P1-C canonical fields
+    type: Optional[str] = None
+    category: Optional[str] = None
+    balance_after: Optional[float] = None
+    reference_type: Optional[str] = None
+    reference_id: Optional[str] = None
+    razorpay_payment_id: Optional[str] = None
+    
     description: Optional[str] = None
     created_at: datetime
     
@@ -34,23 +43,3 @@ class TransactionResponse(BaseModel):
 class RechargeRequest(BaseModel):
     amount: float
     payment_method: str = "upi"
-
-class DealerTransactionResponse(TransactionResponse):
-    customer_name: str
-    customer_phone: Optional[str] = None
-    station_name: str
-    terminal_id: Optional[int] = None
-    battery_serial: Optional[str] = None
-    duration_minutes: Optional[int] = None
-    net_amount: float
-    commission_amount: float
-    settlement_status: str
-
-class TransactionLifecycleEvent(BaseModel):
-    event_type: str
-    timestamp: datetime
-    is_completed: bool
-
-class TransactionLifecycleResponse(BaseModel):
-    transaction_id: int
-    events: List[TransactionLifecycleEvent]

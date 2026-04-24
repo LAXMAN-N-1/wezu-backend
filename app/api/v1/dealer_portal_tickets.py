@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Dealer Portal Tickets — Support ticket CRUD and reply system.
 """
@@ -5,7 +6,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func
 from pydantic import BaseModel
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 
 from app.db.session import get_session
 from app.api.deps import get_current_user

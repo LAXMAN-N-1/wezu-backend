@@ -1,3 +1,4 @@
+from __future__ import annotations
 from sqlmodel import Session, select
 from app.models.ecommerce import EcommerceProduct, EcommerceOrder, EcommerceOrderItem
 from app.models.user import User
@@ -32,8 +33,13 @@ class OrderService:
         total_amount = 0.0
         order_items = []
         
+        # Batch-load all products at once (eliminates per-item db.get N+1)
+        product_ids = [item["product_id"] for item in items_data]
+        products = db.exec(select(EcommerceProduct).where(EcommerceProduct.id.in_(product_ids))).all()
+        products_map = {p.id: p for p in products}
+
         for item in items_data:
-            product = db.get(EcommerceProduct, item["product_id"])
+            product = products_map.get(item["product_id"])
             if not product:
                 raise HTTPException(status_code=404, detail=f"EcommerceProduct {item['product_id']} not found")
             if product.stock_quantity < item["quantity"]:

@@ -1,8 +1,9 @@
+from __future__ import annotations
 import sys
 import os
 import random
 import uuid
-from datetime import datetime, UTC, timedelta
+from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 
 # Add backend to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))

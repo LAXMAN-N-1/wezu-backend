@@ -1,43 +1,85 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlmodel import Session, select
-from typing import List, Optional
+from typing import Any, List, Optional
+from pydantic import BaseModel, Field
+import logging
+
 from app.api import deps
 from app.core.audit import audit_log
+
+logger = logging.getLogger(__name__)
 from app.models.user import User
 from app.models.financial import Transaction
 from app.schemas.wallet import TransactionResponse, RechargeRequest
-from app.schemas.payment import WalletBalanceResponse, PaymentMethodResponse
+from app.schemas.payment import WalletBalanceResponse
 from app.services.wallet_service import WalletService
 from app.services.payment_service import PaymentService
+from app.services.payment_method_service import PaymentMethodService
 from app.services.invoice_service import InvoiceService
 from fastapi.responses import StreamingResponse
 
 router = APIRouter()
 
+
+class PaymentMethodCreateRequest(BaseModel):
+    type: str
+    provider_token: str
+    provider: str = "razorpay"
+    is_default: bool = False
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
 # Payment Methods
 @router.get("/payment-methods", response_model=dict)
-async def list_payment_methods(current_user: User = Depends(deps.get_current_user)):
+async def list_payment_methods(
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
     """List stored payment methods"""
-    from app.api.v1.payments import get_payment_methods
-    return get_payment_methods(current_user)
+    methods = PaymentMethodService.list_serialized_methods(db, current_user.id)
+    default_method_id = next((item["id"] for item in methods if item.get("is_default")), None)
+    return {
+        "success": True,
+        "data": {
+            "methods": methods,
+            "available_methods": PaymentMethodService.available_method_catalog(),
+            "default_method_id": default_method_id,
+        },
+    }
 
 @router.post("/payment-methods")
 async def add_payment_method(
-    method_data: dict,
+    method_data: PaymentMethodCreateRequest,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
 ):
     """Add a new payment method"""
-    return {"message": "Payment method added", "id": "new_method_id"}
+    method, created = PaymentMethodService.add_method(
+        db,
+        user_id=current_user.id,
+        method_type=method_data.type,
+        provider_token=method_data.provider_token,
+        provider=method_data.provider,
+        is_default=method_data.is_default,
+        details=method_data.details,
+    )
+    return {
+        "success": True,
+        "message": "Payment method added" if created else "Payment method already exists",
+        "created": created,
+        "method": PaymentMethodService.serialize(method),
+    }
 
 @router.delete("/payment-methods/{method_id}")
 async def remove_payment_method(
-    method_id: str,
+    method_id: int,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
 ):
     """Remove a payment method"""
-    return {"message": "Payment method removed"}
+    PaymentMethodService.delete_method(db, user_id=current_user.id, method_id=method_id)
+    return {"success": True, "message": "Payment method removed", "method_id": method_id}
 
 # Wallet
 @router.get("/balance", response_model=WalletBalanceResponse)
@@ -86,43 +128,15 @@ async def get_wallet_transactions(
         
     return db.exec(statement.order_by(Transaction.created_at.desc()).offset(skip).limit(limit)).all()
 
-from pydantic import BaseModel
-class TransferRequest(BaseModel):
-    recipient_phone: str
-    amount: float
-    note: Optional[str] = None
+# DECONFLICTED P0-B: POST /transfer removed.
+# Canonical handler lives in app/api/v1/wallet_enhanced.py.
+# Legacy handler called WalletService.transfer_balance() which does not exist.
+# Removed 2026-04-06.
 
-@router.post("/transfer", response_model=TransactionResponse)
-async def transfer_to_user(
-    request: TransferRequest,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db)
-):
-    """Transfer money to another user by phone number"""
-    return WalletService.transfer_balance(
-        db, 
-        sender_id=current_user.id, 
-        recipient_phone=request.recipient_phone, 
-        amount=request.amount, 
-        note=request.note
-    )
-
-@router.get("/cashback", response_model=dict)
-async def get_cashback_history(
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db)
-):
-    """Get cashback history and total"""
-    transactions = WalletService.get_cashback_history(db, current_user.id)
-    total_cashback = sum(t.amount for t in transactions)
-    
-    return {
-        "success": True,
-        "data": {
-            "total_cashback": total_cashback,
-            "transactions": [TransactionResponse.model_validate(t) for t in transactions]
-        }
-    }
+# DECONFLICTED P0-B: GET /cashback removed.
+# Canonical handler lives in app/api/v1/wallet_enhanced.py.
+# Legacy handler called WalletService.get_cashback_history() which does not exist.
+# Removed 2026-04-06.
 
 class WithdrawRequest(BaseModel):
     amount: float
@@ -132,6 +146,46 @@ class WithdrawRequest(BaseModel):
     bank_name: Optional[str] = None
     ifsc_code: Optional[str] = None
     upi_id: Optional[str] = None
+
+
+class WalletPayRequest(BaseModel):
+    amount: float
+    description: Optional[str] = None
+
+
+class WithdrawVerifyRequest(BaseModel):
+    pin: str = Field(min_length=4, max_length=12)
+    amount: float = Field(gt=0)
+
+
+@router.post("/withdraw/verify", response_model=dict)
+async def verify_withdrawal_request(
+    req: WithdrawVerifyRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    """
+    Lightweight compatibility endpoint used by mobile clients before submit.
+    Validates PIN format and sufficient wallet balance for the requested amount.
+    """
+    normalized_pin = (req.pin or "").strip()
+    if not normalized_pin.isdigit() or len(normalized_pin) != 4:
+        return {"success": False, "message": "Invalid PIN"}
+
+    profile_pin = (
+        getattr(getattr(current_user, "user_profile", None), "pin_code", None) or ""
+    ).strip()
+    if profile_pin and normalized_pin != profile_pin:
+        return {"success": False, "message": "Invalid PIN"}
+
+    wallet = WalletService.get_wallet(db, current_user.id)
+    requested = WalletService._to_money(req.amount)
+    balance = WalletService._to_money(wallet.balance)
+    if balance < requested:
+        return {"success": False, "message": "Insufficient wallet balance"}
+
+    return {"success": True, "message": "PIN verified"}
+
 
 @router.post("/withdraw", response_model=dict) # Return basic dict or WithdrawalRequest model if schema defined
 @audit_log("WALLET_WITHDRAWAL", "WALLET")
@@ -158,7 +212,38 @@ async def request_withdrawal(
     except HTTPException as e:
         raise e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("withdrawal_request_failed", user_id=current_user.id)
+        raise HTTPException(status_code=500, detail="Withdrawal request failed")
+
+
+@router.post("/pay", response_model=dict)
+@audit_log("WALLET_PAYMENT", "WALLET")
+async def pay_from_wallet(
+    request: Request,
+    req: WalletPayRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    """
+    Deduct amount from wallet for direct in-app payment flows.
+    """
+    try:
+        wallet = WalletService.deduct_balance(
+            db,
+            current_user.id,
+            req.amount,
+            description=req.description or "Wallet payment",
+        )
+        return {
+            "status": "success",
+            "balance": float(wallet.balance),
+            "message": "Payment successful",
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("wallet_payment_failed", user_id=current_user.id)
+        raise HTTPException(status_code=500, detail="Wallet payment failed")
 
 @router.get("/transactions/{payment_id}/receipt")
 async def get_payment_receipt(

@@ -1,5 +1,6 @@
+from __future__ import annotations
 """API Key model for Settings module."""
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from typing import Optional
 from sqlmodel import SQLModel, Field
 

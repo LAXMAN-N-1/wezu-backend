@@ -1,9 +1,10 @@
+from __future__ import annotations
 """
 Rental Repository
 Data access layer for Rental model
 """
 from typing import Optional, List
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from sqlmodel import Session, select
 from app.models.rental import Rental
 from app.repositories.base_repository import BaseRepository
@@ -13,16 +14,16 @@ from pydantic import BaseModel
 class RentalCreate(BaseModel):
     user_id: int
     battery_id: int
-    station_id: int
+    start_station_id: int
     start_time: datetime
-    end_time: datetime
-    rental_fee: float
+    expected_end_time: datetime
+    total_amount: float
 
 
 class RentalUpdate(BaseModel):
     status: Optional[str] = None
-    actual_end_time: Optional[datetime] = None
-    total_fee: Optional[float] = None
+    end_time: Optional[datetime] = None
+    total_amount: Optional[float] = None
 
 
 class RentalRepository(BaseRepository[Rental, RentalCreate, RentalUpdate]):
@@ -62,11 +63,11 @@ class RentalRepository(BaseRepository[Rental, RentalCreate, RentalUpdate]):
         return self.get_multi_by_field(db, "battery_id", battery_id, skip=skip, limit=limit)
     
     def get_overdue_rentals(self, db: Session) -> List[Rental]:
-        """Get all overdue rentals"""
+        """Get all overdue rentals (active rentals past their expected end time)"""
         now = datetime.now(UTC)
         query = select(Rental).where(
             (Rental.status == "active") &
-            (Rental.end_time < now)
+            (Rental.expected_end_time < now)
         )
         return list(db.exec(query).all())
     

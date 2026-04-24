@@ -1,6 +1,7 @@
+from __future__ import annotations
 import os
 import sys
-from datetime import datetime, UTC, timedelta, date
+from datetime import datetime, timedelta, date, timezone; UTC = timezone.utc
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 from sqlmodel import Session, select

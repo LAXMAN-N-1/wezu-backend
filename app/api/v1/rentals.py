@@ -1,7 +1,8 @@
+from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session
 from typing import List, Optional, Any
-from datetime import datetime, UTC, date, timedelta
+from datetime import datetime, date, timedelta, timezone; UTC = timezone.utc
 from pydantic import BaseModel
 from app.api import deps
 from app.models.user import User
@@ -50,7 +51,14 @@ async def read_rentals(
 ):
     """Admin: paginated list of all rentals with filters."""
     from sqlmodel import select
-    statement = select(Rental)
+    from sqlalchemy.orm import selectinload
+    # Eager-load relationships referenced by RentalResponse to avoid N+1:
+    # battery (required) and events (list). start_station/end_station are
+    # rendered as IDs only, so no eager-load needed for them.
+    statement = select(Rental).options(
+        selectinload(Rental.battery),
+        selectinload(Rental.events),
+    )
     if status:
         statement = statement.where(Rental.status == status)
     if user_id:
@@ -59,7 +67,7 @@ async def read_rentals(
         statement = statement.where(Rental.start_station_id == station_id)
     if start_date:
         statement = statement.where(Rental.start_time >= start_date)
-        
+
     return db.exec(statement.offset(skip).limit(limit)).all()
 
 @router.get("/my", response_model=List[RentalResponse])
@@ -185,17 +193,20 @@ async def request_extension(
         raise HTTPException(status_code=400, detail="Rental is not active")
     
     # Calculate extension days and cost
-    extension_days = (req.requested_end_date - rental.end_date).days
+    extension_days = (req.requested_end_date - rental.end_time).days if rental.end_time else 0
     if extension_days <= 0:
         raise HTTPException(status_code=400, detail="Extension date must be after current end date")
     
-    # Simple cost calculation (should be in service)
-    additional_cost = extension_days * rental.daily_rate
+    # Compute daily rate from total_amount and original duration
+    duration_secs = (rental.expected_end_time - rental.start_time).total_seconds() if rental.expected_end_time else 86400
+    original_days = max(1, int(duration_secs / 86400))
+    daily_rate = rental.total_amount / original_days if original_days > 0 else 0
+    additional_cost = extension_days * daily_rate
     
     extension = RentalExtension(
         rental_id=rental_id,
         user_id=current_user.id,
-        current_end_date=rental.end_date,
+        current_end_date=rental.end_time,
         requested_end_date=req.requested_end_date,
         extension_days=extension_days,
         additional_cost=additional_cost,
@@ -228,8 +239,12 @@ async def request_pause(
     if pause_days <= 0:
         raise HTTPException(status_code=400, detail="Invalid pause period")
     
+    # Compute daily rate from total_amount and original duration
+    duration_secs = (rental.expected_end_time - rental.start_time).total_seconds() if rental.expected_end_time else 86400
+    original_days = max(1, int(duration_secs / 86400))
+    daily_rate = rental.total_amount / original_days if original_days > 0 else 0
     # Reduced rate during pause (e.g., 20% of daily rate)
-    daily_pause_charge = rental.daily_rate * 0.2
+    daily_pause_charge = daily_rate * 0.2
     total_pause_cost = daily_pause_charge * pause_days
     
     pause = RentalPause(
@@ -404,69 +419,63 @@ async def request_battery_swap(
     if rental.status != "active":
          raise HTTPException(status_code=400, detail="Rental is not active")
     
-    rental.swap_station_id = req.station_id
-    rental.swap_requested_at = datetime.now(UTC)
+    # Record swap request as a RentalEvent (Rental model has no swap fields)
+    from app.models.rental_event import RentalEvent as SwapRentalEvent
+    swap_event = SwapRentalEvent(
+        rental_id=rental.id,
+        event_type="swap_requested",
+        station_id=req.station_id,
+        battery_id=rental.battery_id,
+        description=f"Swap requested at station #{req.station_id}: {req.reason}",
+    )
+    db.add(swap_event)
     db.add(rental)
     db.commit()
     db.refresh(rental)
     
     return rental
 
-class IssueReport(BaseModel):
-    issue_type: str
-    description: str
-    severity: str = "medium"
+# DECONFLICTED P0-B: POST /{rental_id}/report-issue removed.
+# Canonical handler lives in app/api/v1/rentals_enhanced.py
+# (uses WorkflowAutomationService for ticket notification).
+# Removed 2026-04-06.
 
-@router.post("/{rental_id}/report-issue")
-async def report_rental_issue(
-    rental_id: int,
-    issue: IssueReport,
+# DECONFLICTED P0-B: GET /{rental_id}/receipt removed.
+# Canonical handler lives in app/api/v1/rentals_enhanced.py
+# (returns structured receipt JSON instead of requiring InvoiceService PDF).
+# Removed 2026-04-06.
+
+class PriceCalculationRequest(BaseModel):
+    battery_id: int
+    duration_days: int = 1
+    promo_code: Optional[str] = None
+
+class ConfirmationRequest(BaseModel):
+    payment_reference: str
+
+@router.post("/calculate-price")
+async def calculate_rental_price(
+    req: PriceCalculationRequest,
     current_user: User = Depends(deps.get_current_user),
     db: Session = Depends(deps.get_db)
 ):
-    """Report an issue with a rental"""
-    rental = db.get(Rental, rental_id)
+    from app.services.rental_service import RentalService
+    return RentalService.calculate_price(db, req.battery_id, req.duration_days, req.promo_code)
+
+@router.post("/{rental_id}/confirm", response_model=RentalResponse)
+async def confirm_rental(
+    rental_id: int,
+    req: ConfirmationRequest,
+    current_user: User = Depends(deps.get_current_user),
+    db: Session = Depends(deps.get_db),
+):
+    rental = db.query(Rental).filter(Rental.id == rental_id).first()
     if not rental or rental.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Rental not found")
-    
-    # Create support ticket for the issue
-    from app.models.support import SupportTicket
-    
-    ticket = SupportTicket(
-        user_id=current_user.id,
-        subject=f"Rental Issue - {issue.issue_type}",
-        description=f"Rental ID: {rental_id}\n{issue.description}",
-        category="rental_issue",
-        priority=issue.severity,
-        status="open"
-    )
-    db.add(ticket)
+    rental.status = "ACTIVE"
+    # Note: adding payment_reference logic if model supports it, else ignored.
+    if hasattr(rental, 'payment_reference'):
+        rental.payment_reference = req.payment_reference
     db.commit()
-    db.refresh(ticket)
-    
-    return {
-        "message": "Issue reported successfully",
-        "ticket_id": ticket.id,
-        "status": "open"
-    }
-
-@router.get("/{rental_id}/receipt")
-async def get_rental_receipt_v2(
-    rental_id: int,
-    current_user: User = Depends(deps.get_current_user),
-    db: Session = Depends(deps.get_db)
-):
-    """Generate and stream PDF receipt for a specific rental."""
-    rental = db.get(Rental, rental_id)
-    if not rental or (rental.user_id != current_user.id and not current_user.is_superuser):
-        raise HTTPException(status_code=404, detail="Rental not found")
-    
-    buffer = InvoiceService.generate_rental_invoice(rental_id, db)
-    if not buffer:
-        raise HTTPException(status_code=500, detail="Failed to generate receipt")
-        
-    return StreamingResponse(
-        buffer, 
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=receipt_{rental_id}.pdf"}
-    )
+    db.refresh(rental)
+    return rental

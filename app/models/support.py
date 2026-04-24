@@ -1,4 +1,4 @@
-from datetime import datetime, UTC
+from datetime import datetime, timezone; UTC = timezone.utc
 from typing import Optional, TYPE_CHECKING, List
 from sqlmodel import SQLModel, Field, Relationship
 from enum import Enum
@@ -89,3 +89,12 @@ class ChatMessage(SQLModel, table=True):
     
     # Relationships
     session: "ChatSession" = Relationship(back_populates="messages")
+
+
+class AutoResponse(SQLModel, table=True):
+    __tablename__ = "auto_responses"
+    id: Optional[int] = Field(default=None, primary_key=True)
+    keyword: str = Field(index=True)
+    response: str
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
