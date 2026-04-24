@@ -192,7 +192,11 @@ def list_users(
             statement = statement.where(User.status == status.lower())
 
         if user_type:
-            statement = statement.where(User.user_type == user_type)
+            try:
+                ut = UserType(user_type.strip().upper())
+                statement = statement.where(User.user_type == ut)
+            except ValueError:
+                pass
 
         if kyc_status:
             statement = statement.where(User.kyc_status == kyc_status)

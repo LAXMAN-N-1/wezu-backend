@@ -1,7 +1,6 @@
 from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select, func, text
-from sqlalchemy import inspect as sa_inspect
 from typing import Any, Optional
 from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from app.api import deps
@@ -19,9 +18,10 @@ def _has_inventory_audit_table(db: Session) -> bool:
         return _inventory_audit_table_supported
 
     try:
-        _inventory_audit_table_supported = sa_inspect(db.get_bind()).has_table(
-            "inventory_audit_logs"
-        )
+        result = db.exec(
+            text("SELECT 1 FROM information_schema.tables WHERE table_name='inventory_audit_logs' LIMIT 1")
+        ).first()
+        _inventory_audit_table_supported = result is not None
     except Exception:
         _inventory_audit_table_supported = False
 

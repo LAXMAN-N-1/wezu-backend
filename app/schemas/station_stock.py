@@ -2,7 +2,6 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict
 from typing import List, Optional, Literal
 from datetime import datetime
-import uuid
 
 # --- Stock Overview ---
 class StockOverviewResponse(BaseModel):
@@ -76,7 +75,7 @@ class ReorderRequestCreate(BaseModel):
     reason: Optional[str] = None
 
 class ReorderRequestResponse(BaseModel):
-    id: uuid.UUID
+    id: int
     station_id: int
     requested_quantity: int
     reason: Optional[str] = None

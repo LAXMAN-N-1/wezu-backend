@@ -2,7 +2,6 @@ from __future__ import annotations
 from sqlmodel import SQLModel, Field, Relationship
 from typing import Optional
 from datetime import datetime, timezone; UTC = timezone.utc
-import uuid
 
 class StationStockConfig(SQLModel, table=True):
     __tablename__ = "station_stock_configs" # type: ignore
@@ -21,7 +20,7 @@ class StationStockConfig(SQLModel, table=True):
 class ReorderRequest(SQLModel, table=True):
     __tablename__ = "reorder_requests" # type: ignore
 
-    id: int = Field(default_factory=uuid.uuid4, primary_key=True, index=True)
+    id: Optional[int] = Field(default=None, primary_key=True, index=True)
     station_id: int = Field(foreign_key="stations.id", index=True)
     requested_quantity: int
     reason: Optional[str] = None

@@ -28,7 +28,7 @@ class BatteryBase(BaseModel):
     
 class BatteryCreate(BatteryBase):
     status: Optional[str] = "available"
-    health_status: Optional[str] = "good"
+    health_status: Optional[str] = "GOOD"
     current_charge: float = 100.0
     health_percentage: float = 100.0
     location_type: Optional[str] = "warehouse"
