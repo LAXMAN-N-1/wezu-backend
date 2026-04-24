@@ -34,9 +34,9 @@ services:
     container_name: wezu_mqtt_prod
     restart: unless-stopped
     volumes:
-      - ./mosquitto/config:/mosquitto/config
-      - ./mosquitto/data:/mosquitto/data
-      - ./mosquitto/log:/mosquitto/log
+      - ../../mosquitto/config:/mosquitto/config
+      - ../../mosquitto/data:/mosquitto/data
+      - ../../mosquitto/log:/mosquitto/log
     healthcheck:
       test: [ "CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 | grep -v Error || exit 1" ]
       interval: 30s
@@ -45,7 +45,7 @@ services:
 
   web:
     build:
-      context: ..
+      context: ../..
       dockerfile: Dockerfile
     container_name: wezu_backend_prod
     restart: unless-stopped
@@ -57,7 +57,7 @@ services:
       mqtt:
         condition: service_healthy
     env_file:
-      - ../.env
+      - ../../.env
     environment:
       - MQTT_BROKER_URL=mqtt://mqtt:1883
       - ENVIRONMENT=production
