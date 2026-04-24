@@ -9,6 +9,7 @@ from slowapi.util import get_remote_address
 
 from app.core.config import settings
 from app.core.proxy import extract_forwarded_client_ip
+from app.utils.endpoint_signature import preserve_endpoint_signature
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,21 @@ try:
 except Exception as exc:
     logger.warning("Failed to initialize distributed rate limiter backend; falling back to in-memory: %s", exc)
     limiter = Limiter(key_func=_get_rate_limit_key, storage_uri="memory://")
+
+_base_limit_decorator_factory = limiter.limit
+
+
+def _limit_with_preserved_signature(limit_value: str):
+    base_decorator = _base_limit_decorator_factory(limit_value)
+
+    def decorator(func):
+        wrapped = base_decorator(func)
+        return preserve_endpoint_signature(wrapped, func)
+
+    return decorator
+
+
+limiter.limit = _limit_with_preserved_signature  # type: ignore[assignment]
 
 # Can serve as dependency or direct import
 def limit(limit_value: str):
