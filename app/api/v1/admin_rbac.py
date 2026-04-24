@@ -164,11 +164,9 @@ def create_role(
         
         role_data["parent_id"] = parent_id
     else:
-        # Preset global roles are managed by migration/seed only.
-        raise HTTPException(
-            status_code=400,
-            detail="Global custom role creation is disabled; create dealer child roles only",
-        )
+        # Allow production admins to create global custom roles from Admin UI.
+        role_data["is_custom_role"] = True
+        role_data["scope_owner"] = "global"
 
     role = Role(**role_data)
     db.add(role)
