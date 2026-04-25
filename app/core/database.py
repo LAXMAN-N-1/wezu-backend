@@ -1354,6 +1354,7 @@ def _on_connect(dbapi_connection, connection_record):
     parsed_url = make_url(settings.DATABASE_URL)
 
     if parsed_url.drivername.startswith("sqlite"):
+
         cursor = dbapi_connection.cursor()
         try:
             cursor.execute("PRAGMA journal_mode=WAL")

@@ -23,7 +23,12 @@ if TYPE_CHECKING:
     from app.models.driver_profile import DriverProfile
     from app.models.rbac import Role, UserAccessPath
     from app.models.token import SessionToken
+    from app.models.user_profile import UserProfile
     from app.models.notification_preference import NotificationPreference
+    from app.models.financial import Transaction
+    from app.models.membership import UserMembership
+    from app.models.rental import Rental
+    from app.models.logistics import DeliveryOrder
 
 class UserType(str, Enum):
     CUSTOMER = "CUSTOMER"

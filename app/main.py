@@ -71,7 +71,8 @@ from app.api.v1 import (
     dealer_documents, dealer_portal_roles, dealer_portal_users,
     dealer_analytics, dealer_campaigns, dealer_stations, drivers, catalog,
     admin_invoices, admin_financial_reports, admin_audit, admin_rbac, admin_users,
-    admin_dealers, maintenance, security,
+    admin_dealers, maintenance, security, station_clusters, battery_alerts,
+    admin_user_bulk, dealer_commission, test_reports,
 )
 # Hardened-only endpoints
 from app.api.v1 import (
@@ -120,7 +121,31 @@ logger.info(
     log_requests=settings.LOG_REQUESTS,
 )
 
+from app.api.v1.admin import (
+    support as admin_support, 
+    faqs as admin_faqs, 
+    analytics as admin_analytics, 
+    users as admin_users_sub,
+    promo as admin_coupons,
+    reviews as admin_reviews,
+    roles as admin_roles,
+    legal as admin_legal,
+    banners as admin_banners,
+    media as admin_media,
+    blogs as admin_blogs
+)
+from app.api.admin import router as admin_router
+from app.api.v1.dashboard import router as dashboard_router
+from app.api.webhooks import razorpay as razorpay_webhook
+from app.middleware.rate_limit import limiter
+from app.middleware.audit import AuditMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from app.workers import start_scheduler, stop_scheduler
+from app.services.websocket_service import heartbeat_task
+from app.services.mqtt_service import start_mqtt_service, stop_mqtt_service
 from app.utils.cors import cors_headers_for_origin
+import asyncio
 
 CORS_ALLOWED_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
 CORS_ALLOWED_HEADERS = ["*"]
@@ -468,6 +493,7 @@ app.add_middleware(
 
 @app.get("/live", tags=["System"])
 def live_check():
+
     return {
         "status": "ok",
         "service": "api",
@@ -639,6 +665,8 @@ app.include_router(batteries.router, prefix=f"{v1_str}/batteries", tags=["Batter
 app.include_router(battery_catalog.router, prefix=f"{v1_str}/batteries", tags=["Battery Catalog"])
 app.include_router(rentals.router, prefix=f"{v1_str}/rentals", tags=["Rentals"])
 app.include_router(bookings.router, prefix=f"{v1_str}/bookings", tags=["Bookings"])
+app.include_router(station_clusters.router, prefix=f"{v1_str}/stations", tags=["Customer: Stations"])
+app.include_router(battery_alerts.router, prefix=f"{v1_str}/customer/battery-alerts", tags=["Customer: Battery Alerts"])
 app.include_router(vehicles.router, prefix=f"{v1_str}/vehicles", tags=["Vehicles"])
 app.include_router(swaps.router, prefix=f"{v1_str}/swaps", tags=["Swaps"])
 app.include_router(maintenance.router, prefix=f"{v1_str}/maintenance", tags=["Maintenance"])
@@ -687,6 +715,7 @@ admin_deps = [Depends(deps.get_current_active_admin)]
 app.include_router(global_admin_router, prefix=admin_api, tags=["Admin: Core"], dependencies=admin_deps)
 app.include_router(dashboard_router, prefix=f"{v1_str}/dashboard", tags=["Admin: Dashboard"], dependencies=admin_deps)
 app.include_router(admin_users.router, prefix=f"{admin_api}/users", tags=["Admin: Users"], dependencies=admin_deps)
+app.include_router(admin_user_bulk.router, prefix=f"{v1_str}/admin/users", tags=["Admin User Bulk Operations"], dependencies=admin_deps)
 app.include_router(admin_kyc.router, prefix=f"{admin_api}/kyc", tags=["Admin: KYC"], dependencies=admin_deps)
 app.include_router(admin_stations.router, prefix=f"{admin_api}/stations", tags=["Admin: Stations"], dependencies=admin_deps)
 app.include_router(admin_invoices.router, prefix=f"{admin_api}/invoices", tags=["Admin: Invoices"], dependencies=admin_deps)
@@ -718,6 +747,7 @@ app.include_router(dealer_analytics.router, prefix=f"{dealer_api}/analytics", ta
 app.include_router(dealer_campaigns.router, prefix=f"{dealer_api}/campaigns", tags=["Dealer: Campaigns"], dependencies=dealer_scope_deps)
 app.include_router(dealer_onboarding.router, prefix=f"{dealer_api}/onboarding", tags=["Dealer: Onboarding"], dependencies=dealer_scope_deps)
 app.include_router(dealer_kyc.router, prefix=f"{dealer_api}/onboarding", tags=["Dealer: KYC"])
+app.include_router(dealer_commission.router, prefix=f"{v1_str}/dealer-commission", tags=["Dealer Commission & Settlement"])
 app.include_router(dealer_portal_inventory.router, prefix=f"{dealer_api}/portal", tags=["Dealer: Inventory"], dependencies=dealer_scope_deps)
 
 # ── Logistics ──────────────────────────────────────────────────────────────
@@ -745,6 +775,7 @@ app.include_router(inventory.router, prefix=f"{v1_str}/inventory", tags=["Invent
 app.include_router(ml.router, prefix=f"{v1_str}/ml", tags=["Machine Learning"])
 app.include_router(audit.router, prefix=f"{v1_str}/audit", tags=["Audit Logs"])
 app.include_router(system.router, prefix=v1_str, tags=["System"])
+app.include_router(test_reports.router, prefix=f"{v1_str}/test-reports", tags=["Test Reports"])
 
 # ── Webhooks & Internal ───────────────────────────────────────────────────
 app.include_router(razorpay_webhook.router, prefix="/api/webhooks", tags=["Webhooks"])

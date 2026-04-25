@@ -268,5 +268,9 @@ async def transition_user_state(
             "allowed_next": UserStateService.get_allowed_transitions(user.status),
         }
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=400,
+            content={"error": str(e), "detail": str(e)},
+        )
 

@@ -8,7 +8,7 @@ from app.models.station_heartbeat import StationHeartbeat
 
 from app.models.battery import Battery
 from app.models.rental import Rental
-from app.schemas.station import StationCreate, StationUpdate
+from app.schemas.station import StationCreate, StationUpdate, NearbyStationResponse, NearbyFilterSchema
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta, timezone; UTC = timezone.utc
 from sqlmodel import Session, select, func
@@ -32,8 +32,8 @@ class StationService:
         status: Optional[str] = None,
         is_24x7: Optional[bool] = None,
         sort_by: str = "distance",
-        filters: Optional['NearbyFilterSchema'] = None
-    ) -> List['NearbyStationResponse']:
+        filters: Optional[NearbyFilterSchema] = None
+    ) -> List[NearbyStationResponse]:
         from app.schemas.station import NearbyStationResponse, StationImageResponse, NearbyFilterSchema
         from app.models.battery_catalog import BatteryCatalog
         from sqlalchemy.orm import selectinload
@@ -121,13 +121,7 @@ class StationService:
 
     @staticmethod
     def create_station(db: Session, station_in: StationCreate) -> Station:
-        station = Station(**station_in.dict())
-        db.add(station)
-        db.commit()
-        db.refresh(station)
-        
-        # Generate QR Code Data
-        station.qr_code_data = f"wezu://station/{station.id}"
+        station = Station(**station_in.model_dump())
         db.add(station)
         db.commit()
         db.refresh(station)

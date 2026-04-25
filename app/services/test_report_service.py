@@ -44,6 +44,7 @@ class TestReportService:
                 total_tests=results.get("total_tests", 0),
                 passed=results.get("passed", 0),
                 failed=results.get("failed", 0),
+                skipped=results.get("skipped", 0),
                 failures=results.get("failures"),
                 errors=results.get("errors"),
                 execution_time=exec_time,

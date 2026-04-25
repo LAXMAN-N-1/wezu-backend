@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     from app.models.commission import Commission # If it existed
     from app.models.staff import StaffProfile
     from app.models.settlement import Settlement
+    from app.models.user import User
 # from pydantic import EmailStr
 import sqlalchemy as sa
 from sqlalchemy import JSON
@@ -59,6 +60,7 @@ class DealerProfile(SQLModel, table=True):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
     # Relationships
+
     user: "User" = Relationship(
         back_populates="dealer_profile",
         sa_relationship_kwargs={

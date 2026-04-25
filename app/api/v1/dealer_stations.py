@@ -364,7 +364,7 @@ def submit_new_station(
 ) -> Any:
     """Submit a new station. Will be pending active state."""
     dealer_id = _get_dealer_id(db, current_user.id)
-    result = DealerStationService.submit_station(db, dealer_id, data.dict())
+    result = DealerStationService.submit_station(db, dealer_id, data.model_dump())
     
     log_audit_action(
         db=db,
@@ -376,6 +376,7 @@ def submit_new_station(
     )
     # Note: Service already commits but we add logic here and commit again (audit is pending transaction)
     db.commit()
+    db.refresh(result)
     
     return result
 
@@ -425,7 +426,7 @@ def schedule_maintenance(
 ) -> Any:
     """Schedule future downtime for a station."""
     dealer_id = _get_dealer_id(db, current_user.id)
-    downtime = DealerStationService.schedule_maintenance(db, station_id, dealer_id, data.dict())
+    downtime = DealerStationService.schedule_maintenance(db, station_id, dealer_id, data.model_dump())
     return downtime
 
 

@@ -217,6 +217,7 @@ class BookingService:
             except Exception:
                 logger.exception("Failed to schedule reservation reminder reservation_id=%s", reservation.id)
 
+
         return reservation
 
     @staticmethod

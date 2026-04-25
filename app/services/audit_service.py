@@ -8,7 +8,8 @@ from typing import Optional, Dict, Any
 from sqlmodel import Session, select, func
 from app.core.database import engine
 from app.models.audit_log import AuditLog, SecurityEvent
-from datetime import datetime, timedelta, timezone; UTC = timezone.utc
+from app.utils.audit_context import log_audit_action
+from datetime import datetime, UTC, timedelta, timezone; UTC = timezone.utc
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +147,7 @@ class AuditService:
         metadata: Dict[str, Any],
         ip_address: Optional[str] = None
     ):
-        """Async version for middleware and high-frequency logging."""
+        """Async version for middleware and high-frequency logging using context-aware logging."""
         with Session(engine) as db:
             try:
                 log = AuditLog(
@@ -216,6 +217,63 @@ class AuditService:
                 query = query.where(AuditLog.user_id == user_id)
                 count_query = count_query.where(AuditLog.user_id == user_id)
 
+    async def get_logs_advanced(
+        self,
+        db: Session,
+        user_id: int = None,
+        action: str = None,
+        resource_type: str = None,
+        target_id: int = None,
+        module: str = None,
+        status: str = None,
+        trace_id: str = None,
+        date_from: datetime = None,
+        date_to: datetime = None,
+        page: int = 1,
+        limit: int = 50,
+        level: str = None,
+        is_suspicious: bool = None,
+        ip_address: str = None,
+    ):
+        """Standardized enterprise-grade paginated log retrieval."""
+        query = self._build_query(
+            db=db,
+            user_id=user_id,
+            action=action,
+            resource_type=resource_type,
+            target_id=target_id,
+            module=module,
+            status=status,
+            trace_id=trace_id,
+            date_from=date_from,
+            date_to=date_to,
+            level=level,
+            is_suspicious=is_suspicious,
+            ip_address=ip_address
+        )
+        
+        # Count total
+        count_query = select(func.count()).select_from(query.alias())
+        total_count = db.exec(count_query).one()
+        
+        # Paginated fetch
+        offset = (page - 1) * limit
+        logs = db.exec(query.offset(offset).limit(limit)).all()
+        
+        return {
+            "logs": [log.to_dict() if hasattr(log, "to_dict") else log for log in logs],
+            "total_count": total_count
+        }
+
+    async def get_logs(self, user_id: int = None, page: int = 1, limit: int = 20):
+        """Fetch paginated logs."""
+        with Session(engine) as db:
+            query = select(AuditLog)
+            count_query = select(func.count(AuditLog.id))
+            if user_id:
+                query = query.where(AuditLog.user_id == user_id)
+                count_query = count_query.where(AuditLog.user_id == user_id)
+
             total = int(db.exec(count_query).one() or 0)
             query = query.order_by(AuditLog.timestamp.desc()).offset((page - 1) * limit).limit(limit)
             logs = db.exec(query).all()
@@ -234,6 +292,12 @@ class AuditService:
         target_id: int = None,
         date_from: datetime = None,
         date_to: datetime = None,
+        module: str = None,
+        status: str = None,
+        trace_id: str = None,
+        level: str = None,
+        is_suspicious: bool = None,
+        ip_address: str = None,
     ):
         """Build a filtered query for audit logs (shared by list/export)."""
         query = select(AuditLog)

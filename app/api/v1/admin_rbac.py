@@ -131,7 +131,8 @@ def create_role(
     # 2. Inheritance Logic
     permissions_to_assign = set(role_in.permissions or [])
     
-    parent_id = role_in.parent_role_id or getattr(role_in, "parent_id", None)
+    parent_id = getattr(role_in, "parent_role_id", None) or getattr(role_in, "parent_id", None)
+
     if parent_id:
         parent_role = db.get(Role, parent_id)
         if not parent_role:

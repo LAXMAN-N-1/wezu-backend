@@ -66,7 +66,7 @@ class DealerStationService:
     def update_opening_hours(db: Session, station_id: int, dealer_id: int, hours: str) -> Station:
         """Update opening hours for a station."""
         station = DealerStationService.get_dealer_station(db, station_id, dealer_id)
-        station.opening_hours = hours # Format expected: "09:00-18:00" etc
+        station.operating_hours = hours # Format expected: "09:00-18:00" etc
         db.add(station)
         db.commit()
         db.refresh(station)

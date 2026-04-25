@@ -36,6 +36,9 @@ SQLAlchemy==2.0.48
 sqlmodel>=0.0.16
 structlog==23.2.0
 twilio==9.4.1
-uvicorn==0.24.0
+uvicorn[standard]==0.24.0
+aiofiles==23.2.1
+greenlet==3.2.3
 webauthn>=2.7.1
 googlemaps>=4.10.0
+

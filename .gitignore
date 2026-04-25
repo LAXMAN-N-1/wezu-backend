@@ -1,97 +1,60 @@
-# ── Secrets — NEVER commit ────────────────────────────────────────────────────
+# Environment
 .env
 .env.local
-.env.production
-.env.staging
-*.env
-token.json
 
-# ── Firebase credentials ──────────────────────────────────────────────────────
+# Firebase
 firebase-*.json
-*-firebase-adminsdk-*.json
-google-services.json
 
-# ── Python ────────────────────────────────────────────────────────────────────
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+env/
 build/
+develop-eggs/
 dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
 *.egg-info/
+.installed.cfg
 *.egg
 
-# ── Virtual environments ──────────────────────────────────────────────────────
+# Virtual Environment
 .venv/
 venv/
 wezu_env/
-env/
 
-# ── Logs & debug output ───────────────────────────────────────────────────────
+# Uploads
+uploads/
+.gsd/
+.gemini/
+.agent/
+
+# Logs
 logs/
 *.log
-debug_output.txt
-err.txt
-git_status.txt
-.git_status.txt
-conflicts.txt
-openapi_error.txt
-test_login_output.txt
-test_output_*.txt
 
-# ── Database & cache files ────────────────────────────────────────────────────
+# Database
 *.db
-*.db-shm
-*.db-wal
 *.sqlite
 *_dump.sql
 
-# ── Test / dev caches ─────────────────────────────────────────────────────────
-.pytest_cache/
-.hypothesis/
-.mypy_cache/
-.ruff_cache/
-htmlcov/
-.coverage
-coverage.xml
-
-# ── API collection exports (keep in Insomnia/Postman, not git) ────────────────
-WEZU Energy/
-*.insomnia
-*.postman_collection.json
-
-# ── Root-level debug / fix / test scripts ─────────────────────────────────────
-/test_*.py
-/check_*.py
-/debug_*.py
-/fix_*.py
-/verify_*.py
-/bulk_fix*.py
-/drop_types.py
-/query_neon.py
-/revert_pg*.py
-/targeted_fix*.py
-/validate_imports.py
+# Generated API Docs
 openapi.json
 
-# ── Backup files ──────────────────────────────────────────────────────────────
-*.bak
-requirements.txt.bak
-
-# ── Uploads (use S3/CDN in production) ───────────────────────────────────────
-uploads/
-tmp/
-
-# ── Generated artifacts ───────────────────────────────────────────────────────
-BACKEND_MNC_GRADE_TRACKER.md
-
-# ── Apple / IDE ───────────────────────────────────────────────────────────────
-.DS_Store
-.gsd/
+# IDE
 .vscode/
 .idea/
-.gemini/
-.agent/
-.claude/
+
+# Temp
+*.bak
 walkthrough.md

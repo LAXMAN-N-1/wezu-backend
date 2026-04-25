@@ -561,10 +561,10 @@ def require_role(role_name: str):
     ) -> User:
         if current_user.is_superuser:
             return current_user
-
         required = canonical_role_name(role_name)
         user_role_names = get_user_role_names(current_user)
         if required not in user_role_names:
+
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="insufficient_permissions",

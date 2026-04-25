@@ -5,6 +5,7 @@ from app.core.config import settings
 from app.services.request_audit_queue import request_audit_queue
 from app.core.proxy import get_client_ip
 import time
+import traceback
 
 class AuditMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):

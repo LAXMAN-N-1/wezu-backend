@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 from app.models.user import User, UserStatus
 
 VALID_TRANSITIONS = {
-    UserStatus.PENDING: [UserStatus.VERIFIED],
-    UserStatus.VERIFIED: [UserStatus.ACTIVE],
+    UserStatus.PENDING: [UserStatus.ACTIVE, UserStatus.PENDING_VERIFICATION],
+    UserStatus.PENDING_VERIFICATION: [UserStatus.ACTIVE, UserStatus.SUSPENDED],
     UserStatus.ACTIVE: [UserStatus.SUSPENDED, UserStatus.DELETED],
     UserStatus.SUSPENDED: [UserStatus.ACTIVE, UserStatus.DELETED],
 }
@@ -67,7 +67,7 @@ class UserStateService:
         user.status = new_status_enum
 
         # Sync is_active flag
-        if new_status_enum in (UserStatus.ACTIVE, UserStatus.VERIFIED):
+        if new_status_enum == UserStatus.ACTIVE:
             user.is_active = True
         elif new_status_enum in (UserStatus.SUSPENDED, UserStatus.DELETED):
             user.is_active = False
@@ -98,8 +98,8 @@ class UserStateService:
             resource_type="USER",
             resource_id=str(user_id),
             target_id=user_id,
-            old_value={"status": old_status},
-            new_value={"status": new_status},
+            old_value={"status": str(old_status.value) if hasattr(old_status, "value") else str(old_status)},
+            new_value={"status": str(new_status_enum.value) if hasattr(new_status_enum, "value") else str(new_status)},
         )
 
         logger.info(f"User {user_id} transitioned: {old_status} → {new_status}")

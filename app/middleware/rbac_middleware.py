@@ -46,6 +46,7 @@ class RBACMiddleware(BaseHTTPMiddleware):
                 
                 if token_data.sub:
                     request.state.user_id = int(token_data.sub)
+
                                 
             except ExpiredSignatureError:
                 if settings.AUTH_PROVIDER == "local":
