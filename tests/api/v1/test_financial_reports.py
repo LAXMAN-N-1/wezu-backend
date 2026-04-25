@@ -5,7 +5,7 @@ from sqlmodel import Session, select
 
 UTC = timezone.utc
 
-from app.models.user import User
+from app.models.user import User, UserStatus
 from app.models.roles import RoleEnum
 from app.models.rbac import Role, UserRole
 from app.models.financial import Wallet, Transaction, TransactionType, TransactionStatus
@@ -32,7 +32,7 @@ def admin_and_dealer(session: Session):
     if not admin:
         admin = User(
             email="fin_admin@test.com", hashed_password="pw",
-            is_active=True, is_superuser=True, status="active",
+            is_active=True, is_superuser=True, status=UserStatus.ACTIVE,
         )
         session.add(admin)
         session.commit()
@@ -44,7 +44,7 @@ def admin_and_dealer(session: Session):
     if not dealer:
         dealer = User(
             email="fin_dealer@test.com", hashed_password="pw",
-            is_active=True, status="active",
+            is_active=True, status=UserStatus.ACTIVE,
         )
         session.add(dealer)
         session.commit()

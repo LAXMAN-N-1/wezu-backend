@@ -19,7 +19,11 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column('test_reports', sa.Column('skipped', sa.Integer(), nullable=False, server_default='0'))
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [col['name'] for col in inspector.get_columns('test_reports')]
+    if 'skipped' not in columns:
+        op.add_column('test_reports', sa.Column('skipped', sa.Integer(), nullable=False, server_default='0'))
 
 
 def downgrade() -> None:
