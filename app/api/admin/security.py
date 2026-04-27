@@ -8,6 +8,7 @@ from app.core.database import get_db
 from app.api.deps import get_current_active_admin
 from app.models.user import User
 from app.models.audit_log import AuditLog, SecurityEvent
+from app.models.login_history import LoginHistory
 from app.models.system import SystemConfig
 
 router = APIRouter()
@@ -168,6 +169,51 @@ def list_audit_logs(
                 "old_value": log.old_value, "new_value": log.new_value,
             }
             for log in logs
+        ],
+        "total_count": total,
+    }
+
+
+@router.get("/login-activity")
+def list_login_activity(
+    session: Session = Depends(get_db),
+    skip: int = 0,
+    limit: int = 50,
+    status: Optional[str] = Query(None, description="Filter by login status"),
+    current_user: User = Depends(get_current_active_admin),
+):
+    filters = []
+    if status:
+        filters.append(LoginHistory.status == status)
+
+    total = session.exec(
+        select(func.count(LoginHistory.id)).where(*filters)
+    ).one()
+
+    rows = session.exec(
+        select(LoginHistory, User)
+        .join(User, User.id == LoginHistory.user_id)
+        .where(*filters)
+        .order_by(LoginHistory.timestamp.desc())
+        .offset(skip)
+        .limit(limit)
+    ).all()
+
+    return {
+        "items": [
+            {
+                "id": log.id,
+                "timestamp": log.timestamp,
+                "user_id": user.id,
+                "user_name": user.full_name or user.email or f"User #{user.id}",
+                "email": user.email,
+                "role_name": user.role.name if user.role else user.user_type.value,
+                "ip_address": log.ip_address,
+                "device_browser": log.user_agent,
+                "status": log.status,
+                "is_success": log.status.lower() == "success",
+            }
+            for log, user in rows
         ],
         "total_count": total,
     }
